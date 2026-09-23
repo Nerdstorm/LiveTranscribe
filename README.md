@@ -1,9 +1,14 @@
 # Live Transcribe
 
-On-device, realtime speech-to-text for Apple silicon Macs. Speak into your microphone and the
-transcript appears in a small window, each line cleaned up by a local language model and saved
-to a JSONL file. Every model runs on your Mac with [MLX](https://github.com/ml-explore/mlx-swift):
-no audio or text leaves it.
+On-device speech-to-text for Apple silicon Macs, in two modes:
+
+- **Dictation, in any app.** Hold Fn (🌐), speak, release: the text, cleaned up by a local
+  language model, is typed at the cursor of whatever app you are in.
+- **Live transcript.** Speak into your microphone and the transcript appears in a small window,
+  each line cleaned up and saved to a JSONL file.
+
+Every model runs on your Mac with [MLX](https://github.com/ml-explore/mlx-swift): no audio or
+text leaves it.
 
 The pipeline: microphone → Silero voice activity detection → Parakeet speech-to-text →
 Qwen3-1.7B correction (recognition errors, punctuation, casing and grammar; it does not
@@ -48,21 +53,44 @@ Or open `LiveTranscribe.xcodeproj` in Xcode and choose Run. The shared scheme ru
 build Xcode asks you to trust mlx-swift's `CudaBuild` build-tool plugin, which only does work in
 CUDA builds; `-skipPackagePluginValidation` skips that prompt on the command line.
 
-On first launch the app downloads the models into the Hugging Face cache
-(`~/.cache/huggingface`, shared with the tests, the bench and other Hugging Face tools) and shows
-their progress. **Start Transcribing** becomes available once the models have loaded. If the
-cleanup model fails to load, the app transcribes without cleanup and offers **Retry**. The first
-Start asks for microphone access.
+Live Transcribe runs in the menu bar; it has a Dock icon only while one of its windows is open.
+On first launch it opens **Set Up Dictation**, which asks for microphone and Accessibility access
+(Accessibility lets the dictation shortcut work in every app and type the text), and downloads
+the models into the Hugging Face cache (`~/.cache/huggingface`, shared with the tests, the bench
+and other Hugging Face tools). Dictation and **Start Transcribing** become available once the
+models have loaded. If the cleanup model fails to load, the app transcribes without cleanup and
+offers **Retry**.
 
-Choose the microphone from the menu above the transcript. **System Default** follows the input
-selected in macOS. Your choice is saved and applies from the next Start; it cannot be changed
-while a session is running. If the chosen microphone is disconnected, Start reports it until you
-reconnect it or choose another.
+Choose the microphone from the menu bar's **Microphone** menu or above the transcript. **System
+Default** follows the input selected in macOS, including while you dictate or transcribe, so a
+newly connected microphone is picked up. Virtual and aggregate devices (from Teams, Zoom, audio
+routing tools) are hidden unless you turn on **Show Other Devices**, and are never switched to
+automatically. If a microphone you chose disconnects, capture falls back to the system default,
+tells you, and switches back when it reconnects.
 
-**Settings** (⌘,) holds every tunable: models, cleanup on or off, voice-detection thresholds and
-pre-roll, segment limits, how often the live partial text refreshes, cleanup context, timeout and
-queue size, GPU cache, and how often capture may restart after an error. **Changes apply the next
-time the app starts.** **Restore Defaults** resets these and keeps your microphone choice.
+**Settings** (⌘, or the menu bar) has tabs for dictation (shortcut, cleanup level, microphone),
+snippets, vocabulary, per-app insertion, history and permissions. Dictation settings apply
+immediately. **Advanced** holds the live transcript's tunables: models, voice-detection
+thresholds and pre-roll, segment limits, partial text refresh, cleanup context, timeout and
+queue size, GPU cache, and capture restarts. **Those apply the next time the app starts.**
+
+### Dictation
+
+- **Hold** the shortcut (Fn by default), speak, and release. Text is inserted where the cursor
+  is, through Accessibility, or by pasting for apps that ignore it (your clipboard is put back
+  afterwards). If neither works, the text is left on the clipboard and the floating panel says so.
+- **Double-tap** the shortcut to dictate hands-free; press it again to finish.
+- **Esc** cancels, while recording or while the text is being prepared.
+- **Undo AI Edit** (⌃⌥Z, within 30 seconds) swaps the cleaned text for exactly what you said.
+- **Cleanup level** (menu bar or Settings): *None* inserts the raw transcript; *Light* fixes
+  punctuation, casing and recognition errors only; *Medium* (default) also removes fillers such
+  as "um" and resolves spoken self-corrections ("Monday, no wait, Tuesday" → "Tuesday"); *High*
+  may also reword lightly for grammar.
+- **Snippets**: say a trigger phrase to insert saved text exactly as written.
+- **Vocabulary**: names and jargon the cleanup should spell your way, with the ways you say them.
+- Nothing is typed into password fields. With Fn as the shortcut, set System Settings ›
+  Keyboard › *Press 🌐 key to* to **Do Nothing**, or macOS also acts on the key; Settings warns
+  when it is not.
 
 ### Signing and Gatekeeper
 
@@ -84,13 +112,21 @@ granted again (remove the old entry and add the new build).
   redirects to), to download the models on first launch, and on the next launch after you choose
   a different model in Settings. Downloaded models are reused without contacting Hugging Face
   again.
-- Every session is saved as an unencrypted JSONL file in
+- **Dictation history is on by default.** Every dictation (what you said, the text inserted, the
+  app, the cleanup level and timings) is kept in
+  `~/Library/Application Support/org.nerdstorm.LiveTranscribe/History/` on this Mac only. It is
+  never synced to iCloud or anywhere else. Turn it off, set how long it is kept, or clear it in
+  Settings › History; **Dictation History** in the menu bar shows and searches it.
+- Snippets, vocabulary and per-app insertion choices are JSON files in the same folder, readable
+  only by your account.
+- Every live transcript session is saved as an unencrypted JSONL file in
   `~/Library/Application Support/org.nerdstorm.LiveTranscribe/Sessions/`,
   which the **Sessions** button opens. Each line holds one segment: the raw and cleaned text,
   whether and why cleanup fell back to the raw text, start and end times, per-stage latencies,
   a timestamp and IDs. Files are kept until you delete them.
 - Deleting the app does not delete its data. To remove it, delete
-  `~/Library/Application Support/org.nerdstorm.LiveTranscribe` (sessions),
+  `~/Library/Application Support/org.nerdstorm.LiveTranscribe` (sessions, dictation history,
+  snippets, vocabulary and per-app insertion choices),
   `~/Library/Preferences/org.nerdstorm.LiveTranscribe.plist` (settings) and the models in
   `~/.cache/huggingface/hub` (folders named `models--mlx-community--…`, and `mlx-audio`).
 - Earlier builds ran in the App Sandbox and kept their data in
@@ -126,21 +162,30 @@ redistributed build must carry those notices too.
 ## Project layout
 
 ```
-App/                          SwiftUI app target: window, settings, composition root
+App/                          menu bar app: menu, windows, composition root
 LiveTranscribe.xcodeproj      app project (ad-hoc signed, hardened runtime, no App Sandbox)
-scripts/                      generate-test-audio.sh
+docs/dictation.md             dictation: decisions, assumptions, settings and eval results
+scripts/                      generate-test-audio.sh, generate-dictation-audio.sh
 Packages/LiveTranscribeKit/   all feature code, as vertical slices
   Sources/
-    Shared/          value types, AppSettings, logging, deadline, edit distance
+    Shared/          value types, AppSettings, logging, deadline, edit distance, atomic file writes
     Capture/         AVCaptureSession microphone capture → 16 kHz mono; microphone list and choice
     Segmentation/    Silero VAD + segmentation state machine (pre-roll, hysteresis, max length)
     Transcription/   Parakeet via mlx-audio-swift
     Cleanup/         Qwen3 via mlx-swift-lm, prompt, OutputGuard fallbacks, fine-tuned adapter
-    Persistence/     JSONL session files
+    Persistence/     JSONL session files and dictation history
     Session/         SessionCoordinator (lifecycle) + SessionPipeline (3 concurrent stages)
-    TranscriptUI/    view model and views
+    TranscriptUI/    live transcript view model and views
+    Hotkey/          global shortcut monitor (event tap), hold/double-tap gestures, bindings
+    Permissions/     Accessibility and microphone permission, System Settings links
+    Insertion/       typing at the cursor: Accessibility, paste with clipboard restore, per-app choice
+    Styles/          rule-based filler removal and list formatting
+    Snippets/        trigger phrases and the text they insert
+    Vocabulary/      names and jargon, with how they are spoken
+    Dictation/       DictationController: hotkey → record → transcribe → clean up → insert
+    DictationUI/     menu bar menu, floating panel, setup, Settings tabs, history window
     MLXSupport/      MLX runtime configuration (GPU cache limit)
-    Bench/           command-line tool: WER and per-stage latency over test clips
+    Bench/           command-line tool: WER and latency over test clips, live transcript or dictation
     CleanupTraining/ dataset, LoRA training and evaluation for the cleanup adapter
     Train/           command-line tool: generate, validate, train and evaluate the adapter
   Tests/             Swift Testing; tests that need the models run only when enabled
@@ -151,8 +196,11 @@ Packages/LiveTranscribeKit/   all feature code, as vertical slices
 implementation (the bench and the tests wire their own). The Settings window is the exception: it
 reads and writes the settings in UserDefaults directly. Everything else depends on protocols
 (`AudioSource`, `SpeechSegmenter`, `Transcriber`, `Cleaner`, `SessionSink`,
-`MicrophonePermissionProviding`, and in the UI `SessionControlling` and `InputDeviceSelecting`),
-which the unit tests replace with fakes or, for `SessionSink`, the in-memory `MemorySessionSink`.
+`MicrophonePermissionProviding`, for dictation `HotkeyMonitor`, `FocusedTargetProvider`,
+`TextDelivery`, `DictationHistory` and `AccessibilityPermissionProviding`, and in the UI
+`SessionControlling` and `InputDeviceSelecting`), which the unit tests replace with fakes or, for
+`SessionSink`, the in-memory `MemorySessionSink`. Dictation and the live transcript share one
+instance of each model; they never run at the same time.
 
 ## Tests
 
@@ -168,6 +216,13 @@ with macOS text-to-speech before building the tests:
 
 ```bash
 scripts/generate-test-audio.sh
+```
+
+The dictation eval's 44 clips (`Tests/IntegrationTests/Fixtures/Dictation/clips.tsv`) are
+generated the same way:
+
+```bash
+scripts/generate-dictation-audio.sh
 ```
 
 The end-to-end tests run the real models, downloading them into `~/.cache/huggingface`.
@@ -221,10 +276,44 @@ is the configured 600 ms of silence that closes a segment; lower `vadSilenceMs` 
 more segment splits. The clips are synthetic speech, so measure with real recordings on your own
 hardware before relying on these numbers.
 
+### Dictation eval
+
+```bash
+(cd Packages/LiveTranscribeKit && .build/xcode/Build/Products/Release/Bench --dictation)
+```
+
+Runs the 44 dictation clips (plain sentences, fillers, self-corrections, questions and longer
+passages) through dictation's speech-to-text and cleanup at every cleanup level, and reports per
+level and category the WER against what was *said* and against what was *meant* (fillers dropped,
+self-corrections resolved), the fallbacks, and p50/p95 latency from release to text against the
+target of p95 under 1.2 s. `--level <none|light|medium|high>` (repeatable) limits the levels,
+`--clips <dir>` reads other clips, `--p95-target-ms <n>` changes the target and `--verbose`
+prints every output.
+
+Last run, on an M4 Pro:
+
+| Level | WER vs said | WER vs meant | Fallbacks | p50 (ms) | p95 (ms) |
+|---|---:|---:|---:|---:|---:|
+| None | 1.9% | 24.2% | 0 | 32 | 59 |
+| Light | 2.1% | 23.9% | 0 | 159 | 308 |
+| Medium | 15.5% | 1.8% | 1 | 184 | 386 |
+| High | 15.5% | 1.8% | 1 | 199 | 388 |
+
+Medium resolved all 12 self-corrections and removed the fillers from all 10 filler clips. Every
+level met the latency target. The one fallback (a plain sentence at Medium and High) is the
+self-correction adapter changing a sentence that had nothing to correct; OutputGuard caught it
+and the raw text was inserted.
+
 ## Design notes
 
-- **One window with a Start/Stop button**, rather than a menu-bar app, keeps the proof of concept
-  simple.
+- **A menu bar app.** Dictation has to be available in every app, so Live Transcribe lives in
+  the menu bar (`LSUIElement`) and becomes a regular app with a Dock icon only while one of its
+  windows (transcript, history, Settings, setup) is open.
+- **Dictation reuses the live transcript's models and cleanup** rather than adding a second
+  pipeline: one Parakeet and one Qwen3-1.7B instance serve both. The self-correction adapter is
+  switched on per request, only at Medium and High, so Light never resolves corrections.
+- **The shortcut is read with a `CGEventTap`**, which needs Accessibility. That is also the
+  permission typing into other apps needs, so dictation asks for only two permissions.
 - **Capture uses an input-only `AVCaptureSession`, not `AVAudioEngine`.** On macOS,
   `AVAudioEngine` stops whenever its audio device reconfigures, and a Bluetooth headset
   reconfigures every time its microphone opens, because it switches to its call profile.
@@ -263,6 +352,14 @@ hardware before relying on these numbers.
   words; and cleanup that keeps every cue may not delete a run of spoken words or a negation.
   A correction that moves a word rather than deleting it ("Tell Yasmin, or rather, Victor" →
   "Tell Victor, or rather,") can still get through.
+- **Dictation needs Accessibility, which macOS ties to the app's signature.** Each ad-hoc
+  rebuild is a new app to macOS: remove Live Transcribe from Privacy & Security › Accessibility
+  and add the new build, or the shortcut stops working.
+- The self-correction adapter occasionally rewrites a plain sentence (1 of 44 eval clips);
+  OutputGuard catches it and inserts the raw transcript instead of the cleaned text.
+- Reserved system shortcuts (⌘Space, ⌘Tab, …) are recognised by key position on a US layout, so
+  on other layouts Settings may accept a shortcut that macOS already uses.
+- ⌃⌥Space is allowed as a shortcut but can clash with input-source switching on some Macs.
 - If the app crashes, up to `cleanupQueueCapacity` + 1 segments (9 by default) that were
   transcribed but not yet cleaned are lost: their raw text was on screen but not yet saved.
 - The models come from each repository's `main` branch at first launch and are then reused, so
