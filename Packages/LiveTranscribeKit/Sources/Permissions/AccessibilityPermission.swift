@@ -24,8 +24,9 @@ public protocol AccessibilityPermissionProviding: Sendable {
 ///
 /// The grant is tied to the app's code signature. An ad-hoc signed build gets a new signature
 /// every time it is rebuilt, and macOS then keeps showing the old entry as switched on while
-/// refusing access; removing the entry and adding the app again fixes it. Developer ID builds
-/// keep their grant across updates.
+/// refusing access; removing the entry and adding the app again fixes it. Builds signed with a
+/// certificate (Apple Development locally, see `Config/Signing.xcconfig`, or Developer ID) keep
+/// their grant across rebuilds and updates.
 public struct SystemAccessibilityPermission: AccessibilityPermissionProviding {
     private let pollInterval: Duration
 

@@ -1,0 +1,12 @@
+// Code signing for the LiveTranscribe app target.
+//
+// Builds are signed ad hoc by default ("Sign to Run Locally"), which needs no Apple account. But
+// macOS identifies an ad-hoc build by its hash, so every rebuild loses the Accessibility and
+// microphone permissions. To keep them across rebuilds, sign with your own certificate: copy
+// Signing.local.xcconfig.example to Signing.local.xcconfig (gitignored) and fill it in.
+
+CODE_SIGN_STYLE = Automatic
+CODE_SIGN_IDENTITY = -
+DEVELOPMENT_TEAM =
+
+#include? "Signing.local.xcconfig"

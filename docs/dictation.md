@@ -15,6 +15,7 @@ focus context, Command Mode, multilingual) is not started.
 | D3 | Default cleanup level: Medium. | Handoff |
 | D4 | English only in v1. | Handoff |
 | D5 | Models stay Parakeet TDT 0.6B v3 + Qwen3-1.7B-4bit (+ Silero VAD). No 4B or larger model, now or for Command Mode. | Owner |
+| D6 | Local builds can be signed with a developer's own certificate through a gitignored `Config/Signing.local.xcconfig`, so macOS keeps the Accessibility and microphone grants across rebuilds. An ad-hoc build's designated requirement is its code hash (`cdhash`), which every build changes; a certificate's names the certificate. The committed default stays ad-hoc, so the public repository holds no team ID and builds anywhere. | Owner |
 | H1 | Default hotkey: Fn (🌐), changeable in Settings. Settings open from the menu bar. | Owner |
 | H2 | History is on by default and keeps everything until turned off or given a retention limit. It stays on this Mac and is never synced. | Owner |
 | M1 | With **System Default** selected, capture follows macOS's default input as it changes, including mid-session, so a newly connected microphone (which macOS usually makes the default) is picked up without a restart. Virtual and aggregate devices are never followed automatically. | Owner |
