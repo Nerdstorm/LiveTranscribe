@@ -47,6 +47,17 @@ struct SelfCorrectionTests {
         #expect(review(raw, cleaned) == .rejected(.invalidSelfCorrection))
     }
 
+    @Test func acceptsAFullRetractionEndingInBackToBackCues() {
+        let cleaned = "I returned the jacket to the shop in the shopping centre."
+        let raw = "i returned the jacket to the shop on high street wait no to the shop in the shopping centre"
+        #expect(review(raw, cleaned) == .accepted(cleaned))
+    }
+
+    @Test func backToBackCuesStillLimitTheRetractedWords() {
+        let raw = "i returned the jacket to the big shop on high street wait no to the shop in the centre"
+        #expect(review(raw, "I returned the jacket to the shop in the centre.") == .rejected(.invalidSelfCorrection))
+    }
+
     @Test func rejectsRetractingMoreThanTheLimit() {
         let verdict = review("I want to talk about fuel efficiency in cars sorry busses", "Buses.")
         #expect(verdict == .rejected(.invalidSelfCorrection))
