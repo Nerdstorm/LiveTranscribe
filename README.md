@@ -1,18 +1,201 @@
 # Live Transcribe
 
-On-device speech-to-text for Apple silicon Macs, in two modes:
+**Talk the way you talk. Get the sentence you meant, typed at your cursor in almost any app, and
+not a word leaves your Mac.**
 
-- **Dictation, in any app.** Hold Fn (🌐), speak, release: the text, cleaned up by a local
-  language model, is typed at the cursor of whatever app you are in.
-- **Live transcript.** Speak into your microphone and the transcript appears in a small window,
-  each line cleaned up and saved to a JSONL file.
+Hold **fn (🌐)**, speak, and let go. Live Transcribe turns what you said into clean, punctuated
+text and types it where you are working: a message, an email, a document, a terminal. The "um"s
+are gone. "Monday, no wait, Tuesday" comes out as "Tuesday". Add your names and jargon once, and
+they are spelled your way.
 
-Every model runs on your Mac with [MLX](https://github.com/ml-explore/mlx-swift): no audio or
-text leaves it.
+Speech-to-text and a small language model run on your Apple silicon Mac with
+[MLX](https://github.com/ml-explore/mlx-swift). There is no account, no cloud and no telemetry,
+and once the models are downloaded it works offline. When you would rather watch than type, a
+live transcript window shows your words as you speak and tidies each line in place.
 
-The pipeline: microphone → Silero voice activity detection → Parakeet speech-to-text →
-Qwen3-1.7B correction (recognition errors, punctuation, casing and grammar; it does not
-rephrase) → window and file.
+Free and open source (MIT) · Apple silicon · macOS 14 or later (tested on macOS 27) · English ·
+[build from source](#build-and-run)
+
+## See the difference
+
+Real outputs from the dictation eval, at the default **Medium** cleanup level:
+
+| You say | Live Transcribe types |
+|---|---|
+| Um, I think we should, uh, push the launch by a week | I think we should push the launch by a week. |
+| Let's meet on Monday, no wait, Tuesday | Let's meet on Tuesday. |
+| The budget is fifty thousand, I mean sixty thousand | The budget is 60,000. |
+| We're flying into Boston, scratch that, into New York | We're flying into New York. |
+| Tell Daniel, sorry, tell Maria the draft is ready | Tell Maria the draft is ready. |
+| So, uh, what time does the, um, the train leave | So, what time does the train leave? |
+| I'll be about ten minutes late, the train is running slow today | I'll be about 10 minutes late. The train is running slow today. |
+
+**12 of 12 self-corrections resolved. 10 of 10 filler clips cleaned. 386 ms at p95.** In the
+44-clip dictation eval at Medium, speech-to-text plus cleanup of sentence-length dictations took
+184 ms at p50 and 386 ms at p95, well inside the 1.2 s target.
+
+Measured on an M4 Pro with synthetic speech: the left column is the script a macOS text-to-speech
+voice read aloud. Stopping the recorder and inserting the text are not included in those times.
+One of the 44 clips, a plain sentence, fell back to the uncleaned transcript
+([details](#dictation-eval)).
+
+## What you get
+
+### Say it naturally, get what you meant
+
+- **Fillers disappear.** At **Medium** and **High**, "um", "uh", "er" and "hmm" are removed by a
+  fixed rule, so it happens every time, and words such as "umbrella" are never touched.
+- **Correct yourself out loud.** At Medium and High, say "fuel efficiency in cars, sorry, buses"
+  and "fuel efficiency in buses" is typed. Cues such as "no wait", "I mean", "actually" and
+  "scratch that" work too. The bundled adapter resolved all 12 corrections in the eval, though
+  you should expect lower accuracy on real speech.
+- **A small model, taught a new skill.** A 10 MB fine-tuned adapter, trained in this repository
+  and bundled with the app, resolved 97.3% of the self-corrections in a 515-example held-out
+  test of synthetic sentences (the base model alone: 0.8%). It left 98.4% of look-alike
+  sentences, such as "sorry I'm late", as spoken.
+- **Punctuation and capitals, done.** From **Light** up, the local model fixes punctuation,
+  casing and misheard words.
+- **Spoken lists become numbered lists.** In a multi-line text area (a field macOS reports as a
+  text area, such as a TextEdit document), at Medium or High, say "first… second… and third…"
+  and each item gets its own numbered line.
+- **You choose how much it edits.** Pick **None**, **Light**, **Medium** or **High** from the
+  menu bar in two clicks, and your next dictation uses it.
+- **Undo the AI, keep your words.** Press ⌃⌥Z within 30 seconds, in the field you dictated
+  into, and what you actually said replaces the cleaned text, with your snippets and vocabulary
+  still applied.
+- **A safety net against rewrites.** Every edit is checked. If the model drops a "not", deletes
+  words you said (below High) or rewrites too much, your own words are typed instead, with
+  fillers still removed and lists still formatted at Medium and High.
+
+### Dictate from any app
+
+- **One key, from any app.** Hold the shortcut in whatever app you are in, speak, and let go:
+  the cleaned text is typed at your cursor, with no window to switch to.
+- **Hands-free for longer thoughts.** Double-tap the shortcut, keep talking, and tap once more
+  to finish. A recording keeps up to 5 minutes by default, and you can change that in
+  **Timing**.
+- **Starts when you do.** Recording begins the moment the key goes down, and with **Keep the
+  microphone ready** on, it even keeps the 300 ms before you pressed it.
+- **Unplugged mid-sentence? Nothing heard is thrown away.** If your microphone disconnects
+  during a dictation, capture moves to another microphone after a brief gap. If there is none,
+  the dictation ends, what was heard is typed, and the panel says how many seconds it caught.
+- **Change your mind with Esc.** Esc throws the dictation away while you are talking or while
+  the text is being prepared, and nothing is typed or saved. (Esc needs the shortcut to be on;
+  the **×** on the panel always cancels.)
+- **Always know what it is doing.** A small panel by your cursor (or near the bottom of the
+  screen in apps that don't report the cursor's position), on any display and over full-screen
+  apps, shows a live microphone level, then **Transcribing…**, and never takes focus from your
+  app. If something needs you, it says so in one plain sentence.
+
+### Make it yours
+
+- **Say a phrase, get your saved text.** Say "my calendar link" and the link, address or
+  signature you saved in **Snippets** is inserted exactly as written, line breaks included,
+  because the language model never sees it.
+- **Your names, spelled your way.** Add "Nerdstorm" to **Vocabulary** with how it gets misheard
+  ("nerd storm"), and dictation replaces that mishearing with your spelling, at every cleanup
+  level.
+- **Your terms, in context.** From Light up, the cleanup model is also given up to 50 of your
+  most relevant terms, so it can sometimes catch mishearings you never listed.
+- **The shortcut you like.** Use fn, a single modifier key such as Right ⌥ Option, or a
+  combination such as ⌃⌥Space. The shortcut recorder refuses shortcuts that would break copy,
+  paste or other standard macOS shortcuts, and says why.
+- **fn, sorted.** fn needs macOS's **Press 🌐 key to** setting on **Do Nothing**. Setup and
+  Settings check it and open the right pane for you.
+- **Change anything, no restart.** Shortcuts, the cleanup level, the microphone and 13 timing
+  controls all apply to your next dictation.
+
+### Dependable, app after app
+
+- **Text that lands, and is checked.** Text goes straight into the field through Accessibility,
+  and the app reads the field back to confirm it arrived, leaving your clipboard alone.
+- **Terminals, browsers and Electron apps too.** Where typing through Accessibility isn't
+  accepted, the text is pasted, and then your clipboard is put back as it was, images, files and
+  rich text included.
+- **Ready for your apps.** Seven terminals and ten Electron and Chromium apps (VS Code, Cursor,
+  Slack, Notion, Chrome, Arc and more) are set to paste out of the box, and any other app is a
+  few clicks away in **Settings › Apps**.
+- **Refused text isn't lost.** If an app accepts neither method, the text waits on the
+  clipboard, a note at your cursor says to press ⌘V, and **Copy Last Dictation** in the menu
+  copies it again later.
+- **Spaces where they belong.** Dictate right after a word and a space is added for you, but
+  not after an opening bracket or before a full stop (in apps that let Accessibility read the
+  text before the cursor).
+- **Safe around passwords and app switches.** Dictated text never goes into a password field
+  that macOS marks as secure. If you switch apps while the text is being prepared, it still goes
+  into the field you dictated into, or onto the clipboard when it would have to be pasted, never
+  into the other app.
+- **Your other shortcuts keep working.** fn with the arrow keys, other modifier shortcuts and
+  Esc reach your apps as usual. Esc is taken only while a dictation is in progress.
+- **Never stalls on a frozen app.** Each Accessibility call to another app gives up after
+  250 ms instead of the system default of about 6 s, and text dictated into a Spotlight-style
+  launcher panel goes to the panel, not the app behind it.
+- **Microphones that behave.** When macOS switches to a microphone you plug in, **System
+  Default** follows it. A chosen microphone that goes missing is replaced by another until it
+  returns. Meeting apps' virtual devices are never switched to automatically while a physical
+  microphone is connected.
+- **Bluetooth headsets keep recording.** AirPods and other headsets keep recording when macOS
+  switches them to call mode, instead of restarting in a loop.
+
+### Private by design
+
+- **Nothing leaves your Mac.** All three models run locally with MLX, and after the first
+  download no internet connection is needed.
+- **One set of models, two modes.** Dictation and the live transcript share one copy of each
+  model, about 3 GB of memory with the defaults.
+- **History you control.** Dictations are kept on this Mac only, never synced, and **Dictation
+  History** finds them by what you said, what was typed or the app. Set how long they are kept,
+  or turn history off.
+- **See what the AI changed.** Each entry shows the typed text beside what you said, with
+  **Copy Original** to get your own words back.
+- **Discreet about what you say.** Dictated text is never written to the system log. Pasted
+  text is marked so clipboard managers that honour the nspasteboard.org convention skip it. The
+  app's own VoiceOver announcements wait until you finish dictating, so they aren't dictated
+  along with you.
+
+### A live transcript, too
+
+- **Watch your words appear.** Press **Start Transcribing** and words show up while you are
+  still talking, then each line is cleaned in place.
+- **See every change.** A wand icon marks each line the model corrected, and its tooltip shows
+  the raw text.
+- **Every line in context.** Each line is cleaned with up to three lines before it as context.
+- **Stop without losing the end.** **Stop** turns the microphone off at once, then finishes and
+  saves every line you already spoke.
+- **Every session saved.** Each session is a JSON Lines file with the raw and cleaned text and
+  per-stage timings, ready for your own scripts, and **Copy** puts the whole transcript on the
+  clipboard.
+
+### Easy to start, easy to trust
+
+- **Guided setup.** **Set Up Dictation** walks you through microphone access, Accessibility and
+  the fn key, ticks off each step as soon as macOS reports it, and ends with a practice box.
+- **Problems come with a fix.** The menu bar icon and status line show whether dictation is
+  ready, listening, downloading models or waiting for a permission, and a missing permission
+  comes with a button that opens the right System Settings pane.
+- **Built for VoiceOver.** Setup, Settings, the menu and the history window are labelled for
+  VoiceOver, and status changes are announced.
+- **Open all the way down.** MIT licensed, with more than 1,000 tests, a **Bench** tool that
+  measures accuracy and speed on your own recordings, and a **Train** tool that rebuilds the
+  self-correction adapter on your Mac, in Swift (the bundled one took 30 minutes).
+- **Bring your own models.** Point **Settings › Advanced** at another Hugging Face
+  speech-to-text, cleanup or voice-activity model that the MLX libraries can load. Or turn the
+  language model off, and dictation still removes fillers and formats spoken lists at Medium and
+  High.
+
+## Coming next
+
+Ideas for a later phase. None of this is started, and **none of it is in the app yet**:
+
+- Built-in **"new line"** and **"new paragraph"** commands. Today you can add them yourself as
+  snippets whose text is a line break.
+- Bullet lists without spoken numbers. Today a list needs "first… second…".
+- Paragraph breaks in long dictations.
+- Per-app formatting, such as a greeting and sign-off in email.
+- Per-app tone.
+- Awareness of the focused app's context.
+- **Command Mode**: select text and say how to change it.
+- Multilingual cleanup. Today dictation and cleanup are English only.
 
 ## Status
 
@@ -53,59 +236,202 @@ Or open `LiveTranscribe.xcodeproj` in Xcode and choose Run. The shared scheme ru
 build Xcode asks you to trust mlx-swift's `CudaBuild` build-tool plugin, which only does work in
 CUDA builds; `-skipPackagePluginValidation` skips that prompt on the command line.
 
-Live Transcribe runs in the menu bar; it has a Dock icon only while one of its windows is open.
-On first launch it opens **Set Up Dictation**, which asks for microphone and Accessibility access
-(Accessibility lets the dictation shortcut work in every app and type the text), and downloads
-the models into the Hugging Face cache (`~/.cache/huggingface`, shared with the tests, the bench
-and other Hugging Face tools). Dictation and **Start Transcribing** become available once the
-models have loaded. If the cleanup model fails to load, the app transcribes without cleanup and
-offers **Retry**.
+### First launch
 
-Choose the microphone from the menu bar's **Microphone** menu or above the transcript. **System
-Default** follows the input selected in macOS, including while you dictate or transcribe, so a
-newly connected microphone is picked up. Virtual and aggregate devices (from Teams, Zoom, audio
-routing tools) are hidden unless you turn on **Show Other Devices**, and are never switched to
-automatically. If a microphone you chose disconnects, capture falls back to the system default,
-tells you, and switches back when it reconnects.
+Live Transcribe runs in the menu bar. It has a Dock icon and a main menu only while one of its
+windows is open, and it keeps running when you close them all.
 
-**Settings** (⌘, or the menu bar) has tabs for dictation (shortcut, cleanup level, microphone),
-snippets, vocabulary, per-app insertion, history and permissions. Dictation settings apply
-immediately. **Advanced** holds the live transcript's tunables: models, voice-detection
-thresholds and pre-roll, segment limits, partial text refresh, cleanup context, timeout and
-queue size, GPU cache, and capture restarts. **Those apply the next time the app starts.**
+While dictation is on and a permission is missing, **Set Up Dictation** opens at launch. Its
+steps are **Microphone**, **Accessibility** (which lets the dictation shortcut work in every app
+and type the text), **fn key** (only while fn is the shortcut) and **Try it**, a practice box.
+Every step can be skipped, and each is checked again when you come back from System Settings.
+**Set Up Dictation…** stays in the menu bar menu while a permission is missing.
 
-### Dictation
-
-- **Hold** the shortcut (Fn by default), speak, and release. Text is inserted where the cursor
-  is, through Accessibility, or by pasting for apps that ignore it (your clipboard is put back
-  afterwards). If neither works, the text is left on the clipboard and the floating panel says so.
-- **Double-tap** the shortcut to dictate hands-free; press it again to finish.
-- **Esc** cancels, while recording or while the text is being prepared (with the shortcut on;
-  the × in the floating panel always cancels).
-- **Undo AI Edit** (⌃⌥Z, within 30 seconds, in the field you dictated into) swaps the cleaned
-  text for what you said before cleanup; your snippets and vocabulary stay applied.
-- **Cleanup level** (menu bar or Settings): *None* inserts the raw transcript; *Light* fixes
-  punctuation, casing and recognition errors only; *Medium* (default) also removes fillers such
-  as "um" and resolves spoken self-corrections ("Monday, no wait, Tuesday" → "Tuesday"); *High*
-  may also reword lightly for grammar.
-- **Snippets**: say a trigger phrase to insert saved text exactly as written.
-- **Vocabulary**: names and jargon the cleanup should spell your way, with the ways you say them.
-- Nothing is typed into password fields. With Fn as the shortcut, set System Settings ›
-  Keyboard › *Press 🌐 key to* to **Do Nothing**, or macOS also acts on the key; Settings warns
-  when it is not.
+At the same time the app downloads the models (about 3.5 GB) into the Hugging Face cache
+(`~/.cache/huggingface`, shared with the tests, the bench and other Hugging Face tools). The menu
+bar and the transcript window show the progress. Dictation and **Start Transcribing** become
+available once the models have loaded. If the cleanup model fails to load, the app transcribes
+without cleanup and offers **Retry**.
 
 ### Signing and Gatekeeper
 
 The app is built for Developer ID distribution: it runs outside the App Sandbox (inserting text
 into other apps needs the Accessibility permission, which sandboxed apps cannot use), with the
-Hardened Runtime. That rules out the Mac App Store.
+Hardened Runtime and only the microphone entitlement. That rules out the Mac App Store.
 
 Builds from this repository are ad-hoc signed ("Sign to Run Locally") and not notarized, so they
 run on the Mac that built them. Gatekeeper blocks a copy downloaded onto another Mac; build it
-there instead, or allow it under System Settings › Privacy & Security. To distribute a build, sign
-it with your Developer ID and notarize it. The ad-hoc signature changes with every build, so
-macOS asks for microphone access again after a rebuild, and the Accessibility permission must be
-granted again (remove the old entry and add the new build).
+there instead, or allow it under System Settings › Privacy & Security. To distribute a build,
+sign it with your Developer ID and notarize it.
+
+**The ad-hoc signature changes with every build.** After a rebuild, macOS asks for microphone
+access again, and the Accessibility permission must be granted again: remove the old Live
+Transcribe entry in Privacy & Security › Accessibility and add the new build. Until then the
+shortcut does not work.
+
+## Using Live Transcribe
+
+### Dictation
+
+- **Hold** the shortcut (**fn (🌐)** by default) for at least 300 ms, speak, and release. The
+  text is inserted where the cursor is.
+- **Double-tap** it to dictate hands-free, and press it once more to finish. (**Double-tap the
+  shortcut for hands-free**, on by default.) A single short tap does nothing.
+- **Esc** cancels, while recording or while the text is being prepared. Esc works while the
+  shortcut is running (dictation on and Accessibility granted); the **×** in the floating panel
+  and **Cancel Dictation** in the menu always cancel. A cancelled dictation is neither inserted
+  nor saved.
+- **Start Dictation** in the menu bar starts a hands-free dictation without the shortcut; press
+  the shortcut or choose **Stop Dictation** to finish.
+- The text is inserted in the first way that works:
+  1. **Accessibility**: the text replaces the field's selection, and the app reads the field
+     back to check that it arrived. Your clipboard is not touched.
+  2. **Paste**, for apps that ignore that, or that are set to paste in **Settings › Apps**. The
+     clipboard is saved, the text is pasted with ⌘V, and the clipboard is put back after 250 ms,
+     unless you copied something in the meantime. A paste cannot be verified.
+  3. Otherwise the text is left on the clipboard, and the floating panel says "*App* didn't
+     accept the text. It's on the clipboard: press ⌘V".
+- A space is added before the text when it follows a word, in apps that let Accessibility read
+  the character before the cursor.
+- Nothing is typed or copied into a password field: a field macOS marks as secure, or any field
+  while secure keyboard entry is on. Text inserted through Accessibility goes into the field you
+  dictated into, wherever the focus is by then. If another app has focus by the time the text is
+  ready to paste, the text goes on the clipboard instead.
+- **Undo AI Edit** (⌃⌥Z, within 30 seconds, in the field you dictated into) swaps the cleaned
+  text for what you said before cleanup. Snippets and vocabulary stay applied. It changes nothing
+  if another app or field has focus (click back into the field and try again within the
+  30 seconds) or if the text was edited since. It works between dictations, and at **None** there
+  is nothing to undo.
+- **Copy Last Dictation** puts the last dictated text on the clipboard, until the app quits.
+- Recordings shorter than 300 ms are ignored ("Didn't catch that").
+- Only the first 5 minutes of a recording are kept (**Longest recording** in **Timing**, from
+  10 seconds to 30 minutes). The panel keeps showing **Listening** and doesn't warn at the limit.
+  When you finish, those 5 minutes are inserted and the panel says "Recording stopped at 5 min;
+  the rest wasn't heard".
+- Long dictations have not been measured. Cleanup runs on the whole dictation in one call,
+  within the cleanup timeout (3 s by default). By extrapolation from the eval, a dictation longer
+  than a minute or two will likely exceed it and be inserted uncleaned, with fillers still
+  removed, and without a message.
+- If the microphone stops for good partway (a Bluetooth headset disconnects on a Mac with no
+  other microphone, for example), what was heard is inserted and the floating panel says so.
+- One dictation runs at a time, and none while the live transcript is listening: **Stop Live
+  Transcript** in the menu bar frees the microphone.
+- With fn as the shortcut, set System Settings › Keyboard › **Press 🌐 key to** to **Do
+  Nothing**, or macOS also acts on the key (changing the input source, showing emoji, or starting
+  its own dictation). Setup and Settings warn you until it is set.
+- Change the shortcuts in **Settings › General › Shortcuts**. The **Dictation shortcut** can be
+  one modifier held on its own (fn (🌐), Right ⌘ Command, Right ⌥ Option, Left ⌥ Option, Right ⌃
+  Control, Left ⌃ Control or Right ⇧ Shift) or a combination that includes ⌘, ⌥ or ⌃. **Undo AI
+  edit** must be a combination. Standard macOS shortcuts (⌘C, ⌘V, ⌘Z, ⌘Tab, ⌘Space, ⌃Space and
+  others) are refused.
+
+### Cleanup levels
+
+| Level | What cleanup changes |
+|---|---|
+| **None** | Nothing. The transcript is inserted as heard, with your snippets and vocabulary applied. |
+| **Light** | Punctuation, casing and misheard words. Fillers and self-corrections are kept as spoken; the model is told not to add or remove words (it may drop a repeated word such as "the the"). |
+| **Medium** (default) | Light, plus: fillers such as "um" are removed, spoken self-corrections are resolved ("Monday, no wait, Tuesday" → "Tuesday"), and spoken lists become numbered lines in multi-line text areas. |
+| **High** | Medium, plus light rewording for grammar and clarity. On a 1.7B model it behaves close to Medium. |
+
+- Choose the level from **Cleanup** in the menu bar or in **Settings › General › Cleanup**. It
+  applies to dictation and the live transcript. Snippets, vocabulary and list formatting apply to
+  dictation only.
+- Self-correction cues are "sorry", "I mean", "I meant", "no", "wait", "rather", "actually",
+  "make that", "scratch that" and "correction". The bundled adapter resolves them at Medium and
+  High only (**Resolve spoken self-corrections** in **Settings › Advanced**, on by default).
+- A list needs spoken ordinals in order, starting with "first" ("first", "second", … or
+  "firstly", …), at least two, each starting a clause; "finally" or "lastly" may end it. The
+  ordinals become numbers, each item starts with a capital, and the joining "and"/"then" and the
+  punctuation between items go; no other words change. Lists are formatted only in multi-line
+  text areas (fields macOS reports as a text area).
+- OutputGuard checks every output of the model. If the output is empty or chatty, drops a
+  correction cue without a genuine self-correction, deletes a run of spoken words (below High),
+  drops a negation, alters a snippet placeholder, changes the word count or the text too much, or
+  takes longer than 3 s (**Timeout** in **Settings › Advanced**), the uncleaned text is used
+  instead, with fillers still removed and lists still formatted. In dictation this is silent:
+  **Dictation History** shows it and the reason, if history is on.
+- With **Clean up transcripts with the LLM** off in **Settings › Advanced**, nothing is reworded.
+  In dictation, Medium and High still remove fillers and format lists, and snippets and
+  vocabulary still apply; the live transcript shows the raw text. The switch applies at the next
+  launch.
+
+### Snippets, vocabulary and apps
+
+- **Settings › Snippets**: a **Trigger phrase** and the **Text to insert**. Triggers match whole
+  words, ignoring case and punctuation. The text is inserted exactly as written, line breaks
+  included, at every cleanup level; the language model sees only a placeholder.
+- **Settings › Vocabulary**: a **Term**, spelled as you want it written, and optional **Spoken
+  variants**, one per line. Each variant is replaced by the term at every level ("I work at nerd
+  storm." → "I work at Nerdstorm."). Terms with distinctive casing, such as GitHub or macOS, are
+  also re-cased wherever they appear. From Light up, each dictation also gives the cleanup model
+  up to 50 of the most relevant terms (**Vocabulary terms per dictation** in **Timing**).
+- **Settings › Apps**: **Accessibility** or **Paste** for any app. Built in, paste is used for
+  Terminal, iTerm2, Warp, Ghostty, Alacritty, kitty, WezTerm, VS Code, Cursor, Slack, Discord,
+  Notion, Figma, Chrome, Brave, Edge and Arc. Your setting wins over a built-in one.
+- The three lists are JSON files you can also edit by hand. A damaged file (one that can't be
+  decoded) is renamed to `<name>.corrupt-<timestamp>` rather than overwritten, and Settings says
+  where it went.
+
+### Dictation History
+
+**Dictation History…** in the menu bar lists saved dictations, newest first. Search matches the
+inserted text, what you said and the app, ignoring case and accents. Each entry shows both texts,
+the app, the cleanup level, whether cleanup fell back and why, how the text was delivered, the
+audio length and the latency, with **Copy**, **Copy Original** and **Delete**.
+
+In **Settings › History**: **Keep dictation history** (on by default), **Keep dictations for**
+(Forever, 7 days, 30 days, 90 days or 1 year), **Show History…** and **Clear History…**. Expired
+dictations are deleted at launch, when settings change, and every hour while the app runs.
+
+### Live transcript
+
+**Live Transcript…** in the menu bar opens the window. **Start Transcribing** (⌘R) starts
+listening. **Stop** releases the microphone at once, then finishes and saves every segment
+already spoken.
+
+- Words appear in grey while you speak (every 1,000 ms by default). When you pause, the line
+  shows the raw transcript, then the cleaned text replaces it.
+- A wand icon marks a line the model changed; its tooltip shows the raw text. An orange mark
+  means cleanup was rejected, and its tooltip says why.
+- **Copy** copies the whole transcript. **Sessions** opens the folder of saved sessions.
+- Closing the window stops a transcript that is listening, and **Stop Live Transcript** in the
+  menu bar stops it from any app.
+- A segment ends after 600 ms of silence, is split at 15 s, and is dropped as noise with less
+  than 250 ms of speech. Each line is cleaned with the 3 previous lines as context.
+
+### Microphones
+
+Choose the microphone from the menu bar's **Microphone** menu, above the transcript, or in
+**Settings › General**; all three show the same list and the same choice. **System Default**
+follows the input selected in macOS, including while you dictate or transcribe, so a newly
+connected microphone is picked up when macOS makes it the default input. Virtual and aggregate
+devices (from Teams, Zoom, audio routing tools) are hidden unless you turn on **Show Other
+Devices** (**Show other devices** in Settings), and are never switched to automatically while a
+physical microphone is connected. If a microphone you chose disconnects, capture falls back to
+the system default, tells you, and switches back when it reconnects.
+
+**Keep the microphone ready** (**Settings › General**, off by default) keeps the microphone open
+between dictations, so dictation starts faster and keeps the 300 ms before you pressed the key.
+macOS's microphone indicator then stays on while the app runs.
+
+### Settings
+
+**Settings** (⌘, or the menu bar) has seven tabs:
+
+| Tab | What it holds |
+|---|---|
+| **General** | **Enable dictation**, the shortcuts, the cleanup level, the microphone, **Keep the microphone ready**, and **Timing**: 13 controls for gestures, recording limits, undo, messages, pasting, Accessibility and vocabulary |
+| **Snippets** | trigger phrases and the text they insert |
+| **Vocabulary** | names and jargon, with how they are spoken |
+| **Apps** | the insertion method per app |
+| **History** | dictation history on or off, retention, clearing |
+| **Permissions** | microphone and Accessibility status, with buttons that open the right System Settings pane |
+| **Advanced** | for dictation and the live transcript: the speech-to-text and cleanup models, **Clean up transcripts with the LLM**, **Resolve spoken self-corrections**, the cleanup **Timeout**, the GPU cache and capture restarts; for the live transcript only: the voice-activity model, silence, speech threshold, pre-roll and minimum speech, maximum segment length, live partials, context segments and queue capacity |
+
+Settings on every tab but **Advanced** apply immediately, to the next dictation. **Settings on
+the Advanced tab apply the next time the app starts.** Its **Restore Defaults** resets only that
+tab: dictation settings, shortcuts, cleanup level, history and microphone stay as they are.
 
 ## Privacy
 
@@ -114,18 +440,26 @@ granted again (remove the old entry and add the new build).
   redirects to), to download the models on first launch, and on the next launch after you choose
   a different model in Settings. Downloaded models are reused without contacting Hugging Face
   again.
-- **Dictation history is on by default.** Every dictation (what you said, the text inserted, the
-  app, the cleanup level and timings) is kept in
-  `~/Library/Application Support/org.nerdstorm.LiveTranscribe/History/` on this Mac only. It is
-  never synced to iCloud or anywhere else. Turn it off, set how long it is kept, or clear it in
-  Settings › History; **Dictation History** in the menu bar shows and searches it.
-- Snippets, vocabulary and per-app insertion choices are JSON files in the same folder, readable
-  only by your account.
+- **Dictation history is on by default.** Every completed dictation (what you said, the text
+  inserted, the app, the cleanup level, whether and why cleanup fell back, how the text was
+  delivered, and timings) is kept unencrypted in
+  `~/Library/Application Support/org.nerdstorm.LiveTranscribe/History/dictations.jsonl`, on this
+  Mac only and readable only by your account. It is never synced to iCloud or anywhere else.
+  Cancelled dictations are never saved. Turn history off, set how long it is kept, or clear it in
+  Settings › History; **Dictation History** in the menu bar shows and searches it, and deletes
+  single dictations.
+- Snippets, vocabulary and per-app insertion choices are JSON files in
+  `~/Library/Application Support/org.nerdstorm.LiveTranscribe/` (`snippets.json`,
+  `vocabulary.json`, `insertion-overrides.json`), readable only by your account.
 - Every live transcript session is saved as an unencrypted JSONL file in
-  `~/Library/Application Support/org.nerdstorm.LiveTranscribe/Sessions/`,
-  which the **Sessions** button opens. Each line holds one segment: the raw and cleaned text,
-  whether and why cleanup fell back to the raw text, start and end times, per-stage latencies,
-  a timestamp and IDs. Files are kept until you delete them.
+  `~/Library/Application Support/org.nerdstorm.LiveTranscribe/Sessions/`, which the **Sessions**
+  button opens. Each line holds one segment: the raw and cleaned text, whether and why cleanup
+  fell back to the raw text, start and end times, per-stage latencies, a timestamp and IDs. Files
+  are kept until you delete them.
+- Dictated text is not written to the system log. Transcript text, file paths and device names
+  are logged only as private data, which macOS redacts. Text the app pastes is marked transient,
+  so clipboard managers that honour the nspasteboard.org convention skip it; text left on the
+  clipboard because an app refused it is an ordinary copy.
 - Deleting the app does not delete its data. To remove it, delete
   `~/Library/Application Support/org.nerdstorm.LiveTranscribe` (sessions, dictation history,
   snippets, vocabulary and per-app insertion choices),
@@ -146,11 +480,15 @@ this repository.
 |---|---|---|---|
 | Speech-to-text | [mlx-community/parakeet-tdt-0.6b-v3](https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v3) | [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) by NVIDIA | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
 | Cleanup | [mlx-community/Qwen3-1.7B-4bit](https://huggingface.co/mlx-community/Qwen3-1.7B-4bit) | [Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B) by the Qwen team, Alibaba Cloud | Apache-2.0 |
-| Self-correction adapter | bundled (`Sources/Cleanup/Adapter`) | trained on synthetic data in this repository (`Training/`) | MIT |
+| Self-correction adapter | bundled (`Sources/Cleanup/Adapter`) | trained on synthetic data in this repository ([`Training/`](Packages/LiveTranscribeKit/Training/README.md)) | MIT |
 | Voice activity detection | [mlx-community/silero-vad](https://huggingface.co/mlx-community/silero-vad) | [Silero VAD](https://github.com/snakers4/silero-vad) by the Silero team | MIT |
 
 If you redistribute the Parakeet weights, for example bundled with a build, CC BY 4.0 requires
 you to credit NVIDIA.
+
+Other models can be tried in **Settings › Advanced** (a Hugging Face repository ID for each role;
+it is downloaded on the next launch). They must be models mlx-audio-swift or mlx-swift-lm can
+load, and the self-correction adapter is used only with mlx-community/Qwen3-1.7B-4bit.
 
 Built with [mlx-swift](https://github.com/ml-explore/mlx-swift),
 [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm),
@@ -206,7 +544,7 @@ instance of each model; they never run at the same time.
 
 ## Tests
 
-Unit tests need no models:
+The package has more than 1,000 Swift Testing tests. Unit tests need no models:
 
 ```bash
 (cd Packages/LiveTranscribeKit && xcodebuild test -scheme LiveTranscribeKit-Package -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/xcode -skipPackagePluginValidation -skip-testing:IntegrationTests)
@@ -250,6 +588,7 @@ hard prompt cases, a development aid for prompt changes.
 Options:
 
 - `--fixtures <dir>`: a folder of `.wav` clips, each with a matching `.txt` transcript.
+- `--level <none|light|medium|high>`: the cleanup level (default: Medium).
 - `--no-cleanup`: speech-to-text only.
 - `--no-adapter`: clean up without the fine-tuned self-correction adapter.
 - `--fast`: feed audio as fast as possible instead of in real time. Latency numbers are then
@@ -276,7 +615,8 @@ from Parakeet v2, the previous default; v3 has not been benchmarked yet.**
 WER was 1.0% raw and 1.0% cleaned, with no fallbacks, and all four checks passed. The first row
 is the configured 600 ms of silence that closes a segment; lower `vadSilenceMs` to trade it for
 more segment splits. The clips are synthetic speech, so measure with real recordings on your own
-hardware before relying on these numbers.
+hardware before relying on these numbers. Speech-to-text and cleanup calls are also marked as
+signpost intervals ("STT", "LLM") for Instruments.
 
 ### Dictation eval
 
@@ -287,12 +627,14 @@ hardware before relying on these numbers.
 Runs the 44 dictation clips (plain sentences, fillers, self-corrections, questions and longer
 passages) through dictation's speech-to-text and cleanup at every cleanup level, and reports per
 level and category the WER against what was *said* and against what was *meant* (fillers dropped,
-self-corrections resolved), the fallbacks, and p50/p95 latency from release to text against the
-target of p95 under 1.2 s. `--level <none|light|medium|high>` (repeatable) limits the levels,
-`--clips <dir>` reads other clips, `--p95-target-ms <n>` changes the target and `--verbose`
-prints every output.
+self-corrections resolved), the fallbacks, and p50/p95 latency against the target of p95 under
+1.2 s. Latency here is speech-to-text plus cleanup; stopping the recorder and inserting the text
+are not included. `--level <none|light|medium|high>` (repeatable) limits the levels,
+`--clips <dir>` reads other clips, `--p95-target-ms <n>` changes the target, `--no-adapter`
+cleans up without the adapter and `--verbose` prints every output, with the reason for each
+fallback.
 
-Last run, on an M4 Pro:
+Last run, on an M4 Pro with macOS 27 and synthetic speech:
 
 | Level | WER vs said | WER vs meant | Fallbacks | p50 (ms) | p95 (ms) |
 |---|---:|---:|---:|---:|---:|
@@ -302,20 +644,46 @@ Last run, on an M4 Pro:
 | High | 15.5% | 1.8% | 1 | 199 | 388 |
 
 Medium resolved all 12 self-corrections and removed the fillers from all 10 filler clips. Every
-level met the latency target. The one fallback (a plain sentence at Medium and High) is the
-self-correction adapter changing a sentence that had nothing to correct; OutputGuard caught it
-and the raw text was inserted.
+level met the latency target. The one fallback (the same plain sentence at Medium and High, "I've
+attached the invoice and the signed agreement.") is the self-correction adapter changing a
+sentence that had nothing to correct. OutputGuard caught it (three spoken words dropped at
+Medium; similarity 0.48, below the floor, at High) and the uncleaned transcript was inserted.
+The longest clip is about 30 words, so these numbers say nothing about long dictations.
+
+## Training the adapter
+
+The self-correction adapter is trained on the Mac, in Swift, with the `Train` tool: `generate`
+builds the synthetic dataset, `validate` checks every example against the app's own OutputGuard,
+`train` fine-tunes the adapter and `evaluate` measures it as the app runs it. On 515 held-out
+examples of synthetic sentences it resolved 97.3% of self-corrections (the base model 0.8%) and
+kept 98.4% of look-alike sentences as spoken. On the 95 curated held-out examples alone, written
+separately from the generator's templates, it resolved 39 of 40 corrections. Commands and full
+results are in [Training/README.md](Packages/LiveTranscribeKit/Training/README.md).
 
 ## Design notes
 
+- **Two pipelines, one set of models.** The live transcript runs microphone → Silero voice
+  activity detection → Parakeet speech-to-text → Qwen3-1.7B cleanup at the chosen level → window
+  and JSONL file. Dictation runs shortcut → recording → Parakeet → snippet placeholders and
+  vocabulary → filler rule and Qwen3-1.7B cleanup, checked by OutputGuard → list formatting →
+  snippets restored → text at the cursor. One Parakeet and one Qwen3-1.7B instance serve both.
 - **A menu bar app.** Dictation has to be available in every app, so Live Transcribe lives in
   the menu bar (`LSUIElement`) and becomes a regular app with a Dock icon only while one of its
   windows (transcript, history, Settings, setup) is open.
-- **Dictation reuses the live transcript's models and cleanup** rather than adding a second
-  pipeline: one Parakeet and one Qwen3-1.7B instance serve both. The self-correction adapter is
-  switched on per request, only at Medium and High, so Light never resolves corrections.
+- **The self-correction adapter is switched on per request**, only at Medium and High, so Light
+  never resolves corrections.
+- **The adapter is loaded as separate LoRA layers**, at the exact base-model commit it was
+  trained on, not fused into the weights. Fusing re-quantizes the adapted weights to 4 bits, and
+  the fused adapter resolved only 13% of self-corrections.
+- **Fillers and lists are rules, not model output.** A 1.7B model does neither reliably, and a
+  rule can be tested exhaustively. Fillers are removed before the model runs; lists are formatted
+  after it, only for multi-line text areas.
+- **Snippets are hidden from the model.** Each trigger becomes a placeholder (`⟦S1⟧`) that the
+  model must copy unchanged. OutputGuard rejects any output that alters one, and the saved text
+  goes back in only after cleanup.
 - **The shortcut is read with a `CGEventTap`**, which needs Accessibility. That is also the
-  permission typing into other apps needs, so dictation asks for only two permissions.
+  permission typing into other apps needs, so dictation asks for only two permissions. The tap
+  runs on its own thread, and is re-enabled at once if macOS disables it.
 - **Capture uses an input-only `AVCaptureSession`, not `AVAudioEngine`.** On macOS,
   `AVAudioEngine` stops whenever its audio device reconfigures, and a Bluetooth headset
   reconfigures every time its microphone opens, because it switches to its call profile.
@@ -326,7 +694,8 @@ and the raw text was inserted.
   followed by an assistant turn holding its cleaned text, and the new segment is the last user
   turn. With the context inlined into a single message, the model sometimes echoed the context
   back and OutputGuard rejected the output for its word count. With multi-turn, fallbacks on a
-  set of hard prompt cases went from 1 in 10 to none.
+  set of hard prompt cases went from 1 in 10 to none. Dictation cleans each dictation on its own,
+  without context.
 - **The Hugging Face downloader and tokenizer adapters are hand-written**
   (`Cleanup/HuggingFaceAdapters.swift`) instead of using mlx-swift-lm's `MLXHuggingFace` macros,
   which would need Xcode's macro-trust prompt. That makes `swift-huggingface` and
@@ -334,31 +703,48 @@ and the raw text was inserted.
 - **`mlx-audio-swift` is pinned by revision** (the commit of tag v0.1.3), not by version. It uses
   `unsafeFlags`, which SwiftPM accepts only from packages pinned by revision or by local path.
 
+More decisions, and the assumptions behind them, are in [docs/dictation.md](docs/dictation.md).
+
 ## Known limitations
 
 - **A Bluetooth headset's microphone switches the headset into call mode.** macOS does this
   whenever any app opens a headset microphone: the headset drops to 16 kHz and its playback
   quality falls until capture stops. Transcription works, but for better playback use the
   built-in or a wired microphone while the headset plays audio.
-- Correcting with a 1.7B model does not reliably fix homophones ("cash" → "cache"). That needs a
-  larger model or a domain vocabulary. OutputGuard's similarity floor limits how far the model can
-  change the text.
-- Spoken self-corrections ("fuel efficiency in cars, sorry, buses" → "fuel efficiency in buses")
-  are resolved by a small fine-tuned adapter bundled with the app (Settings › *Resolve spoken
-  self-corrections*). On 515 held-out examples it resolved 97% of self-corrections and kept 98%
-  of look-alike sentences ("sorry I'm late", "I mean, honestly…") as spoken; without it,
-  Qwen3-1.7B resolved under 1%. Its training data is synthetic, so expect lower accuracy on real
-  speech. OutputGuard rejects any cleanup that drops a correction cue ("sorry", "I mean", "no",
-  "wait", "actually", "scratch that", …) unless the only words it removed were up to six
-  retracted words before that cue, the cue itself, fillers such as "um", and immediately repeated
-  words; and cleanup that keeps every cue may not delete a run of spoken words or a negation.
-  A correction that moves a word rather than deleting it ("Tell Yasmin, or rather, Victor" →
-  "Tell Victor, or rather,") can still get through.
 - **Dictation needs Accessibility, which macOS ties to the app's signature.** Each ad-hoc
   rebuild is a new app to macOS: remove Live Transcribe from Privacy & Security › Accessibility
   and add the new build, or the shortcut stops working.
+- **Long dictations are untested.** The eval's longest clip is about 30 words. Cleanup runs on
+  the whole dictation under a 3 s timeout, so a dictation longer than a minute or two will likely
+  be inserted uncleaned (fillers still removed at Medium and High), without a message. Past the
+  recording limit (5 minutes by default) speech is dropped, and the panel says so only when you
+  finish.
+- Correcting with a 1.7B model does not reliably fix homophones ("cash" → "cache"). That needs a
+  larger model; in dictation, a vocabulary entry fixes a specific one. OutputGuard's similarity
+  floor limits how far the model can change the text. **High** behaves close to Medium for the
+  same reason.
+- Spoken self-corrections ("fuel efficiency in cars, sorry, buses" → "fuel efficiency in buses")
+  are resolved by a small fine-tuned adapter trained on synthetic data, so expect lower accuracy
+  on real speech than the 97% it scored on synthetic held-out examples. OutputGuard rejects any
+  cleanup that drops a correction cue ("sorry", "I mean", "no", "wait", "actually", "scratch
+  that", …) unless the only words it removed were up to six retracted words before that cue, the
+  cue itself, fillers such as "um", and immediately repeated words; and cleanup that keeps every
+  cue may not delete a run of spoken words or a negation. A correction that moves a word rather
+  than deleting it ("Tell Yasmin, or rather, Victor" → "Tell Victor, or rather,") can still get
+  through.
 - The self-correction adapter occasionally rewrites a plain sentence (1 of 44 eval clips);
-  OutputGuard catches it and inserts the raw transcript instead of the cleaned text.
+  OutputGuard catches it and inserts the raw transcript instead of the cleaned text. In
+  dictation such a fallback is silent: only **Dictation History** shows it, if history is on.
+- Spoken lists are formatted only when you say the ordinals ("first", "second", …), and only in
+  multi-line text areas.
+- The floating panel sits next to the cursor, and a leading space is added, only in apps that
+  report their text through Accessibility. Elsewhere the panel appears near the bottom of the
+  screen and no space is added.
+- After a pasted dictation, **Undo AI Edit** can't tell whether you typed more in the same field;
+  ⌘Z then undoes that typing first.
+- The microphone opens while the focused field is read, so in a password field the microphone
+  indicator may flash briefly. The recording is thrown away before it is transcribed, and
+  nothing is typed.
 - Reserved system shortcuts (⌘Space, ⌘Tab, …) are recognised by key position on a US layout, so
   on other layouts Settings may accept a shortcut that macOS already uses.
 - ⌃⌥Space is allowed as a shortcut but can clash with input-source switching on some Macs.
