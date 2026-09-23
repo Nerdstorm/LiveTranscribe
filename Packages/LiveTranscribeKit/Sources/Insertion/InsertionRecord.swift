@@ -75,4 +75,10 @@ public enum UndoResult: Sendable, Equatable {
             false
         }
     }
+
+    /// Whether ⌘Z was sent to the app, so the cleaned text may already be gone whatever the
+    /// insert that followed did.
+    public var sentUndoKeystroke: Bool {
+        if case .undoneAndInserted = self { true } else { false }
+    }
 }

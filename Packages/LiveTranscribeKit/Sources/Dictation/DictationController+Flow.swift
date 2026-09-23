@@ -200,7 +200,8 @@ extension DictationController {
         let target = await currentTarget()
         setCaret(target.caretRect)
         let result = await dependencies.delivery.undo(entry.record, replacingWith: entry.uncleaned, in: target)
-        if result.succeeded || result == .copiedToClipboard {
+        if result.succeeded || result.sentUndoKeystroke || result == .copiedToClipboard {
+            // Once ⌘Z has gone to the app, trying again would undo something else.
             undoEntry = nil
         }
         show(Self.notice(for: result))
@@ -237,7 +238,14 @@ extension DictationController {
     static func notice(for result: UndoResult) -> DictationNotice {
         switch result {
         case .replacedInPlace: .undone
-        case .undoneAndInserted(let inserted): inserted.isInserted ? .undone : .undoCopiedToClipboard
+        case .undoneAndInserted(let inserted):
+            switch inserted {
+            case .inserted, .nothingToInsert: .undone
+            case .copiedToClipboard: .undoCopiedToClipboard
+            // Focus turned to a password field between ⌘Z and the insert.
+            case .refusedSecureField: .secureField
+            case .failed: .undoFailed
+            }
         case .copiedToClipboard: .undoCopiedToClipboard
         case .refusedDifferentApp: .undoRefused("Switch back to the app you dictated into to undo")
         case .refusedFocusMoved: .undoRefused("Click back into the field you dictated into to undo")
