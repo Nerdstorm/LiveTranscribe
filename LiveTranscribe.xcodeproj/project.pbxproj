@@ -13,6 +13,7 @@
 /* Begin PBXFileReference section */
 		A10000000000000000000005 /* LiveTranscribe.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LiveTranscribe.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000014 /* LiveTranscribeKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = LiveTranscribeKit; sourceTree = "<group>"; };
+		A10000000000000000000016 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -53,9 +54,18 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000004 /* App */,
+				A10000000000000000000017 /* Config */,
 				A10000000000000000000015 /* Packages */,
 				A10000000000000000000003 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		A10000000000000000000017 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000016 /* Signing.xcconfig */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		A10000000000000000000003 /* Products */ = {
@@ -211,13 +221,11 @@
 		};
 		A10000000000000000000011 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000016 /* Signing.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = App/LiveTranscribe.entitlements;
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -241,14 +249,12 @@
 		};
 		A10000000000000000000012 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000016 /* Signing.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = App/LiveTranscribe.entitlements;
-				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
-				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;

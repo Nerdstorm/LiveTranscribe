@@ -1,0 +1,13 @@
+// Copy to Signing.local.xcconfig, next to this file, to sign your builds with your own
+// certificate. That file is gitignored. macOS then ties Live Transcribe's permissions to the
+// certificate instead of to each build, so they survive rebuilds: grant them once more after
+// switching, and not again while the certificate stays the same.
+//
+// An Apple Development certificate is enough (Xcode › Settings › Accounts creates one, free with
+// any Apple ID). List the ones you have with:
+//     security find-identity -v -p codesigning
+// The team ID is the certificate's organizational unit, also shown under Accounts.
+
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = Apple Development
+DEVELOPMENT_TEAM = YOUR_TEAM_ID
