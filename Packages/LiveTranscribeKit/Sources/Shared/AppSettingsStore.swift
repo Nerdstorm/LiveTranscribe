@@ -94,9 +94,10 @@ public struct AppSettingsStore: Sendable {
         }
     }
 
-    /// Removes every stored value so the registered defaults apply again.
+    /// Removes every stored setting so the registered defaults apply again. The chosen
+    /// microphone stays: it is picked in the main window, not in Settings.
     public func resetToDefaults() {
-        for key in AppSettingsKey.allCases {
+        for key in AppSettingsKey.allCases where key != .inputDeviceUID {
             defaults.removeObject(forKey: key.rawValue)
         }
     }

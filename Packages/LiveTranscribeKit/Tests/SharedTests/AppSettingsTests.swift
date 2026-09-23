@@ -60,7 +60,7 @@ struct AppSettingsTests {
         #expect(settings.sanitized().captureMaxRestartsPerMinute == 1)
     }
 
-    @Test func inputDeviceChoiceRoundTripsAndResets() {
+    @Test func inputDeviceChoiceRoundTrips() {
         let (store, suite) = makeStore()
         defer { UserDefaults().removePersistentDomain(forName: suite) }
         #expect(store.inputDeviceUID == nil, "unset means the system default input")
@@ -68,9 +68,18 @@ struct AppSettingsTests {
         #expect(store.inputDeviceUID == "BuiltInMicrophoneDevice")
         store.setInputDeviceUID("")
         #expect(store.inputDeviceUID == nil)
+    }
+
+    @Test func restoringDefaultsKeepsTheChosenMicrophone() {
+        let (store, suite) = makeStore()
+        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        var settings = AppSettings.defaults
+        settings.vadSilenceMs = 900
+        store.save(settings)
         store.setInputDeviceUID("00-11-22:input")
         store.resetToDefaults()
-        #expect(store.inputDeviceUID == nil)
+        #expect(store.load() == AppSettings.defaults)
+        #expect(store.inputDeviceUID == "00-11-22:input", "the microphone is chosen in the main window, not in Settings")
     }
 
     @Test func defaultsAreAlreadySanitized() {
