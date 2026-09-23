@@ -23,6 +23,10 @@ public enum FallbackReason: Sendable, Equatable, CustomStringConvertible {
     case selfCorrectionNotAllowed
     /// A snippet placeholder was dropped, repeated or altered.
     case placeholderChanged
+    /// A run of spoken words was deleted with nothing in its place, and no cue explains it.
+    case droppedWords(count: Int)
+    /// A negation ("not", "never", "can't") was removed.
+    case lostNegation
     case timedOut(seconds: Double)
     case cancelled
     case generationFailed(String)
@@ -37,6 +41,8 @@ public enum FallbackReason: Sendable, Equatable, CustomStringConvertible {
         case .invalidSelfCorrection: "removed words that were not a self-correction"
         case .selfCorrectionNotAllowed: "resolved a self-correction at a level that keeps every word"
         case .placeholderChanged: "changed a snippet placeholder"
+        case .droppedWords(let count): "dropped \(count) spoken words"
+        case .lostNegation: "dropped a negation"
         case .timedOut(let seconds): String(format: "timed out after %.1fs", seconds)
         case .cancelled: "cancelled"
         case .generationFailed(let message): "generation failed: \(message)"
@@ -62,6 +68,9 @@ public enum GuardVerdict: Sendable, Equatable {
 /// the words the speaker took back and dropping their correction, which is often short enough
 /// to pass the length and similarity limits. At a level that keeps every word (Light), dropping
 /// a cue is always rejected.
+///
+/// Output that keeps every cue is checked by ``DroppedWords``: it may not remove a negation and,
+/// unless the level allows rewording (High), may not delete a run of spoken words outright.
 public struct OutputGuard: Sendable {
     public struct Policy: Sendable, Equatable {
         /// Allowed ratio of the output's word count to the input's, per level. A level missing
@@ -75,6 +84,10 @@ public struct OutputGuard: Sendable {
         public var correctionCues: [String]
         /// Filler words that may be dropped along with a self-correction.
         public var fillers: [String]
+        /// Words that negate what follows; removing one reverses the meaning.
+        public var negations: [String]
+        /// Longest run of spoken words that output keeping every cue may delete outright.
+        public var maxDroppedRun: Int
         /// Most words a self-correction may retract before its cue.
         public var maxRetractedWords: Int
         /// Minimum similarity for a word that was not spoken to count as a respelling of one
@@ -87,6 +100,8 @@ public struct OutputGuard: Sendable {
             preambles: [String],
             correctionCues: [String],
             fillers: [String],
+            negations: [String],
+            maxDroppedRun: Int,
             maxRetractedWords: Int,
             minRespellingSimilarity: Double
         ) {
@@ -95,6 +110,8 @@ public struct OutputGuard: Sendable {
             self.preambles = preambles
             self.correctionCues = correctionCues
             self.fillers = fillers
+            self.negations = negations
+            self.maxDroppedRun = maxDroppedRun
             self.maxRetractedWords = maxRetractedWords
             self.minRespellingSimilarity = minRespellingSimilarity
         }
@@ -117,6 +134,8 @@ public struct OutputGuard: Sendable {
                 "scratch that", "correction",
             ],
             fillers: FillerRemover.standardFillers,
+            negations: ["not", "never", "no", "nothing", "nobody", "none", "neither", "nor", "nowhere", "cannot", "without"],
+            maxDroppedRun: 1,
             maxRetractedWords: 6,
             minRespellingSimilarity: 0.6
         )
@@ -124,10 +143,12 @@ public struct OutputGuard: Sendable {
 
     public let policy: Policy
     private let selfCorrection: SelfCorrection
+    private let droppedWords: DroppedWords
 
     public init(policy: Policy = .default) {
         self.policy = policy
         self.selfCorrection = SelfCorrection(policy: policy)
+        self.droppedWords = DroppedWords(policy: policy)
     }
 
     /// Whether `cleaned` has fewer correction cues than `raw`, so that ``review(raw:outcome:)``
@@ -177,6 +198,12 @@ public struct OutputGuard: Sendable {
             return selfCorrection.isCorrection(raw: rawWords, cleaned: cleanedWords)
                 ? .accepted(cleaned)
                 : .rejected(.invalidSelfCorrection)
+        }
+        if !options.level.allowsRewording, let count = droppedWords.droppedRun(raw: rawWords, cleaned: cleanedWords) {
+            return .rejected(.droppedWords(count: count))
+        }
+        if droppedWords.losesNegation(raw: rawWords, cleaned: cleanedWords) {
+            return .rejected(.lostNegation)
         }
 
         let rawWordCount = EditDistance.words(in: raw).count

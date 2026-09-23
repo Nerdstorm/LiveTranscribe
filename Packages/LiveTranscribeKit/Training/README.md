@@ -72,3 +72,25 @@ cd Packages/LiveTranscribeKit
 
 To ship a new adapter, copy `adapters.safetensors` and `adapter_config.json` from the run folder
 into `Sources/Cleanup/Adapter/`, then rebuild the app.
+
+## Results
+
+The bundled adapter was trained with the defaults (600 iterations, batch 8, learning rate 2e-5,
+rank 8, scale 20, the last 16 layers, curated examples twice) in 30 minutes on an Apple silicon
+Mac; the lowest validation loss, 0.0015, came at iteration 450. `Train evaluate` on the 515 test
+examples (420 generated, 95 curated), shown text matched to the target:
+
+| Category | Base model, strict prompt | With the adapter |
+|---|---:|---:|
+| correction | 2/260 (0.8%) | 253/260 (97.3%) |
+| control | 121/125 (96.8%) | 123/125 (98.4%) |
+| cleanup | 95/100 (95.0%) | 99/100 (99.0%) |
+| boundary | 30/30 (100%) | 30/30 (100%) |
+| cleanup latency p50 / p95 | 138 / 191 ms | 152 / 230 ms |
+
+On the 95 curated examples alone, which were written separately from the generator's templates,
+the adapter matched 92 (corrections 39/40). Most remaining misses fall back to the uncorrected
+text; the rest respell names ("Yasmin" → "Yasmine").
+
+The adapter is loaded as separate LoRA layers, not fused into the model: fusing re-quantizes the
+adapted weights to 4 bits, and the fused adapter resolved only 13% of self-corrections.

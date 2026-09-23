@@ -14,7 +14,7 @@ public struct CleanupAdapter: Sendable, Equatable {
 
     /// Hugging Face id of the model the adapter was trained on.
     public let baseModel: String
-    /// Commit of ``baseModel`` the adapter was trained on. It is only fused into that commit.
+    /// Commit of ``baseModel`` the adapter was trained on. It is only loaded into that commit.
     public let baseRevision: String
     public let directory: URL
 

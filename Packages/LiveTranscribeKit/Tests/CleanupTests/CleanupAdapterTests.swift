@@ -51,6 +51,14 @@ struct CleanupAdapterTests {
         #expect(CleanupAdapter.selected(for: settings, bundled: adapter) == nil)
     }
 
+    @Test func theBundledAdapterMatchesTheDefaultModel() throws {
+        let adapter = try #require(CleanupAdapter.bundled(), "the trained adapter ships in Sources/Cleanup/Adapter")
+        #expect(adapter.baseModel == AppSettings.defaults.llmModel)
+        #expect(adapter.baseRevision.count == 40, "pinned to a commit, not a branch")
+        #expect(CleanupAdapter.selected(for: .defaults, bundled: adapter) == adapter)
+        _ = try adapter.loRAContainer()
+    }
+
     @Test func theAdapterGetsThePromptItWasTrainedOn() throws {
         let adapter = CleanupAdapter(baseModel: "m", baseRevision: commit, directory: URL(fileURLWithPath: "/"))
         let medium = CleanupOptions(level: .medium)

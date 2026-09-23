@@ -11,14 +11,17 @@ import Shared
 /// `clean` before sending the next, and the container serialises access to the model.
 ///
 /// With a ``CleanupAdapter``, the model is loaded at the commit the adapter was trained on and
-/// the adapter is fused into its weights, so generation costs the same as without it. If that
-/// fails, the base model is used, and ``PromptBuilder`` gives every level the strict rules.
+/// the adapter's LoRA layers are loaded alongside its weights. It is not fused into them: fusing
+/// re-quantizes each weight to 4 bits, which rounds away most of the adapter's small change
+/// (held-out self-corrections resolved: 97% unfused, 13% fused). The unfused layers add no
+/// measurable latency. If that fails, the base model is used, and ``PromptBuilder`` gives every
+/// level the strict rules.
 public actor MLXCleaner: Cleaner {
     public struct Configuration: Sendable, Equatable {
         public let modelID: String
         public let contextSegments: Int
         public let timeoutSeconds: Double
-        /// Fine-tuned adapter to fuse into the model, or `nil` for the base model.
+        /// Fine-tuned adapter to load into the model, or `nil` for the base model.
         public let adapter: CleanupAdapter?
         /// One prompt for every request, for prompt experiments; `nil` lets ``PromptBuilder``
         /// compose one per request from its options.
@@ -89,11 +92,11 @@ public actor MLXCleaner: Cleaner {
         if let adapter = configuration.adapter {
             do {
                 let pinned = try await Self.loadModel(modelID, revision: adapter.baseRevision, progress: progress)
-                try await Self.fuse(adapter, into: pinned)
+                try await Self.apply(adapter, to: pinned)
                 loaded = pinned
                 applied = adapter
                 Log.cleanup.info(
-                    "Fused the cleanup adapter trained on \(adapter.baseModel, privacy: .public)@\(adapter.baseRevision.prefix(7), privacy: .public)"
+                    "Loaded the cleanup adapter trained on \(adapter.baseModel, privacy: .public)@\(adapter.baseRevision.prefix(7), privacy: .public)"
                 )
             } catch is CancellationError {
                 throw CancellationError()
@@ -163,10 +166,10 @@ public actor MLXCleaner: Cleaner {
         }
     }
 
-    private static func fuse(_ adapter: CleanupAdapter, into container: ModelContainer) async throws {
+    private static func apply(_ adapter: CleanupAdapter, to container: ModelContainer) async throws {
         let lora = try adapter.loRAContainer()
         try await container.perform(values: lora) { context, lora in
-            try context.model.fuse(with: lora)
+            try context.model.load(adapter: lora)
             eval(context.model)
         }
     }

@@ -95,6 +95,8 @@ struct PromptProbeTests {
         preambles: [],
         correctionCues: [],
         fillers: [],
+        negations: [],
+        maxDroppedRun: .max,
         maxRetractedWords: 0,
         minRespellingSimilarity: 1
     ))
