@@ -15,6 +15,19 @@ struct AppSettingsTests {
         #expect(store.load() == AppSettings.defaults)
     }
 
+    /// Registering defaults posts `UserDefaults.didChangeNotification`; the app applies settings
+    /// from an observer of that notification, so a load that registered would re-trigger itself
+    /// without end (it crashed the app at launch).
+    @Test func loadingNeverRegistersOrWrites() {
+        let (store, suite) = makeStore()
+        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        _ = store.load()
+        // The registration domain is shared by every UserDefaults in the process.
+        let registered = UserDefaults.standard.volatileDomain(forName: UserDefaults.registrationDomain)
+        #expect(registered[AppSettingsKey.dictationHotkey.rawValue] == nil)
+        #expect(UserDefaults(suiteName: suite)?.persistentDomain(forName: suite)?.isEmpty ?? true)
+    }
+
     @Test func savedSettingsRoundTrip() {
         let (store, suite) = makeStore()
         defer { UserDefaults().removePersistentDomain(forName: suite) }

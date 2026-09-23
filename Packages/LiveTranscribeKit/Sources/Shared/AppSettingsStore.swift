@@ -67,21 +67,35 @@ public struct AppSettingsStore: Sendable {
         defaults.register(defaults: Self.dictionary(from: .defaults))
     }
 
-    /// Reads the current settings, sanitised to runnable ranges.
+    /// Reads the current settings, sanitised to runnable ranges. An unset key reads as its
+    /// default.
+    ///
+    /// A pure read: it never registers or writes anything, so it is safe to call on every use and
+    /// from a `UserDefaults.didChangeNotification` observer. (Registering posts that
+    /// notification, so a read that registered would re-trigger its own observer forever.)
     public func load() -> AppSettings {
-        registerDefaults()
         let d = defaults
-        func string(_ key: AppSettingsKey) -> String { d.string(forKey: key.rawValue) ?? "" }
-        func int(_ key: AppSettingsKey) -> Int { d.integer(forKey: key.rawValue) }
-        func double(_ key: AppSettingsKey) -> Double { d.double(forKey: key.rawValue) }
-        func bool(_ key: AppSettingsKey) -> Bool { d.bool(forKey: key.rawValue) }
+        let fallback = Self.dictionary(from: .defaults)
+        func isSet(_ key: AppSettingsKey) -> Bool { d.object(forKey: key.rawValue) != nil }
+        func string(_ key: AppSettingsKey) -> String {
+            isSet(key) ? d.string(forKey: key.rawValue) ?? "" : fallback[key.rawValue] as? String ?? ""
+        }
+        func int(_ key: AppSettingsKey) -> Int {
+            isSet(key) ? d.integer(forKey: key.rawValue) : (fallback[key.rawValue] as? NSNumber)?.intValue ?? 0
+        }
+        func double(_ key: AppSettingsKey) -> Double {
+            isSet(key) ? d.double(forKey: key.rawValue) : (fallback[key.rawValue] as? NSNumber)?.doubleValue ?? 0
+        }
+        func bool(_ key: AppSettingsKey) -> Bool {
+            isSet(key) ? d.bool(forKey: key.rawValue) : (fallback[key.rawValue] as? NSNumber)?.boolValue ?? false
+        }
 
         return AppSettings(
             sttModel: string(.sttModel),
             llmModel: string(.llmModel),
             vadModel: string(.vadModel),
-            cleanupEnabled: d.bool(forKey: AppSettingsKey.cleanupEnabled.rawValue),
-            cleanupAdapterEnabled: d.bool(forKey: AppSettingsKey.cleanupAdapterEnabled.rawValue),
+            cleanupEnabled: bool(.cleanupEnabled),
+            cleanupAdapterEnabled: bool(.cleanupAdapterEnabled),
             cleanupLevel: CleanupLevel(rawValue: string(.cleanupLevel)) ?? AppSettings.defaults.cleanupLevel,
             vadSilenceMs: int(.vadSilenceMs),
             vadSpeechThreshold: double(.vadSpeechThreshold),
