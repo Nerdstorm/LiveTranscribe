@@ -25,6 +25,7 @@ let package = Package(
             ]
         ),
         .executable(name: "Bench", targets: ["Bench"]),
+        .executable(name: "Train", targets: ["Train"]),
     ],
     dependencies: [
         // Pinned exactly. mlx-audio-swift must be pinned by revision (tag v0.1.3) because its
@@ -120,6 +121,12 @@ let package = Package(
                 .product(name: "MLXLLM", package: "mlx-swift-lm"),
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
             ],
+            swiftSettings: strictSwift
+        ),
+
+        .executableTarget(
+            name: "Train",
+            dependencies: ["Shared", "Cleanup", "CleanupTraining", "MLXSupport"],
             swiftSettings: strictSwift
         ),
 

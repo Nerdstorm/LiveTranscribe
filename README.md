@@ -128,7 +128,9 @@ Packages/LiveTranscribeKit/   all feature code, as vertical slices
     MLXSupport/      MLX runtime configuration (GPU cache limit)
     Bench/           command-line tool: WER and per-stage latency over test clips
     CleanupTraining/ dataset, LoRA training and evaluation for the cleanup adapter
+    Train/           command-line tool: generate, validate, train and evaluate the adapter
   Tests/             Swift Testing; tests that need the models run only when enabled
+  Training/          the adapter's dataset, and how it is trained (Training/README.md)
 ```
 
 `App/AppComposition.swift` is the app's composition root: it constructs every concrete slice
