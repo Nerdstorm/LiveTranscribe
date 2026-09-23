@@ -56,6 +56,10 @@ let package = Package(
         // Vocabulary because a module named Dictionary would shadow Swift.Dictionary.
         .target(name: "Vocabulary", dependencies: ["Shared"], swiftSettings: strictSwift),
 
+        // Dictated text into the focused field of any app (Accessibility, then paste, then the
+        // clipboard), per-app overrides, and the insertion half of Undo AI edit.
+        .target(name: "Insertion", dependencies: ["Shared"], swiftSettings: strictSwift),
+
         // Microphone and Accessibility status for dictation, and links to System Settings.
         .target(name: "Permissions", dependencies: ["Shared", "Capture"], swiftSettings: strictSwift),
 
@@ -153,6 +157,7 @@ let package = Package(
         .testTarget(name: "StylesTests", dependencies: ["Styles"], swiftSettings: strictSwift),
         .testTarget(name: "SnippetsTests", dependencies: ["Snippets", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "VocabularyTests", dependencies: ["Vocabulary", "Shared"], swiftSettings: strictSwift),
+        .testTarget(name: "InsertionTests", dependencies: ["Insertion", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "PermissionsTests", dependencies: ["Permissions", "Capture"], swiftSettings: strictSwift),
         .testTarget(name: "DictationTests", dependencies: ["Dictation", "Capture", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "CaptureTests", dependencies: ["Capture", "Shared"], swiftSettings: strictSwift),
