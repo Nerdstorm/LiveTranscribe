@@ -12,7 +12,7 @@ public struct AppSettings: Sendable, Equatable {
     public var vadModel: String
     /// Kill switch for cleanup. When `false` the LLM is never loaded and output is raw-only.
     public var cleanupEnabled: Bool
-    /// Fuses the bundled fine-tuned adapter, which resolves spoken self-corrections ("cars,
+    /// Loads the bundled fine-tuned adapter, which resolves spoken self-corrections ("cars,
     /// sorry, buses" → "buses"), into the cleanup LLM. Applies only to the model it was trained on.
     public var cleanupAdapterEnabled: Bool
     /// Silence that ends a segment.
