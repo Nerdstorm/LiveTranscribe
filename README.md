@@ -89,12 +89,14 @@ macOS may ask for microphone access again after a rebuild.
 ## Models and credits
 
 The app downloads the models from Hugging Face. They are not part of this repository and not
-covered by its licence.
+covered by its licence. The cleanup adapter, a 10 MB LoRA adapter for Qwen3-1.7B, is part of
+this repository.
 
 | Role | Model used | Original model | Licence |
 |---|---|---|---|
 | Speech-to-text | [mlx-community/parakeet-tdt-0.6b-v3](https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v3) | [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) by NVIDIA | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
 | Cleanup | [mlx-community/Qwen3-1.7B-4bit](https://huggingface.co/mlx-community/Qwen3-1.7B-4bit) | [Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B) by the Qwen team, Alibaba Cloud | Apache-2.0 |
+| Self-correction adapter | bundled (`Sources/Cleanup/Adapter`) | trained on synthetic data in this repository (`Training/`) | MIT |
 | Voice activity detection | [mlx-community/silero-vad](https://huggingface.co/mlx-community/silero-vad) | [Silero VAD](https://github.com/snakers4/silero-vad) by the Silero team | MIT |
 
 If you redistribute the Parakeet weights, for example bundled with a build, CC BY 4.0 requires
@@ -238,13 +240,17 @@ hardware before relying on these numbers.
 - Correcting with a 1.7B model does not reliably fix homophones ("cash" → "cache"). That needs a
   larger model or a domain vocabulary. OutputGuard's similarity floor limits how far the model can
   change the text.
-- Spoken self-corrections are normally kept as spoken. The cleanup prompt tells the model to
-  remove nothing, so "fuel efficiency in cars, sorry, buses" usually stays as said rather than
-  becoming "fuel efficiency in buses". Asked to resolve them, Qwen3-1.7B got at most 1 in 7 right
-  and usually kept the words the speaker took back instead of the correction. OutputGuard
-  therefore rejects any cleanup that drops a correction cue ("sorry", "I mean", "no", "wait",
-  "actually", "scratch that", …) unless the only words it removed were up to six retracted words
-  before that cue, the cue itself, fillers such as "um", and immediately repeated words.
+- Spoken self-corrections ("fuel efficiency in cars, sorry, buses" → "fuel efficiency in buses")
+  are resolved by a small fine-tuned adapter bundled with the app (Settings › *Resolve spoken
+  self-corrections*). On 515 held-out examples it resolved 97% of self-corrections and kept 98%
+  of look-alike sentences ("sorry I'm late", "I mean, honestly…") as spoken; without it,
+  Qwen3-1.7B resolved under 1%. Its training data is synthetic, so expect lower accuracy on real
+  speech. OutputGuard rejects any cleanup that drops a correction cue ("sorry", "I mean", "no",
+  "wait", "actually", "scratch that", …) unless the only words it removed were up to six
+  retracted words before that cue, the cue itself, fillers such as "um", and immediately repeated
+  words; and cleanup that keeps every cue may not delete a run of spoken words or a negation.
+  A correction that moves a word rather than deleting it ("Tell Yasmin, or rather, Victor" →
+  "Tell Victor, or rather,") can still get through.
 - If the app crashes, up to `cleanupQueueCapacity` + 1 segments (9 by default) that were
   transcribed but not yet cleaned are lost: their raw text was on screen but not yet saved.
 - The models come from each repository's `main` branch at first launch and are then reused, so
