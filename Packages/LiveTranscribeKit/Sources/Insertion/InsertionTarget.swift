@@ -85,7 +85,9 @@ public struct InsertionTarget: Sendable {
 
 /// Reads the field that currently has keyboard focus.
 ///
-/// A protocol so the dictation flow can be tested without Accessibility permission.
+/// Read when dictation starts and finishes, and again by ``PasteboardTextInserter`` just before
+/// ⌘V. A protocol so the dictation flow and the paste can be tested without Accessibility
+/// permission.
 public protocol FocusedTargetProvider: Sendable {
     func currentTarget() -> InsertionTarget
 }

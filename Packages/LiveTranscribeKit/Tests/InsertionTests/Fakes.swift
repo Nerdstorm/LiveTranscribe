@@ -150,6 +150,35 @@ final class FakeInserter: TextInserter {
     }
 }
 
+/// The keyboard focus as the paste inserter reads it again just before ⌘V; the test moves it.
+final class FakeFocus: FocusedTargetProvider {
+    private let target: Locked<InsertionTarget>
+    private let reads = Locked(0)
+    private let mainThreadReads = Locked(0)
+
+    /// Focus in an ordinary field of `app`.
+    init(app: AppInfo? = Fixtures.textEdit) {
+        target = Locked(Fixtures.target(nil, app: app))
+    }
+
+    /// How many times the focus was read.
+    var readCount: Int { reads.value }
+    /// How many of those reads ran on the main thread, where real Accessibility calls would
+    /// stall the UI.
+    var mainThreadReadCount: Int { mainThreadReads.value }
+
+    /// The user moves focus to a field of `app`: a password field when `secure`.
+    func move(to app: AppInfo?, secure: Bool = false) {
+        target.set(Fixtures.target(nil, app: app, isSecure: secure))
+    }
+
+    func currentTarget() -> InsertionTarget {
+        reads.update { $0 += 1 }
+        if Thread.isMainThread { mainThreadReads.update { $0 += 1 } }
+        return target.value
+    }
+}
+
 /// A value shared between a test and a fake's callback.
 final class Locked<Value: Sendable>: Sendable {
     private let lock: OSAllocatedUnfairLock<Value>

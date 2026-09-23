@@ -28,13 +28,4 @@ struct InsertionSpacingTests {
     func leavesTextAlone(preceding: Character?, text: String) {
         #expect(InsertionSpacing.adjusted(text, after: preceding) == text)
     }
-
-    @Test func readsTheCharacterBeforeTheCursorInUTF16() {
-        #expect(InsertionSpacing.character(before: NSRange(location: 5, length: 0), in: "Hello world") == "o")
-        #expect(InsertionSpacing.character(before: NSRange(location: 0, length: 0), in: "Hello") == nil)
-        #expect(InsertionSpacing.character(before: NSRange(location: 6, length: 0), in: "Hello") == nil)
-        #expect(InsertionSpacing.character(before: NSRange(location: NSNotFound, length: 0), in: "Hello") == nil)
-        // "Hi 👋" is 5 UTF-16 units; the emoji is a surrogate pair.
-        #expect(InsertionSpacing.character(before: NSRange(location: 5, length: 0), in: "Hi 👋") == "👋")
-    }
 }

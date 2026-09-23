@@ -18,15 +18,24 @@ public protocol TextDelivery: Sendable {
 public final class SystemTextDelivery: TextDelivery {
     private let settings: @Sendable () -> AppSettings
     private let overrides: InserterOverridesStore
+    private let focus: any FocusedTargetProvider
     private let pasteboard = SystemPasteboard()
     private let keystrokes = CGEventKeystrokeSender()
     /// The shared paste inserter and the restore delay it was built with; rebuilt when the
     /// delay changes in Settings.
     private let pasteInserter = OSAllocatedUnfairLock<(delayMs: Int, inserter: PasteboardTextInserter)?>(initialState: nil)
 
-    public init(settings: @escaping @Sendable () -> AppSettings, overrides: InserterOverridesStore) {
+    /// - Parameter focus: Read again just before each paste, so ⌘V never goes to a password
+    ///   field or another app that took focus while the dictation was processed. The same
+    ///   provider the dictation flow reads the target with.
+    public init(
+        settings: @escaping @Sendable () -> AppSettings,
+        overrides: InserterOverridesStore,
+        focus: any FocusedTargetProvider
+    ) {
         self.settings = settings
         self.overrides = overrides
+        self.focus = focus
     }
 
     public func insert(_ text: String, into target: InsertionTarget) async -> InsertionResult {
@@ -62,9 +71,12 @@ public final class SystemTextDelivery: TextDelivery {
     private func paste(restoreDelayMs: Int) -> PasteboardTextInserter {
         let pasteboard = pasteboard
         let keystrokes = keystrokes
+        let focus = focus
         return pasteInserter.withLock { cached in
             if let cached, cached.delayMs == restoreDelayMs { return cached.inserter }
-            let inserter = PasteboardTextInserter(pasteboard: pasteboard, keystrokes: keystrokes, restoreDelayMs: restoreDelayMs)
+            let inserter = PasteboardTextInserter(
+                pasteboard: pasteboard, keystrokes: keystrokes, focus: focus, restoreDelayMs: restoreDelayMs
+            )
             cached = (restoreDelayMs, inserter)
             return inserter
         }

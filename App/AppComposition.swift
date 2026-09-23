@@ -98,6 +98,9 @@ final class AppComposition {
 
         let currentSettings: @Sendable () -> AppSettings = { store.load() }
         let dictationSettings = settings.dictation
+        // One reader of the focused field: the flow reads the target with it, and the paste
+        // reads it again just before ⌘V.
+        let focus = SettingsDrivenFocus(settings: currentSettings)
         dictation = DictationController(dependencies: .init(
             hotkeys: CGEventTapHotkeyMonitor(),
             recorder: DictationRecorder(
@@ -115,8 +118,8 @@ final class AppComposition {
                 )
             ),
             processor: DictationProcessor(transcriber: transcriber, cleaner: cleaner),
-            focus: SettingsDrivenFocus(settings: currentSettings),
-            delivery: SystemTextDelivery(settings: currentSettings, overrides: overrides),
+            focus: focus,
+            delivery: SystemTextDelivery(settings: currentSettings, overrides: overrides, focus: focus),
             history: history,
             snippets: { await Self.load("snippets") { try await snippets.all() } },
             vocabulary: { await Self.load("vocabulary") { try await vocabulary.all() } },

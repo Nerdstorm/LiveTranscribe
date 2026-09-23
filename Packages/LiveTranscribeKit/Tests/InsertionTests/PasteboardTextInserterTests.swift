@@ -18,9 +18,10 @@ struct PasteboardTextInserterTests {
 
     private func makeInserter(
         _ pasteboard: FakePasteboard,
-        _ keystrokes: FakeKeystrokes
+        _ keystrokes: FakeKeystrokes,
+        focus: FakeFocus = FakeFocus()
     ) -> PasteboardTextInserter {
-        PasteboardTextInserter(pasteboard: pasteboard, keystrokes: keystrokes, restoreDelayMs: 0)
+        PasteboardTextInserter(pasteboard: pasteboard, keystrokes: keystrokes, focus: focus, restoreDelayMs: 0)
     }
 
     @Test func pastesTheTextThenRestoresEveryItemAndType() async throws {
@@ -93,7 +94,9 @@ struct PasteboardTextInserterTests {
 
     @Test func waitsBeforeRestoring() async throws {
         let pasteboard = FakePasteboard(items: Self.userClipboard)
-        let inserter = PasteboardTextInserter(pasteboard: pasteboard, keystrokes: FakeKeystrokes(), restoreDelayMs: 20)
+        let inserter = PasteboardTextInserter(
+            pasteboard: pasteboard, keystrokes: FakeKeystrokes(), focus: FakeFocus(), restoreDelayMs: 20
+        )
         let clock = ContinuousClock()
         let start = clock.now
 
@@ -106,7 +109,9 @@ struct PasteboardTextInserterTests {
     /// Cancelling after ⌘V must not restore early, or the app would paste the user's clipboard.
     @Test func restoresOnlyAfterTheDelayEvenWhenCancelled() async throws {
         let pasteboard = FakePasteboard(items: Self.userClipboard)
-        let inserter = PasteboardTextInserter(pasteboard: pasteboard, keystrokes: FakeKeystrokes(), restoreDelayMs: 50)
+        let inserter = PasteboardTextInserter(
+            pasteboard: pasteboard, keystrokes: FakeKeystrokes(), focus: FakeFocus(), restoreDelayMs: 50
+        )
         let clock = ContinuousClock()
         let start = clock.now
 
@@ -127,7 +132,9 @@ struct PasteboardTextInserterTests {
             let current = pasteboard.string
             clipboardAtEachPaste.update { $0.append(current) }
         })
-        let inserter = PasteboardTextInserter(pasteboard: pasteboard, keystrokes: keystrokes, restoreDelayMs: 30)
+        let inserter = PasteboardTextInserter(
+            pasteboard: pasteboard, keystrokes: keystrokes, focus: FakeFocus(), restoreDelayMs: 30
+        )
 
         async let first = inserter.insert("first", into: Fixtures.target(nil))
         async let second = inserter.insert("second", into: Fixtures.target(nil))
@@ -137,6 +144,100 @@ struct PasteboardTextInserterTests {
         #expect(Set(pasteboard.transientWrites) == ["first", "second"])
         #expect(Set(clipboardAtEachPaste.value.compactMap { $0 }) == ["first", "second"])
         #expect(pasteboard.restores == 2)
+    }
+
+    // MARK: - Focus checked again just before ⌘V
+
+    /// The target was read before processing; the user tabbed into a password field since.
+    @Test func doesNotPasteOrTouchThePasteboardWhenFocusBecameSecure() async {
+        let pasteboard = FakePasteboard(items: Self.userClipboard)
+        let keystrokes = FakeKeystrokes()
+        let focus = FakeFocus()
+        focus.move(to: Fixtures.textEdit, secure: true)
+
+        await #expect(throws: InsertionError.focusBecameSecure) {
+            try await makeInserter(pasteboard, keystrokes, focus: focus).insert("hunter2", into: Fixtures.target(nil))
+        }
+        #expect(keystrokes.pastes == 0)
+        #expect(pasteboard.changeCount == 0, "the dictated text never reached the pasteboard")
+        #expect(pasteboard.items == Self.userClipboard)
+    }
+
+    /// ⌘V would go to the app that has focus now, not the one dictated into.
+    @Test func doesNotPasteIntoAnotherApp() async {
+        let pasteboard = FakePasteboard(items: Self.userClipboard)
+        let keystrokes = FakeKeystrokes()
+        let focus = FakeFocus()
+        focus.move(to: Fixtures.notes)
+
+        await #expect(throws: InsertionError.focusMovedToAnotherApp) {
+            try await makeInserter(pasteboard, keystrokes, focus: focus).insert("dictated", into: Fixtures.target(nil))
+        }
+        #expect(keystrokes.pastes == 0)
+        #expect(pasteboard.changeCount == 0)
+        #expect(pasteboard.items == Self.userClipboard)
+    }
+
+    @Test func aRelaunchOfTheSameAppIsAnotherApp() async {
+        let focus = FakeFocus()
+        focus.move(to: AppInfo(bundleIdentifier: "com.apple.TextEdit", name: "TextEdit", processIdentifier: 99))
+        let keystrokes = FakeKeystrokes()
+
+        await #expect(throws: InsertionError.focusMovedToAnotherApp) {
+            try await makeInserter(FakePasteboard(), keystrokes, focus: focus).insert("dictated", into: Fixtures.target(nil))
+        }
+        #expect(keystrokes.pastes == 0)
+    }
+
+    @Test func pastesWhenFocusIsStillInTheSameApp() async throws {
+        let focus = FakeFocus()
+        let keystrokes = FakeKeystrokes()
+
+        _ = try await makeInserter(FakePasteboard(), keystrokes, focus: focus).insert("dictated", into: Fixtures.target(nil))
+
+        #expect(keystrokes.pastes == 1)
+        #expect(focus.readCount == 1)
+    }
+
+    /// The re-read makes Accessibility calls to another app; a paste asked for on the main actor
+    /// must still make them elsewhere.
+    @MainActor
+    @Test func readsTheFocusOffTheMainThread() async throws {
+        let focus = FakeFocus()
+        let keystrokes = FakeKeystrokes()
+
+        _ = try await makeInserter(FakePasteboard(), keystrokes, focus: focus).insert("dictated", into: Fixtures.target(nil))
+
+        #expect(keystrokes.pastes == 1)
+        #expect(focus.readCount == 1)
+        #expect(focus.mainThreadReadCount == 0)
+    }
+
+    /// A paste queued behind another checks the focus when its turn comes, not when it was asked.
+    @Test func aQueuedPasteChecksTheFocusWhenItRuns() async throws {
+        let pasteboard = FakePasteboard(items: Self.userClipboard)
+        let focus = FakeFocus()
+        // The first paste lands; then the user tabs into a password field.
+        let keystrokes = FakeKeystrokes(onPaste: { focus.move(to: Fixtures.textEdit, secure: true) })
+        let inserter = PasteboardTextInserter(pasteboard: pasteboard, keystrokes: keystrokes, focus: focus, restoreDelayMs: 30)
+
+        /// The error a paste threw, `nil` if it pasted.
+        func failure(pasting text: String) async -> InsertionError? {
+            do {
+                _ = try await inserter.insert(text, into: Fixtures.target(nil))
+                return nil
+            } catch {
+                return error
+            }
+        }
+        async let first = failure(pasting: "first")
+        async let second = failure(pasting: "second")
+        let failures = await [first, second]
+
+        #expect(keystrokes.pastes == 1)
+        #expect(failures.compactMap { $0 } == [.focusBecameSecure])
+        #expect(pasteboard.transientWrites.count == 1)
+        #expect(pasteboard.items == Self.userClipboard)
     }
 
     @Test func systemPasteboardUsesTheSharedMarkerNames() {

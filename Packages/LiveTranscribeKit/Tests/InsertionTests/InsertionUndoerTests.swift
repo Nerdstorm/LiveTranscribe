@@ -12,6 +12,8 @@ struct InsertionUndoerTests {
         let field: FakeElement
         let pasteboard = FakePasteboard()
         let keystrokes: FakeKeystrokes
+        /// Focus as the paste reads it just before ⌘V: in the app last dictated into.
+        let focus = FakeFocus()
         let undoer: InsertionUndoer
         let router: InsertionRouter
 
@@ -22,16 +24,17 @@ struct InsertionUndoerTests {
                 : FakeKeystrokes(succeeds: false)
             router = InsertionRouter(
                 accessibility: AXTextInserter(verificationDelayMs: 0),
-                paste: PasteboardTextInserter(pasteboard: pasteboard, keystrokes: keystrokes, restoreDelayMs: 0),
+                paste: PasteboardTextInserter(pasteboard: pasteboard, keystrokes: keystrokes, focus: focus, restoreDelayMs: 0),
                 pasteboard: pasteboard,
                 overrides: overrides
             )
             undoer = InsertionUndoer(router: router, keystrokes: keystrokes, settleDelayMs: 0)
         }
 
-        /// Inserts the cleaned text through the router, as dictation would, and records it.
-        /// `seenByAccessibility: false` is an app that hid the field from Accessibility then.
+        /// Inserts the cleaned text through the router, as dictation would with `app` focused, and
+        /// records it. `seenByAccessibility: false` is an app that hid the field from Accessibility then.
         func insertCleaned(app: AppInfo = Fixtures.textEdit, seenByAccessibility: Bool = true) async throws -> InsertionRecord {
+            focus.move(to: app)
             let target = Fixtures.target(seenByAccessibility ? field : nil, app: app)
             let result = await router.insert(InsertionUndoerTests.cleaned, into: target)
             return try #require(InsertionRecord(
@@ -146,7 +149,7 @@ struct InsertionUndoerTests {
         let keystrokes = FakeKeystrokes()
         let router = InsertionRouter(
             accessibility: AXTextInserter(verificationDelayMs: 0),
-            paste: PasteboardTextInserter(pasteboard: pasteboard, keystrokes: keystrokes, restoreDelayMs: 0),
+            paste: PasteboardTextInserter(pasteboard: pasteboard, keystrokes: keystrokes, focus: FakeFocus(), restoreDelayMs: 0),
             pasteboard: pasteboard,
             overrides: .empty
         )

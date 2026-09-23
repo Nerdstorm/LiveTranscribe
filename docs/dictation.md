@@ -78,6 +78,21 @@ focus context, Command Mode, multilingual) is not started.
   dictation. New timing takes effect once the current gesture ends.
 - **Models are shared.** Dictation uses the transcript session's transcriber and cleaner, so they
   load once; dictation is available as soon as the session's models are.
+- **Focus that moves while a dictation is processed.** The field is read when the key is
+  released, and paste goes wherever the focus is when ⌘V is posted, up to seconds later. So paste
+  reads the focus again just before it writes the pasteboard. A secure field now gets nothing,
+  not even a clipboard copy, as if it had been focused all along. Another app now (a different
+  process, so a relaunch counts) gets nothing either: the text goes on the clipboard with the
+  usual *didn't accept the text* notice, which names the app dictated into. Only the app is
+  compared, not the field: tabbing to another field of the same app pastes there, as typing
+  would, and a stricter element comparison could turn pastes into clipboard copies in the apps
+  that are pasted into, whose Accessibility elements are the least dependable. Accessibility
+  insertion writes to the field that was read, wherever the focus is, so it needs no check.
+- **The automatic space needs `AXStringForRange`.** Deciding whether dictated text needs a leading
+  space reads the selection and then at most 16 UTF-16 units before it, never the whole field,
+  which can be a multi-megabyte document. An app without that attribute gets no automatic space.
+  The 16 is not a setting: it only has to hold one character (the longest standard emoji
+  sequences are 15 units), and a longer one is cut to a tail that spacing treats the same way.
 
 ## Architecture
 
@@ -131,7 +146,8 @@ Hotkey up ───▶ discard if < 300 ms
 ```
 
 Esc cancels at any point before insertion. Nothing is inserted into secure (password) fields,
-and nothing is recorded in history for a cancelled dictation.
+including one focused while the dictation was processed, and nothing is recorded in history for
+a cancelled dictation.
 
 ### Hotkey gestures
 
@@ -159,14 +175,19 @@ and nothing is recorded in history for a cancelled dictation.
 
 1. `AXTextInserter`: set `kAXSelectedTextAttribute` on the focused element and verify by
    re-reading its value. Used only when the value is readable before and after.
-2. `PasteboardTextInserter`: snapshot every pasteboard item and type, write the text (marked
-   transient so clipboard managers skip it), post ⌘V, restore the snapshot after 250 ms unless
-   the pasteboard changed in the meantime.
+2. `PasteboardTextInserter`: snapshot every pasteboard item and type, read the focus again,
+   write the text (marked transient so clipboard managers skip it), post ⌘V, restore the snapshot
+   after 250 ms unless the pasteboard changed in the meantime. If the focus is now secure, or in
+   another app, nothing is written or pasted (`focusBecameSecure`, `focusMovedToAnotherApp`).
 3. Otherwise the text stays on the clipboard and the HUD says so.
 
 Per-app overrides (bundled defaults for terminals, Electron and Chromium apps; user entries in
 Settings) pick paste first. Secure fields (`AXSecureTextField`, or secure event input active)
-get nothing.
+get nothing, whether they were focused when the key was released or only when the paste ran.
+
+The leading space before dictated text comes from the character before the caret, read off the
+main actor with `kAXSelectedTextRangeAttribute` and `kAXStringForRangeParameterizedAttribute`
+(`AccessibilityElement.characterBeforeSelection()`), never by copying the field's value.
 
 ### Undo AI edit
 

@@ -1,4 +1,3 @@
-import ApplicationServices
 import Foundation
 import Insertion
 import Persistence
@@ -127,7 +126,9 @@ extension DictationController {
         guard !cancelRequested else { return finish(.cancelled) }
         guard !output.isEmpty else { return finish(.nothingHeard) }
 
-        let preceding = Self.characterBeforeCaret(in: target)
+        let preceding = await Self.characterBeforeCaret(in: target)
+        // Esc may have been pressed while the field was read; nothing is inserted yet.
+        guard !cancelRequested else { return finish(.cancelled) }
         let text = InsertionSpacing.adjusted(output.text, after: preceding)
         let result = await dependencies.delivery.insert(text, into: target)
         let insertedAt = dependencies.now()
@@ -207,12 +208,11 @@ extension DictationController {
 
     // MARK: - Mapping
 
-    static func characterBeforeCaret(in target: InsertionTarget) -> Character? {
-        guard let element = target.element,
-              let value = element.string(kAXValueAttribute),
-              let selection = element.range(kAXSelectedTextRangeAttribute)
-        else { return nil }
-        return InsertionSpacing.character(before: selection, in: value)
+    /// The character before the caret, for spacing; read off the main actor, like
+    /// ``currentTarget()``, because Accessibility calls wait on the other app.
+    nonisolated static func characterBeforeCaret(in target: InsertionTarget) async -> Character? {
+        guard let element = target.element else { return nil }
+        return await Task.detached { element.characterBeforeSelection() }.value
     }
 
     static func delivery(of result: InsertionResult) -> String {

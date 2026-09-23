@@ -26,9 +26,11 @@ public enum InsertionResult: Sendable, Equatable {
     /// The text went into the field. `range` is the UTF-16 range it now occupies when the method
     /// can know it (Accessibility); `nil` for paste, which cannot be verified.
     case inserted(InsertionMethod, range: NSRange?)
-    /// No method worked, so the text was left on the clipboard for the user to paste themselves.
+    /// No method worked, or focus moved to another app before the paste, so the text was left
+    /// on the clipboard for the user to paste themselves.
     case copiedToClipboard
-    /// The focused field is a password field (or secure event input is on): nothing was typed
+    /// The focused field is a password field (or secure event input is on), either when the
+    /// target was read or when focus was checked again just before pasting: nothing was typed
     /// and nothing was copied, so dictated text never lands somewhere hidden.
     case refusedSecureField
     /// The text was empty, so nothing was attempted. Callers normally skip insertion before this.
@@ -62,6 +64,13 @@ public enum InsertionError: LocalizedError, Equatable, Sendable {
     case pasteboardWriteFailed
     /// ⌘V could not be posted (usually missing Accessibility permission).
     case keystrokeFailed
+    /// Just before ⌘V, the focused field turned out to be secure (focus moved to a password
+    /// field, or secure event input came on, after the target was read). Nothing was pasted and
+    /// the pasteboard was not touched.
+    case focusBecameSecure
+    /// Just before ⌘V, another app had keyboard focus: ⌘V would have gone there instead. Nothing
+    /// was pasted and the pasteboard was not touched.
+    case focusMovedToAnotherApp
 
     public var errorDescription: String? {
         switch self {
@@ -81,6 +90,10 @@ public enum InsertionError: LocalizedError, Equatable, Sendable {
             "The text could not be put on the clipboard for pasting."
         case .keystrokeFailed:
             "The paste shortcut could not be sent. Check that Live Transcribe has Accessibility permission."
+        case .focusBecameSecure:
+            "Focus moved to a password field before the text could be pasted."
+        case .focusMovedToAnotherApp:
+            "Focus moved to another app before the text could be pasted."
         }
     }
 

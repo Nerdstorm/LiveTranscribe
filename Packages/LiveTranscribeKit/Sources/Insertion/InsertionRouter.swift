@@ -10,6 +10,11 @@ import Shared
 ///    without a focused element, gets paste only.
 /// 3. If every method fails, the text is left on the clipboard for the user to paste.
 ///
+/// Accessibility writes to the target's own element, wherever the focus is now. Paste goes to the
+/// current focus, so the paste inserter checks it again just before ⌘V: a field that has become
+/// secure is refused as in step 1 (``InsertionError/focusBecameSecure``), and focus in another
+/// app leaves the text on the clipboard as in step 3 (``InsertionError/focusMovedToAnotherApp``).
+///
 /// A failure that may have changed the field (``InsertionError/mayHaveChangedField``) skips the
 /// remaining methods and goes straight to the clipboard, so the text is never typed twice.
 ///
@@ -56,6 +61,10 @@ public struct InsertionRouter: Sendable {
                     \(method.rawValue, privacy: .public) insertion into \(app, privacy: .public) \
                     failed: \(error.localizedDescription, privacy: .public)
                     """)
+                if error == .focusBecameSecure {
+                    // Found only just before ⌘V: as for a secure target, nothing is copied either.
+                    return .refusedSecureField
+                }
                 if error.mayHaveChangedField {
                     Log.insertion.error("The field in \(app, privacy: .public) may hold part of the text; not retrying")
                     break

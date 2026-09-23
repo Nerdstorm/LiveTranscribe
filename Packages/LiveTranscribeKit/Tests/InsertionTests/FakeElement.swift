@@ -30,6 +30,10 @@ final class FakeElement: AccessibilityElement {
         var behaviour: Behaviour
         var ignoresSelectionWrites: Bool
         var valueWrites = 0
+        /// Reads of the whole value (`kAXValueAttribute`).
+        var valueReads = 0
+        /// Ranges asked for through ``string(forRange:)``.
+        var stringForRangeRequests: [NSRange] = []
         /// A write accepted under ``Behaviour/appliesLate`` that has not landed yet.
         var pendingWrite: String?
         var history: [(value: String?, selection: NSRange?)] = []
@@ -39,11 +43,14 @@ final class FakeElement: AccessibilityElement {
     let subrole: String?
     let processIdentifier: pid_t?
     private let caretBounds: CGRect?
+    private let providesStringForRange: Bool
     private let state: OSAllocatedUnfairLock<State>
 
     /// - Parameters:
     ///   - value: The field's text; `nil` makes it unreadable.
     ///   - selection: Defaults to a caret at the end of `value`.
+    ///   - providesStringForRange: `false` for an app without
+    ///     `kAXStringForRangeParameterizedAttribute`.
     init(
         value: String?,
         selection: NSRange? = nil,
@@ -52,12 +59,14 @@ final class FakeElement: AccessibilityElement {
         processIdentifier: pid_t? = 42,
         caretBounds: CGRect? = nil,
         behaviour: Behaviour = .normal,
-        ignoresSelectionWrites: Bool = false
+        ignoresSelectionWrites: Bool = false,
+        providesStringForRange: Bool = true
     ) {
         self.role = role
         self.subrole = subrole
         self.processIdentifier = processIdentifier
         self.caretBounds = caretBounds
+        self.providesStringForRange = providesStringForRange
         let initialSelection = selection ?? value.map { NSRange(location: $0.utf16.count, length: 0) }
         self.state = OSAllocatedUnfairLock(initialState: State(
             value: value,
@@ -71,6 +80,8 @@ final class FakeElement: AccessibilityElement {
     var selection: NSRange? { state.withLock { $0.selection } }
     /// Calls that tried to set `kAXSelectedTextAttribute`.
     var valueWrites: Int { state.withLock { $0.valueWrites } }
+    var valueReads: Int { state.withLock { $0.valueReads } }
+    var stringForRangeRequests: [NSRange] { state.withLock { $0.stringForRangeRequests } }
 
     func setBehaviour(_ behaviour: Behaviour) {
         state.withLock { $0.behaviour = behaviour }
@@ -104,6 +115,7 @@ final class FakeElement: AccessibilityElement {
         state.withLock { state in
             switch attribute {
             case kAXValueAttribute:
+                state.valueReads += 1
                 let current = state.value
                 if let pending = state.pendingWrite {
                     state.pendingWrite = nil
@@ -162,6 +174,18 @@ final class FakeElement: AccessibilityElement {
 
     func bounds(for range: NSRange) -> CGRect? {
         caretBounds
+    }
+
+    func string(forRange range: NSRange) -> String? {
+        state.withLock { state in
+            state.stringForRangeRequests.append(range)
+            guard providesStringForRange, let value = state.value else { return nil }
+            let length = value.utf16.count
+            // Real apps answer a range outside the value with an error.
+            guard range.location >= 0, range.length >= 0, range.location <= length, range.length <= length - range.location
+            else { return nil }
+            return (value as NSString).substring(with: range)
+        }
     }
 
     func isSameElement(as other: any AccessibilityElement) -> Bool {

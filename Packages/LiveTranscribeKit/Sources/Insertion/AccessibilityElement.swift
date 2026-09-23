@@ -25,6 +25,9 @@ public protocol AccessibilityElement: Sendable {
     func setRange(_ range: NSRange, for attribute: String) -> Bool
     /// Screen rectangle of the text in `range` (`kAXBoundsForRangeParameterizedAttribute`).
     func bounds(for range: NSRange) -> CGRect?
+    /// The text in `range` alone (`kAXStringForRangeParameterizedAttribute`), without copying the
+    /// whole value; `nil` if the app does not provide it.
+    func string(forRange range: NSRange) -> String?
     /// Whether `other` refers to the same UI element, so undo can tell that focus has not moved.
     func isSameElement(as other: any AccessibilityElement) -> Bool
 }
@@ -85,17 +88,17 @@ public struct AXElement: AccessibilityElement, @unchecked Sendable {
     }
 
     public func bounds(for range: NSRange) -> CGRect? {
-        var cfRange = CFRange(location: range.location, length: range.length)
-        guard let parameter = AXValueCreate(.cfRange, &cfRange) else { return nil }
-        var result: CFTypeRef?
-        let error = AXUIElementCopyParameterizedAttributeValue(
-            element, kAXBoundsForRangeParameterizedAttribute as CFString, parameter, &result
-        )
-        guard error == .success, let result, CFGetTypeID(result) == AXValueGetTypeID() else { return nil }
+        guard let result = copyValue(kAXBoundsForRangeParameterizedAttribute, for: range),
+              CFGetTypeID(result) == AXValueGetTypeID()
+        else { return nil }
         let axValue = unsafeDowncast(result, to: AXValue.self)
         var rect = CGRect.zero
         guard AXValueGetType(axValue) == .cgRect, AXValueGetValue(axValue, .cgRect, &rect) else { return nil }
         return rect
+    }
+
+    public func string(forRange range: NSRange) -> String? {
+        copyValue(kAXStringForRangeParameterizedAttribute, for: range) as? String
     }
 
     public func isSameElement(as other: any AccessibilityElement) -> Bool {
@@ -106,6 +109,20 @@ public struct AXElement: AccessibilityElement, @unchecked Sendable {
     private func copyValue(_ attribute: String) -> CFTypeRef? {
         var value: CFTypeRef?
         let error = AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
+        guard error == .success else {
+            // Expected for attributes an element does not support; kept at debug level.
+            Log.insertion.debug("AX read \(attribute, privacy: .public) failed: error \(error.rawValue, privacy: .public)")
+            return nil
+        }
+        return value
+    }
+
+    /// A parameterized attribute that takes a range, such as the bounds or the text in it.
+    private func copyValue(_ attribute: String, for range: NSRange) -> CFTypeRef? {
+        var cfRange = CFRange(location: range.location, length: range.length)
+        guard let parameter = AXValueCreate(.cfRange, &cfRange) else { return nil }
+        var value: CFTypeRef?
+        let error = AXUIElementCopyParameterizedAttributeValue(element, attribute as CFString, parameter, &value)
         guard error == .success else {
             // Expected for attributes an element does not support; kept at debug level.
             Log.insertion.debug("AX read \(attribute, privacy: .public) failed: error \(error.rawValue, privacy: .public)")

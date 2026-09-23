@@ -11,6 +11,8 @@ struct InsertionRouterTests {
         let field: FakeElement
         let pasteboard: FakePasteboard
         let keystrokes: FakeKeystrokes
+        /// Focus as the paste reads it just before ⌘V; in TextEdit, like the targets, until moved.
+        let focus = FakeFocus()
         let router: InsertionRouter
 
         init(
@@ -28,7 +30,7 @@ struct InsertionRouterTests {
             self.keystrokes = keystrokes
             self.router = InsertionRouter(
                 accessibility: AXTextInserter(verificationDelayMs: 0),
-                paste: PasteboardTextInserter(pasteboard: pasteboard, keystrokes: keystrokes, restoreDelayMs: 0),
+                paste: PasteboardTextInserter(pasteboard: pasteboard, keystrokes: keystrokes, focus: focus, restoreDelayMs: 0),
                 pasteboard: pasteboard,
                 overrides: overrides
             )
@@ -163,6 +165,62 @@ struct InsertionRouterTests {
         #expect(paste.insertedTexts.isEmpty)
         #expect(pasteboard.items == Self.clipboard)
         #expect(router.methods(for: target).isEmpty)
+    }
+
+    // MARK: - Focus moved while the dictation was processed
+
+    /// The target was read before processing; since then the user tabbed into a password field.
+    /// Paste goes to the current focus, so it is refused, and nothing is copied either.
+    @Test func refusesAPasteWhenFocusBecameSecure() async {
+        let harness = Harness(field: FakeElement(value: "user@"), clipboard: Self.clipboard)
+        harness.focus.move(to: Fixtures.textEdit, secure: true)
+
+        let result = await harness.router.insert("example.com", into: Fixtures.target(nil))
+
+        #expect(result == .refusedSecureField)
+        #expect(harness.keystrokes.pastes == 0)
+        #expect(harness.pasteboard.changeCount == 0, "the pasteboard is untouched")
+        #expect(harness.pasteboard.items == Self.clipboard)
+        #expect(harness.field.value == "user@")
+    }
+
+    /// Accessibility writes to the field it was given, wherever the focus is now, so it is not
+    /// affected; its fallback to paste is.
+    @Test func refusesTheFallbackPasteWhenFocusBecameSecure() async {
+        let harness = Harness(field: FakeElement(value: "user@", behaviour: .ignoresWrites), clipboard: Self.clipboard)
+        harness.focus.move(to: Fixtures.textEdit, secure: true)
+
+        let result = await harness.router.insert("example.com", into: Fixtures.target(harness.field))
+
+        #expect(result == .refusedSecureField)
+        #expect(harness.field.valueWrites == 1, "Accessibility was tried on the original field")
+        #expect(harness.keystrokes.pastes == 0)
+        #expect(harness.pasteboard.items == Self.clipboard)
+    }
+
+    @Test func accessibilityStillInsertsIntoTheOriginalFieldWhenFocusMoved() async {
+        let harness = Harness(field: FakeElement(value: "Dear "), clipboard: Self.clipboard)
+        harness.focus.move(to: Fixtures.textEdit, secure: true)
+
+        let result = await harness.router.insert("Sam,", into: Fixtures.target(harness.field))
+
+        #expect(result == .inserted(.accessibility, range: NSRange(location: 5, length: 4)))
+        #expect(harness.field.value == "Dear Sam,")
+        #expect(harness.focus.readCount == 0, "no paste, so no need to check the focus")
+    }
+
+    /// ⌘V would land in the other app; the text goes on the clipboard instead, as when nothing
+    /// could insert it.
+    @Test func leavesTheTextOnTheClipboardWhenFocusMovedToAnotherApp() async {
+        let harness = Harness(field: FakeElement(value: "$ "), clipboard: Self.clipboard)
+        harness.focus.move(to: Fixtures.notes)
+
+        let result = await harness.router.insert("ls", into: Fixtures.target(harness.field, app: Fixtures.terminal))
+
+        #expect(result == .copiedToClipboard)
+        #expect(harness.keystrokes.pastes == 0)
+        #expect(harness.pasteboard.items == [FakePasteboard.plainItem("ls")])
+        #expect(harness.field.value == "$ ")
     }
 
     @Test func leavesTheTextOnTheClipboardWhenEveryMethodFails() async {

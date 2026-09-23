@@ -64,16 +64,65 @@ struct FakeElement: AccessibilityElement {
     var caret: Int
     var subrole: String?
     var role: String? = kAXTextAreaRole
+    /// Records the text reads, when a test watches them.
+    var probe: ElementProbe?
 
-    func string(_ attribute: String) -> String? { attribute == kAXValueAttribute ? value : nil }
+    func string(_ attribute: String) -> String? {
+        probe?.record(attribute)
+        return attribute == kAXValueAttribute ? value : nil
+    }
     func range(_ attribute: String) -> NSRange? {
         attribute == kAXSelectedTextRangeAttribute ? NSRange(location: caret, length: 0) : nil
     }
     func setString(_ value: String, for attribute: String) -> Bool { false }
     func setRange(_ range: NSRange, for attribute: String) -> Bool { false }
     func bounds(for range: NSRange) -> CGRect? { CGRect(x: 100, y: 200, width: 2, height: 16) }
+    func string(forRange range: NSRange) -> String? {
+        probe?.record(kAXStringForRangeParameterizedAttribute)
+        let text = value as NSString
+        guard range.location >= 0, range.length >= 0, NSMaxRange(range) <= text.length else { return nil }
+        return text.substring(with: range)
+    }
     var processIdentifier: pid_t? { 42 }
     func isSameElement(as other: any AccessibilityElement) -> Bool { true }
+}
+
+/// Which text attributes a ``FakeElement`` was asked for, and on which thread. While held, text
+/// reads for a range made off the main thread wait for ``release()``, so a test can act in
+/// between. A read on the main thread never waits: that would deadlock the test instead of
+/// failing it.
+final class ElementProbe: Sendable {
+    private struct State {
+        var attributes: [String] = []
+        var onMainThread = false
+        var gate: DispatchSemaphore?
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    var attributes: [String] { state.withLock { $0.attributes } }
+    /// Whether any read happened on the main thread, where it would stall the UI.
+    var readOnMainThread: Bool { state.withLock { $0.onMainThread } }
+
+    func record(_ attribute: String) {
+        let onMain = Thread.isMainThread
+        let gate = state.withLock { state in
+            state.attributes.append(attribute)
+            state.onMainThread = state.onMainThread || onMain
+            return attribute == kAXStringForRangeParameterizedAttribute && !onMain ? state.gate : nil
+        }
+        gate?.wait()
+    }
+
+    func hold() { state.withLock { $0.gate = DispatchSemaphore(value: 0) } }
+
+    func release() {
+        let gate = state.withLock { state in
+            defer { state.gate = nil }
+            return state.gate
+        }
+        gate?.signal()
+    }
 }
 
 final class FakeFocus: FocusedTargetProvider, @unchecked Sendable {
@@ -83,8 +132,10 @@ final class FakeFocus: FocusedTargetProvider, @unchecked Sendable {
 
     static let app = AppInfo(bundleIdentifier: "com.example.Notes", name: "Notes", processIdentifier: 42)
 
-    static func field(value: String, secure: Bool) -> InsertionTarget {
-        let element = FakeElement(value: value, caret: (value as NSString).length, subrole: secure ? kAXSecureTextFieldSubrole : nil)
+    static func field(value: String, secure: Bool, probe: ElementProbe? = nil) -> InsertionTarget {
+        let element = FakeElement(
+            value: value, caret: (value as NSString).length, subrole: secure ? kAXSecureTextFieldSubrole : nil, probe: probe
+        )
         return InsertionTarget(app: app, element: element, secureEventInputEnabled: false)
     }
 
