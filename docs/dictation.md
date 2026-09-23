@@ -28,7 +28,21 @@ focus context, Command Mode, multilingual) is not started.
 - **No Dock icon.** The app lives in the menu bar (`LSUIElement`). It becomes a regular app
   (Dock icon, main menu) only while one of its windows is open, so ⌘C, ⌘W etc. work there.
 - **Continuous mode and dictation don't overlap.** While the live transcript is listening, the
-  dictation hotkey shows *Stop the live transcript to dictate* instead of recording.
+  dictation hotkey shows *Stop the live transcript to dictate* instead of recording, and the menu
+  bar menu lists *Stop Live Transcript* (`MenuBarStatus.canStopLiveTranscript`).
+- **Closing the live transcript window stops it** (the lead's call in review). Closing it used to
+  quit the app; the menu bar app now keeps running, and a transcript left listening with no
+  window kept the microphone open, saved everything said nearby and refused every dictation.
+  `WindowPresenter` calls `TranscriptViewModel.stopListening()`, which stops only a listening
+  session and never starts one. A Start still opening the microphone when the window closes is
+  stopped as soon as it reports listening. Keeping it running in the background, with a prompt on
+  close, was the alternative.
+- **Settings keeps one view per window.** `SettingsNavigation` holds the selected tab, so asking
+  for a tab (History's *History Settings…*, setup's *Choose Another Shortcut…*) switches the open
+  window instead of rebuilding it, which threw away an editor sheet and its unsaved draft. While a
+  sheet is open the tab stays as it is and the window only comes forward, because switching away
+  from the tab that opened the sheet can close it, and at best leaves it over the wrong tab.
+  Settings reopens on the tab it last showed.
 - **The cleanup level applies to both modes.** Medium removes fillers in the live transcript too.
   Snippets and vocabulary apply only to dictation.
 - **A chosen microphone that disconnects** falls back to the system default with a notice
@@ -157,7 +171,9 @@ Changed slices:
   without it.
 - **Session**: the continuous pipeline passes `CleanupOptions` from settings.
 - **App**: no sandbox, menu-bar app (`LSUIElement`), composition of the dictation flow, and
-  `WindowPresenter`, which opens every window with AppKit and switches the activation policy.
+  `WindowPresenter`, which opens every window with AppKit, switches the activation policy, stops
+  the live transcript when its window closes and switches Settings tabs through
+  `SettingsNavigation`.
 
 ### Dictation flow
 

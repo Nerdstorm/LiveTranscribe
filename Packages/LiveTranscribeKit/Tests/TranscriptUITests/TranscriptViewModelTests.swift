@@ -184,6 +184,47 @@ struct TranscriptViewModelTests {
         try await waitUntil { session.stopCalls == 1 }
     }
 
+    @Test func stopListeningStopsAListeningSessionAndNeverStartsOne() async throws {
+        let model = self.model
+        model.apply(.phase(.listening))
+        model.stopListening()
+        try await waitUntil { session.stopCalls == 1 }
+
+        // Closing the window of a session that is not listening must not start one.
+        for phase in [SessionPhase.ready, .loading, .stopping, .failed(.audioCaptureFailed(message: "x"))] {
+            model.apply(.phase(phase))
+            model.stopListening()
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(session.startCalls == 0)
+        #expect(session.stopCalls == 1)
+    }
+
+    @Test func aStartUnderWayWhenAskedToStopIsStoppedOnceItListens() async throws {
+        let model = self.model
+        model.apply(.phase(.ready))
+        model.toggleListening()
+        try await waitUntil { session.startCalls == 1 }
+        // The window closes while the microphone is still opening.
+        model.stopListening()
+        #expect(session.stopCalls == 0)
+        model.apply(.phase(.listening))
+        try await waitUntil { session.stopCalls == 1 }
+    }
+
+    @Test func aNewStartIsNotStoppedByAnEarlierStopRequest() async throws {
+        let model = self.model
+        model.apply(.phase(.ready))
+        // Closed while nothing was starting, then started again from the window.
+        model.stopListening()
+        model.toggleListening()
+        try await waitUntil { session.startCalls == 1 }
+        model.apply(.phase(.listening))
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(session.stopCalls == 0)
+        #expect(model.isListening)
+    }
+
     @Test func warningsCanBeDismissed() {
         let model = self.model
         model.apply(.warning("disk full"))

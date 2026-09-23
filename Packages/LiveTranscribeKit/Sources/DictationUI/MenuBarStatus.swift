@@ -93,8 +93,8 @@ enum MenuBarIndicator: Equatable, Sendable {
     }
 }
 
-/// Everything the menu shows and allows, derived from dictation, the hotkey, the speech models
-/// and the microphone permission.
+/// Everything the menu shows and allows, derived from dictation, the hotkey, the live transcript
+/// session (which holds the speech models) and the microphone permission.
 ///
 /// Pure, so every combination is unit-tested; ``MenuBarContent`` and ``MenuBarLabel`` only
 /// render it.
@@ -109,6 +109,9 @@ struct MenuBarStatus: Equatable, Sendable {
     let canUndo: Bool
     /// *Copy Last Dictation* has something to copy.
     let canCopyLastDictation: Bool
+    /// *Stop Live Transcript* is listed while the live transcript is listening, so it can be
+    /// stopped from any app without finding its window (closing the window stops it too).
+    let canStopLiveTranscript: Bool
 
     /// - Parameter hasLastDictation: the controller has a last dictation (`lastText` is set).
     ///   Without one there is nothing to copy, and nothing to undo either: the controller keeps
@@ -125,6 +128,7 @@ struct MenuBarStatus: Equatable, Sendable {
             phase: phase, hotkey: hotkey, session: session, modelProgress: modelProgress, microphone: microphone
         )
         canCopyLastDictation = hasLastDictation
+        canStopLiveTranscript = session == .listening
         switch phase {
         case .idle:
             toggleTitle = "Start Dictation"

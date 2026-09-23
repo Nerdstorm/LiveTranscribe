@@ -101,6 +101,17 @@ struct MenuBarStatusTests {
         }
     }
 
+    @Test func aListeningLiveTranscriptCanBeStoppedFromTheMenu() {
+        #expect(status(session: .listening).canStopLiveTranscript)
+        // Offered whatever the status line says: with the shortcut off, or mid-dictation.
+        #expect(status(hotkey: .disabled, session: .listening).canStopLiveTranscript)
+        #expect(status(phase: .processing, session: .listening).canStopLiveTranscript)
+        // Nothing to stop while it is already stopping, or when it isn't running.
+        for session in [SessionPhase.stopping, .ready, .loading, .notLoaded, .failed(.audioCaptureFailed(message: "x"))] {
+            #expect(!status(session: session).canStopLiveTranscript, "\(session)")
+        }
+    }
+
     @Test func aStoppedOrDisabledHotkeySaysDictationIsOff() {
         #expect(status(hotkey: .disabled).indicator.statusText == "Dictation is off")
         #expect(status(hotkey: .stopped).indicator == .off)

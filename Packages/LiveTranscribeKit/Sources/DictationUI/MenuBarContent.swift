@@ -5,8 +5,8 @@ import Shared
 import SwiftUI
 import TranscriptUI
 
-/// The menu bar menu: dictation status and controls, the cleanup level, the microphone, and the
-/// app's windows.
+/// The menu bar menu: dictation status and controls, stopping the live transcript, the cleanup
+/// level, the microphone, and the app's windows.
 ///
 /// Made for `MenuBarExtra { MenuBarContent(context:) } label: { MenuBarLabel(context:) }` with
 /// `.menuBarExtraStyle(.menu)`, so it uses only views a menu can show. What it says and allows
@@ -49,6 +49,11 @@ public struct MenuBarContent: View {
             .onReceive(NotificationCenter.default.publisher(for: NSMenu.didBeginTrackingNotification)) { _ in
                 menuOpenings &+= 1
             }
+        if status.canStopLiveTranscript {
+            // Right under the status line, which then usually reads "Stop the live transcript to
+            // dictate", so it stops from any app without finding the transcript window.
+            Button("Stop Live Transcript") { transcript.stopListening() }
+        }
         Button(status.toggleTitle) { controller.toggleDictation() }
             .disabled(!status.canToggleDictation)
         if status.canCancel {

@@ -27,6 +27,10 @@ public final class TranscriptViewModel {
     @ObservationIgnored private var deviceChangesTask: Task<Void, Never>?
     /// Cleanup state captured when the current session started; decides whether raw lines wait.
     @ObservationIgnored private var sessionCleansText = false
+    /// Set by ``stopListening()`` when nothing is listening yet, so a Start still under way
+    /// (the microphone opening, the permission prompt) is stopped as soon as it reports
+    /// listening, instead of running with no window to stop it. The next Start clears it.
+    @ObservationIgnored private var stopWhenListening = false
     /// Every microphone seen connected since launch, as last seen, by UID. Only a chosen
     /// microphone's UID is saved, so this lets the pickers name and group it while it is
     /// disconnected. In memory only; it holds one entry per device ever connected.
@@ -69,9 +73,24 @@ public final class TranscriptViewModel {
         switch phase {
         case .listening: Task { await session.stop() }
         case .ready, .failed(.microphonePermissionDenied), .failed(.audioCaptureFailed), .failed(.persistenceFailed):
+            stopWhenListening = false
             Task { await session.start() }
         default: break
         }
+    }
+
+    /// Stops the live transcript, and never starts one: for closing the transcript window and
+    /// the menu's *Stop Live Transcript*.
+    ///
+    /// A Start that has not reported listening yet is stopped once it does, so closing the
+    /// window straight after pressing Start still leaves the microphone closed.
+    public func stopListening() {
+        guard phase == .listening else {
+            stopWhenListening = true
+            return
+        }
+        Log.ui.info("Stopping the live transcript")
+        Task { await session.stop() }
     }
 
     public func retryLoading() {
@@ -150,6 +169,11 @@ public final class TranscriptViewModel {
         case .phase(let newPhase):
             phase = newPhase
             if newPhase == .ready { modelProgress.removeAll() }
+            if newPhase == .listening, stopWhenListening {
+                stopWhenListening = false
+                Log.ui.info("Stopping a live transcript that started after it was asked to stop")
+                Task { await session.stop() }
+            }
         case .modelProgress(let progress):
             if let index = modelProgress.firstIndex(where: { $0.modelID == progress.modelID }) {
                 modelProgress[index] = progress

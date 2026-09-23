@@ -10,6 +10,10 @@ import TranscriptUI
 /// its own. While any window is open it becomes a regular app, with a Dock icon and a main menu,
 /// so the window comes forward and can be switched to; when the last one closes it returns to
 /// the menu bar.
+///
+/// Closing the transcript window stops the live transcript: the app keeps running in the menu
+/// bar, and a transcript left listening with no window would keep the microphone open and block
+/// dictation.
 @MainActor
 final class WindowPresenter: NSObject, DictationWindowActions, NSWindowDelegate {
     private enum Kind: String {
@@ -18,6 +22,8 @@ final class WindowPresenter: NSObject, DictationWindowActions, NSWindowDelegate 
 
     private let context: DictationUIContext
     private var windows: [Kind: NSWindow] = [:]
+    /// The Settings window's tab, kept for the app's lifetime so Settings reopens where it was left.
+    private let settingsNavigation = SettingsNavigation()
 
     init(context: DictationUIContext) {
         self.context = context
@@ -35,15 +41,12 @@ final class WindowPresenter: NSObject, DictationWindowActions, NSWindowDelegate 
         }
     }
 
+    /// Only the tab changes on a window that is already open. Its view is never replaced, so an
+    /// editor sheet and its unsaved draft survive.
     func showSettings(tab: SettingsTab?) {
-        if let tab, let window = windows[.settings] {
-            // Rebuilt with a new identity, so the tab view starts on the requested tab.
-            window.contentViewController = NSHostingController(
-                rootView: SettingsRootView(context: context, selection: tab).id(tab)
-            )
-        }
+        settingsNavigation.show(tab, sheetIsOpen: windows[.settings]?.attachedSheet != nil)
         present(.settings, title: "Settings", size: nil, resizable: false) {
-            SettingsRootView(context: context, selection: tab ?? .general)
+            SettingsRootView(context: context, navigation: settingsNavigation)
         }
     }
 
@@ -104,6 +107,10 @@ final class WindowPresenter: NSObject, DictationWindowActions, NSWindowDelegate 
               let kind = windows.first(where: { $0.value === window })?.key
         else { return }
         windows[kind] = nil
+        if kind == .transcript {
+            // Stops only a transcript that is listening, or about to; never starts one.
+            context.transcript.stopListening()
+        }
         if windows.isEmpty {
             // Back to the menu bar: no Dock icon while nothing is open.
             NSApp.setActivationPolicy(.accessory)
