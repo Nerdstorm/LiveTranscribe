@@ -50,7 +50,7 @@ struct PermissionsSettingsView: View {
         .formStyle(.grouped)
         .task { await model.followAccessibility() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            model.refreshMicrophone()
+            model.refresh()
         }
     }
 }
@@ -62,10 +62,11 @@ private struct PermissionsSettingsRow: View {
 
     var body: some View {
         let granted = model.isGranted(permission)
+        let needsReopen = permission == .accessibility && model.needsReopen
         let status = model.statusText(permission)
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: granted ? "checkmark.circle.fill" : "xmark.circle.fill")
-                .foregroundStyle(granted ? AnyShapeStyle(.green) : AnyShapeStyle(.orange))
+            Image(systemName: needsReopen ? "exclamationmark.triangle.fill" : granted ? "checkmark.circle.fill" : "xmark.circle.fill")
+                .foregroundStyle(granted && !needsReopen ? AnyShapeStyle(.green) : AnyShapeStyle(.orange))
                 .font(.title3)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
@@ -79,7 +80,12 @@ private struct PermissionsSettingsRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                if permission == .accessibility, !granted {
+                if needsReopen {
+                    Text(PermissionsSettingsModel.reopenHint)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if permission == .accessibility, !granted {
                     Text("If Live Transcribe is already switched on there, remove it with −, then add it again.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -94,8 +100,8 @@ private struct PermissionsSettingsRow: View {
                 .accessibilityLabel(accessibilityTitle(for: action))
             }
         }
-        .onChange(of: granted) { _, nowGranted in
-            SettingsRootAnnouncer.announce("\(permission.title) \(nowGranted ? "allowed" : "not allowed")")
+        .onChange(of: status) { _, newStatus in
+            SettingsRootAnnouncer.announce("\(permission.title): \(newStatus)")
         }
     }
 
@@ -103,6 +109,7 @@ private struct PermissionsSettingsRow: View {
         switch action {
         case .request: permission == .microphone ? "Allow…" : "Grant Access…"
         case .openSettings: "Open System Settings"
+        case .reopen: "Reopen Live Transcribe"
         }
     }
 
@@ -110,6 +117,7 @@ private struct PermissionsSettingsRow: View {
         switch action {
         case .request: "Allow \(permission.title.lowercased()) access"
         case .openSettings: "Open System Settings for \(permission.title.lowercased())"
+        case .reopen: "Reopen Live Transcribe so it can paste"
         }
     }
 }

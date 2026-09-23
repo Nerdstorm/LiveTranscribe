@@ -62,12 +62,21 @@ public struct OnboardingView: View {
                 hotkeyName: model.hotkey.displayName,
                 handsFreeEnabled: handsFreeEnabled,
                 note: OnboardingModel.tryItNote(
-                    permissionsGranted: model.isComplete(.microphone) && model.isComplete(.accessibility),
+                    // A needed reopen has its own prompt: dictating into this page works meanwhile.
+                    permissionsGranted: model.isComplete(.microphone) && model.accessibilityGranted,
                     hotkey: context.controller.hotkeyState,
                     session: context.transcript.phase
-                )
+                ),
+                reopen: reopenIfNeeded,
+                errorMessage: model.errorMessage
             )
         }
+    }
+
+    /// Reopens the app, while it must reopen before it can paste into other apps.
+    private var reopenIfNeeded: (@MainActor () -> Void)? {
+        guard model.needsReopen else { return nil }
+        return { [model] in model.reopen() }
     }
 
     private var footer: some View {

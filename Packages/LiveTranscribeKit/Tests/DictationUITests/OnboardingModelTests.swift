@@ -39,18 +39,23 @@ private final class FakeMicrophone: MicrophonePermissionProviding {
 private final class FakeAccessibility: AccessibilityPermissionProviding {
     private struct State {
         var granted: Bool
+        var canPost: Bool
         var prompts = 0
         var continuation: AsyncStream<Bool>.Continuation?
     }
 
     private let state: OSAllocatedUnfairLock<State>
 
-    init(granted: Bool) {
-        state = OSAllocatedUnfairLock(initialState: State(granted: granted))
+    /// - Parameter canPost: What ``canPostKeystrokes()`` answers until ``set(canPost:)``.
+    init(granted: Bool, canPost: Bool = true) {
+        state = OSAllocatedUnfairLock(initialState: State(granted: granted, canPost: canPost))
     }
 
     var prompts: Int { state.withLock { $0.prompts } }
     func isGranted() -> Bool { state.withLock { $0.granted } }
+    func canPostKeystrokes() -> Bool { state.withLock { $0.canPost } }
+    /// Not streamed: the model reads it again with each Accessibility change and on refresh.
+    func set(canPost: Bool) { state.withLock { $0.canPost = canPost } }
     func prompt() { state.withLock { $0.prompts += 1 } }
 
     func set(_ granted: Bool) {
@@ -76,7 +81,9 @@ private final class SystemSpy {
     var fnUsage: FnKeyUsage = .doNothing
     var opensKeyboardSettings = true
     var opensPrivacySettings = true
+    var reopensApp = true
     private(set) var openedPermissions: [RequiredPermission] = []
+    private(set) var reopens = 0
     private(set) var keyboardSettingsOpened = 0
     private(set) var announcements: [String] = []
 
@@ -91,7 +98,11 @@ private final class SystemSpy {
                 self.keyboardSettingsOpened += 1
                 return self.opensKeyboardSettings
             },
-            announce: { self.announcements.append($0) }
+            announce: { self.announcements.append($0) },
+            reopenApp: {
+                self.reopens += 1
+                return self.reopensApp
+            }
         )
     }
 }
@@ -275,6 +286,46 @@ struct OnboardingModelTests {
         accessibility.set(false)
         await waitUntil { !model.accessibilityGranted }
         #expect(spy.announcements == ["Accessibility access is on", "Accessibility access is off"])
+    }
+
+    // MARK: - Reopen
+
+    /// Accessibility is on, but macOS still refuses ⌘V until the app reopens.
+    @Test func accessibilityThatCannotPasteYetIsNotDone() {
+        accessibility.set(canPost: false)
+        let model = makeModel(microphone: .granted, accessibility: true)
+        #expect(model.needsReopen)
+        #expect(!model.isComplete(.accessibility))
+        #expect(model.step == .accessibility, "setup opens where something is needed")
+    }
+
+    @Test func reopensOrSaysHowToByHand() {
+        accessibility.set(canPost: false)
+        let model = makeModel(microphone: .granted, accessibility: true)
+        model.reopen()
+        #expect(spy.reopens == 1)
+        #expect(model.errorMessage == nil)
+
+        spy.reopensApp = false
+        model.reopen()
+        #expect(model.errorMessage == "Couldn't reopen Live Transcribe. Quit it from the menu bar, then open it again.")
+    }
+
+    /// Granted while setup is open: the paste part may not follow until the app reopens.
+    @Test func aGrantThatCannotPasteYetAsksForAReopen() async {
+        accessibility.set(canPost: false)
+        let model = makeModel()
+        let observation = Task { await model.observeAccessibility() }
+        defer { observation.cancel() }
+        accessibility.set(true)
+        await waitUntil { model.accessibilityGranted }
+        #expect(model.needsReopen)
+        #expect(spy.announcements == [OnboardingModel.reopenStatus])
+
+        accessibility.set(canPost: true)
+        model.refresh()
+        #expect(model.isComplete(.accessibility))
+        #expect(spy.announcements == [OnboardingModel.reopenStatus, "Accessibility access is on"])
     }
 
     @Test func refreshPicksUpChangesMadeInSystemSettings() {

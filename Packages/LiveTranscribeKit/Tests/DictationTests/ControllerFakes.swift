@@ -193,9 +193,12 @@ final class FakeAccessibility: AccessibilityPermissionProviding, @unchecked Send
     private let continuation: AsyncStream<Bool>.Continuation
     private let stream: AsyncStream<Bool>
     private let granted: OSAllocatedUnfairLock<Bool>
+    private let postsKeystrokes: Bool
 
-    init(granted: Bool) {
+    /// - Parameter postsKeystrokes: What ``canPostKeystrokes()`` answers.
+    init(granted: Bool, postsKeystrokes: Bool = true) {
         self.granted = OSAllocatedUnfairLock(initialState: granted)
+        self.postsKeystrokes = postsKeystrokes
         (stream, continuation) = AsyncStream.makeStream(of: Bool.self)
         continuation.yield(granted)
     }
@@ -206,6 +209,7 @@ final class FakeAccessibility: AccessibilityPermissionProviding, @unchecked Send
     }
 
     func isGranted() -> Bool { granted.withLock { $0 } }
+    func canPostKeystrokes() -> Bool { postsKeystrokes }
     func prompt() {}
     func changes() -> AsyncStream<Bool> { stream }
 }

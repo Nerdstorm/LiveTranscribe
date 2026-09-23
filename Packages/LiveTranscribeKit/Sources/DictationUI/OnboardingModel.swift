@@ -45,6 +45,8 @@ final class OnboardingModel {
         var openKeyboardSettings: @MainActor () -> Bool
         /// Reads a status change out to VoiceOver users.
         var announce: @MainActor (String) -> Void
+        /// Quits and reopens the app; `false`, without quitting, if it could not.
+        var reopenApp: @MainActor () -> Bool
     }
 
     private(set) var step: OnboardingStep
@@ -52,6 +54,8 @@ final class OnboardingModel {
     /// The system microphone prompt is up.
     private(set) var isRequestingMicrophone = false
     private(set) var accessibilityGranted: Bool
+    /// Whether macOS lets the app post the ⌘V of a paste; see ``needsReopen``.
+    private(set) var canPostKeystrokes: Bool
     /// Accessibility was asked for during this setup, so a stale entry in the list is worth
     /// mentioning: an app rebuilt with a new signature shows as on but is refused.
     private(set) var hasAskedForAccessibility = false
@@ -81,6 +85,7 @@ final class OnboardingModel {
         self.promptMemory = promptMemory
         microphone = microphonePermission.status()
         accessibilityGranted = accessibility.isGranted()
+        canPostKeystrokes = accessibility.canPostKeystrokes()
         fnUsage = system.fnKeyUsage()
         step = .microphone
         step = steps.first { !isComplete($0) } ?? .tryIt
@@ -96,11 +101,11 @@ final class OnboardingModel {
     var usesFnKey: Bool { hotkey == .modifierKey(.fn) }
 
     /// Whether a step needs nothing more from the user. *Try it* never does, so it is never
-    /// shown as done.
+    /// shown as done. Accessibility still needs a reopen while ``needsReopen``.
     func isComplete(_ step: OnboardingStep) -> Bool {
         switch step {
         case .microphone: microphone == .granted
-        case .accessibility: accessibilityGranted
+        case .accessibility: accessibilityGranted && !needsReopen
         case .fnKey: !fnUsage.conflictsWithFnHotkey
         case .tryIt: false
         }
@@ -170,6 +175,15 @@ final class OnboardingModel {
         errorMessage = system.openPrivacySettings(permission) ? nil : permission.settingsFailureMessage
     }
 
+    /// Accessibility is on, but macOS still doesn't let the app paste: it applies that part of
+    /// the permission to a running app only once it reopens.
+    var needsReopen: Bool { accessibilityGranted && !canPostKeystrokes }
+
+    /// Quits and reopens the app, or says how to do it by hand.
+    func reopen() {
+        errorMessage = system.reopenApp() ? nil : AppRelauncher.failureMessage
+    }
+
     /// Follows Accessibility access until the task running it is cancelled, so the step updates
     /// as soon as the user switches it on.
     func observeAccessibility() async {
@@ -191,11 +205,18 @@ final class OnboardingModel {
         system.announce(status == .granted ? "Microphone access is on" : "Microphone access is off")
     }
 
+    /// Takes a new Accessibility state, and reads again whether the app may paste, which only
+    /// changes with it (or with a reopen).
     private func updateAccessibility(_ granted: Bool) {
-        guard granted != accessibilityGranted else { return }
+        let canPost = accessibility.canPostKeystrokes()
+        guard granted != accessibilityGranted || canPost != canPostKeystrokes else { return }
         accessibilityGranted = granted
-        system.announce(granted ? "Accessibility access is on" : "Accessibility access is off")
+        canPostKeystrokes = canPost
+        system.announce(needsReopen ? Self.reopenStatus : granted ? "Accessibility access is on" : "Accessibility access is off")
     }
+
+    /// The Accessibility step's status, and what VoiceOver hears, while ``needsReopen``.
+    static let reopenStatus = "Access is on, but Live Transcribe can't paste until it reopens"
 
     // MARK: - fn key
 
@@ -259,7 +280,8 @@ extension OnboardingModel.System {
             fnKeyUsage: { FnKeyUsage.current() },
             openPrivacySettings: { PrivacySettings.open($0) },
             openKeyboardSettings: { PrivacySettings.openKeyboardSettings() },
-            announce: { HUDAnnouncer.post($0) }
+            announce: { HUDAnnouncer.post($0) },
+            reopenApp: { AppRelauncher.relaunch() }
         )
     }
 }

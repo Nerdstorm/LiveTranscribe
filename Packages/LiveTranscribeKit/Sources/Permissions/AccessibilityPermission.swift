@@ -6,6 +6,12 @@ import Shared
 /// tap), for inserting text through the Accessibility API, and for posting ⌘V and ⌘Z.
 public protocol AccessibilityPermissionProviding: Sendable {
     func isGranted() -> Bool
+    /// Whether macOS lets this app post keystrokes: the ⌘V of a paste and the ⌘Z of undo.
+    ///
+    /// It comes with Accessibility, but a running app can be trusted for Accessibility and still
+    /// be refused here. That was seen after the app's Accessibility entry was removed and added
+    /// again while it ran, so the app offers to reopen, to be checked afresh at launch.
+    func canPostKeystrokes() -> Bool
     /// Shows the system alert that offers to open System Settings. macOS shows it at most once
     /// per launch, and never once access is granted.
     func prompt()
@@ -30,6 +36,10 @@ public struct SystemAccessibilityPermission: AccessibilityPermissionProviding {
 
     public func isGranted() -> Bool {
         AXIsProcessTrusted()
+    }
+
+    public func canPostKeystrokes() -> Bool {
+        CGPreflightPostEventAccess()
     }
 
     public func prompt() {

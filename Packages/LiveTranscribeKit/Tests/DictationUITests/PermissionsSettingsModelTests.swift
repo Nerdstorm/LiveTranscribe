@@ -35,7 +35,15 @@ private final class FakeMicrophone: MicrophonePermissionProviding {
 
 /// An Accessibility permission the test grants or revokes; changes are pushed to `changes()`.
 private final class FakeAccessibility: AccessibilityPermissionProviding {
-    private let state = OSAllocatedUnfairLock(initialState: (granted: false, prompts: 0, continuation: AsyncStream<Bool>.Continuation?.none))
+    private let state = OSAllocatedUnfairLock(
+        initialState: (granted: false, canPost: true, prompts: 0, continuation: AsyncStream<Bool>.Continuation?.none)
+    )
+
+    /// What ``canPostKeystrokes()`` answers. Not streamed: it changes only with Accessibility.
+    var postsKeystrokes: Bool {
+        get { state.withLock { $0.canPost } }
+        set { state.withLock { $0.canPost = newValue } }
+    }
 
     var prompts: Int { state.withLock { $0.prompts } }
 
@@ -55,6 +63,8 @@ private final class FakeAccessibility: AccessibilityPermissionProviding {
     }
 
     func isGranted() -> Bool { state.withLock { $0.granted } }
+
+    func canPostKeystrokes() -> Bool { postsKeystrokes }
 
     func prompt() { state.withLock { $0.prompts += 1 } }
 
@@ -78,12 +88,16 @@ struct PermissionsSettingsModelTests {
     /// This test's launch: a fresh memory, so tests don't share the app-wide one.
     private let promptMemory = PermissionsSettingsPromptMemory()
 
-    private func model(opened: @escaping @MainActor (RequiredPermission) -> Bool = { _ in true }) -> PermissionsSettingsModel {
+    private func model(
+        opened: @escaping @MainActor (RequiredPermission) -> Bool = { _ in true },
+        reopen: @escaping @MainActor () -> Bool = { true }
+    ) -> PermissionsSettingsModel {
         PermissionsSettingsModel(
             microphonePermission: microphone,
             accessibility: accessibility,
             promptMemory: promptMemory,
-            openSettings: opened
+            openSettings: opened,
+            reopenApp: reopen
         )
     }
 
@@ -125,7 +139,7 @@ struct PermissionsSettingsModelTests {
         let model = model()
         microphone.currentStatus = .granted
         #expect(!model.isGranted(.microphone), "not re-read until refresh")
-        model.refreshMicrophone()
+        model.refresh()
         #expect(model.isGranted(.microphone))
     }
 
@@ -181,6 +195,60 @@ struct PermissionsSettingsModelTests {
         #expect(model.isGranted(.accessibility))
         #expect(model.action(for: .accessibility) == nil)
         #expect(model.statusText(.accessibility) == "Allowed")
+    }
+
+    // MARK: - Reopen
+
+    /// Accessibility is on, but macOS still refuses ⌘V until the app reopens.
+    @Test func accessibilityThatCannotPasteYetOffersToReopen() async {
+        accessibility.set(granted: true)
+        accessibility.postsKeystrokes = false
+        var reopens = 0
+        let model = model(reopen: { reopens += 1; return true })
+
+        #expect(model.needsReopen)
+        #expect(model.statusText(.accessibility) == "Allowed, but can't paste yet")
+        #expect(model.action(for: .accessibility) == .reopen)
+
+        await model.perform(.reopen, for: .accessibility)
+        #expect(reopens == 1)
+        #expect(model.errorMessage == nil)
+    }
+
+    @Test func aReopenThatFailsSaysWhatToDoByHand() async {
+        accessibility.set(granted: true)
+        accessibility.postsKeystrokes = false
+        let model = model(reopen: { false })
+
+        await model.perform(.reopen, for: .accessibility)
+        #expect(model.errorMessage == "Couldn't reopen Live Transcribe. Quit it from the menu bar, then open it again.")
+    }
+
+    /// Without Accessibility, keystrokes are refused too: granting it is what's needed, not a reopen.
+    @Test func noReopenIsOfferedWhileAccessibilityIsOff() {
+        accessibility.postsKeystrokes = false
+        let model = model()
+        #expect(!model.needsReopen)
+        #expect(model.statusText(.accessibility) == "Not allowed")
+        #expect(model.action(for: .accessibility) == .request)
+    }
+
+    @Test func whetherTheAppCanPasteIsReadAgainWithAccessibility() async {
+        accessibility.postsKeystrokes = false
+        let model = model()
+        let following = Task { await model.followAccessibility() }
+        for _ in 0..<1_000 where !accessibility.hasSubscriber {
+            await Task.yield()
+        }
+        accessibility.set(granted: true)
+        accessibility.finish()
+        await following.value
+        #expect(model.needsReopen, "granted while running, as when the entry is removed and added again")
+
+        accessibility.postsKeystrokes = true
+        model.refresh()
+        #expect(!model.needsReopen)
+        #expect(model.action(for: .accessibility) == nil)
     }
 
     // MARK: - Shortcut status
