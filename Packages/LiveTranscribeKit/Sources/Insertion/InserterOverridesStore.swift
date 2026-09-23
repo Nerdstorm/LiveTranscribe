@@ -31,6 +31,8 @@ public enum InserterOverridesStoreError: LocalizedError, Equatable, Sendable {
 /// An actor so a save from Settings and a load at launch never interleave on the file.
 public actor InserterOverridesStore {
     public static let fileName = "insertion-overrides.json"
+    /// Owner read and write only, like the other files the user edits in Settings.
+    static let filePermissions: mode_t = 0o600
 
     public nonisolated let fileURL: URL
     private let now: @Sendable () -> Date
@@ -102,7 +104,7 @@ public actor InserterOverridesStore {
             try FileManager.default.createDirectory(
                 at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true
             )
-            try data.write(to: fileURL, options: .atomic)
+            try AtomicFileWriter.write(data, to: fileURL, permissions: Self.filePermissions)
             Log.insertion.info("Saved \(overrides.methods.count, privacy: .public) per-app insertion overrides")
         } catch {
             Log.insertion.error("""

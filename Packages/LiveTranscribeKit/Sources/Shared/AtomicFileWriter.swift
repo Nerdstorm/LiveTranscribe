@@ -10,8 +10,10 @@ import Foundation
 ///
 /// Every system call's `errno` is read straight after the call, inside the closure that owns the
 /// path buffer: releasing that buffer may change `errno`, which would report the wrong error.
-enum AtomicFileWriter {
-    static func write(_ data: Data, to url: URL, permissions: mode_t) throws {
+public enum AtomicFileWriter {
+    /// Writes `data` to `url`, whose folder must exist. On failure the destination is unchanged
+    /// and the temporary file is removed.
+    public static func write(_ data: Data, to url: URL, permissions: mode_t) throws {
         let temporaryURL = url.deletingLastPathComponent()
             .appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString).tmp")
         let (descriptor, openError) = temporaryURL.withUnsafeFileSystemRepresentation { path -> (Int32, Int32) in
