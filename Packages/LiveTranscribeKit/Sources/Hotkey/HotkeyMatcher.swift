@@ -65,6 +65,11 @@ public struct HotkeyMatch: Sendable, Equatable {
 ///   Esc meant for the frontmost app still reaches it the rest of the time.
 /// - Any other `keyDown` while a modifier-only hotkey is held means another key (not
 ///   swallowed): the user is typing a shortcut such as fn+arrow.
+/// - An event the app posted itself (``KeyEventInfo/isSynthetic``: the ⌘V of a paste, the ⌘Z of
+///   undo) means nothing, is never swallowed and changes no state, whatever its key. The ⌘Z
+///   that undo posts usually arrives while the Z of ⌃⌥Z is still held: swallowed as that key's
+///   repeat, it would never reach the app, and its key-up would end the swallowing before the
+///   real Z key-up.
 ///
 /// A combination that fails ``HotkeyBinding/validate()`` is never matched, as dictation or
 /// undo, so a binding built in code cannot make the tap swallow ordinary typing.
@@ -102,7 +107,9 @@ public struct HotkeyMatcher: Sendable {
 
     /// Decides what `event` means. `capturingEscape` is whether Esc is swallowed right now.
     public mutating func match(_ event: KeyEventInfo, capturingEscape: Bool) -> HotkeyMatch {
-        switch event.type {
+        // Before any state is read or changed: the app's own keystroke is not the user's.
+        guard !event.isSynthetic else { return .passThrough }
+        return switch event.type {
         case .flagsChanged: matchFlagsChanged(event)
         case .keyDown: matchKeyDown(event, capturingEscape: capturingEscape)
         case .keyUp: matchKeyUp(event)

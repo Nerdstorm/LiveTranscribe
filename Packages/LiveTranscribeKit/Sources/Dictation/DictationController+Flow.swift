@@ -240,6 +240,7 @@ extension DictationController {
         case .undoneAndInserted(let inserted): inserted.isInserted ? .undone : .undoCopiedToClipboard
         case .copiedToClipboard: .undoCopiedToClipboard
         case .refusedDifferentApp: .undoRefused("Switch back to the app you dictated into to undo")
+        case .refusedFocusMoved: .undoRefused("Click back into the field you dictated into to undo")
         case .refusedFieldChanged: .undoRefused("The text was edited since, so it wasn't undone")
         case .refusedSecureField: .secureField
         case .failed: .undoFailed

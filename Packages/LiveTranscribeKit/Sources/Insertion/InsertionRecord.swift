@@ -8,7 +8,8 @@ public struct InsertionRecord: Sendable {
     /// The UTF-16 range the text occupied right after insertion; `nil` for paste.
     public let range: NSRange?
     public let app: AppInfo?
-    /// The field it went into, when Accessibility could see it.
+    /// The field it went into, when Accessibility could see it, for either method: undo is
+    /// refused once another field has focus.
     public let element: (any AccessibilityElement)?
     /// For the caller's undo window (30 s by default): the undoer does not check it.
     public let insertedAt: ContinuousClock.Instant
@@ -41,32 +42,36 @@ public struct InsertionRecord: Sendable {
 
 /// What ``InsertionUndoer/undo(_:replacingWith:in:)`` did, for the HUD.
 public enum UndoResult: Sendable, Equatable {
-    /// The inserted text was selected and replaced with the raw transcript through Accessibility;
-    /// `range` is where the raw transcript now sits.
+    /// The inserted text was selected and replaced with the uncleaned text through Accessibility;
+    /// `range` is where the uncleaned text now sits.
     case replacedInPlace(range: NSRange)
-    /// ⌘Z was sent, then the raw transcript went through the router with this result.
+    /// ⌘Z was sent, then the uncleaned text went through the router with this result.
     case undoneAndInserted(InsertionResult)
     /// Replacing in place changed the field unexpectedly, so nothing more was tried (⌘Z could
-    /// undo the wrong thing); the raw transcript is on the clipboard.
+    /// undo the wrong thing); the uncleaned text is on the clipboard.
     case copiedToClipboard
     /// Another app (or an unknown one) is in front; ⌘Z there would undo something unrelated.
     case refusedDifferentApp
-    /// The field was edited after the insertion, or focus moved to another field, so ⌘Z would
-    /// undo the user's own change instead of the insertion.
+    /// Focus moved to another field of the same app, so ⌘Z would undo something in that field.
+    /// Nothing changed: undo works again once the dictated field has focus.
+    case refusedFocusMoved
+    /// The field was edited after the insertion, so ⌘Z would undo the user's own change instead
+    /// of the insertion.
     case refusedFieldChanged
     /// The focused field is now secure; nothing is sent to it.
     case refusedSecureField
     /// ⌘Z could not be posted, or the clipboard could not be written. Nothing changed.
     case failed
 
-    /// Whether the raw transcript has replaced the edit in the field.
+    /// Whether the uncleaned text has replaced the edit in the field.
     public var succeeded: Bool {
         switch self {
         case .replacedInPlace:
             true
         case .undoneAndInserted(let result):
             result.isInserted || result == .nothingToInsert
-        case .copiedToClipboard, .refusedDifferentApp, .refusedFieldChanged, .refusedSecureField, .failed:
+        case .copiedToClipboard, .refusedDifferentApp, .refusedFocusMoved, .refusedFieldChanged, .refusedSecureField,
+             .failed:
             false
         }
     }

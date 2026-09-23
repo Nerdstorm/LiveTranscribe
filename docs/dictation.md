@@ -52,6 +52,19 @@ focus context, Command Mode, multilingual) is not started.
   than opening the microphone late and losing the first words.
 - **A dictation started from the menu** is hands-free: the shortcut stops it and Esc cancels it.
 - **Undo AI edit** works only between dictations, never during one.
+- **Undo AI edit puts back the uncleaned text, not the literal transcript.** F3 says undo
+  "swaps to the raw transcript"; it is read as "the text before cleanup". Everything cleanup
+  changed is taken back (fillers, punctuation, casing, rewording, list formatting), but snippet
+  expansions and vocabulary spellings stay: the user set those up, and turning a snippet back
+  into its spoken trigger would not help anyone. History keeps the literal transcript.
+- **Undo after a paste checks the field, not what it holds.** A paste records no range, and
+  reading a field's whole value after every paste would block on large fields (a terminal's
+  scrollback) and misfire where the app changes the value by itself (live terminal output,
+  rich-text reformatting). So undo refuses when another field has focus, whenever Accessibility
+  sees the field at both ends, but not when the user typed more in the same field: ⌘Z then
+  undoes that typing first. An Accessibility insertion is checked for both. Apps whose
+  accessibility is off (Electron apps such as Slack, until something turns it on) may report no
+  field, or one element for the whole window; there only the app is checked.
 - **The self-correction adapter is on only at Medium and High.** It resolves corrections
   whatever the prompt says, so at Light (every word kept) it is switched off per request and
   the base model cleans up.
@@ -84,7 +97,8 @@ New package targets (vertical slices), each with its own test target:
 Changed slices:
 
 - **Shared**: `CleanupLevel`, because `AppSettings` carries it and four slices read it; the
-  snippet placeholder token format (`⟦S1⟧`), which Snippets writes and Cleanup checks.
+  snippet placeholder token format (`⟦S1⟧`), which Snippets writes and Cleanup checks;
+  `SyntheticEventMarker`, the tag Insertion puts on the keys it posts and Hotkey's tap reads.
 - **Cleanup**: `Prompt` becomes `PromptBuilder`: base rules + level rules + vocabulary +
   placeholder rule + prior context, each a separately tested function. `Cleaner.clean` takes
   `CleanupOptions` (level, vocabulary terms, placeholder tokens, multi-line). `OutputGuard`
@@ -133,6 +147,10 @@ and nothing is recorded in history for a cancelled dictation.
   and a few more, listed in `Hotkey/ReservedShortcuts.swift`) can't be chosen for dictation or
   undo: the tap would take them from every app. ⌃⌥Space stays allowed: macOS uses it only to
   step through several input sources, and apps leave it alone.
+- The ⌘V and ⌘Z the app posts itself (a paste, Undo AI edit) carry `SyntheticEventMarker` in
+  `eventSourceUserData`, and the tap passes them through untouched: not swallowed, not a
+  shortcut, not another key. Without the tag, the ⌘Z that undo posts while the Z of ⌃⌥Z is
+  still held was swallowed as that key's repeat. Other apps' posted keys count as typing.
 - While Settings records a new shortcut, the shortcuts are paused so every key reaches the
   recorder. A dictation being recorded then is dropped silently, and the menu's *Start
   Dictation* says to finish recording first. They resume however recording ends.
@@ -152,8 +170,16 @@ get nothing.
 
 ### Undo AI edit
 
-⌃⌥Z within 30 s of an insertion, in the same app: select the inserted range via AX and replace
-it with the raw transcript; otherwise send ⌘Z and insert the raw transcript.
+⌃⌥Z within 30 s of an insertion, in the same app and field: select the inserted range via AX
+and replace it with the uncleaned text; otherwise send ⌘Z and insert the uncleaned text. The
+uncleaned text is the dictation before cleanup, with snippets and vocabulary still applied (see
+*Assumptions*).
+
+Undo refuses, changing nothing, when another app is in front, when another field of the same
+app has focus (checked for pasted text too, whenever Accessibility sees the field when it is
+inserted and when undo is pressed), when an Accessibility insertion was edited since, and in a
+password field. A refused undo can be tried again within the window, for example after clicking
+back into the dictated field.
 
 ## Settings
 

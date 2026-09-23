@@ -179,7 +179,7 @@ let package = Package(
         .testTarget(name: "SnippetsTests", dependencies: ["Snippets", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "VocabularyTests", dependencies: ["Vocabulary", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "InsertionTests", dependencies: ["Insertion", "Shared"], swiftSettings: strictSwift),
-        .testTarget(name: "HotkeyTests", dependencies: ["Hotkey"], swiftSettings: strictSwift),
+        .testTarget(name: "HotkeyTests", dependencies: ["Hotkey", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "PermissionsTests", dependencies: ["Permissions", "Capture"], swiftSettings: strictSwift),
         .testTarget(
             name: "DictationTests",

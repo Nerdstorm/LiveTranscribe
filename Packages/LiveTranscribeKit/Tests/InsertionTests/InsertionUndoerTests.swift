@@ -30,8 +30,9 @@ struct InsertionUndoerTests {
         }
 
         /// Inserts the cleaned text through the router, as dictation would, and records it.
-        func insertCleaned(app: AppInfo = Fixtures.textEdit) async throws -> InsertionRecord {
-            let target = Fixtures.target(field, app: app)
+        /// `seenByAccessibility: false` is an app that hid the field from Accessibility then.
+        func insertCleaned(app: AppInfo = Fixtures.textEdit, seenByAccessibility: Bool = true) async throws -> InsertionRecord {
+            let target = Fixtures.target(seenByAccessibility ? field : nil, app: app)
             let result = await router.insert(InsertionUndoerTests.cleaned, into: target)
             return try #require(InsertionRecord(
                 text: InsertionUndoerTests.cleaned, result: result, target: target, insertedAt: .now
@@ -201,9 +202,66 @@ struct InsertionUndoerTests {
 
         let result = await harness.undoer.undo(record, replacingWith: Self.raw, in: Fixtures.target(otherField))
 
-        #expect(result == .refusedFieldChanged)
+        #expect(result == .refusedFocusMoved)
+        #expect(!result.succeeded)
         #expect(harness.keystrokes.undos == 0)
         #expect(otherField.value == "Subject")
+    }
+
+    /// A paste leaves no range to check, but the field is still known: ⌘Z in another field of the
+    /// same app (Gmail's Subject after dictating into the body) would undo the user's typing there,
+    /// and the uncleaned text would follow it in.
+    @Test func refusesAPasteWhenFocusMovedToAnotherField() async throws {
+        let harness = Harness(field: FakeElement(value: "$ "))
+        let record = try await harness.insertCleaned(app: Fixtures.terminal)
+        #expect(record.method == .paste)
+        let otherField = FakeElement(value: "Subject")
+        otherField.typeText(": Q3 report")
+
+        let result = await harness.undoer.undo(
+            record, replacingWith: Self.raw, in: Fixtures.target(otherField, app: Fixtures.terminal)
+        )
+
+        #expect(result == .refusedFocusMoved)
+        #expect(harness.keystrokes.undos == 0)
+        #expect(harness.keystrokes.pastes == 1, "only the dictation's own paste")
+        #expect(otherField.value == "Subject: Q3 report")
+        #expect(harness.field.value == "$ " + Self.cleaned)
+    }
+
+    /// Back in the dictated field, the refused undo works: nothing was changed by the refusal.
+    @Test func undoesAPasteOnceFocusIsBackInItsField() async throws {
+        let harness = Harness(field: FakeElement(value: "$ "))
+        let record = try await harness.insertCleaned(app: Fixtures.terminal)
+        let otherField = FakeElement(value: "Subject")
+        _ = await harness.undoer.undo(record, replacingWith: Self.raw, in: Fixtures.target(otherField, app: Fixtures.terminal))
+
+        let result = await harness.undoer.undo(
+            record, replacingWith: Self.raw, in: Fixtures.target(harness.field, app: Fixtures.terminal)
+        )
+
+        #expect(result == .undoneAndInserted(.inserted(.paste, range: nil)))
+        #expect(harness.field.value == "$ " + Self.raw)
+    }
+
+    /// Accessibility could not see the field at the insertion or cannot now (Electron apps that
+    /// hide their fields, a lookup that timed out): the fields cannot be compared, so the same-app
+    /// check is all there is, and ⌘Z runs as before.
+    @Test("A paste whose field is unknown on either side is still undone", arguments: [
+        (true, false), (false, true), (false, false),
+    ])
+    func undoesAPasteWhoseFieldCannotBeCompared(seenAtInsertion: Bool, seenNow: Bool) async throws {
+        let harness = Harness(field: FakeElement(value: "$ "))
+        let record = try await harness.insertCleaned(app: Fixtures.terminal, seenByAccessibility: seenAtInsertion)
+        #expect(record.method == .paste)
+
+        let result = await harness.undoer.undo(
+            record, replacingWith: Self.raw, in: Fixtures.target(seenNow ? harness.field : nil, app: Fixtures.terminal)
+        )
+
+        #expect(result == .undoneAndInserted(.inserted(.paste, range: nil)))
+        #expect(harness.keystrokes.undos == 1)
+        #expect(harness.field.value == "$ " + Self.raw)
     }
 
     @Test func refusesASecureField() async throws {

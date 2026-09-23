@@ -56,11 +56,16 @@ public struct KeyEventInfo: Sendable, Equatable {
     public var flags: KeyEventFlags
     /// A repeat generated while a key is held, rather than a new press.
     public var isAutorepeat: Bool
+    /// Posted by this app itself, such as the ⌘V of a paste or the ⌘Z of *Undo AI edit*: the
+    /// event carries `SyntheticEventMarker`. Never a hotkey, whatever its key. Events other apps
+    /// post count as typing.
+    public var isSynthetic: Bool
 
-    public init(type: KeyEventType, keyCode: UInt16, flags: KeyEventFlags, isAutorepeat: Bool) {
+    public init(type: KeyEventType, keyCode: UInt16, flags: KeyEventFlags, isAutorepeat: Bool, isSynthetic: Bool = false) {
         self.type = type
         self.keyCode = keyCode
         self.flags = flags
         self.isAutorepeat = isAutorepeat
+        self.isSynthetic = isSynthetic
     }
 }

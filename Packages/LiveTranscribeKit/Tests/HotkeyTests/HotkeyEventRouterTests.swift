@@ -1,5 +1,6 @@
 import CoreGraphics
 @testable import Hotkey
+import Shared
 import Testing
 
 @Suite("HotkeyEventRouter")
@@ -73,6 +74,21 @@ struct HotkeyEventRouterTests {
         #expect(await Self.events(of: stream) == [.pressed, .otherKey, .undo])
     }
 
+    /// Undo's own ⌘Z, posted while ⌃⌥Z is still held, reaches the app and delivers nothing.
+    @Test func theAppsOwnKeystrokesAreNeitherDeliveredNorSwallowed() async {
+        let (router, stream) = Self.router()
+        let swallowed = [
+            Keys.down(Keys.keyZ, [.control, .option]),
+            Keys.posted(Keys.down(Keys.keyZ, [.command])),
+            Keys.posted(Keys.up(Keys.keyZ, [.command])),
+            Keys.up(Keys.keyZ),
+        ].map(router.route)
+        router.finish()
+
+        #expect(swallowed == [true, false, false, true])
+        #expect(await Self.events(of: stream) == [.undo])
+    }
+
     @Test func eventsAfterFinishAreDropped() async {
         let (router, stream) = Self.router()
         router.finish()
@@ -104,6 +120,19 @@ struct KeyEventInfoConversionTests {
         let info = try #require(KeyEventInfo(event: event, type: .keyDown))
         #expect(!info.isAutorepeat)
         #expect(info.keyCode == 6)
+    }
+
+    @Test("Only the app's own tag marks an event as its own", arguments: [
+        (SyntheticEventMarker.value, true),
+        (0, false),
+        (SyntheticEventMarker.value + 1, false),
+        (-1, false),
+    ] as [(Int64, Bool)])
+    func recognisesTheAppsOwnEvents(userData: Int64, isSynthetic: Bool) throws {
+        let event = try #require(CGEvent(keyboardEventSource: nil, virtualKey: 6, keyDown: true))
+        event.setIntegerValueField(.eventSourceUserData, value: userData)
+        let info = try #require(KeyEventInfo(event: event, type: .keyDown))
+        #expect(info.isSynthetic == isSynthetic)
     }
 
     @Test("Other event types are ignored", arguments: [CGEventType.leftMouseDown, .scrollWheel, .tapDisabledByTimeout])

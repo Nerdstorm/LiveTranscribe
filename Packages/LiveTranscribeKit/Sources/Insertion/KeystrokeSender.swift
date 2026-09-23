@@ -10,7 +10,8 @@ public protocol KeystrokeSender: Sendable {
 }
 
 /// ``KeystrokeSender`` that posts synthetic key events at the HID level, where they reach the app
-/// with keyboard focus as if typed.
+/// with keyboard focus as if typed. Each event is tagged with `SyntheticEventMarker`, so the
+/// app's own hotkey tap never mistakes it for the user's typing.
 ///
 /// Uses virtual key codes (V is 9, Z is 6), which name physical key positions. Layouts that move
 /// letters (Dvorak without the "QWERTY ⌘" variant) may map those positions to other shortcuts.
@@ -35,18 +36,31 @@ public struct CGEventKeystrokeSender: KeystrokeSender {
             Log.insertion.error("\(name, privacy: .public) not sent: no permission to post keyboard events")
             return false
         }
-        let source = CGEventSource(stateID: .hidSystemState)
-        guard let down = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
-              let up = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
-        else {
+        guard let events = Self.shortcutEvents(commandWith: keyCode) else {
             Log.insertion.error("\(name, privacy: .public) not sent: the key events could not be created")
             return false
         }
-        // Only ⌘, whatever modifiers are physically held (the hotkey may still be down).
-        down.flags = .maskCommand
-        up.flags = .maskCommand
-        down.post(tap: .cghidEventTap)
-        up.post(tap: .cghidEventTap)
+        events.down.post(tap: .cghidEventTap)
+        events.up.post(tap: .cghidEventTap)
         return true
+    }
+
+    /// The key-down and key-up of ⌘ and `keyCode`, tagged as the app's own; `nil` if Core
+    /// Graphics cannot create them.
+    ///
+    /// Only ⌘, whatever modifiers are physically held (the hotkey may still be down). Both events
+    /// carry `SyntheticEventMarker` so the app's hotkey tap lets them through: the ⌘Z of *Undo AI
+    /// edit* is usually posted while the Z of ⌃⌥Z is still held, and would otherwise be swallowed
+    /// as that key's repeat.
+    static func shortcutEvents(commandWith keyCode: CGKeyCode) -> (down: CGEvent, up: CGEvent)? {
+        let source = CGEventSource(stateID: .hidSystemState)
+        guard let down = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
+              let up = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
+        else { return nil }
+        for event in [down, up] {
+            event.flags = .maskCommand
+            event.setIntegerValueField(.eventSourceUserData, value: SyntheticEventMarker.value)
+        }
+        return (down, up)
     }
 }

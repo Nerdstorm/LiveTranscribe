@@ -119,6 +119,7 @@ actor FakeDelivery: TextDelivery {
     var undoResult: UndoResult = .replacedInPlace(range: NSRange(location: 0, length: 0))
 
     func set(result: InsertionResult) { self.result = result }
+    func set(undoResult: UndoResult) { self.undoResult = undoResult }
 
     func insert(_ text: String, into target: InsertionTarget) async -> InsertionResult {
         inserted.append(text)

@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import Shared
 
 extension KeyEventInfo {
     /// The hotkey-relevant parts of a tapped event; `nil` for event types the matcher ignores.
@@ -15,7 +16,8 @@ extension KeyEventInfo {
             type: kind,
             keyCode: UInt16(truncatingIfNeeded: event.getIntegerValueField(.keyboardEventKeycode)),
             flags: KeyEventFlags(rawValue: event.flags.rawValue),
-            isAutorepeat: event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+            isAutorepeat: event.getIntegerValueField(.keyboardEventAutorepeat) != 0,
+            isSynthetic: event.getIntegerValueField(.eventSourceUserData) == SyntheticEventMarker.value
         )
     }
 }

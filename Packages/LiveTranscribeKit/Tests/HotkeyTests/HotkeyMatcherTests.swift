@@ -20,6 +20,13 @@ enum Keys {
     static func up(_ keyCode: UInt16, _ flags: KeyEventFlags = []) -> KeyEventInfo {
         KeyEventInfo(type: .keyUp, keyCode: keyCode, flags: flags, isAutorepeat: false)
     }
+
+    /// `event` as the app itself posts it: the ⌘V of a paste or the ⌘Z of undo.
+    static func posted(_ event: KeyEventInfo) -> KeyEventInfo {
+        var event = event
+        event.isSynthetic = true
+        return event
+    }
 }
 
 @Suite("HotkeyMatcher")
@@ -183,6 +190,57 @@ struct HotkeyMatcherTests {
             Keys.up(Keys.keyZ, [.command]),
         ])
         #expect(decisions == [HotkeyMatch(meaning: .undo, consumes: true), Self.swallowed, Self.swallowed, .passThrough, .passThrough])
+    }
+
+    /// The ⌘Z that undo posts arrives while the Z of ⌃⌥Z is usually still held. It must reach the
+    /// app, and must not end the swallowing of the real Z, whose key-up the app never saw go down.
+    @Test func theAppsOwnUndoShortcutPassesThroughWhileTheUndoKeyIsHeld() {
+        var matcher = HotkeyMatcher(binding: .defaultDictation, undoBinding: .defaultUndo)
+        let decisions = Self.match(&matcher, [
+            Keys.down(Keys.keyZ, [.control, .option]),
+            Keys.posted(Keys.down(Keys.keyZ, [.command])),
+            Keys.posted(Keys.up(Keys.keyZ, [.command])),
+            Keys.down(Keys.keyZ, [.control, .option], repeat: true),
+            Keys.up(Keys.keyZ, [.control, .option]),
+        ])
+        #expect(decisions == [
+            HotkeyMatch(meaning: .undo, consumes: true), .passThrough, .passThrough, Self.swallowed, Self.swallowed,
+        ])
+    }
+
+    /// A dictation combination on V, still held when the dictation is pasted: the paste's ⌘V is
+    /// neither swallowed nor taken for the hotkey's release.
+    @Test func theAppsOwnPastePassesThroughAHeldComboOnTheSameKey() {
+        let keyV: UInt16 = 9
+        var matcher = HotkeyMatcher(binding: .keyCombo(keyCode: keyV, modifiers: [.control, .option]), undoBinding: .defaultUndo)
+        let decisions = Self.match(&matcher, [
+            Keys.down(keyV, [.control, .option]),
+            Keys.posted(Keys.down(keyV, [.command])),
+            Keys.posted(Keys.up(keyV, [.command])),
+        ])
+        #expect(decisions == [HotkeyMatch(meaning: .hotkeyDown, consumes: true), .passThrough, .passThrough])
+        #expect(matcher.isHotkeyHeld)
+        #expect(matcher.match(Keys.up(keyV), capturingEscape: false) == HotkeyMatch(meaning: .hotkeyUp, consumes: true))
+    }
+
+    /// Posted events never count as the user's keys: not as a hotkey, an undo or an Esc, and not
+    /// as another key that interrupts a held modifier hotkey.
+    @Test("The app's own events mean nothing, whatever their key", arguments: [
+        Keys.down(Keys.keyZ, [.control, .option]),
+        Keys.down(Keys.space, [.control, .option]),
+        Keys.down(Keys.escape),
+        Keys.down(Keys.keyA, [.secondaryFn]),
+        Keys.flagsChanged(63, []),
+    ])
+    func postedEventsMeanNothing(event: KeyEventInfo) {
+        var matcher = HotkeyMatcher(binding: .defaultDictation, undoBinding: .defaultUndo)
+        _ = matcher.match(Keys.flagsChanged(63, [.secondaryFn]), capturingEscape: true)
+        #expect(matcher.match(Keys.posted(event), capturingEscape: true) == .passThrough)
+        #expect(matcher.isHotkeyHeld, "a posted event does not release the held hotkey")
+
+        var combo = HotkeyMatcher(binding: Keys.controlOption, undoBinding: .defaultUndo)
+        #expect(combo.match(Keys.posted(event), capturingEscape: true) == .passThrough)
+        #expect(!combo.isHotkeyHeld)
     }
 
     @Test func aModifierOnlyUndoBindingIsIgnored() {
