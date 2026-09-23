@@ -116,6 +116,9 @@ actor Gate {
         await withCheckedContinuation { waiters.append($0) }
     }
 
+    /// Whether anything is waiting for the gate to open.
+    var hasWaiters: Bool { !waiters.isEmpty }
+
     func open() {
         isOpen = true
         waiters.forEach { $0.resume() }

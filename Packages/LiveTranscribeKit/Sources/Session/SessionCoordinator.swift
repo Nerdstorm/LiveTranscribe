@@ -55,6 +55,10 @@ public actor SessionCoordinator: SessionControlling {
     private var cleanupAvailability: CleanupAvailability
     private var loadTask: Task<Void, Never>?
     private var activeRun: ActiveRun?
+    /// A ``start()`` is under way: it awaits permission, the session file and the microphone
+    /// before `activeRun` is set, so without this a second Start would open a second capture
+    /// that nothing tracks or stops.
+    private var isStarting = false
 
     public init(settings: AppSettings, dependencies: Dependencies) {
         (events, eventInput) = AsyncStream.makeStream(of: SessionEvent.self)
@@ -147,12 +151,14 @@ public actor SessionCoordinator: SessionControlling {
         default:
             return
         }
+        guard !isStarting, activeRun == nil else { return }
+        isStarting = true
+        defer { isStarting = false }
         guard await dependencies.microphonePermission.request() else {
             Log.session.notice("Microphone permission denied")
             setPhase(.failed(.microphonePermissionDenied))
             return
         }
-        guard activeRun == nil else { return }
 
         let sessionID = UUID()
         let sink: any SessionSink

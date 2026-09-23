@@ -15,7 +15,8 @@ private struct Harness {
     let cleaner = FakeCleaner()
     let sink = MemorySessionSink()
 
-    init(settings: AppSettings = .defaults, micGranted: Bool = true) {
+    /// - Parameter beforeSink: Runs before the session file is made; a test holds a Start there.
+    init(settings: AppSettings = .defaults, micGranted: Bool = true, beforeSink: @escaping @Sendable () async -> Void = {}) {
         let source = self.source
         let sink = self.sink
         coordinator = SessionCoordinator(
@@ -26,7 +27,10 @@ private struct Harness {
                 transcriber: transcriber,
                 cleaner: cleaner,
                 cleanupOptions: { CleanupOptions(level: settings.cleanupLevel) },
-                makeSink: { _ in sink },
+                makeSink: { _ in
+                    await beforeSink()
+                    return sink
+                },
                 microphonePermission: FakePermission(granted: micGranted)
             )
         )
@@ -134,6 +138,27 @@ struct SessionCoordinatorTests {
         #expect(cleaned.cleanedText == "utterance 1")
         #expect(cleaned.fallbackReason == "generation failed: Metal device lost")
         #expect(await h.sink.records.first?.fellBack == true)
+    }
+
+    /// A double click on Start: the second press arrives while the first is still opening the
+    /// session, and must not open a second capture that Stop would never close.
+    @Test func aSecondStartWhileTheFirstIsUnderWayOpensNothing() async throws {
+        let gate = Gate()
+        let h = Harness(beforeSink: { await gate.wait() })
+        await h.coordinator.prepare()
+        let first = Task { await h.coordinator.start() }
+        while await !gate.hasWaiters { await Task.yield() }
+        let second = Task { await h.coordinator.start() }
+        try await Task.sleep(for: .milliseconds(50))
+        await gate.open()
+        await first.value
+        await second.value
+        try await h.recorder.waitUntil { $0.phases.last == .listening }
+        #expect(await h.source.startCount == 1)
+
+        await h.coordinator.stop()
+        #expect(await h.source.stopCount >= 1)
+        #expect(await h.recorder.events.phases.last == .ready)
     }
 
     @Test func stopDrainsQueuedSegmentsAndFlushes() async throws {
