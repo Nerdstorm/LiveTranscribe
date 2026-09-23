@@ -146,7 +146,7 @@ let package = Package(
             name: "Bench",
             dependencies: [
                 "Shared", "Capture", "Segmentation", "Transcription", "Cleanup",
-                "Persistence", "Session", "MLXSupport",
+                "Persistence", "Session", "MLXSupport", "Dictation",
             ],
             swiftSettings: strictSwift
         ),

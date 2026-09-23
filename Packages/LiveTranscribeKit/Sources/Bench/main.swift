@@ -2,6 +2,7 @@
 // per-stage latency. Build with xcodebuild (MLX needs its Metal library); see README.md.
 //
 //   Bench [--fixtures <dir>] [--level none|light|medium|high] [--no-cleanup] [--no-adapter] [--fast]
+//   Bench --dictation [--clips <dir>] [--level <level>]... [--p95-target-ms <ms>] [--verbose] [--no-adapter]
 
 import Capture
 import Cleanup
@@ -19,6 +20,14 @@ struct BenchOptions {
     var adapterEnabled = true
     var level = AppSettings.defaults.cleanupLevel
     var pacing = FileAudioSource.Pacing.realTime
+    /// Dictation eval instead of the live-transcript bench.
+    var dictation = false
+    var clipsDirectory = URL(fileURLWithPath: "Tests/IntegrationTests/Fixtures/Dictation", isDirectory: true)
+    /// Levels given with --level; the dictation eval runs every level when none are.
+    var levels: [CleanupLevel]?
+    /// The dictation latency target from docs/dictation.md: p95 of release-to-text under 1.2 s.
+    var p95TargetMs = 1_200
+    var verbose = false
 
     static func parse(_ arguments: [String]) throws -> BenchOptions {
         var options = BenchOptions()
@@ -33,12 +42,25 @@ struct BenchOptions {
                     throw BenchError.usage("--level needs one of \(CleanupLevel.allCases.map(\.rawValue).joined(separator: ", "))")
                 }
                 options.level = level
+                options.levels = (options.levels ?? []) + [level]
             case "--no-cleanup":
                 options.cleanupEnabled = false
             case "--no-adapter":
                 options.adapterEnabled = false
             case "--fast":
                 options.pacing = .asFastAsPossible
+            case "--dictation":
+                options.dictation = true
+            case "--clips":
+                guard let path = iterator.next() else { throw BenchError.usage("--clips needs a directory") }
+                options.clipsDirectory = URL(fileURLWithPath: path, isDirectory: true)
+            case "--p95-target-ms":
+                guard let value = iterator.next().flatMap(Int.init), value > 0 else {
+                    throw BenchError.usage("--p95-target-ms needs a positive number")
+                }
+                options.p95TargetMs = value
+            case "--verbose":
+                options.verbose = true
             default:
                 throw BenchError.usage("unknown argument \(argument)")
             }
@@ -54,7 +76,12 @@ enum BenchError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .usage(let detail): "\(detail)\nusage: Bench [--fixtures <dir>] [--level none|light|medium|high] [--no-cleanup] [--no-adapter] [--fast]"
+        case .usage(let detail):
+            """
+            \(detail)
+            usage: Bench [--fixtures <dir>] [--level none|light|medium|high] [--no-cleanup] [--no-adapter] [--fast]
+                   Bench --dictation [--clips <dir>] [--level <level>]... [--p95-target-ms <ms>] [--verbose] [--no-adapter]
+            """
         case .noFixtures(let path):
             "No .wav files with matching .txt references in \(path). Run scripts/generate-test-audio.sh first."
         case .sessionFailed(let detail): "Session failed: \(detail)"
@@ -91,6 +118,11 @@ settings.cleanupAdapterEnabled = options.adapterEnabled
 settings.cleanupLevel = options.level
 let cleanupOptions = CleanupOptions(level: options.level)
 MLXRuntime.configure(gpuCacheLimitMB: settings.gpuCacheLimitMB)
+
+if options.dictation {
+    try await DictationBench.run(options: options, settings: settings)
+    exit(0)
+}
 
 let fixtures = try Fixture.load(from: options.fixturesDirectory)
 guard !fixtures.isEmpty else { throw BenchError.noFixtures(options.fixturesDirectory.path) }
