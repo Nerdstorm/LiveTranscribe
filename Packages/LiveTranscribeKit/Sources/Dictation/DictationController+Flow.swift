@@ -173,7 +173,7 @@ extension DictationController {
         }
         // Where the text went comes first: it may be waiting on the clipboard for ⌘V.
         finish(
-            Self.notice(for: result, app: target.app?.name),
+            Self.notice(for: result, app: target.app?.name, accessibilityGranted: dependencies.accessibility.isGranted()),
             Self.notice(for: recording, limitSeconds: settings.dictation.maxRecordingSeconds)
         )
     }
@@ -241,10 +241,20 @@ extension DictationController {
         }
     }
 
-    static func notice(for result: InsertionResult, app: String?) -> DictationNotice? {
+    /// What the HUD says about where the text went; `nil` when it simply went in.
+    ///
+    /// - Parameter accessibilityGranted: Read only when the paste was not permitted: macOS
+    ///   refuses keystrokes without Accessibility, and sometimes, with it on, until the app reopens.
+    static func notice(
+        for result: InsertionResult,
+        app: String?,
+        accessibilityGranted: @autoclosure () -> Bool
+    ) -> DictationNotice? {
         switch result {
         case .inserted, .nothingToInsert: nil
-        case .copiedToClipboard: .copiedToClipboard(app: app)
+        case .copiedToClipboard(.notAccepted): .copiedToClipboard(app: app)
+        case .copiedToClipboard(.focusMoved): .copiedAfterFocusMoved
+        case .copiedToClipboard(.pasteNotPermitted): .pasteNotAllowed(needsReopen: accessibilityGranted())
         case .refusedSecureField: .secureField
         case .failed: .insertionFailed
         }

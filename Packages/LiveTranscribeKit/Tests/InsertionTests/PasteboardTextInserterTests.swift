@@ -178,6 +178,21 @@ struct PasteboardTextInserterTests {
         #expect(pasteboard.items == Self.userClipboard)
     }
 
+    /// macOS would drop ⌘V, so the user's clipboard is not swapped out for nothing.
+    @Test func doesNotTouchThePasteboardWithoutPermissionToPostKeystrokes() async {
+        let pasteboard = FakePasteboard(items: Self.userClipboard)
+        let keystrokes = FakeKeystrokes(permitted: false)
+        let focus = FakeFocus()
+
+        await #expect(throws: InsertionError.pasteNotPermitted) {
+            try await makeInserter(pasteboard, keystrokes, focus: focus).insert("dictated", into: Fixtures.target(nil))
+        }
+        #expect(keystrokes.pastes == 0)
+        #expect(pasteboard.changeCount == 0)
+        #expect(pasteboard.items == Self.userClipboard)
+        #expect(focus.readCount == 0, "nothing will be pasted, so the focus doesn't matter")
+    }
+
     @Test func aRelaunchOfTheSameAppIsAnotherApp() async {
         let focus = FakeFocus()
         focus.move(to: AppInfo(bundleIdentifier: "com.apple.TextEdit", name: "TextEdit", processIdentifier: 99))

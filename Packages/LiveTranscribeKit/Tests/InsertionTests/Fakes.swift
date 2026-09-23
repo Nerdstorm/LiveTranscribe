@@ -96,18 +96,28 @@ final class FakeKeystrokes: KeystrokeSender {
     }
 
     private let succeeds: Bool
+    private let permitted: Bool
     private let onPaste: @Sendable () -> Void
     private let onUndo: @Sendable () -> Void
     private let state = OSAllocatedUnfairLock(initialState: State())
 
-    init(succeeds: Bool = true, onPaste: @escaping @Sendable () -> Void = {}, onUndo: @escaping @Sendable () -> Void = {}) {
+    /// - Parameter permitted: What ``canPost()`` answers: whether macOS would let the app post.
+    init(
+        succeeds: Bool = true,
+        permitted: Bool = true,
+        onPaste: @escaping @Sendable () -> Void = {},
+        onUndo: @escaping @Sendable () -> Void = {}
+    ) {
         self.succeeds = succeeds
+        self.permitted = permitted
         self.onPaste = onPaste
         self.onUndo = onUndo
     }
 
     var pastes: Int { state.withLock { $0.pastes } }
     var undos: Int { state.withLock { $0.undos } }
+
+    func canPost() -> Bool { permitted }
 
     func sendPaste() -> Bool {
         guard succeeds else { return false }

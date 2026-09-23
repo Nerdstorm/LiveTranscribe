@@ -9,7 +9,14 @@ public enum DictationNotice: Sendable, Equatable {
     case secureField
     case nothingHeard
     case cancelled
+    /// The app took neither an Accessibility insertion nor a paste; the text is on the clipboard.
     case copiedToClipboard(app: String?)
+    /// Another app had focus by the time the text was ready; the text is on the clipboard.
+    case copiedAfterFocusMoved
+    /// macOS doesn't let Live Transcribe post ⌘V, so the text is on the clipboard. With
+    /// Accessibility already on (`needsReopen`), reopening the app is what's left to do;
+    /// otherwise Accessibility must be allowed first.
+    case pasteNotAllowed(needsReopen: Bool)
     case insertionFailed
     case captureFailed(String)
     /// The microphone stopped partway through; what was heard before it did was inserted.
@@ -41,6 +48,11 @@ public enum DictationNotice: Sendable, Equatable {
         case .cancelled: "Cancelled"
         case .copiedToClipboard(let app):
             if let app { "\(app) didn't accept the text. It's on the clipboard: press ⌘V" } else { "Copied: press ⌘V to paste" }
+        case .copiedAfterFocusMoved: "Another app took focus, so the text is on the clipboard: press ⌘V"
+        case .pasteNotAllowed(needsReopen: true):
+            "Quit and reopen Live Transcribe so it can paste. The text is on the clipboard: press ⌘V"
+        case .pasteNotAllowed(needsReopen: false):
+            "Allow Live Transcribe in Accessibility so it can paste. The text is on the clipboard: press ⌘V"
         case .insertionFailed: "The text couldn't be inserted or copied"
         case .captureFailed(let detail): "The microphone stopped: \(detail)"
         case .captureStoppedEarly(let seconds):
@@ -61,8 +73,8 @@ public enum DictationNotice: Sendable, Equatable {
     /// Shown as a problem rather than as information.
     public var isProblem: Bool {
         switch self {
-        case .cancelled, .undone, .nothingToUndo, .nothingHeard, .copiedToClipboard, .undoCopiedToClipboard, .microphone,
-             .stillProcessing, .recordingShortcut:
+        case .cancelled, .undone, .nothingToUndo, .nothingHeard, .copiedToClipboard, .copiedAfterFocusMoved,
+             .undoCopiedToClipboard, .microphone, .stillProcessing, .recordingShortcut:
             false
         default:
             true

@@ -19,12 +19,13 @@ struct InsertionRouterTests {
             field: FakeElement,
             clipboard: [PasteboardSnapshot.Item] = [],
             keystrokesSucceed: Bool = true,
+            keystrokesPermitted: Bool = true,
             overrides: InserterOverrides = .bundled
         ) {
             let pasteboard = FakePasteboard(items: clipboard)
-            let keystrokes = keystrokesSucceed
+            let keystrokes = keystrokesSucceed && keystrokesPermitted
                 ? FakeKeystrokes.typing(into: field, from: pasteboard)
-                : FakeKeystrokes(succeeds: false)
+                : FakeKeystrokes(succeeds: keystrokesSucceed, permitted: keystrokesPermitted)
             self.field = field
             self.pasteboard = pasteboard
             self.keystrokes = keystrokes
@@ -97,7 +98,7 @@ struct InsertionRouterTests {
 
         let result = await harness.router.insert("buy milk", into: Fixtures.target(harness.field))
 
-        #expect(result == .copiedToClipboard)
+        #expect(result == .copiedToClipboard(.notAccepted))
         #expect(harness.keystrokes.pastes == 0)
         #expect(harness.pasteboard.string == "buy milk")
     }
@@ -217,10 +218,51 @@ struct InsertionRouterTests {
 
         let result = await harness.router.insert("ls", into: Fixtures.target(harness.field, app: Fixtures.terminal))
 
-        #expect(result == .copiedToClipboard)
+        #expect(result == .copiedToClipboard(.focusMoved))
         #expect(harness.keystrokes.pastes == 0)
         #expect(harness.pasteboard.items == [FakePasteboard.plainItem("ls")])
         #expect(harness.field.value == "$ ")
+    }
+
+    /// The app isn't to blame: macOS doesn't let Live Transcribe paste, so the HUD must say so.
+    @Test func saysPastingIsNotAllowedWhenThatIsWhyTheTextIsOnTheClipboard() async {
+        let harness = Harness(field: FakeElement(value: "$ "), clipboard: Self.clipboard, keystrokesPermitted: false)
+
+        let result = await harness.router.insert("ls", into: Fixtures.target(harness.field, app: Fixtures.terminal))
+
+        #expect(result == .copiedToClipboard(.pasteNotPermitted))
+        #expect(harness.pasteboard.items == [FakePasteboard.plainItem("ls")])
+        #expect(harness.field.value == "$ ")
+    }
+
+    /// The last failure decides: Accessibility was refused, but it's the paste that needs fixing.
+    @Test func thePasteFailureExplainsTheClipboardAfterAnAccessibilityFailure() async {
+        let harness = Harness(
+            field: FakeElement(value: "", behaviour: .ignoresWrites),
+            clipboard: Self.clipboard,
+            keystrokesPermitted: false
+        )
+
+        let result = await harness.router.insert("dictated", into: Fixtures.target(harness.field))
+
+        #expect(result == .copiedToClipboard(.pasteNotPermitted))
+        #expect(harness.pasteboard.string == "dictated")
+    }
+
+    @Test("Each failure that ends on the clipboard says why", arguments: [
+        (InsertionError.pasteNotPermitted, ClipboardReason.pasteNotPermitted),
+        (.focusMovedToAnotherApp, .focusMoved),
+        (.noFocusedElement, .notAccepted),
+        (.valueUnreadable, .notAccepted),
+        (.selectionUnreadable, .notAccepted),
+        (.writeRejected, .notAccepted),
+        (.writeIgnored, .notAccepted),
+        (.verificationFailed, .notAccepted),
+        (.pasteboardWriteFailed, .notAccepted),
+        (.keystrokeFailed, .notAccepted),
+    ])
+    func clipboardReason(error: InsertionError, reason: ClipboardReason) {
+        #expect(error.clipboardReason == reason)
     }
 
     @Test func leavesTheTextOnTheClipboardWhenEveryMethodFails() async {
@@ -232,7 +274,7 @@ struct InsertionRouterTests {
 
         let result = await harness.router.insert("dictated", into: Fixtures.target(harness.field))
 
-        #expect(result == .copiedToClipboard)
+        #expect(result == .copiedToClipboard(.notAccepted))
         #expect(harness.pasteboard.string == "dictated")
         // An ordinary copy: no transient markers, so clipboard managers keep it.
         #expect(harness.pasteboard.items == [FakePasteboard.plainItem("dictated")])

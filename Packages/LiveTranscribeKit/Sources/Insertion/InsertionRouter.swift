@@ -8,7 +8,8 @@ import Shared
 ///    copied. Checked first, so no method ever runs against it.
 /// 2. Accessibility, then paste. An app whose override is ``InsertionMethod/paste``, or a target
 ///    without a focused element, gets paste only.
-/// 3. If every method fails, the text is left on the clipboard for the user to paste.
+/// 3. If every method fails, the text is left on the clipboard for the user to paste, with the
+///    last failure's ``InsertionError/clipboardReason`` so the HUD can say what to do about it.
 ///
 /// Accessibility writes to the target's own element, wherever the focus is now. Paste goes to the
 /// current focus, so the paste inserter checks it again just before ⌘V: a field that has become
@@ -51,6 +52,7 @@ public struct InsertionRouter: Sendable {
             return .refusedSecureField
         }
 
+        var reason = ClipboardReason.notAccepted
         for method in methods(for: target) {
             do {
                 let range = try await inserter(for: method).insert(text, into: target)
@@ -65,13 +67,14 @@ public struct InsertionRouter: Sendable {
                     // Found only just before ⌘V: as for a secure target, nothing is copied either.
                     return .refusedSecureField
                 }
+                reason = error.clipboardReason
                 if error.mayHaveChangedField {
                     Log.insertion.error("The field in \(app, privacy: .public) may hold part of the text; not retrying")
                     break
                 }
             }
         }
-        return copyToClipboard(text)
+        return copyToClipboard(text, because: reason)
     }
 
     /// The methods ``insert(_:into:)`` tries for `target`, in order. Empty for a secure target.
@@ -85,13 +88,13 @@ public struct InsertionRouter: Sendable {
     }
 
     /// Leaves `text` on the clipboard as an ordinary copy, for when it could not be inserted.
-    public func copyToClipboard(_ text: String) -> InsertionResult {
+    public func copyToClipboard(_ text: String, because reason: ClipboardReason) -> InsertionResult {
         guard pasteboard.writeString(text) else {
             Log.insertion.error("Nothing inserted and the clipboard could not be written")
             return .failed
         }
         Log.insertion.info("Text left on the clipboard for the user to paste")
-        return .copiedToClipboard
+        return .copiedToClipboard(reason)
     }
 
     private func inserter(for method: InsertionMethod) -> any TextInserter {

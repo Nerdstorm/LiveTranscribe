@@ -12,6 +12,7 @@ import Shared
 /// was read before speech-to-text and cleanup ran, up to seconds earlier. So the focus is read
 /// again just before the pasteboard is written: if it is now secure (the user tabbed into a
 /// password field), or another app has it, nothing is pasted and the pasteboard is left alone.
+/// The same goes when macOS doesn't let the app post keystrokes: ⌘V could not be sent anyway.
 ///
 /// Pastes through one inserter (and its copies) run one at a time, in call order: an overlapping
 /// paste would snapshot the other's text and restore it over the user's clipboard. Build one
@@ -43,13 +44,18 @@ public struct PasteboardTextInserter: TextInserter {
     /// Once called, the paste runs to the end even if the caller is cancelled, including any wait
     /// for an earlier paste; cancel before calling.
     ///
-    /// - Throws: ``InsertionError/focusBecameSecure`` or ``InsertionError/focusMovedToAnotherApp``
-    ///   when the focus changed since `target` was read; the pasteboard is then untouched.
+    /// - Throws: ``InsertionError/pasteNotPermitted`` when macOS doesn't let the app post ⌘V, and
+    ///   ``InsertionError/focusBecameSecure`` or ``InsertionError/focusMovedToAnotherApp`` when the
+    ///   focus changed since `target` was read; the pasteboard is then untouched.
     public func insert(_ text: String, into target: InsertionTarget) async throws(InsertionError) -> NSRange? {
         try await queue.run { await self.paste(text, into: target) }.get()
     }
 
     private func paste(_ text: String, into target: InsertionTarget) async -> Result<NSRange?, InsertionError> {
+        guard keystrokes.canPost() else {
+            Log.insertion.error("Nothing pasted: macOS doesn't let Live Transcribe post keystrokes")
+            return .failure(.pasteNotPermitted)
+        }
         // Read-only, and possibly slow (it makes other apps provide promised data), so taken
         // before the focus check: the check then runs as close to ⌘V as it can.
         let snapshot = pasteboard.snapshot()
