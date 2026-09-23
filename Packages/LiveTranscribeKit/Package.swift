@@ -73,7 +73,7 @@ let package = Package(
         .target(
             name: "Cleanup",
             dependencies: [
-                "Shared",
+                "Shared", "Styles",
                 .product(name: "MLXLLM", package: "mlx-swift-lm"),
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
                 .product(name: "MLX", package: "mlx-swift"),
@@ -117,7 +117,7 @@ let package = Package(
         .target(
             name: "CleanupTraining",
             dependencies: [
-                "Shared", "Cleanup", "MLXSupport",
+                "Shared", "Cleanup", "MLXSupport", "Styles",
                 .product(name: "MLX", package: "mlx-swift"),
                 .product(name: "MLXNN", package: "mlx-swift"),
                 .product(name: "MLXOptimizers", package: "mlx-swift"),

@@ -41,6 +41,8 @@ final class AppComposition {
                 segmenter: SileroSegmenter(modelID: settings.vadModel, config: SegmentationConfig(settings: settings)),
                 transcriber: MLXTranscriber(modelID: settings.sttModel),
                 cleaner: MLXCleaner(configuration: .init(settings: settings)),
+                // Read at every Start, like the microphone, so a new level applies without a relaunch.
+                cleanupOptions: { CleanupOptions(level: store.load().cleanupLevel) },
                 makeSink: { sessionID in
                     guard let sessionsDirectory else {
                         throw PersistenceError.directoryUnavailable("Application Support is not available")

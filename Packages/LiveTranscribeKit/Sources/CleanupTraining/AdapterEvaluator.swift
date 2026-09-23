@@ -1,6 +1,7 @@
 import Cleanup
 import Foundation
 import Shared
+import Styles
 
 /// How a cleaner does on a set of examples, measured on the text the app would show.
 public struct EvaluationReport: Sendable, Codable {
@@ -51,20 +52,25 @@ public struct EvaluationReport: Sendable, Codable {
 }
 
 public enum AdapterEvaluator {
-    /// Cleans every example through `cleaner`, exactly as the app would, and scores the result.
+    /// Cleans every example through `cleaner` at `options`, exactly as the app would, and scores
+    /// the result. At a level that removes fillers, so does the expected text: the model never
+    /// sees them.
     public static func evaluate(
         _ examples: [TrainingExample],
         with cleaner: any Cleaner,
+        options: CleanupOptions,
         log: @escaping @Sendable (String) -> Void = { _ in }
     ) async -> EvaluationReport {
+        let fillerRemover = FillerRemover()
         var report = EvaluationReport()
         var latencies: [Int] = []
         for (index, example) in examples.enumerated() {
             let segment = Segment(id: UUID(), sessionID: UUID(), startMs: 0, endMs: 1_000, rawText: example.raw)
-            let cleaned = await cleaner.clean(segment, context: example.context)
+            let cleaned = await cleaner.clean(segment, context: example.context, options: options)
             latencies.append(cleaned.latencyMs)
 
-            let matched = EditDistance.normalize(cleaned.cleanedText) == EditDistance.normalize(example.target)
+            let expected = options.level.removesFillers ? fillerRemover.removingFillers(from: example.target) : example.target
+            let matched = EditDistance.normalize(cleaned.cleanedText) == EditDistance.normalize(expected)
             var score = report.scores[example.category] ?? .init()
             score.total += 1
             if matched { score.matched += 1 }
@@ -74,7 +80,7 @@ public enum AdapterEvaluator {
                 report.misses.append(.init(
                     category: example.category,
                     raw: example.raw,
-                    expected: example.target,
+                    expected: expected,
                     shown: cleaned.cleanedText,
                     fallbackReason: cleaned.fallbackReason
                 ))

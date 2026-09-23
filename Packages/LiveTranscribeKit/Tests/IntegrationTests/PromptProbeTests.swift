@@ -85,10 +85,12 @@ struct PromptProbeTests {
         return configured.isEmpty ? [AppSettings.defaults.llmModel] : configured
     }
 
+    /// The app's default level: fillers are removed before the model sees the text.
+    static let options = CleanupOptions(level: .medium)
+
     /// Accepts any non-empty answer, so the probe sees what the model actually wrote.
     static let permissiveGuard = OutputGuard(policy: .init(
-        minWordRatio: 0,
-        maxWordRatio: .infinity,
+        wordRatioBounds: Dictionary(uniqueKeysWithValues: CleanupLevel.allCases.map { ($0, 0...Double.greatestFiniteMagnitude) }),
         minSimilarity: 0,
         preambles: [],
         correctionCues: [],
@@ -128,7 +130,7 @@ struct PromptProbeTests {
                     let cleaned = await Self.clean(probe.raw, context: probe.context, with: cleaner)
                     latencies.append(cleaned.latencyMs)
                     if cleaned.fellBack { failed += 1 }
-                    let verdict = productionGuard.review(raw: probe.raw, outcome: .completed(cleaned.cleanedText))
+                    let verdict = productionGuard.review(raw: probe.raw, outcome: .completed(cleaned.cleanedText), options: Self.options)
                     let shown: String
                     switch verdict {
                     case .accepted(let text): shown = text
@@ -143,7 +145,7 @@ struct PromptProbeTests {
                     let cleaned = await Self.clean(probe.raw, context: probe.context, with: cleaner)
                     latencies.append(cleaned.latencyMs)
                     if cleaned.fellBack { failed += 1 }
-                    let verdict = productionGuard.review(raw: probe.raw, outcome: .completed(cleaned.cleanedText))
+                    let verdict = productionGuard.review(raw: probe.raw, outcome: .completed(cleaned.cleanedText), options: Self.options)
                     if case .rejected = verdict { rejected += 1 }
                     print("VARIANT \(label) general \(Self.describe(verdict)) | \(cleaned.cleanedText)")
                 }
@@ -165,7 +167,7 @@ struct PromptProbeTests {
         var settings = AppSettings.defaults
         settings.llmModel = model
         MLXRuntime.configure(gpuCacheLimitMB: settings.gpuCacheLimitMB)
-        let cleaner = MLXCleaner(configuration: .init(settings: settings, template: template), outputGuard: outputGuard)
+        let cleaner = MLXCleaner(configuration: .init(settings: settings, promptOverride: template), outputGuard: outputGuard)
         try await cleaner.load { _ in }
         return cleaner
     }
@@ -179,7 +181,7 @@ struct PromptProbeTests {
 
     private static func clean(_ raw: String, context: [String], with cleaner: MLXCleaner) async -> CleanedSegment {
         let segment = Segment(id: UUID(), sessionID: UUID(), startMs: 0, endMs: 1_000, rawText: raw)
-        return await cleaner.clean(segment, context: context)
+        return await cleaner.clean(segment, context: context, options: options)
     }
 
     private static func describe(_ verdict: GuardVerdict) -> String {

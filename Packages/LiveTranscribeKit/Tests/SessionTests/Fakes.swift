@@ -149,7 +149,7 @@ actor FakeCleaner: Cleaner {
         if let loadError { throw loadError }
     }
 
-    func clean(_ segment: Segment, context: [String]) async -> CleanedSegment {
+    func clean(_ segment: Segment, context: [String], options: CleanupOptions) async -> CleanedSegment {
         startedCount += 1
         contexts.append(context)
         switch behavior {
@@ -157,7 +157,7 @@ actor FakeCleaner: Cleaner {
         case .gated(let gate): await gate.wait()
         case .delayed(let duration): try? await Task.sleep(for: duration)
         case .failingGeneration:
-            return await CleanupExecutor(contextLimit: 3, timeoutSeconds: 1).run(segment, context: context) { _ in
+            return await CleanupExecutor(contextLimit: 3, timeoutSeconds: 1).run(segment, context: context, options: options) { _ in
                 throw FakeError(message: "Metal device lost")
             }
         }

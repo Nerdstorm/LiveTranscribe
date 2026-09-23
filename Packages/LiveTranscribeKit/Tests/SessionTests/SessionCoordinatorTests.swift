@@ -1,3 +1,4 @@
+import Cleanup
 import Foundation
 import Persistence
 @testable import Session
@@ -24,6 +25,7 @@ private struct Harness {
                 segmenter: segmenter,
                 transcriber: transcriber,
                 cleaner: cleaner,
+                cleanupOptions: { CleanupOptions(level: settings.cleanupLevel) },
                 makeSink: { _ in sink },
                 microphonePermission: FakePermission(granted: micGranted)
             )

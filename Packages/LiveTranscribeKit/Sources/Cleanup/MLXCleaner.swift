@@ -12,7 +12,7 @@ import Shared
 ///
 /// With a ``CleanupAdapter``, the model is loaded at the commit the adapter was trained on and
 /// the adapter is fused into its weights, so generation costs the same as without it. If that
-/// fails, the base model is used with the strict ``Prompt/cleanup`` prompt instead.
+/// fails, the base model is used, and ``PromptBuilder`` gives every level the strict rules.
 public actor MLXCleaner: Cleaner {
     public struct Configuration: Sendable, Equatable {
         public let modelID: String
@@ -20,41 +20,46 @@ public actor MLXCleaner: Cleaner {
         public let timeoutSeconds: Double
         /// Fine-tuned adapter to fuse into the model, or `nil` for the base model.
         public let adapter: CleanupAdapter?
-        /// The prompt: ``Prompt/adapted`` with an adapter, ``Prompt/cleanup`` without, unless
-        /// given explicitly (for prompt experiments).
-        public let template: PromptTemplate
+        /// One prompt for every request, for prompt experiments; `nil` lets ``PromptBuilder``
+        /// compose one per request from its options.
+        public let promptOverride: PromptTemplate?
 
         public init(
             modelID: String,
             contextSegments: Int,
             timeoutSeconds: Double,
             adapter: CleanupAdapter? = nil,
-            template: PromptTemplate? = nil
+            promptOverride: PromptTemplate? = nil
         ) {
             self.modelID = modelID
             self.contextSegments = contextSegments
             self.timeoutSeconds = timeoutSeconds
             self.adapter = adapter
-            self.template = template ?? (adapter == nil ? Prompt.cleanup : Prompt.adapted)
+            self.promptOverride = promptOverride
         }
 
         /// Uses the bundled adapter when the settings enable it and it matches the model.
-        public init(settings: AppSettings, template: PromptTemplate? = nil) {
+        public init(settings: AppSettings, promptOverride: PromptTemplate? = nil) {
             self.init(
                 settings: settings,
                 adapter: CleanupAdapter.selected(for: settings, bundled: CleanupAdapter.bundled()),
-                template: template
+                promptOverride: promptOverride
             )
         }
 
-        public init(settings: AppSettings, adapter: CleanupAdapter?, template: PromptTemplate? = nil) {
+        public init(settings: AppSettings, adapter: CleanupAdapter?, promptOverride: PromptTemplate? = nil) {
             self.init(
                 modelID: settings.llmModel,
                 contextSegments: settings.contextSegments,
                 timeoutSeconds: settings.cleanupTimeoutSeconds,
                 adapter: adapter,
-                template: template
+                promptOverride: promptOverride
             )
+        }
+
+        /// The prompts for a model with or without the adapter fused in.
+        public func prompts(adapted: Bool) -> PromptBuilder {
+            PromptBuilder(adapted: adapted, override: promptOverride)
         }
     }
 
@@ -72,7 +77,7 @@ public actor MLXCleaner: Cleaner {
     public init(configuration: Configuration, outputGuard: OutputGuard = OutputGuard()) {
         self.configuration = configuration
         self.outputGuard = outputGuard
-        self.executor = Self.executor(for: configuration, template: configuration.template, outputGuard: outputGuard)
+        self.executor = Self.executor(for: configuration, adapted: configuration.adapter != nil, outputGuard: outputGuard)
     }
 
     public func load(progress: @escaping ModelLoadProgressHandler) async throws {
@@ -80,7 +85,6 @@ public actor MLXCleaner: Cleaner {
         let modelID = configuration.modelID
 
         let loaded: ModelContainer
-        var template = configuration.template
         var applied: CleanupAdapter?
         if let adapter = configuration.adapter {
             do {
@@ -98,7 +102,6 @@ public actor MLXCleaner: Cleaner {
                     "Cleanup adapter not used, falling back to the base model: \(error.localizedDescription, privacy: .public)"
                 )
                 loaded = try await Self.loadModel(modelID, revision: nil, progress: progress)
-                template = Prompt.cleanup
             }
         } else {
             loaded = try await Self.loadModel(modelID, revision: nil, progress: progress)
@@ -107,11 +110,17 @@ public actor MLXCleaner: Cleaner {
 
         progress(ModelLoadProgress(modelID: modelID, stage: .warmingUp))
         let started = ContinuousClock.now
-        let warmUp = Prompt.request(for: "this is a warm up sentence", context: [], contextLimit: 0, template: template)
+        let prompts = configuration.prompts(adapted: applied != nil)
+        let warmUp = Prompt.request(
+            for: "this is a warm up sentence",
+            context: [],
+            contextLimit: 0,
+            template: prompts.template(for: CleanupOptions(level: .medium))
+        )
         _ = try await withDeadline(seconds: Self.warmUpTimeoutSeconds) {
             try await Self.generate(with: loaded, request: warmUp)
         }
-        executor = Self.executor(for: configuration, template: template, outputGuard: outputGuard)
+        executor = Self.executor(for: configuration, adapted: applied != nil, outputGuard: outputGuard)
         container = loaded
         activeAdapter = applied
         progress(ModelLoadProgress(modelID: modelID, stage: .ready, fractionCompleted: 1))
@@ -120,21 +129,22 @@ public actor MLXCleaner: Cleaner {
         )
     }
 
-    public func clean(_ segment: Segment, context: [String]) async -> CleanedSegment {
-        guard let container else {
-            return .fallback(segment, reason: "cleanup model not loaded", latencyMs: 0)
-        }
-        return await executor.run(segment, context: context) { request in
-            try await Self.generate(with: container, request: request)
+    /// Before the model has loaded, the level's deterministic rules still apply and the result
+    /// is marked as a fallback.
+    public func clean(_ segment: Segment, context: [String], options: CleanupOptions) async -> CleanedSegment {
+        let container = self.container
+        return await executor.run(segment, context: context, options: options) { request in
+            guard let container else { throw CleanupModelNotLoaded() }
+            return try await Self.generate(with: container, request: request)
         }
     }
 
-    private static func executor(for configuration: Configuration, template: PromptTemplate, outputGuard: OutputGuard) -> CleanupExecutor {
+    private static func executor(for configuration: Configuration, adapted: Bool, outputGuard: OutputGuard) -> CleanupExecutor {
         CleanupExecutor(
             contextLimit: configuration.contextSegments,
             timeoutSeconds: configuration.timeoutSeconds,
             outputGuard: outputGuard,
-            template: template
+            prompts: configuration.prompts(adapted: adapted)
         )
     }
 
@@ -186,4 +196,9 @@ public actor MLXCleaner: Cleaner {
             return text
         }
     }
+}
+
+/// A cleanup was requested before ``MLXCleaner/load(progress:)`` finished.
+struct CleanupModelNotLoaded: LocalizedError {
+    var errorDescription: String? { "cleanup model not loaded" }
 }

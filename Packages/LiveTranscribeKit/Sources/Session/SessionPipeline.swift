@@ -15,6 +15,8 @@ actor SessionPipeline {
         let sessionID: UUID
         let contextSegments: Int
         let cleanupQueueCapacity: Int
+        /// Read once at Start, so a session is cleaned at one level throughout.
+        let cleanupOptions: CleanupOptions
     }
 
     private struct TranscriptionJob: Sendable {
@@ -201,7 +203,7 @@ actor SessionPipeline {
         }
         for await job in jobs {
             let context = Array(cleanedContext.suffix(configuration.contextSegments))
-            let cleaned = await cleaner.clean(job.segment, context: context)
+            let cleaned = await cleaner.clean(job.segment, context: context, options: configuration.cleanupOptions)
             cleanedContext.append(cleaned.cleanedText)
             if cleanedContext.count > configuration.contextSegments {
                 cleanedContext.removeFirst(cleanedContext.count - configuration.contextSegments)

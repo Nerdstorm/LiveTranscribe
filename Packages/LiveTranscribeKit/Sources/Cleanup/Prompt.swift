@@ -54,45 +54,30 @@ public struct PromptTemplate: Sendable, Equatable {
 /// to correct "CONTEXT + TEXT" in one message tends to return both, which the output guard then
 /// has to reject.
 public enum Prompt {
-    /// Strict correction: the model is told to remove nothing, so spoken self-corrections
-    /// normally stay as said ("cars, sorry, buses"). Asking Qwen3-1.7B to resolve them, by
+    /// Strict correction, the Light level's prompt and every level's without the adapter: the
+    /// model is told to remove nothing, so spoken self-corrections normally stay as said
+    /// ("cars, sorry, buses"). Asking Qwen3-1.7B to resolve them, by
     /// instruction or by worked examples, resolved at most 1 in 7 correctly, usually kept the
     /// retracted words instead of the correction, and made it drop hedges such as "I think"
-    /// elsewhere. ``OutputGuard`` still accepts a correct resolution if the model makes one.
-    public static let cleanup = PromptTemplate(
-        system: """
-            Correct transcription errors, punctuation, casing and grammar in the TEXT.
-            Preserve meaning, tone, hedging and filler intent exactly.
-            Do not add, remove, summarise or rephrase content.
-            If the text is already correct, return it unchanged.
-            Output only the corrected text.
-            """,
-        examples: []
-    )
+    /// elsewhere. At Medium and High, ``OutputGuard`` still accepts a correct resolution if the
+    /// model makes one.
+    public static let cleanup = PromptBuilder(adapted: false).template(for: CleanupOptions(level: .light))
 
     /// Used with the bundled fine-tuned adapter (``CleanupAdapter``), which was trained on
-    /// exactly this prompt. The one removal it allows is a spoken self-correction; the adapter
-    /// supplies the ability the base model lacks, and ``OutputGuard`` checks that nothing else
-    /// was removed.
-    public static let adapted = PromptTemplate(
-        system: """
-            Correct transcription errors, punctuation, casing and grammar in the TEXT.
-            Preserve meaning, tone, hedging and filler intent exactly.
-            Do not add, summarise or rephrase content.
-            When the speaker corrects themselves, keep only the correction.
-            If the text is already correct, return it unchanged.
-            Output only the corrected text.
-            """,
-        examples: []
-    )
+    /// exactly this prompt: the Medium level's. The one removal it allows is a spoken
+    /// self-correction; the adapter supplies the ability the base model lacks, and
+    /// ``OutputGuard`` checks that nothing else was removed.
+    public static let adapted = PromptBuilder(adapted: true).template(for: CleanupOptions(level: .medium))
 
     /// Qwen3's chat template reads `enable_thinking`. Thinking must be off: with it on, latency
     /// grows by seconds and `<think>` blocks leak into the output.
     public static let templateContext: [String: Bool] = ["enable_thinking": false]
 
-    /// Output budget: two tokens per input word plus a fixed allowance for punctuation.
+    /// Output budget: two tokens per input word plus a fixed allowance for punctuation, plus room
+    /// for each snippet placeholder, whose brackets take several tokens each.
     public static let maxTokensPerInputWord = 2
     public static let maxTokensAllowance = 16
+    public static let maxTokensPerPlaceholder = 6
 
     public static func request(
         for text: String,
@@ -123,7 +108,9 @@ public enum Prompt {
     }
 
     public static func maxTokens(for text: String) -> Int {
-        EditDistance.words(in: text).count * maxTokensPerInputWord + maxTokensAllowance
+        EditDistance.words(in: text).count * maxTokensPerInputWord
+            + PlaceholderToken.openingCount(in: text) * maxTokensPerPlaceholder
+            + maxTokensAllowance
     }
 
     static func userMessage(for text: String) -> String {

@@ -16,6 +16,8 @@ public actor SessionCoordinator: SessionControlling {
         public var segmenter: any SpeechSegmenter
         public var transcriber: any Transcriber
         public var cleaner: any Cleaner
+        /// Read at every Start, so a change of cleanup level applies to the next session.
+        public var cleanupOptions: @Sendable () -> CleanupOptions
         public var makeSink: @Sendable (UUID) async throws -> any SessionSink
         public var microphonePermission: any MicrophonePermissionProviding
 
@@ -24,6 +26,7 @@ public actor SessionCoordinator: SessionControlling {
             segmenter: any SpeechSegmenter,
             transcriber: any Transcriber,
             cleaner: any Cleaner,
+            cleanupOptions: @escaping @Sendable () -> CleanupOptions,
             makeSink: @escaping @Sendable (UUID) async throws -> any SessionSink,
             microphonePermission: any MicrophonePermissionProviding
         ) {
@@ -31,6 +34,7 @@ public actor SessionCoordinator: SessionControlling {
             self.segmenter = segmenter
             self.transcriber = transcriber
             self.cleaner = cleaner
+            self.cleanupOptions = cleanupOptions
             self.makeSink = makeSink
             self.microphonePermission = microphonePermission
         }
@@ -174,7 +178,8 @@ public actor SessionCoordinator: SessionControlling {
             configuration: .init(
                 sessionID: sessionID,
                 contextSegments: settings.contextSegments,
-                cleanupQueueCapacity: settings.cleanupQueueCapacity
+                cleanupQueueCapacity: settings.cleanupQueueCapacity,
+                cleanupOptions: dependencies.cleanupOptions()
             ),
             segmenter: dependencies.segmenter,
             transcriber: dependencies.transcriber,
