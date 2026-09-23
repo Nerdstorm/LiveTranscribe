@@ -6,8 +6,8 @@ to a JSONL file. Every model runs on your Mac with [MLX](https://github.com/ml-e
 no audio or text leaves it.
 
 The pipeline: microphone → Silero voice activity detection → Parakeet speech-to-text →
-Qwen3-1.7B correction (casing, punctuation and obvious recognition errors; it does not rephrase)
-→ window and file.
+Qwen3-1.7B correction (recognition errors, punctuation, casing and grammar; it does not
+rephrase) → window and file.
 
 ## Status
 
@@ -59,9 +59,10 @@ selected in macOS. Your choice is saved and applies from the next Start; it cann
 while a session is running. If the chosen microphone is disconnected, Start reports it until you
 reconnect it or choose another.
 
-**Settings** (⌘,) holds every tunable: models, cleanup on or off, voice-detection thresholds,
-segment limits, cleanup context, timeout and queue size, GPU cache, and how often capture may
-restart after an error. **Changes apply the next time the app starts.**
+**Settings** (⌘,) holds every tunable: models, cleanup on or off, voice-detection thresholds and
+pre-roll, segment limits, how often the live partial text refreshes, cleanup context, timeout and
+queue size, GPU cache, and how often capture may restart after an error. **Changes apply the next
+time the app starts.** **Restore Defaults** resets these and keeps your microphone choice.
 
 ### Signing and Gatekeeper
 
@@ -73,9 +74,10 @@ macOS may ask for microphone access again after a rebuild.
 ## Privacy
 
 - Audio and transcripts never leave your Mac. There is no telemetry.
-- The only network traffic is to huggingface.co, to download the models on first launch, or
-  when you choose a different model in Settings. Downloaded models are reused without contacting
-  Hugging Face again.
+- The only network traffic is to Hugging Face (huggingface.co and the download servers it
+  redirects to), to download the models on first launch, and on the next launch after you choose
+  a different model in Settings. Downloaded models are reused without contacting Hugging Face
+  again.
 - Every session is saved as an unencrypted JSONL file in
   `~/Library/Containers/org.nerdstorm.LiveTranscribe/Data/Library/Application Support/org.nerdstorm.LiveTranscribe/Sessions/`,
   which the **Sessions** button opens. Each line holds one segment: the raw and cleaned text,
@@ -102,8 +104,10 @@ Built with [mlx-swift](https://github.com/ml-explore/mlx-swift),
 [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm),
 [mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift),
 [swift-huggingface](https://github.com/huggingface/swift-huggingface) and
-[swift-transformers](https://github.com/huggingface/swift-transformers). All package
-dependencies, including indirect ones, are MIT or Apache-2.0 licensed.
+[swift-transformers](https://github.com/huggingface/swift-transformers). Every package
+dependency, including indirect ones, is MIT or Apache-2.0 licensed. Some bundle third-party code
+under other permissive licences (MLX includes the BSD-licensed PocketFFT, for example), so a
+redistributed build must carry those notices too.
 
 ## Project layout
 
@@ -126,10 +130,12 @@ Packages/LiveTranscribeKit/   all feature code, as vertical slices
   Tests/             Swift Testing; tests that need the models run only when enabled
 ```
 
-`App/AppComposition.swift` is the app's composition root, the only place the app constructs
-concrete types (the bench and the tests wire their own). Everything else depends on the slice
-protocols (`AudioSource`, `SpeechSegmenter`, `Transcriber`, `Cleaner`, `SessionSink`), which the
-unit tests replace with fakes.
+`App/AppComposition.swift` is the app's composition root: it constructs every concrete slice
+implementation (the bench and the tests wire their own). The Settings window is the exception: it
+reads and writes the settings in UserDefaults directly. Everything else depends on protocols
+(`AudioSource`, `SpeechSegmenter`, `Transcriber`, `Cleaner`, `SessionSink`,
+`MicrophonePermissionProviding`, and in the UI `SessionControlling` and `InputDeviceSelecting`),
+which the unit tests replace with fakes or, for `SessionSink`, the in-memory `MemorySessionSink`.
 
 ## Tests
 
@@ -228,11 +234,13 @@ hardware before relying on these numbers.
 - Correcting with a 1.7B model does not reliably fix homophones ("cash" → "cache"). That needs a
   larger model or a domain vocabulary. OutputGuard's similarity floor limits how far the model can
   change the text.
-- Spoken self-corrections are kept as spoken: "fuel efficiency in cars, sorry, buses" is not
-  reduced to "fuel efficiency in buses". Asked to resolve them, Qwen3-1.7B got at most 1 in 7
-  right and usually kept the words the speaker took back instead of the correction. OutputGuard
-  therefore rejects any cleanup that drops a correction phrase ("sorry", "I mean", "no wait", …)
-  unless all it removed was the retracted words and that phrase.
+- Spoken self-corrections are normally kept as spoken. The cleanup prompt tells the model to
+  remove nothing, so "fuel efficiency in cars, sorry, buses" usually stays as said rather than
+  becoming "fuel efficiency in buses". Asked to resolve them, Qwen3-1.7B got at most 1 in 7 right
+  and usually kept the words the speaker took back instead of the correction. OutputGuard
+  therefore rejects any cleanup that drops a correction cue ("sorry", "I mean", "no", "wait",
+  "actually", "scratch that", …) unless the only words it removed were up to six retracted words
+  before that cue, the cue itself, fillers such as "um", and immediately repeated words.
 - If the app crashes, up to `cleanupQueueCapacity` + 1 segments (9 by default) that were
   transcribed but not yet cleaned are lost: their raw text was on screen but not yet saved.
 - The models come from each repository's `main` branch at first launch and are then reused, so

@@ -54,10 +54,11 @@ public struct PromptTemplate: Sendable, Equatable {
 /// to correct "CONTEXT + TEXT" in one message tends to return both, which the output guard then
 /// has to reject.
 public enum Prompt {
-    /// Strict correction: nothing is removed, including spoken self-corrections ("cars, sorry,
-    /// buses" stays as said). Asking Qwen3-1.7B to resolve self-corrections, by instruction or by
-    /// worked examples, resolved at most 1 in 7 correctly, usually kept the retracted words
-    /// instead of the correction, and made it drop hedges such as "I think" elsewhere.
+    /// Strict correction: the model is told to remove nothing, so spoken self-corrections
+    /// normally stay as said ("cars, sorry, buses"). Asking Qwen3-1.7B to resolve them, by
+    /// instruction or by worked examples, resolved at most 1 in 7 correctly, usually kept the
+    /// retracted words instead of the correction, and made it drop hedges such as "I think"
+    /// elsewhere. ``OutputGuard`` still accepts a correct resolution if the model makes one.
     public static let cleanup = PromptTemplate(
         system: """
             Correct transcription errors, punctuation, casing and grammar in the TEXT.
