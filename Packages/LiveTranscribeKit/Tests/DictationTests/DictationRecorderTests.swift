@@ -45,6 +45,34 @@ struct CaptureFailed: LocalizedError {
     var errorDescription: String? { "microphone unplugged" }
 }
 
+/// Capture whose reader outlives it: its stream fails only when the test calls ``end()``, even
+/// after the recorder has closed it and opened another capture. Cancelling the reader does not
+/// end it sooner, the way a reader still busy with a last buffer finishes late.
+actor LingeringAudioSource: AudioSource {
+    private var ending: CheckedContinuation<Void, Never>?
+    private var ended = false
+
+    func start() -> AsyncThrowingStream<[Float], Error> {
+        AsyncThrowingStream(unfolding: { [self] in
+            await self.waitForEnd()
+            throw CaptureFailed()
+        })
+    }
+
+    func stop() {}
+
+    func end() {
+        ended = true
+        ending?.resume()
+        ending = nil
+    }
+
+    private func waitForEnd() async {
+        guard !ended else { return }
+        await withCheckedContinuation { ending = $0 }
+    }
+}
+
 @Suite("DictationRecorder")
 struct DictationRecorderTests {
     private let source = ScriptedAudioSource()
@@ -61,6 +89,24 @@ struct DictationRecorderTests {
     private func settle() async {
         for _ in 0..<20 { await Task.yield() }
         try? await Task.sleep(for: .milliseconds(20))
+    }
+
+    /// The recorder's first event, or `nil` when none arrives within a second. Reading stops the
+    /// event stream, so call it once per recorder.
+    private func firstEvent(of recorder: DictationRecorder) async -> DictationRecorder.Event? {
+        await withTaskGroup(of: DictationRecorder.Event?.self) { group in
+            group.addTask {
+                for await event in recorder.events { return event }
+                return nil
+            }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(1))
+                return nil
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first
+        }
     }
 
     @Test func capturesOnlyWhileRecordingAndClosesAfterwards() async throws {
@@ -120,6 +166,80 @@ struct DictationRecorderTests {
         try await recorder.start()
         #expect(await source.starts == 2, "the next recording opens capture again")
         _ = await recorder.stop()
+    }
+
+    @Test func aCaptureFailureDuringARecordingIsReportedAtOnce() async throws {
+        let recorder = recorder()
+        try await recorder.start()
+        await source.push([0.1])
+        await settle()
+        #expect(await !recorder.hasLostCapture)
+
+        await source.fail(CaptureFailed())
+        #expect(await firstEvent(of: recorder) == .captureEnded)
+        #expect(await recorder.hasLostCapture)
+        #expect(await recorder.stop().failure == "microphone unplugged")
+        #expect(await !recorder.hasLostCapture, "it concerned the recording that stopped")
+    }
+
+    @Test func captureEndingByItselfDuringARecordingIsAFailureToo() async throws {
+        let recorder = recorder()
+        try await recorder.start()
+        await source.push([0.1])
+        await settle()
+        // The stream finishes without an error, and not because the recorder closed it.
+        await source.stop()
+
+        #expect(await firstEvent(of: recorder) == .captureEnded)
+        let recording = await recorder.stop()
+        #expect(recording.samples == [0.1])
+        #expect(recording.failure != nil)
+    }
+
+    @Test func aCaptureFailureWhileKeptReadyIsNotAboutARecording() async throws {
+        let recorder = recorder()
+        try await recorder.setKeepReady(true)
+        await source.fail(CaptureFailed())
+        await settle()
+        #expect(await !recorder.hasLostCapture)
+
+        try await recorder.start()
+        #expect(await source.starts == 2, "the recording opens capture again")
+        await source.push([0.2])
+        await settle()
+        let recording = await recorder.stop()
+        #expect(recording.samples == [0.2])
+        #expect(recording.failure == nil)
+    }
+
+    @Test func aReaderThatOutlivesItsCaptureDoesNotEndTheNextRecording() async throws {
+        let first = LingeringAudioSource()
+        let next = source
+        let opened = OSAllocatedUnfairLock(initialState: 0)
+        let recorder = DictationRecorder(
+            makeSource: { _ -> any AudioSource in
+                opened.withLock { count in
+                    count += 1
+                    return count == 1 ? first : next
+                }
+            },
+            configuration: .init(preRollMs: 10, maxDurationSeconds: 60)
+        )
+        try await recorder.start()
+        await settle()  // its reader is now waiting for audio
+        _ = await recorder.stop()
+        try await recorder.start()
+
+        // The first capture's reader fails only now, while the next recording runs.
+        await first.end()
+        await settle()
+        #expect(await !recorder.hasLostCapture)
+        await next.push([0.2])
+        await settle()
+        let recording = await recorder.stop()
+        #expect(recording.samples == [0.2])
+        #expect(recording.failure == nil)
+        #expect(await next.stops == 1, "the next capture is still the recorder's to close")
     }
 
     @Test func aStartFailureThrowsAndLeavesNothingOpen() async throws {

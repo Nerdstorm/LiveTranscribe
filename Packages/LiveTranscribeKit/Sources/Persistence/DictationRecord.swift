@@ -34,6 +34,9 @@ public struct DictationRecord: Codable, Sendable, Equatable, Identifiable {
     public let audioDurationMs: Int
     /// Time from hotkey release to delivery.
     public let latencyMs: Int
+    /// Why the microphone stopped before the dictation ended, when it did: the text holds only
+    /// what was heard before. `nil` when it did not, and in records written before this was kept.
+    public let captureFailure: String?
 
     /// `createdAt` is rounded to the nearest millisecond; every other value is kept as given.
     public init(
@@ -48,7 +51,8 @@ public struct DictationRecord: Codable, Sendable, Equatable, Identifiable {
         fallbackReason: String?,
         delivery: String,
         audioDurationMs: Int,
-        latencyMs: Int
+        latencyMs: Int,
+        captureFailure: String? = nil
     ) {
         self.id = id
         self.createdAt = Self.millisecondPrecision(createdAt)
@@ -62,9 +66,10 @@ public struct DictationRecord: Codable, Sendable, Equatable, Identifiable {
         self.delivery = delivery
         self.audioDurationMs = audioDurationMs
         self.latencyMs = latencyMs
+        self.captureFailure = captureFailure
     }
 
-    /// Decodes through ``init(id:createdAt:appName:bundleIdentifier:rawText:cleanedText:cleanupLevel:fellBack:fallbackReason:delivery:audioDurationMs:latencyMs:)``
+    /// Decodes through ``init(id:createdAt:appName:bundleIdentifier:rawText:cleanedText:cleanupLevel:fellBack:fallbackReason:delivery:audioDurationMs:latencyMs:captureFailure:)``
     /// so a record decoded by any decoder keeps `createdAt` to the millisecond too.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -80,7 +85,8 @@ public struct DictationRecord: Codable, Sendable, Equatable, Identifiable {
             fallbackReason: try container.decodeIfPresent(String.self, forKey: .fallbackReason),
             delivery: try container.decode(String.self, forKey: .delivery),
             audioDurationMs: try container.decode(Int.self, forKey: .audioDurationMs),
-            latencyMs: try container.decode(Int.self, forKey: .latencyMs)
+            latencyMs: try container.decode(Int.self, forKey: .latencyMs),
+            captureFailure: try container.decodeIfPresent(String.self, forKey: .captureFailure)
         )
     }
 }

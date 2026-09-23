@@ -50,16 +50,14 @@ extension DictationController {
             Log.dictation.error("Recording could not start: \(error.localizedDescription, privacy: .public)")
             _ = await lookup
             gesture.reset()
-            setPhase(.idle)
-            return show(.captureFailed(error.localizedDescription))
+            return endDictation(showing: [.captureFailed(error.localizedDescription)])
         }
         let target = await lookup
         guard !target.isSecure else {
             // Nothing recorded here is ever transcribed.
             await dependencies.recorder.cancel()
             gesture.reset()
-            setPhase(.idle)
-            return show(.secureField)
+            return endDictation(showing: [.secureField])
         }
         setCaret(target.caretRect)
     }
@@ -74,8 +72,18 @@ extension DictationController {
     func discardRecording(notice: DictationNotice?) async {
         guard case .recording = phase else { return }
         await dependencies.recorder.cancel()
-        setPhase(.idle)
-        show(notice)
+        endDictation(showing: notice.map { [$0] } ?? [])
+    }
+
+    /// Capture ended by itself during the recording: it ends now with what was heard, rather
+    /// than showing *Listening* while nothing arrives until the key is released. The event can
+    /// be read late, so it applies only if the recording in progress is the one that lost capture.
+    func endRecordingWithoutCapture() async {
+        guard case .recording = phase, await dependencies.recorder.hasLostCapture else { return }
+        Log.dictation.notice("The microphone stopped during the recording; ending it with what was heard")
+        // The key may still be held; its release then finds the gesture idle and does nothing.
+        gesture.reset()
+        await finishRecording()
     }
 
     func cancelProcessing() {
@@ -90,7 +98,9 @@ extension DictationController {
         let recording = await dependencies.recorder.stop()
         let settings = dependencies.settings()
 
-        if let failure = recording.failure, recording.samples.isEmpty {
+        // Too little arrived before capture failed to transcribe: the failure is the news.
+        if let failure = recording.failure,
+           recording.samples.isEmpty || recording.durationMs < settings.dictation.minUtteranceMs {
             return finish(.captureFailed(failure))
         }
         guard recording.durationMs >= settings.dictation.minUtteranceMs else {
@@ -124,7 +134,7 @@ extension DictationController {
         }
         processingTask = nil
         guard !cancelRequested else { return finish(.cancelled) }
-        guard !output.isEmpty else { return finish(.nothingHeard) }
+        guard !output.isEmpty else { return finish(recording.failure.map { .captureFailed($0) } ?? .nothingHeard) }
 
         let preceding = await Self.characterBeforeCaret(in: target)
         // Esc may have been pressed while the field was read; nothing is inserted yet.
@@ -157,19 +167,21 @@ extension DictationController {
                 fallbackReason: output.fallbackReason,
                 delivery: Self.delivery(of: result),
                 audioDurationMs: recording.durationMs,
-                latencyMs: latencyMs
+                latencyMs: latencyMs,
+                captureFailure: recording.failure
             ))
         }
-        if recording.truncated {
-            return finish(.recordingTruncated(seconds: settings.dictation.maxRecordingSeconds))
-        }
-        finish(Self.notice(for: result, app: target.app?.name))
+        // Where the text went comes first: it may be waiting on the clipboard for ⌘V.
+        finish(
+            Self.notice(for: result, app: target.app?.name),
+            Self.notice(for: recording, limitSeconds: settings.dictation.maxRecordingSeconds)
+        )
     }
 
-    private func finish(_ notice: DictationNotice?) {
+    /// Ends the dictation with `notices`, most important first; `nil`s are skipped.
+    private func finish(_ notices: DictationNotice?...) {
         processingTask = nil
-        setPhase(.idle)
-        show(notice)
+        endDictation(showing: notices.compactMap { $0 })
     }
 
     private func save(_ record: DictationRecord) async {
@@ -233,6 +245,15 @@ extension DictationController {
         case .refusedSecureField: .secureField
         case .failed: .insertionFailed
         }
+    }
+
+    /// What the user should know about a recording that did not hear all they said: it hit the
+    /// length limit, or the microphone stopped partway through.
+    static func notice(for recording: DictationRecorder.Recording, limitSeconds: Int) -> DictationNotice? {
+        if recording.truncated { return .recordingTruncated(seconds: limitSeconds) }
+        guard recording.failure != nil else { return nil }
+        // Rounded, and never "after 0 s": something was heard.
+        return .captureStoppedEarly(afterSeconds: max(1, (recording.durationMs + 500) / 1_000))
     }
 
     static func notice(for result: UndoResult) -> DictationNotice {

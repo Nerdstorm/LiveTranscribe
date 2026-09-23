@@ -281,12 +281,13 @@ struct DictationControllerTests {
         #expect(h.controller.phase == .processing)
 
         h.controller.handle(.pressed)
-        #expect(h.controller.notice == .stillProcessing)
+        #expect(h.controller.progressNotice == .stillProcessing, "shown under Transcribing…")
         h.controller.handle(.released)
         await h.transcriber.release()
         await h.controller.settle()
         #expect(await h.delivery.inserted == ["Ship it on friday."])
         #expect(h.controller.phase == .idle)
+        #expect(h.controller.notice == .stillProcessing, "and again once the dictation is in")
         #expect(await h.source.starts == 1, "the press during processing never opened the microphone")
     }
 }

@@ -30,15 +30,26 @@ public actor DictationRecorder {
         public let samples: [Float]
         /// The recording hit ``Configuration/maxDurationSeconds`` and the rest was dropped.
         public let truncated: Bool
-        /// Capture failed during the recording; `samples` holds what arrived before it did.
+        /// Why capture failed or ended during the recording; `samples` holds what arrived
+        /// before it did.
         public let failure: String?
 
         public var durationMs: Int { AudioFormat.milliseconds(forSamples: samples.count) }
     }
 
+    /// Something that happened to the recording in progress by itself, for the owner to act on.
+    public enum Event: Sendable, Equatable {
+        /// Capture ended during the recording, so nothing more arrives: the microphone failed,
+        /// or went away and could not be recovered. ``stop()`` returns what arrived before, with
+        /// the reason in ``Recording/failure``.
+        case captureEnded
+    }
+
     private let makeSource: @Sendable (_ inputDeviceUID: String?) -> any AudioSource
     private var configuration: Configuration
     private var source: (any AudioSource)?
+    /// Counts the captures opened, so a pump that outlived its capture is recognised as stale.
+    private var sourceGeneration = 0
     /// The microphone choice the open ``source`` was made for.
     private var sourceDeviceUID: String?
     private var pump: Task<Void, Never>?
@@ -53,12 +64,21 @@ public actor DictationRecorder {
     /// Input level (RMS of each buffer, 0...1) while recording, for the HUD's meter.
     public nonisolated let levels: AsyncStream<Float>
     private nonisolated let levelInput: AsyncStream<Float>.Continuation
+    /// What happens to the recording in progress by itself; see ``Event``.
+    public nonisolated let events: AsyncStream<Event>
+    private nonisolated let eventInput: AsyncStream<Event>.Continuation
+
+    /// Whether capture ended during the recording in progress, so it gets no more audio. An
+    /// ``Event/captureEnded`` may be read late, after that recording stopped and another
+    /// started; this says whether it still applies.
+    public var hasLostCapture: Bool { isRecording && failure != nil }
 
     /// - Parameter makeSource: Makes capture for the chosen microphone (`nil`: system default).
     public init(makeSource: @escaping @Sendable (_ inputDeviceUID: String?) -> any AudioSource, configuration: Configuration) {
         self.makeSource = makeSource
         self.configuration = configuration
         (levels, levelInput) = AsyncStream.makeStream(of: Float.self, bufferingPolicy: .bufferingNewest(1))
+        (events, eventInput) = AsyncStream.makeStream(of: Event.self, bufferingPolicy: .bufferingNewest(1))
     }
 
     /// Applies new settings. A new microphone choice reopens capture that is kept ready and idle;
@@ -139,14 +159,16 @@ public actor DictationRecorder {
         }
         self.source = source
         sourceDeviceUID = deviceUID
+        sourceGeneration += 1
+        let generation = sourceGeneration
         pump = Task { [weak self] in
             do {
                 for try await buffer in stream {
                     await self?.receive(buffer)
                 }
-                await self?.captureEnded(failure: nil)
+                await self?.captureEnded(failure: nil, generation: generation)
             } catch {
-                await self?.captureEnded(failure: error)
+                await self?.captureEnded(failure: error, generation: generation)
             }
         }
     }
@@ -194,16 +216,24 @@ public actor DictationRecorder {
         }
     }
 
-    /// Capture ended on its own: a failure, or the device went away for good.
-    private func captureEnded(failure error: Error?) {
-        guard source != nil else { return }  // closed by us
-        if let error {
-            Log.dictation.error("Capture failed: \(error.localizedDescription, privacy: .public)")
-            if isRecording { failure = error.localizedDescription }
+    /// Capture ended on its own: a failure, or the device went away for good. A recording in
+    /// progress keeps what arrived and is reported, so it can end now instead of listening on
+    /// to nothing.
+    private func captureEnded(failure error: Error?, generation: Int) {
+        // Closed by us, or a capture already replaced by a newer one.
+        guard source != nil, generation == sourceGeneration else { return }
+        let reason = error?.localizedDescription ?? "Capture ended unexpectedly."
+        if error != nil {
+            Log.dictation.error("Capture failed: \(reason, privacy: .public)")
+        } else {
+            Log.dictation.notice("Capture ended by itself")
         }
         source = nil
         pump = nil
         preRoll = []
+        guard isRecording else { return }
+        failure = reason
+        eventInput.yield(.captureEnded)
     }
 
     static func rms(_ buffer: [Float]) -> Float {

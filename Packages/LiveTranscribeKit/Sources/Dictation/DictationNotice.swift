@@ -12,6 +12,8 @@ public enum DictationNotice: Sendable, Equatable {
     case copiedToClipboard(app: String?)
     case insertionFailed
     case captureFailed(String)
+    /// The microphone stopped partway through; what was heard before it did was inserted.
+    case captureStoppedEarly(afterSeconds: Int)
     case transcriptionFailed(String)
     case recordingTruncated(seconds: Int)
     case undone
@@ -21,7 +23,9 @@ public enum DictationNotice: Sendable, Equatable {
     case undoFailed
     /// The microphone changed or fell back; the message names the device.
     case microphone(String)
-    /// The hotkey was pressed while the last dictation was still being inserted.
+    /// The hotkey was pressed while the last dictation was still being inserted, so nothing was
+    /// recorded. It shows while that dictation finishes and again once it has, so its message
+    /// is worded to be true at both times.
     case stillProcessing
     /// Dictation was started from the menu while a shortcut is being recorded in Settings.
     case recordingShortcut
@@ -39,15 +43,17 @@ public enum DictationNotice: Sendable, Equatable {
             if let app { "\(app) didn't accept the text. It's on the clipboard: press ⌘V" } else { "Copied: press ⌘V to paste" }
         case .insertionFailed: "The text couldn't be inserted or copied"
         case .captureFailed(let detail): "The microphone stopped: \(detail)"
+        case .captureStoppedEarly(let seconds):
+            "The microphone stopped after \(Self.duration(seconds: seconds)); the rest wasn't heard"
         case .transcriptionFailed(let detail): detail
-        case .recordingTruncated(let seconds): "Recording stopped at \(seconds / 60) min; the rest wasn't heard"
+        case .recordingTruncated(let seconds): "Recording stopped at \(Self.duration(seconds: seconds)); the rest wasn't heard"
         case .undone: "Restored what you said"
         case .undoCopiedToClipboard: "What you said is on the clipboard: select the edit and press ⌘V"
         case .nothingToUndo: "Nothing to undo"
         case .undoRefused(let reason): reason
         case .undoFailed: "Couldn't undo the edit"
         case .microphone(let message): message
-        case .stillProcessing: "Still inserting the last dictation"
+        case .stillProcessing: "Press again to dictate: the last dictation was still being inserted"
         case .recordingShortcut: "Finish recording the shortcut in Settings first"
         }
     }
@@ -60,6 +66,20 @@ public enum DictationNotice: Sendable, Equatable {
             false
         default:
             true
+        }
+    }
+
+    /// A length in whole seconds as the HUD says it: "30 s", "1 min", "1 min 30 s".
+    ///
+    /// Written out rather than formatted for the locale, like every other message, since
+    /// dictation is English only.
+    static func duration(seconds: Int) -> String {
+        let minutes = seconds / 60
+        let rest = seconds % 60
+        switch (minutes, rest) {
+        case (0, _): return "\(rest) s"
+        case (_, 0): return "\(minutes) min"
+        default: return "\(minutes) min \(rest) s"
         }
     }
 }

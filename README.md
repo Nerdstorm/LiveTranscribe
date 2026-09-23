@@ -80,7 +80,8 @@ queue size, GPU cache, and capture restarts. **Those apply the next time the app
   is, through Accessibility, or by pasting for apps that ignore it (your clipboard is put back
   afterwards). If neither works, the text is left on the clipboard and the floating panel says so.
 - **Double-tap** the shortcut to dictate hands-free; press it again to finish.
-- **Esc** cancels, while recording or while the text is being prepared.
+- **Esc** cancels, while recording or while the text is being prepared (with the shortcut on;
+  the × in the floating panel always cancels).
 - **Undo AI Edit** (⌃⌥Z, within 30 seconds, in the field you dictated into) swaps the cleaned
   text for what you said before cleanup; your snippets and vocabulary stay applied.
 - **Cleanup level** (menu bar or Settings): *None* inserts the raw transcript; *Light* fixes

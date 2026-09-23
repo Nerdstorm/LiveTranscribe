@@ -119,7 +119,7 @@ extension DictationController {
             // after this one is inserted, and lose the first words.
             switch input {
             case .escape: cancelProcessing()
-            case .pressed: show(.stillProcessing)
+            case .pressed: showProgress(.stillProcessing)
             default: break
             }
             return

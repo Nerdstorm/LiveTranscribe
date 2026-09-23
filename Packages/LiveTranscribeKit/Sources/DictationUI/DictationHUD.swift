@@ -15,6 +15,8 @@ public final class DictationHUD {
     private struct Snapshot {
         let phase: DictationController.Phase
         let notice: DictationNotice?
+        /// Takes the hint's line while it shows, and changes the HUD's size.
+        let progress: DictationNotice?
         let caret: CGRect?
         /// Changes the hint's text, and so the HUD's width.
         let hotkey: HotkeyState
@@ -62,6 +64,7 @@ public final class DictationHUD {
             Snapshot(
                 phase: controller.phase,
                 notice: controller.notice,
+                progress: controller.progressNotice,
                 caret: controller.caretRect,
                 hotkey: controller.hotkeyState
             )

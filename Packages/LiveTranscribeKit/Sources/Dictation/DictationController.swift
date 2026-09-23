@@ -36,8 +36,15 @@ public final class DictationController {
     public internal(set) var hotkeyState: HotkeyState = .stopped
     /// Whether the shortcuts are paused by ``suspendHotkeys()``. No dictation runs meanwhile.
     public var hotkeysSuspended: Bool { !activeSuspensions.isEmpty }
-    /// The latest message for the HUD; cleared after the notice time in Settings.
+    /// The latest message for the HUD between dictations; cleared after the notice time in
+    /// Settings. At the end of a dictation several can follow one another, each for that time.
     public private(set) var notice: DictationNotice?
+    /// A message about the dictation in progress, such as a change of microphone, which the HUD
+    /// shows under *Listening* or *Transcribing…* for the notice time. It is shown again as
+    /// ``notice`` once the dictation ends, after the dictation's own notices: that is when
+    /// VoiceOver can announce it without being dictated, and when a user looking at their text
+    /// rather than the HUD sees it.
+    public private(set) var progressNotice: DictationNotice?
     /// Microphone level while recording, 0...1.
     public private(set) var inputLevel: Float = 0
     /// The caret in the field the HUD is about (the one being dictated into, or undone in), for
@@ -68,7 +75,12 @@ public final class DictationController {
     @ObservationIgnored var eventsTask: Task<Void, Never>?
     @ObservationIgnored private var permissionTask: Task<Void, Never>?
     @ObservationIgnored private var levelTask: Task<Void, Never>?
+    @ObservationIgnored private var recorderEventTask: Task<Void, Never>?
     @ObservationIgnored private var noticeTask: Task<Void, Never>?
+    @ObservationIgnored private var progressNoticeTask: Task<Void, Never>?
+    /// The progress notices of the dictation in progress, the latest of each kind, in order;
+    /// shown once it ends.
+    @ObservationIgnored private var carriedNotices: [DictationNotice] = []
     @ObservationIgnored var processingTask: Task<DictationProcessor.Output, Error>?
     @ObservationIgnored var cancelRequested = false
     @ObservationIgnored var undoEntry: UndoEntry?
@@ -106,6 +118,16 @@ public final class DictationController {
             for await level in levels {
                 guard let self else { return }
                 if case .recording = self.phase { self.inputLevel = level }
+            }
+        }
+        let events = dependencies.recorder.events
+        recorderEventTask = Task { [weak self] in
+            for await event in events {
+                guard let self else { return }
+                switch event {
+                case .captureEnded:
+                    self.enqueue { await self.endRecordingWithoutCapture() }
+                }
             }
         }
     }
@@ -146,6 +168,8 @@ public final class DictationController {
         permissionTask = nil
         levelTask?.cancel()
         levelTask = nil
+        recorderEventTask?.cancel()
+        recorderEventTask = nil
         hotkeyState = .stopped
         let recorder = dependencies.recorder
         enqueue {
@@ -201,9 +225,14 @@ public final class DictationController {
 
     /// Shows a microphone change reported by capture, such as a fallback to the system default.
     /// Between dictations it concerns no field, so it is not placed at the last one's caret.
+    ///
+    /// It is always shown, so the caller can count it as seen: between dictations at once, and
+    /// during one under *Listening* and again once the dictation ends (see ``progressNotice``).
     public func showMicrophoneNotice(_ message: String) {
-        if phase == .idle { setCaret(nil) }
-        show(.microphone(message))
+        let notice = DictationNotice.microphone(message)
+        guard phase == .idle else { return showProgress(notice) }
+        setCaret(nil)
+        show(notice)
     }
 
     public func dismissNotice() {
@@ -230,15 +259,46 @@ public final class DictationController {
     }
 
     func show(_ notice: DictationNotice?) {
+        show(sequence: notice.map { [$0] } ?? [])
+    }
+
+    /// Shows `notices` one after another, each for the notice time in Settings, then clears the
+    /// HUD; an empty list clears it at once. Replaces whatever was showing or waiting. Notices
+    /// still waiting when a dictation starts are dropped: they were about the last one.
+    func show(sequence notices: [DictationNotice]) {
         noticeTask?.cancel()
-        self.notice = notice
+        notice = notices.first
         guard notice != nil else { return }
+        let rest = Array(notices.dropFirst())
         let seconds = dependencies.settings().dictation.noticeSeconds
         noticeTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(seconds))
-            guard !Task.isCancelled else { return }
-            self?.notice = nil
+            guard !Task.isCancelled, let self else { return }
+            self.show(sequence: self.phase == .idle ? rest : [])
         }
+    }
+
+    /// Shows `notice` about the dictation in progress; see ``progressNotice``. It replaces an
+    /// earlier one of the same kind: only the latest microphone change is still true.
+    func showProgress(_ notice: DictationNotice) {
+        progressNoticeTask?.cancel()
+        progressNotice = notice
+        carriedNotices.removeAll { Self.isSameKind($0, notice) }
+        carriedNotices.append(notice)
+        let seconds = dependencies.settings().dictation.noticeSeconds
+        progressNoticeTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled else { return }
+            self?.progressNotice = nil
+        }
+    }
+
+    /// Returns to idle at the end of a dictation, however it ended, and shows `notices` in
+    /// turn, most important first, followed by the progress notices it carried.
+    func endDictation(showing notices: [DictationNotice]) {
+        let carried = carriedNotices
+        setPhase(.idle)
+        show(sequence: notices + carried)
     }
 
     func setPhase(_ newPhase: Phase) {
@@ -247,6 +307,16 @@ public final class DictationController {
         if newPhase == .idle {
             inputLevel = 0
             startedFromMenu = false
+            progressNoticeTask?.cancel()
+            progressNotice = nil
+            carriedNotices = []
+        }
+    }
+
+    private static func isSameKind(_ first: DictationNotice, _ second: DictationNotice) -> Bool {
+        switch (first, second) {
+        case (.microphone, .microphone): true
+        default: first == second
         }
     }
 

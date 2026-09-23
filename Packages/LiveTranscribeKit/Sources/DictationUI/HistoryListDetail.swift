@@ -88,6 +88,9 @@ struct HistoryListDetail: View {
             if record.fellBack {
                 fact("Not cleaned up", record.fallbackReason ?? "Reason not recorded")
             }
+            if let failure = record.captureFailure {
+                fact("Microphone stopped", failure)
+            }
             fact("Delivery", HistoryListFormat.delivery(record.delivery))
             fact("Audio", HistoryListFormat.seconds(fromMs: record.audioDurationMs))
             fact("Latency", HistoryListFormat.milliseconds(record.latencyMs))

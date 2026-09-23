@@ -8,10 +8,12 @@ import Dictation
 /// row without going away (say, *Nothing to undo* twice within the notice time) is announced
 /// once, like the HUD, which does not change either.
 ///
-/// Only notices the HUD shows are announced, and it shows them only between dictations. Nothing
-/// is announced while recording, *Listening* included: VoiceOver speaking while the microphone
-/// is open would be dictated along with the user. A notice still set when the next recording
-/// starts is dropped, not announced once the microphone is open.
+/// Only notices the HUD shows between dictations are announced. Nothing is announced while
+/// recording, *Listening* included: VoiceOver speaking while the microphone is open would be
+/// dictated along with the user. A notice still set when the next recording starts is dropped,
+/// not announced once the microphone is open. A progress notice shown under *Listening* is not
+/// announced there; the controller shows it again once the dictation ends, and it is announced
+/// then.
 struct HUDAnnouncer {
     private var current: DictationNotice?
 

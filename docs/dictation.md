@@ -48,8 +48,10 @@ focus context, Command Mode, multilingual) is not started.
   field turns out to be a password field, the recording is thrown away before anything is
   transcribed; the microphone indicator may flash.
 - **One dictation at a time.** Pressing the shortcut while the last dictation is still being
-  transcribed or inserted shows *Still inserting the last dictation* and records nothing, rather
-  than opening the microphone late and losing the first words.
+  transcribed or inserted records nothing, rather than opening the microphone late and losing the
+  first words. The HUD says *Press again to dictate: the last dictation was still being inserted*
+  under *Transcribing…* and again once that dictation is in, so the message is seen however
+  quickly it finishes; it is worded to be true at both times.
 - **A dictation started from the menu** is hands-free: the shortcut stops it and Esc cancels it.
 - **Undo AI edit** works only between dictations, never during one.
 - **Undo AI edit puts back the uncleaned text, not the literal transcript.** F3 says undo
@@ -73,6 +75,32 @@ focus context, Command Mode, multilingual) is not started.
   microphone on every press. A chosen microphone that reconnects is switched back to
   automatically. When the macOS default input is a virtual device, a physical microphone is used
   unless none is connected.
+- **Notices about the dictation in progress show under *Listening*.** With the microphone
+  opening on key-down, capture reports a fallback while the dictation is already recording. The
+  notice takes the hint's line (*Listening* / *Transcribing…*) for `dictationNoticeSeconds`, then
+  the hint comes back, and it is shown again once the dictation ends. That second showing is when
+  VoiceOver announces it (nothing is announced while the microphone is open, or it would be
+  dictated) and when someone watching their text rather than the HUD sees it. Only the latest
+  microphone notice of a dictation is repeated: an earlier one no longer describes the
+  microphone in use. Every notice capture reports is therefore shown, so counting it as shown
+  when it arrives (`CaptureNoticeFilter`) is correct.
+- **Notices at the end of a dictation follow one another** instead of the most recent hiding
+  the rest, each for `dictationNoticeSeconds`: first where the text went, if it needs attention
+  (on the clipboard, not inserted, a password field); then what the recording missed (the
+  length limit, or the microphone stopping); then the notices from during the dictation. Any
+  still waiting when the next dictation starts are dropped, since they were about the last one.
+- **A microphone that stops mid-dictation ends it.** When capture fails for good during a
+  recording (a Bluetooth headset disconnects on a Mac with no other microphone), the recording
+  ends at once instead of showing *Listening* while nothing arrives. What was heard is
+  transcribed and inserted, the HUD says *The microphone stopped after 12 s; the rest wasn't
+  heard*, and the history record keeps the reason (`captureFailure`). If too little was heard to
+  transcribe, the HUD says *The microphone stopped:* and the reason instead of *Didn't catch that*.
+- **Durations in messages are written out in English** ("30 s", "1 min 30 s"), not formatted for
+  the locale, like every other message (D4).
+- **The HUD mentions Esc only when Esc works.** Esc is caught by the shortcut's keyboard tap, which
+  does not run when dictation is off in Settings, Accessibility is missing, or the tap failed. A
+  dictation started from the menu in those states shows *Finish from the menu bar · × to cancel*,
+  and the × button's tooltip says *Cancel* without *(esc)*.
 - **Settings apply after a short settle** (`settingsApplyDelayMs`, 300 ms), and the hotkey
   monitor restarts only when a shortcut changes, so editing other settings never interrupts a
   dictation. New timing takes effect once the current gesture ends.
@@ -124,7 +152,9 @@ Changed slices:
   *Show other devices* on, unless one is chosen, and a chosen microphone that is not connected,
   by the name last seen. *System Default* names the microphone capture would open for it at the
   next start, so a virtual default input is not named when a physical one is used.
-- **Persistence**: `DictationRecord` and `DictationHistory` (JSON Lines, pruning).
+- **Persistence**: `DictationRecord` and `DictationHistory` (JSON Lines, pruning). A record
+  keeps `captureFailure` when the microphone stopped partway through; older records read back
+  without it.
 - **Session**: the continuous pipeline passes `CleanupOptions` from settings.
 - **App**: no sandbox, menu-bar app (`LSUIElement`), composition of the dictation flow, and
   `WindowPresenter`, which opens every window with AppKit and switches the activation policy.
@@ -145,9 +175,10 @@ Hotkey up ───▶ discard if < 300 ms
              ─▶ history (raw + cleaned), undo buffer
 ```
 
-Esc cancels at any point before insertion. Nothing is inserted into secure (password) fields,
-including one focused while the dictation was processed, and nothing is recorded in history for
-a cancelled dictation.
+Esc cancels at any point before insertion, while the shortcut's keyboard tap runs; the HUD's ×
+button and the menu always can. Nothing is inserted into secure (password) fields, including one
+focused while the dictation was processed, and nothing is recorded in history for a cancelled
+dictation.
 
 ### Hotkey gestures
 

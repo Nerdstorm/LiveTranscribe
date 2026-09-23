@@ -48,10 +48,23 @@ struct DictationRecordTests {
             fallbackReason: "guard rejected the output",
             delivery: "paste",
             audioDurationMs: 1_500,
-            latencyMs: 250
+            latencyMs: 250,
+            captureFailure: "The microphone stopped and capture could not restart after 3 attempts."
         )
 
         #expect(try JSONDecoder().decode(DictationRecord.self, from: JSONEncoder().encode(record)) == record)
+    }
+
+    /// Records written before the capture failure was kept still read, without one.
+    @Test func aRecordWithoutACaptureFailureReadsBackWithoutOne() throws {
+        let record = Fixtures.record("x", offsetMs: 0)
+        let object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(record)) as? [String: Any])
+        #expect(object["captureFailure"] == nil, "nothing is written when there was none")
+
+        let decoded = try JSONDecoder().decode(DictationRecord.self, from: JSONSerialization.data(withJSONObject: object))
+
+        #expect(decoded.captureFailure == nil)
+        #expect(decoded == record)
     }
 
     @Test func aMissingRequiredFieldIsADecodingError() throws {

@@ -2,7 +2,8 @@ import Dictation
 import SwiftUI
 
 /// The HUD's capsule: the microphone level and a hint while listening, a spinner while
-/// transcribing, or the latest message.
+/// transcribing, or the latest message. A message about the dictation in progress (a change of
+/// microphone, a press while transcribing) takes the hint's line for a while.
 struct DictationHUDView: View {
     /// Widest a message gets before it wraps onto a second line.
     static let messageMaxWidth: CGFloat = 320
@@ -30,9 +31,9 @@ struct DictationHUDView: View {
             HUDLevelMeter(level: controller.inputLevel)
             VStack(alignment: .leading, spacing: 1) {
                 Text(handsFree ? "Listening, hands-free" : "Listening")
-                Text(hint(handsFree: handsFree))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                caption(Self.recordingCaption(
+                    progress: controller.progressNotice, hotkeyState: controller.hotkeyState, handsFree: handsFree
+                ))
             }
             .accessibilityElement(children: .combine)
             cancelButton
@@ -40,7 +41,13 @@ struct DictationHUDView: View {
             ProgressView()
                 .controlSize(.small)
                 .accessibilityHidden(true)
-            Text("Transcribing…")
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Transcribing…")
+                if let progress = controller.progressNotice {
+                    caption(progress.message)
+                }
+            }
+            .accessibilityElement(children: .combine)
             cancelButton
         case .idle:
             if let notice = controller.notice {
@@ -62,13 +69,38 @@ struct DictationHUDView: View {
             Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
         }
         .buttonStyle(.plain)
-        .help("Cancel (esc)")
+        .help(Self.cancelHelp(hotkeyState: controller.hotkeyState))
         .accessibilityLabel("Cancel dictation")
     }
 
-    private func hint(handsFree: Bool) -> String {
-        guard case .running(let hotkey) = controller.hotkeyState else { return "esc to cancel" }
+    /// The line under a title: the hint, or a progress notice, which can be long enough to wrap.
+    private func caption(_ text: String) -> some View {
+        HUDWidthLimit(maxWidth: Self.messageMaxWidth) {
+            Text(text)
+                .lineLimit(2)
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    }
+
+    /// The line under *Listening*: the latest progress notice while it shows, otherwise the hint.
+    static func recordingCaption(progress: DictationNotice?, hotkeyState: HotkeyState, handsFree: Bool) -> String {
+        progress?.message ?? hint(hotkeyState: hotkeyState, handsFree: handsFree)
+    }
+
+    /// How to finish and cancel. Esc is caught only by the shortcut's keyboard tap, which runs
+    /// only while the state is ``HotkeyState/running(hotkey:)``. In any other state (dictation
+    /// turned off, no Accessibility, a tap that failed) the dictation was started from the menu
+    /// and Esc would go to the app in front, so the hint names the menu and the × button.
+    static func hint(hotkeyState: HotkeyState, handsFree: Bool) -> String {
+        guard case .running(let hotkey) = hotkeyState else { return "Finish from the menu bar · × to cancel" }
         return handsFree ? "Press \(hotkey) to finish · esc to cancel" : "Release \(hotkey) to finish · esc to cancel"
+    }
+
+    /// The cancel button's tooltip, which names Esc only while Esc cancels; see
+    /// ``hint(hotkeyState:handsFree:)``.
+    static func cancelHelp(hotkeyState: HotkeyState) -> String {
+        if case .running = hotkeyState { "Cancel (esc)" } else { "Cancel" }
     }
 }
 

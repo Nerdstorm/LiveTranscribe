@@ -11,7 +11,9 @@ public struct CaptureNoticeFilter: Sendable {
 
     public init() {}
 
-    /// Whether `notice` should be shown; records it as shown when it should.
+    /// Whether `notice` should be shown; records it as shown when it should, so call it only
+    /// where a `true` is always followed by showing it. `DictationController.showMicrophoneNotice`
+    /// always shows what it is given, during a dictation too.
     public mutating func shouldShow(_ notice: CaptureNotice) -> Bool {
         guard notice != lastShown else { return false }
         lastShown = notice
