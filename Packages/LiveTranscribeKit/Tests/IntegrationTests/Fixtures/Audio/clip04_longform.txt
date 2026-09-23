@@ -1,0 +1,1 @@
+When we moved the service to the new cluster last month, the latency went up a little at first, but after we tuned the connection pool and turned on caching for the most common queries, it came back down, and now it is actually faster than it was before the move.

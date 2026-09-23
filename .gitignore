@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# Xcode and SwiftPM build output
+.build/
+build/
+DerivedData/
+.swiftpm/
+xcuserdata/
+*.xcresult
+*.xcarchive
+*.dSYM
+*.profraw
+*.log
+
+# Editors
+.vscode/
+.idea/
+
+# Test audio is synthesised locally with macOS text-to-speech (scripts/generate-test-audio.sh);
+# Apple's licence does not allow redistributing it.
+Packages/LiveTranscribeKit/Tests/IntegrationTests/Fixtures/Audio/*.wav
