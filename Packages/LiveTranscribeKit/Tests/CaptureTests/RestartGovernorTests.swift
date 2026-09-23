@@ -30,3 +30,33 @@ struct RestartGovernorTests {
         #expect(decisions(&governor, at: [0]) == [true])
     }
 }
+
+@Suite("RestartGovernor: when the next restart is allowed")
+struct RestartGovernorNextAllowedTests {
+    private let start = ContinuousClock.now
+
+    @Test("Below the limit, now", arguments: [0, 1])
+    func belowTheLimitItIsNow(recorded: Int) {
+        var governor = RestartGovernor(maxRestarts: 2, window: .seconds(60))
+        for offset in 0..<recorded {
+            _ = governor.allowRestart(at: start + .seconds(offset))
+        }
+        #expect(governor.nextAllowedRestart(after: start + .seconds(5)) == start + .seconds(5))
+    }
+
+    @Test func atTheLimitItIsWhenTheOldestAgesOut() {
+        var governor = RestartGovernor(maxRestarts: 2, window: .seconds(60))
+        _ = governor.allowRestart(at: start)
+        _ = governor.allowRestart(at: start + .seconds(10))
+        let next = governor.nextAllowedRestart(after: start + .seconds(20))
+        #expect(next == start + .seconds(60))
+        let allowed = governor.allowRestart(at: next)
+        #expect(allowed, "the instant it names is allowed")
+    }
+
+    @Test func restartsAlreadyOutsideTheWindowDoNotDelay() {
+        var governor = RestartGovernor(maxRestarts: 1, window: .seconds(10))
+        _ = governor.allowRestart(at: start)
+        #expect(governor.nextAllowedRestart(after: start + .seconds(11)) == start + .seconds(11))
+    }
+}

@@ -115,7 +115,8 @@ public final class TranscriptViewModel {
         inputSelection != nil && phase != .listening && phase != .stopping
     }
 
-    /// The saved microphone is not connected; starting would fail until another is chosen.
+    /// The saved microphone is not connected. Capture falls back to the system default, and says
+    /// so, until it reconnects or another is chosen.
     public var selectedInputDeviceIsMissing: Bool {
         guard let selectedInputDeviceUID else { return false }
         return !inputDevices.contains { $0.id == selectedInputDeviceUID }

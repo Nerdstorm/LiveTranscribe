@@ -4,7 +4,9 @@ import Foundation
 import Shared
 import Testing
 
-/// Reads the real microphone list, so it holds with any hardware, including none.
+/// Reads the real microphone list, so it holds with any hardware, including none. Nothing here
+/// opens a microphone; what capture does with a missing or disconnected device is covered with
+/// fakes in `CaptureSessionSourceTests`.
 @Suite("Input devices")
 struct InputDeviceTests {
     private let devices = SystemInputDevices(store: AppSettingsStore(suiteName: "LiveTranscribeTests.\(UUID().uuidString)"))
@@ -19,14 +21,23 @@ struct InputDeviceTests {
         #expect(listed == listed.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending })
     }
 
-    @Test func startingWithADisconnectedMicrophoneFailsClearly() async {
-        let source = CaptureSessionSource(
-            restartPolicy: CaptureRestartPolicy(maxAttempts: 1, delaySeconds: 0, maxRestartsPerMinute: 1),
-            inputDeviceUID: "LiveTranscribe.no-such-device"
-        )
-        await #expect(throws: CaptureError.inputDeviceUnavailable) {
-            _ = try await source.start()
+    @Test func theSnapshotDefaultIsAlwaysAListedDevice() {
+        let snapshot = SystemInputDeviceCatalog().snapshot()
+        if let systemDefault = snapshot.systemDefault {
+            #expect(snapshot.connected.contains(systemDefault))
         }
-        await source.stop()
+    }
+
+    @Test func coreAudioAgreesWithAVFoundationOnEveryTransport() throws {
+        for device in devices.availableDevices() {
+            let captureDevice = try #require(AVCaptureDevice(uniqueID: device.id))
+            let avFoundation = UInt32(bitPattern: captureDevice.transportType)
+            #expect(AudioTransport.transportType(forUID: device.id) == avFoundation, "the UID lookup finds the same device")
+            #expect(device.isVirtual == AudioTransport.isVirtual(transportType: avFoundation))
+        }
+    }
+
+    @Test func anUnknownUIDHasNoTransportType() {
+        #expect(AudioTransport.transportType(forUID: "LiveTranscribe.no-such-device") == nil)
     }
 }
