@@ -21,6 +21,26 @@ public enum AppSettingsKey: String, CaseIterable, Sendable {
     case captureRestartAttempts
     case captureRestartDelaySeconds
     case captureMaxRestartsPerMinute
+    case dictationEnabled
+    case dictationHotkey
+    case undoHotkey
+    case handsFreeEnabled
+    case hotkeyTapMaxMs
+    case hotkeyDoubleTapWindowMs
+    case dictationMinUtteranceMs
+    case dictationMaxRecordingSeconds
+    case keepMicrophoneReady
+    case dictationPreRollMs
+    case undoWindowSeconds
+    case pasteRestoreDelayMs
+    case undoSettleDelayMs
+    case accessibilityTimeoutMs
+    case vocabularyPromptLimit
+    case vocabularySimilarityThreshold
+    case showVirtualInputDevices
+    case historyEnabled
+    case historyRetentionDays
+    case dictationNoticeSeconds
     /// The chosen microphone's Core Audio UID; absent means the system default input.
     /// Not part of ``AppSettings``: it is read at every Start rather than once at launch.
     case inputDeviceUID
@@ -51,6 +71,7 @@ public struct AppSettingsStore: Sendable {
         func string(_ key: AppSettingsKey) -> String { d.string(forKey: key.rawValue) ?? "" }
         func int(_ key: AppSettingsKey) -> Int { d.integer(forKey: key.rawValue) }
         func double(_ key: AppSettingsKey) -> Double { d.double(forKey: key.rawValue) }
+        func bool(_ key: AppSettingsKey) -> Bool { d.bool(forKey: key.rawValue) }
 
         return AppSettings(
             sttModel: string(.sttModel),
@@ -71,7 +92,29 @@ public struct AppSettingsStore: Sendable {
             gpuCacheLimitMB: int(.gpuCacheLimitMB),
             captureRestartAttempts: int(.captureRestartAttempts),
             captureRestartDelaySeconds: double(.captureRestartDelaySeconds),
-            captureMaxRestartsPerMinute: int(.captureMaxRestartsPerMinute)
+            captureMaxRestartsPerMinute: int(.captureMaxRestartsPerMinute),
+            dictation: DictationSettings(
+                enabled: bool(.dictationEnabled),
+                hotkey: string(.dictationHotkey),
+                undoHotkey: string(.undoHotkey),
+                handsFreeEnabled: bool(.handsFreeEnabled),
+                tapMaxMs: int(.hotkeyTapMaxMs),
+                doubleTapWindowMs: int(.hotkeyDoubleTapWindowMs),
+                minUtteranceMs: int(.dictationMinUtteranceMs),
+                maxRecordingSeconds: int(.dictationMaxRecordingSeconds),
+                keepMicrophoneReady: bool(.keepMicrophoneReady),
+                preRollMs: int(.dictationPreRollMs),
+                undoWindowSeconds: int(.undoWindowSeconds),
+                pasteRestoreDelayMs: int(.pasteRestoreDelayMs),
+                undoSettleDelayMs: int(.undoSettleDelayMs),
+                accessibilityTimeoutMs: int(.accessibilityTimeoutMs),
+                vocabularyPromptLimit: int(.vocabularyPromptLimit),
+                vocabularySimilarityThreshold: double(.vocabularySimilarityThreshold),
+                showVirtualInputDevices: bool(.showVirtualInputDevices),
+                historyEnabled: bool(.historyEnabled),
+                historyRetentionDays: int(.historyRetentionDays),
+                noticeSeconds: double(.dictationNoticeSeconds)
+            )
         ).sanitized()
     }
 
@@ -127,6 +170,26 @@ public struct AppSettingsStore: Sendable {
             .captureRestartAttempts: s.captureRestartAttempts,
             .captureRestartDelaySeconds: s.captureRestartDelaySeconds,
             .captureMaxRestartsPerMinute: s.captureMaxRestartsPerMinute,
+            .dictationEnabled: s.dictation.enabled,
+            .dictationHotkey: s.dictation.hotkey,
+            .undoHotkey: s.dictation.undoHotkey,
+            .handsFreeEnabled: s.dictation.handsFreeEnabled,
+            .hotkeyTapMaxMs: s.dictation.tapMaxMs,
+            .hotkeyDoubleTapWindowMs: s.dictation.doubleTapWindowMs,
+            .dictationMinUtteranceMs: s.dictation.minUtteranceMs,
+            .dictationMaxRecordingSeconds: s.dictation.maxRecordingSeconds,
+            .keepMicrophoneReady: s.dictation.keepMicrophoneReady,
+            .dictationPreRollMs: s.dictation.preRollMs,
+            .undoWindowSeconds: s.dictation.undoWindowSeconds,
+            .pasteRestoreDelayMs: s.dictation.pasteRestoreDelayMs,
+            .undoSettleDelayMs: s.dictation.undoSettleDelayMs,
+            .accessibilityTimeoutMs: s.dictation.accessibilityTimeoutMs,
+            .vocabularyPromptLimit: s.dictation.vocabularyPromptLimit,
+            .vocabularySimilarityThreshold: s.dictation.vocabularySimilarityThreshold,
+            .showVirtualInputDevices: s.dictation.showVirtualInputDevices,
+            .historyEnabled: s.dictation.historyEnabled,
+            .historyRetentionDays: s.dictation.historyRetentionDays,
+            .dictationNoticeSeconds: s.dictation.noticeSeconds,
         ]
         return Dictionary(uniqueKeysWithValues: values.map { ($0.key.rawValue, $0.value) })
     }

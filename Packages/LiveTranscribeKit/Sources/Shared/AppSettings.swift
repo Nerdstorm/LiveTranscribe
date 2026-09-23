@@ -47,6 +47,8 @@ public struct AppSettings: Sendable, Equatable {
     /// Capture restarts allowed in any 60 s window before capture stops with an error, instead of
     /// looping on a microphone that keeps failing.
     public var captureMaxRestartsPerMinute: Int
+    /// System-wide dictation: read at each use.
+    public var dictation: DictationSettings
 
     public init(
         sttModel: String,
@@ -67,7 +69,8 @@ public struct AppSettings: Sendable, Equatable {
         gpuCacheLimitMB: Int,
         captureRestartAttempts: Int,
         captureRestartDelaySeconds: Double,
-        captureMaxRestartsPerMinute: Int
+        captureMaxRestartsPerMinute: Int,
+        dictation: DictationSettings
     ) {
         self.sttModel = sttModel
         self.llmModel = llmModel
@@ -88,6 +91,7 @@ public struct AppSettings: Sendable, Equatable {
         self.captureRestartAttempts = captureRestartAttempts
         self.captureRestartDelaySeconds = captureRestartDelaySeconds
         self.captureMaxRestartsPerMinute = captureMaxRestartsPerMinute
+        self.dictation = dictation
     }
 
     public static let defaults = AppSettings(
@@ -109,7 +113,8 @@ public struct AppSettings: Sendable, Equatable {
         gpuCacheLimitMB: 512,
         captureRestartAttempts: 5,
         captureRestartDelaySeconds: 1,
-        captureMaxRestartsPerMinute: 6
+        captureMaxRestartsPerMinute: 6,
+        dictation: .defaults
     )
 
     /// The same settings with every value clamped to a range the pipeline can run with.
@@ -132,6 +137,7 @@ public struct AppSettings: Sendable, Equatable {
         copy.captureRestartAttempts = captureRestartAttempts.clamped(to: 0...20)
         copy.captureRestartDelaySeconds = captureRestartDelaySeconds.clamped(to: 0...30)
         copy.captureMaxRestartsPerMinute = captureMaxRestartsPerMinute.clamped(to: 1...60)
+        copy.dictation = dictation.sanitized()
         return copy
     }
 }
@@ -140,11 +146,5 @@ private extension String {
     func trimmed(or fallback: String) -> String {
         let value = trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? fallback : value
-    }
-}
-
-private extension Comparable {
-    func clamped(to range: ClosedRange<Self>) -> Self {
-        min(max(self, range.lowerBound), range.upperBound)
     }
 }

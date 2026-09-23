@@ -62,6 +62,46 @@ struct AppSettingsTests {
         #expect(settings.sanitized().captureMaxRestartsPerMinute == 1)
     }
 
+    @Test func dictationSettingsRoundTrip() {
+        let (store, suite) = makeStore()
+        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        var settings = AppSettings.defaults
+        settings.dictation.enabled = false
+        settings.dictation.hotkey = "modifier:rightOption"
+        settings.dictation.handsFreeEnabled = false
+        settings.dictation.keepMicrophoneReady = true
+        settings.dictation.historyEnabled = false
+        settings.dictation.historyRetentionDays = 30
+        settings.dictation.vocabularySimilarityThreshold = 0.9
+        settings.dictation.noticeSeconds = 4
+        store.save(settings)
+        #expect(store.load() == settings)
+    }
+
+    @Test func dictationDefaultsMatchTheDesign() {
+        let d = AppSettings.defaults.dictation
+        #expect(d.enabled && d.handsFreeEnabled && d.historyEnabled)
+        #expect(d.hotkey == "modifier:fn")
+        #expect(d.undoHotkey == "combo:6:control,option")
+        #expect(d.historyRetentionDays == 0, "history keeps everything unless the user sets a limit")
+        #expect(!d.keepMicrophoneReady && !d.showVirtualInputDevices)
+        #expect(d.undoWindowSeconds == 30 && d.vocabularyPromptLimit == 50)
+        #expect(d.sanitized() == d)
+    }
+
+    @Test func dictationTunablesAreClamped() {
+        var settings = AppSettings.defaults
+        settings.dictation.tapMaxMs = 5
+        settings.dictation.undoWindowSeconds = 0
+        settings.dictation.historyRetentionDays = -3
+        settings.dictation.vocabularySimilarityThreshold = 2
+        let sanitized = settings.sanitized().dictation
+        #expect(sanitized.tapMaxMs == 100)
+        #expect(sanitized.undoWindowSeconds == 5)
+        #expect(sanitized.historyRetentionDays == 0)
+        #expect(sanitized.vocabularySimilarityThreshold == 1)
+    }
+
     @Test func unknownCleanupLevelReadsAsTheDefault() {
         let (store, suite) = makeStore()
         defer { UserDefaults().removePersistentDomain(forName: suite) }
