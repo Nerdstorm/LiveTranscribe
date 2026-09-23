@@ -7,6 +7,7 @@ public enum AppSettingsKey: String, CaseIterable, Sendable {
     case vadModel
     case cleanupEnabled
     case cleanupAdapterEnabled
+    case cleanupLevel
     case vadSilenceMs
     case vadSpeechThreshold
     case vadPreRollMs
@@ -57,6 +58,7 @@ public struct AppSettingsStore: Sendable {
             vadModel: string(.vadModel),
             cleanupEnabled: d.bool(forKey: AppSettingsKey.cleanupEnabled.rawValue),
             cleanupAdapterEnabled: d.bool(forKey: AppSettingsKey.cleanupAdapterEnabled.rawValue),
+            cleanupLevel: CleanupLevel(rawValue: string(.cleanupLevel)) ?? AppSettings.defaults.cleanupLevel,
             vadSilenceMs: int(.vadSilenceMs),
             vadSpeechThreshold: double(.vadSpeechThreshold),
             vadPreRollMs: int(.vadPreRollMs),
@@ -111,6 +113,7 @@ public struct AppSettingsStore: Sendable {
             .vadModel: s.vadModel,
             .cleanupEnabled: s.cleanupEnabled,
             .cleanupAdapterEnabled: s.cleanupAdapterEnabled,
+            .cleanupLevel: s.cleanupLevel.rawValue,
             .vadSilenceMs: s.vadSilenceMs,
             .vadSpeechThreshold: s.vadSpeechThreshold,
             .vadPreRollMs: s.vadPreRollMs,

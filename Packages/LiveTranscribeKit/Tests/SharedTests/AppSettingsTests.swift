@@ -22,6 +22,7 @@ struct AppSettingsTests {
         settings.llmModel = "mlx-community/Qwen3-0.6B-4bit"
         settings.cleanupEnabled = false
         settings.cleanupAdapterEnabled = false
+        settings.cleanupLevel = .high
         settings.vadSilenceMs = 800
         settings.cleanupTimeoutSeconds = 2.5
         store.save(settings)
@@ -59,6 +60,13 @@ struct AppSettingsTests {
         settings.captureMaxRestartsPerMinute = 0
         #expect(settings.sanitized().captureRestartDelaySeconds == 0)
         #expect(settings.sanitized().captureMaxRestartsPerMinute == 1)
+    }
+
+    @Test func unknownCleanupLevelReadsAsTheDefault() {
+        let (store, suite) = makeStore()
+        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        UserDefaults(suiteName: suite)?.set("extreme", forKey: AppSettingsKey.cleanupLevel.rawValue)
+        #expect(store.load().cleanupLevel == .medium)
     }
 
     @Test func inputDeviceChoiceRoundTrips() {

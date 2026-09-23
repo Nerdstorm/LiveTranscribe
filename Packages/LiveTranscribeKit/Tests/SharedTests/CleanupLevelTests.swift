@@ -1,5 +1,5 @@
 import Foundation
-import Styles
+import Shared
 import Testing
 
 @Suite("CleanupLevel")

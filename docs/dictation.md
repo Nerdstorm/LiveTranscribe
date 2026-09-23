@@ -49,7 +49,7 @@ New package targets (vertical slices), each with its own test target:
 
 | Target | Owns | Depends on |
 |---|---|---|
-| `Styles` | `CleanupLevel`, `FillerRemover`, `ListFormatter` | Shared |
+| `Styles` | `FillerRemover`, `ListFormatter`: the deterministic rules the levels turn on | Shared |
 | `Snippets` | `Snippet`, `SnippetStore`, `SnippetExpander` | Shared |
 | `Vocabulary` | `VocabularyEntry`, `VocabularyStore`, `VocabularyReplacer`, `VocabularySelector` | Shared |
 | `Hotkey` | `HotkeyBinding`, `HotkeyGesture` (pure state machine), `HotkeyMonitor`, `CGEventTapHotkeyMonitor` | Shared |
@@ -60,6 +60,8 @@ New package targets (vertical slices), each with its own test target:
 
 Changed slices:
 
+- **Shared**: `CleanupLevel`, because `AppSettings` carries it and four slices read it; the
+  snippet placeholder token format (`⟦S1⟧`), which Snippets writes and Cleanup checks.
 - **Cleanup**: `Prompt` becomes `PromptBuilder`: base rules + level rules + vocabulary +
   placeholder rule + prior context, each a separately tested function. `Cleaner.clean` takes
   `CleanupOptions` (level, vocabulary terms, placeholder tokens, multi-line). `OutputGuard`

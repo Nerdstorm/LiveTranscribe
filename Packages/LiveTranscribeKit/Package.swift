@@ -45,7 +45,7 @@ let package = Package(
 
         .target(name: "Capture", dependencies: ["Shared"], swiftSettings: strictSwift),
 
-        // Cleanup levels and the deterministic text rules they turn on (fillers, lists).
+        // The deterministic text rules the cleanup levels turn on (fillers, lists).
         .target(name: "Styles", dependencies: ["Shared"], swiftSettings: strictSwift),
 
         .target(
