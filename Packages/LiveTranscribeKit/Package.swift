@@ -64,7 +64,11 @@ let package = Package(
         .target(name: "Permissions", dependencies: ["Shared", "Capture"], swiftSettings: strictSwift),
 
         // System-wide dictation: hotkey → record → transcribe → clean → insert at the cursor.
-        .target(name: "Dictation", dependencies: ["Shared", "Capture"], swiftSettings: strictSwift),
+        .target(
+            name: "Dictation",
+            dependencies: ["Shared", "Capture", "Transcription", "Cleanup", "Styles", "Snippets", "Vocabulary"],
+            swiftSettings: strictSwift
+        ),
 
         .target(
             name: "Segmentation",
@@ -159,7 +163,11 @@ let package = Package(
         .testTarget(name: "VocabularyTests", dependencies: ["Vocabulary", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "InsertionTests", dependencies: ["Insertion", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "PermissionsTests", dependencies: ["Permissions", "Capture"], swiftSettings: strictSwift),
-        .testTarget(name: "DictationTests", dependencies: ["Dictation", "Capture", "Shared"], swiftSettings: strictSwift),
+        .testTarget(
+            name: "DictationTests",
+            dependencies: ["Dictation", "Capture", "Shared", "Transcription", "Cleanup", "Snippets", "Vocabulary"],
+            swiftSettings: strictSwift
+        ),
         .testTarget(name: "CaptureTests", dependencies: ["Capture", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "SegmentationTests", dependencies: ["Segmentation", "Shared"], swiftSettings: strictSwift),
         .testTarget(
