@@ -75,6 +75,7 @@ private final class FakeAccessibility: AccessibilityPermissionProviding {
 private final class SystemSpy {
     var fnUsage: FnKeyUsage = .doNothing
     var opensKeyboardSettings = true
+    var opensPrivacySettings = true
     private(set) var openedPermissions: [RequiredPermission] = []
     private(set) var keyboardSettingsOpened = 0
     private(set) var announcements: [String] = []
@@ -82,7 +83,10 @@ private final class SystemSpy {
     var system: OnboardingModel.System {
         OnboardingModel.System(
             fnKeyUsage: { self.fnUsage },
-            openPrivacySettings: { self.openedPermissions.append($0) },
+            openPrivacySettings: {
+                self.openedPermissions.append($0)
+                return self.opensPrivacySettings
+            },
             openKeyboardSettings: {
                 self.keyboardSettingsOpened += 1
                 return self.opensKeyboardSettings
@@ -217,6 +221,19 @@ struct OnboardingModelTests {
         #expect(accessibility.prompts == 1)
         #expect(spy.openedPermissions == [.accessibility])
         #expect(model.hasAskedForAccessibility)
+    }
+
+    @Test func aPrivacyPaneThatWillNotOpenSaysWhereToGo() {
+        let model = makeModel()
+        spy.opensPrivacySettings = false
+        model.openMicrophoneSettings()
+        #expect(model.errorMessage == "Couldn't open System Settings. Open it from the Apple menu, then choose Privacy & Security › Microphone.")
+        model.grantAccessibility()
+        #expect(model.errorMessage == "Couldn't open System Settings. Open it from the Apple menu, then choose Privacy & Security › Accessibility.")
+
+        spy.opensPrivacySettings = true
+        model.grantAccessibility()
+        #expect(model.errorMessage == nil, "cleared once it opens")
     }
 
     @Test func accessibilityUpdatesLiveWhileObserved() async {

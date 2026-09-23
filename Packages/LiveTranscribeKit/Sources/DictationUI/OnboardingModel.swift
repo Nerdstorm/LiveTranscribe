@@ -39,7 +39,8 @@ final class OnboardingModel {
     struct System {
         /// Reads macOS's *Press 🌐 key to* setting.
         var fnKeyUsage: @MainActor () -> FnKeyUsage
-        var openPrivacySettings: @MainActor (RequiredPermission) -> Void
+        /// Opens a permission's list in System Settings; `false` if it could not.
+        var openPrivacySettings: @MainActor (RequiredPermission) -> Bool
         /// Opens System Settings › Keyboard; `false` if it could not.
         var openKeyboardSettings: @MainActor () -> Bool
         /// Reads a status change out to VoiceOver users.
@@ -148,15 +149,19 @@ final class OnboardingModel {
     }
 
     func openMicrophoneSettings() {
-        system.openPrivacySettings(.microphone)
+        openPrivacySettings(.microphone)
     }
 
     /// Shows the system's Accessibility alert, which also adds the app to the list, and opens
     /// the list in System Settings.
     func grantAccessibility() {
         accessibility.prompt()
-        system.openPrivacySettings(.accessibility)
+        openPrivacySettings(.accessibility)
         hasAskedForAccessibility = true
+    }
+
+    private func openPrivacySettings(_ permission: RequiredPermission) {
+        errorMessage = system.openPrivacySettings(permission) ? nil : permission.settingsFailureMessage
     }
 
     /// Follows Accessibility access until the task running it is cancelled, so the step updates

@@ -122,7 +122,7 @@ let package = Package(
             swiftSettings: strictSwift
         ),
 
-        .target(name: "TranscriptUI", dependencies: ["Shared", "Session", "Capture"], swiftSettings: strictSwift),
+        .target(name: "TranscriptUI", dependencies: ["Shared", "Session", "Capture", "Permissions"], swiftSettings: strictSwift),
 
         // The menu bar, dictation HUD, Settings tabs, history window and onboarding.
         .target(

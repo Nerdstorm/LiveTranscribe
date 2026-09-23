@@ -77,7 +77,7 @@ struct PermissionsSettingsModelTests {
     /// This test's launch: a fresh memory, so tests don't share the app-wide one.
     private let promptMemory = PermissionsSettingsPromptMemory()
 
-    private func model(opened: @escaping @MainActor (RequiredPermission) -> Void = { _ in }) -> PermissionsSettingsModel {
+    private func model(opened: @escaping @MainActor (RequiredPermission) -> Bool = { _ in true }) -> PermissionsSettingsModel {
         PermissionsSettingsModel(
             microphonePermission: microphone,
             accessibility: accessibility,
@@ -101,12 +101,23 @@ struct PermissionsSettingsModelTests {
     @Test func aDeniedMicrophoneOpensSystemSettings() async {
         microphone.currentStatus = .denied
         var opened: [RequiredPermission] = []
-        let model = model { opened.append($0) }
+        let model = model { opened.append($0); return true }
         #expect(model.statusText(.microphone) == "Not allowed")
         #expect(model.action(for: .microphone) == .openSettings)
         await model.perform(.openSettings, for: .microphone)
         #expect(opened == [.microphone])
         #expect(microphone.requests == 0)
+    }
+
+    @Test func aPaneThatWillNotOpenSaysWhereToGo() async {
+        microphone.currentStatus = .denied
+        let model = model { _ in false }
+        await model.perform(.openSettings, for: .microphone)
+        #expect(model.errorMessage == "Couldn't open System Settings. Open it from the Apple menu, then choose Privacy & Security › Microphone.")
+        #expect(model.errorMessage == RequiredPermission.microphone.settingsFailureMessage)
+
+        await model.perform(.request, for: .accessibility)
+        #expect(model.errorMessage == nil, "the next action clears it")
     }
 
     @Test func theMicrophoneIsReadAgainOnRefresh() {
@@ -119,7 +130,7 @@ struct PermissionsSettingsModelTests {
 
     @Test func accessibilityPromptsOnceThenOpensSystemSettings() async {
         var opened: [RequiredPermission] = []
-        let model = model { opened.append($0) }
+        let model = model { opened.append($0); return true }
         #expect(model.statusText(.accessibility) == "Not allowed")
         #expect(model.action(for: .accessibility) == .request)
 

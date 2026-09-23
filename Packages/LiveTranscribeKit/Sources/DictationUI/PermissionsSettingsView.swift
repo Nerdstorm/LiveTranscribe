@@ -23,6 +23,11 @@ struct PermissionsSettingsView: View {
                 ForEach(RequiredPermission.allCases) { permission in
                     PermissionsSettingsRow(permission: permission, model: model)
                 }
+                if let error = model.errorMessage {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             } footer: {
                 Text("Accessibility is needed for the dictation shortcut and for typing into other apps.")
                     .font(.caption)

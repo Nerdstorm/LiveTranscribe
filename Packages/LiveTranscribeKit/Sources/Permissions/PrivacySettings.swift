@@ -34,6 +34,11 @@ public enum RequiredPermission: String, CaseIterable, Sendable, Identifiable {
         case .accessibility: URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
         }
     }
+
+    /// What to show when ``PrivacySettings/open(_:)`` fails for this permission.
+    public var settingsFailureMessage: String {
+        "Couldn't open System Settings. Open it from the Apple menu, then choose Privacy & Security › \(title)."
+    }
 }
 
 /// The permissions dictation needs, as last checked.
@@ -73,7 +78,8 @@ public enum PrivacySettings {
 
     /// Opens the list where the user grants `permission`.
     ///
-    /// - Returns: Whether System Settings opened. A failure is logged.
+    /// - Returns: Whether System Settings opened. A failure is logged; the caller shows
+    ///   ``RequiredPermission/settingsFailureMessage``.
     @discardableResult
     public static func open(_ permission: RequiredPermission) -> Bool {
         open(permission.settingsURL, pane: permission.rawValue) { NSWorkspace.shared.open($0) }

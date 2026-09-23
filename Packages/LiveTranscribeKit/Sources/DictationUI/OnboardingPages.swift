@@ -61,6 +61,7 @@ struct OnboardingMicrophonePage: View {
                     .font(.callout)
                 Button("Open System Settings", action: model.openMicrophoneSettings)
             }
+            OnboardingErrorMessage(message: model.errorMessage)
         }
     }
 
@@ -93,6 +94,7 @@ struct OnboardingAccessibilityPage: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            OnboardingErrorMessage(message: model.errorMessage)
         }
     }
 }
@@ -122,13 +124,22 @@ struct OnboardingFnKeyPage: View {
                     Button("Check Again", action: model.checkFnKey)
                 }
             }
-            if let error = model.errorMessage {
-                Label(error, systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.orange)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            OnboardingErrorMessage(message: model.errorMessage)
             Button("Choose Another Shortcut…", action: chooseAnotherShortcut)
                 .buttonStyle(.link)
+        }
+    }
+}
+
+/// Something the user asked for on this page failed, and what to do instead.
+private struct OnboardingErrorMessage: View {
+    let message: String?
+
+    var body: some View {
+        if let message {
+            Label(message, systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

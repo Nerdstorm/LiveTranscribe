@@ -26,22 +26,25 @@ final class PermissionsSettingsModel {
     /// Whether this launch already asked for Accessibility. After that the prompt shows
     /// nothing more, so the button opens System Settings instead.
     private(set) var accessibilityPrompted: Bool
+    /// System Settings could not be opened; says where to go by hand. Cleared by the next action.
+    private(set) var errorMessage: String?
 
     @ObservationIgnored private let microphonePermission: any MicrophonePermissionProviding
     @ObservationIgnored private let accessibility: any AccessibilityPermissionProviding
     @ObservationIgnored private let promptMemory: PermissionsSettingsPromptMemory
-    @ObservationIgnored private let openSettings: @MainActor (RequiredPermission) -> Void
+    @ObservationIgnored private let openSettings: @MainActor (RequiredPermission) -> Bool
 
     /// - Parameters:
     ///   - promptMemory: Remembers the Accessibility prompt for the whole launch, so a Settings
     ///     window opened again does not offer a prompt macOS will no longer show; tests pass
     ///     their own.
-    ///   - openSettings: Opens a permission's System Settings pane; tests pass a fake.
+    ///   - openSettings: Opens a permission's System Settings pane and reports whether it
+    ///     opened; tests pass a fake.
     init(
         microphonePermission: any MicrophonePermissionProviding,
         accessibility: any AccessibilityPermissionProviding,
         promptMemory: PermissionsSettingsPromptMemory = .shared,
-        openSettings: @escaping @MainActor (RequiredPermission) -> Void = { PrivacySettings.open($0) }
+        openSettings: @escaping @MainActor (RequiredPermission) -> Bool = { PrivacySettings.open($0) }
     ) {
         self.microphonePermission = microphonePermission
         self.accessibility = accessibility
@@ -93,6 +96,7 @@ final class PermissionsSettingsModel {
 
     /// Runs the row's button.
     func perform(_ action: Action, for permission: RequiredPermission) async {
+        errorMessage = nil
         switch (action, permission) {
         case (.request, .microphone):
             let granted = await microphonePermission.request()
@@ -104,7 +108,9 @@ final class PermissionsSettingsModel {
             accessibilityPrompted = true
             accessibilityGranted = accessibility.isGranted()
         case (.openSettings, _):
-            openSettings(permission)
+            if !openSettings(permission) {
+                errorMessage = permission.settingsFailureMessage
+            }
         }
     }
 
