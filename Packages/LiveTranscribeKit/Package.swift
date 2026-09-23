@@ -21,7 +21,7 @@ let package = Package(
             name: "LiveTranscribeKit",
             targets: [
                 "Shared", "Capture", "Segmentation", "Transcription", "Cleanup",
-                "Persistence", "Session", "TranscriptUI", "MLXSupport",
+                "Persistence", "Session", "TranscriptUI", "MLXSupport", "Styles",
             ]
         ),
         .executable(name: "Bench", targets: ["Bench"]),
@@ -44,6 +44,9 @@ let package = Package(
         .target(name: "Shared", swiftSettings: strictSwift),
 
         .target(name: "Capture", dependencies: ["Shared"], swiftSettings: strictSwift),
+
+        // Cleanup levels and the deterministic text rules they turn on (fillers, lists).
+        .target(name: "Styles", dependencies: ["Shared"], swiftSettings: strictSwift),
 
         .target(
             name: "Segmentation",
@@ -133,6 +136,7 @@ let package = Package(
         // MARK: - Tests
 
         .testTarget(name: "SharedTests", dependencies: ["Shared"], swiftSettings: strictSwift),
+        .testTarget(name: "StylesTests", dependencies: ["Styles"], swiftSettings: strictSwift),
         .testTarget(name: "CaptureTests", dependencies: ["Capture", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "SegmentationTests", dependencies: ["Segmentation", "Shared"], swiftSettings: strictSwift),
         .testTarget(
