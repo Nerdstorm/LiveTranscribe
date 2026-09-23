@@ -76,10 +76,8 @@ struct SelfCorrectionTests {
     @Test func keptCuesUseTheUsualLimits() {
         let cleaned = "Sorry to interrupt, but can I ask a question?"
         #expect(review("sorry to interrupt but can i ask a question", cleaned) == .accepted(cleaned))
-        guard case .rejected(.wordRatio) = review("sorry to interrupt but can i ask a question", "Sorry, a question?") else {
-            Issue.record("expected a word-ratio rejection")
-            return
-        }
+        // Keeping the cue means no self-correction was resolved, so the deleted words count.
+        #expect(review("sorry to interrupt but can i ask a question", "Sorry, a question?") == .rejected(.droppedWords(count: 6)))
     }
 
     @Test func countsCuesIncludingMultiWordOnes() {
