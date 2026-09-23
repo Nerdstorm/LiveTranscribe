@@ -83,6 +83,12 @@ public final class TranscriptViewModel {
         Task { await session.retryCleanup() }
     }
 
+    /// Shows a microphone change reported by capture (a new default, or a fallback) in the
+    /// warning banner.
+    public func showCaptureNotice(_ message: String) {
+        warning = message
+    }
+
     public func dismissWarning() {
         warning = nil
     }

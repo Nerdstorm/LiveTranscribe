@@ -214,7 +214,7 @@ let package = Package(
             name: "DictationUITests",
             dependencies: [
                 "DictationUI", "Dictation", "Shared", "Capture", "Hotkey", "Insertion", "Permissions",
-                "Persistence", "Snippets", "Vocabulary", "Styles",
+                "Persistence", "Snippets", "Vocabulary", "Styles", "Session",
             ],
             swiftSettings: strictSwift
         ),

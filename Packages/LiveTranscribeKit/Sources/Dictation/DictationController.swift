@@ -358,6 +358,11 @@ public final class DictationController {
         enqueue { await self.performUndo() }
     }
 
+    /// Shows a microphone change reported by capture, such as a fallback to the system default.
+    public func showMicrophoneNotice(_ message: String) {
+        show(.microphone(message))
+    }
+
     public func dismissNotice() {
         noticeTask?.cancel()
         notice = nil

@@ -19,6 +19,8 @@ public enum DictationNotice: Sendable, Equatable {
     case nothingToUndo
     case undoRefused(String)
     case undoFailed
+    /// The microphone changed or fell back; the message names the device.
+    case microphone(String)
 
     public var message: String {
         switch self {
@@ -40,13 +42,14 @@ public enum DictationNotice: Sendable, Equatable {
         case .nothingToUndo: "Nothing to undo"
         case .undoRefused(let reason): reason
         case .undoFailed: "Couldn't undo the edit"
+        case .microphone(let message): message
         }
     }
 
     /// Shown as a problem rather than as information.
     public var isProblem: Bool {
         switch self {
-        case .cancelled, .undone, .nothingToUndo, .nothingHeard, .copiedToClipboard, .undoCopiedToClipboard:
+        case .cancelled, .undone, .nothingToUndo, .nothingHeard, .copiedToClipboard, .undoCopiedToClipboard, .microphone:
             false
         default:
             true
