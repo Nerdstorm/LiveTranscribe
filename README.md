@@ -112,12 +112,13 @@ One of the 44 clips, a plain sentence, fell back to the uncleaned transcript
 - **Terminals, browsers and Electron apps too.** Where typing through Accessibility isn't
   accepted, the text is pasted, and then your clipboard is put back as it was, images, files and
   rich text included.
-- **Ready for your apps.** Seven terminals and ten Electron and Chromium apps (VS Code, Cursor,
-  Slack, Notion, Chrome, Arc and more) are set to paste out of the box, and any other app is a
-  few clicks away in **Settings › Apps**.
+- **Ready for your apps.** Seven terminals and eleven Electron and Chromium apps (VS Code,
+  Cursor, Slack, Notion, Claude, Chrome, Arc and more) are set to paste out of the box, and any
+  other app is a few clicks away in **Settings › Apps**.
 - **Refused text isn't lost.** If an app accepts neither method, the text waits on the
   clipboard, a note at your cursor says to press ⌘V, and **Copy Last Dictation** in the menu
-  copies it again later.
+  copies it again later. When the fix is on your side, such as reopening Live Transcribe so
+  macOS lets it paste, the note says that instead of blaming the app.
 - **Spaces where they belong.** Dictate right after a word and a space is added for you, but
   not after an opening bracket or before a full stop (in apps that let Accessibility read the
   text before the cursor).
@@ -245,7 +246,9 @@ While dictation is on and a permission is missing, **Set Up Dictation** opens at
 steps are **Microphone**, **Accessibility** (which lets the dictation shortcut work in every app
 and type the text), **fn key** (only while fn is the shortcut) and **Try it**, a practice box.
 Every step can be skipped, and each is checked again when you come back from System Settings.
-**Set Up Dictation…** stays in the menu bar menu while a permission is missing.
+**Set Up Dictation…** stays in the menu bar menu while a permission is missing. If macOS still
+won't let Live Transcribe paste after Accessibility is switched on, setup and **Settings ›
+Permissions** say so and offer **Reopen Live Transcribe**.
 
 At the same time the app downloads the models (about 3.5 GB) into the Hugging Face cache
 (`~/.cache/huggingface`, shared with the tests, the bench and other Hugging Face tools). The menu
@@ -267,7 +270,8 @@ sign it with your Developer ID and notarize it.
 **The ad-hoc signature changes with every build.** After a rebuild, macOS asks for microphone
 access again, and the Accessibility permission must be granted again: remove the old Live
 Transcribe entry in Privacy & Security › Accessibility and add the new build. Until then the
-shortcut does not work.
+shortcut does not work. If the floating panel then says to quit and reopen Live Transcribe so it
+can paste, do that: **Reopen Live Transcribe** in **Settings › Permissions** does it for you.
 
 ## Using Live Transcribe
 
@@ -289,14 +293,19 @@ shortcut does not work.
   2. **Paste**, for apps that ignore that, or that are set to paste in **Settings › Apps**. The
      clipboard is saved, the text is pasted with ⌘V, and the clipboard is put back after 250 ms,
      unless you copied something in the meantime. A paste cannot be verified.
-  3. Otherwise the text is left on the clipboard, and the floating panel says "*App* didn't
-     accept the text. It's on the clipboard: press ⌘V".
+  3. Otherwise the text is left on the clipboard, and the floating panel says why:
+     - "*App* didn't accept the text. It's on the clipboard: press ⌘V" when the app refused both.
+     - "Quit and reopen Live Transcribe so it can paste. The text is on the clipboard: press ⌘V"
+       when Accessibility is on but macOS doesn't let Live Transcribe send ⌘V yet.
+     - "Allow Live Transcribe in Accessibility so it can paste. The text is on the clipboard:
+       press ⌘V" when Accessibility is off.
 - A space is added before the text when it follows a word, in apps that let Accessibility read
   the character before the cursor.
 - Nothing is typed or copied into a password field: a field macOS marks as secure, or any field
   while secure keyboard entry is on. Text inserted through Accessibility goes into the field you
   dictated into, wherever the focus is by then. If another app has focus by the time the text is
-  ready to paste, the text goes on the clipboard instead.
+  ready to paste, the text goes on the clipboard instead, and the panel says another app took
+  focus.
 - **Undo AI Edit** (⌃⌥Z, within 30 seconds, in the field you dictated into) swaps the cleaned
   text for what you said before cleanup. Snippets and vocabulary stay applied. It changes nothing
   if another app or field has focus (click back into the field and try again within the
@@ -368,7 +377,7 @@ shortcut does not work.
   up to 50 of the most relevant terms (**Vocabulary terms per dictation** in **Timing**).
 - **Settings › Apps**: **Accessibility** or **Paste** for any app. Built in, paste is used for
   Terminal, iTerm2, Warp, Ghostty, Alacritty, kitty, WezTerm, VS Code, Cursor, Slack, Discord,
-  Notion, Figma, Chrome, Brave, Edge and Arc. Your setting wins over a built-in one.
+  Notion, Figma, Claude, Chrome, Brave, Edge and Arc. Your setting wins over a built-in one.
 - The three lists are JSON files you can also edit by hand. A damaged file (one that can't be
   decoded) is renamed to `<name>.corrupt-<timestamp>` rather than overwritten, and Settings says
   where it went.
@@ -426,7 +435,7 @@ macOS's microphone indicator then stays on while the app runs.
 | **Vocabulary** | names and jargon, with how they are spoken |
 | **Apps** | the insertion method per app |
 | **History** | dictation history on or off, retention, clearing |
-| **Permissions** | microphone and Accessibility status, with buttons that open the right System Settings pane |
+| **Permissions** | microphone and Accessibility status, with buttons that open the right System Settings pane, and **Reopen Live Transcribe** when macOS won't let it paste until it reopens |
 | **Advanced** | for dictation and the live transcript: the speech-to-text and cleanup models, **Clean up transcripts with the LLM**, **Resolve spoken self-corrections**, the cleanup **Timeout**, the GPU cache and capture restarts; for the live transcript only: the voice-activity model, silence, speech threshold, pre-roll and minimum speech, maximum segment length, live partials, context segments and queue capacity |
 
 Settings on every tab but **Advanced** apply immediately, to the next dictation. **Settings on
@@ -459,7 +468,7 @@ tab: dictation settings, shortcuts, cleanup level, history and microphone stay a
 - Dictated text is not written to the system log. Transcript text, file paths and device names
   are logged only as private data, which macOS redacts. Text the app pastes is marked transient,
   so clipboard managers that honour the nspasteboard.org convention skip it; text left on the
-  clipboard because an app refused it is an ordinary copy.
+  clipboard for you to paste is an ordinary copy.
 - Deleting the app does not delete its data. To remove it, delete
   `~/Library/Application Support/org.nerdstorm.LiveTranscribe` (sessions, dictation history,
   snippets, vocabulary and per-app insertion choices),
@@ -714,6 +723,12 @@ More decisions, and the assumptions behind them, are in [docs/dictation.md](docs
 - **Dictation needs Accessibility, which macOS ties to the app's signature.** Each ad-hoc
   rebuild is a new app to macOS: remove Live Transcribe from Privacy & Security › Accessibility
   and add the new build, or the shortcut stops working.
+- **Pasting can need a reopen after Accessibility is switched on.** Seen once, after the
+  Accessibility entry was removed and added back while the app ran: Accessibility read as on and
+  the shortcut worked, but macOS refused to let the app send ⌘V, so text for apps that are
+  pasted into (terminals, browsers, Electron apps) was left on the clipboard. The panel, setup
+  and **Settings › Permissions** now say so and offer **Reopen Live Transcribe**. That reopening
+  fixes it is expected but not yet confirmed.
 - **Long dictations are untested.** The eval's longest clip is about 30 words. Cleanup runs on
   the whole dictation under a 3 s timeout, so a dictation longer than a minute or two will likely
   be inserted uncleaned (fillers still removed at Medium and High), without a message. Past the
