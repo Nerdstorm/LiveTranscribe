@@ -1,6 +1,7 @@
 import Capture
 @testable import Dictation
 import Foundation
+import os
 import Shared
 import Testing
 
@@ -51,7 +52,7 @@ struct DictationRecorderTests {
     private func recorder(preRollMs: Int = 10, maxDurationSeconds: Int = 60) -> DictationRecorder {
         let source = self.source
         return DictationRecorder(
-            makeSource: { source },
+            makeSource: { _ in source },
             configuration: .init(preRollMs: preRollMs, maxDurationSeconds: maxDurationSeconds)
         )
     }
@@ -137,6 +138,59 @@ struct DictationRecorderTests {
         await recorder.cancel()
         #expect(await source.stops == 1)
         #expect(await recorder.stop().samples.isEmpty)
+    }
+
+    // MARK: - Microphone choice
+
+    /// A recorder that notes which microphone each capture was made for.
+    private func recorder(choosing deviceUID: String?, opened: OSAllocatedUnfairLock<[String?]>) -> DictationRecorder {
+        let source = self.source
+        return DictationRecorder(
+            makeSource: { uid in
+                opened.withLock { $0.append(uid) }
+                return source
+            },
+            configuration: .init(preRollMs: 10, maxDurationSeconds: 60, inputDeviceUID: deviceUID)
+        )
+    }
+
+    @Test func aNewChoiceReopensTheMicrophoneKeptReady() async throws {
+        let opened = OSAllocatedUnfairLock<[String?]>(initialState: [])
+        let recorder = recorder(choosing: nil, opened: opened)
+        try await recorder.setKeepReady(true)
+        await recorder.update(.init(preRollMs: 10, maxDurationSeconds: 60, inputDeviceUID: "usb-mic"))
+        #expect(opened.withLock { $0 } == [nil, "usb-mic"])
+        #expect(await source.stops == 1, "the old capture is closed first")
+        #expect(await source.isOpen, "and the new one is kept ready")
+
+        await recorder.update(.init(preRollMs: 20, maxDurationSeconds: 60, inputDeviceUID: "usb-mic"))
+        #expect(opened.withLock { $0 }.count == 2, "other settings leave capture open")
+    }
+
+    @Test func aChoiceMadeWhileRecordingAppliesAfterTheRecording() async throws {
+        let opened = OSAllocatedUnfairLock<[String?]>(initialState: [])
+        let recorder = recorder(choosing: "built-in", opened: opened)
+        try await recorder.setKeepReady(true)
+        try await recorder.start()
+        await recorder.update(.init(preRollMs: 10, maxDurationSeconds: 60, inputDeviceUID: "usb-mic"))
+        await source.push([0.1])
+        await settle()
+        #expect(opened.withLock { $0 } == ["built-in"], "a recording is never interrupted")
+
+        let recording = await recorder.stop()
+        #expect(recording.samples == [0.1])
+        #expect(opened.withLock { $0 } == ["built-in", "usb-mic"])
+        #expect(await source.isOpen)
+    }
+
+    @Test func withoutKeepReadyTheNextRecordingUsesTheNewChoice() async throws {
+        let opened = OSAllocatedUnfairLock<[String?]>(initialState: [])
+        let recorder = recorder(choosing: "built-in", opened: opened)
+        await recorder.update(.init(preRollMs: 10, maxDurationSeconds: 60, inputDeviceUID: "usb-mic"))
+        #expect(opened.withLock { $0 }.isEmpty, "nothing opens while not kept ready")
+        try await recorder.start()
+        _ = await recorder.stop()
+        #expect(opened.withLock { $0 } == ["usb-mic"])
     }
 
     @Test func levelIsTheBuffersRMS() {

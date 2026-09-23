@@ -101,14 +101,18 @@ final class AppComposition {
         dictation = DictationController(dependencies: .init(
             hotkeys: CGEventTapHotkeyMonitor(),
             recorder: DictationRecorder(
-                makeSource: {
+                makeSource: { deviceUID in
                     CaptureSessionSource(
                         restartPolicy: restartPolicy,
-                        inputDeviceUID: inputDevices.selectedDeviceUID,
+                        inputDeviceUID: deviceUID,
                         onNotice: { notice in relay.send(notice, to: .dictation) }
                     )
                 },
-                configuration: .init(preRollMs: dictationSettings.preRollMs, maxDurationSeconds: dictationSettings.maxRecordingSeconds)
+                configuration: .init(
+                    preRollMs: dictationSettings.preRollMs,
+                    maxDurationSeconds: dictationSettings.maxRecordingSeconds,
+                    inputDeviceUID: inputDevices.selectedDeviceUID
+                )
             ),
             processor: DictationProcessor(transcriber: transcriber, cleaner: cleaner),
             focus: SettingsDrivenFocus(settings: currentSettings),
@@ -120,7 +124,9 @@ final class AppComposition {
             readiness: { await MainActor.run { DictationReadiness(sessionPhase: viewModel.phase) } },
             microphonePermission: microphonePermission,
             accessibility: accessibility,
-            now: { ContinuousClock.now }
+            now: { ContinuousClock.now },
+            // A new choice reopens the microphone when it is kept ready (applySettings).
+            inputDeviceUID: { inputDevices.selectedDeviceUID }
         ))
         dictationUI = DictationUIContext(
             controller: dictation,

@@ -14,10 +14,14 @@ public actor DictationRecorder {
         public var preRollMs: Int
         /// Recording stops growing at this length, so a stuck key cannot exhaust memory.
         public var maxDurationSeconds: Int
+        /// The chosen microphone, `nil` for the system default. A change reopens capture that is
+        /// kept ready, so the new choice is used without waiting for capture to close.
+        public var inputDeviceUID: String?
 
-        public init(preRollMs: Int, maxDurationSeconds: Int) {
+        public init(preRollMs: Int, maxDurationSeconds: Int, inputDeviceUID: String? = nil) {
             self.preRollMs = preRollMs
             self.maxDurationSeconds = maxDurationSeconds
+            self.inputDeviceUID = inputDeviceUID
         }
     }
 
@@ -32,9 +36,11 @@ public actor DictationRecorder {
         public var durationMs: Int { AudioFormat.milliseconds(forSamples: samples.count) }
     }
 
-    private let makeSource: @Sendable () -> any AudioSource
+    private let makeSource: @Sendable (_ inputDeviceUID: String?) -> any AudioSource
     private var configuration: Configuration
     private var source: (any AudioSource)?
+    /// The microphone choice the open ``source`` was made for.
+    private var sourceDeviceUID: String?
     private var pump: Task<Void, Never>?
     private var keepReady = false
     private var isOpening = false
@@ -48,14 +54,19 @@ public actor DictationRecorder {
     public nonisolated let levels: AsyncStream<Float>
     private nonisolated let levelInput: AsyncStream<Float>.Continuation
 
-    public init(makeSource: @escaping @Sendable () -> any AudioSource, configuration: Configuration) {
+    /// - Parameter makeSource: Makes capture for the chosen microphone (`nil`: system default).
+    public init(makeSource: @escaping @Sendable (_ inputDeviceUID: String?) -> any AudioSource, configuration: Configuration) {
         self.makeSource = makeSource
         self.configuration = configuration
         (levels, levelInput) = AsyncStream.makeStream(of: Float.self, bufferingPolicy: .bufferingNewest(1))
     }
 
-    public func update(_ configuration: Configuration) {
+    /// Applies new settings. A new microphone choice reopens capture that is kept ready and idle;
+    /// during a recording it applies once the recording stops.
+    public func update(_ configuration: Configuration) async {
         self.configuration = configuration
+        guard !isRecording else { return }
+        await reopenIfTheChoiceChanged()
     }
 
     /// Keeps capture open between dictations, or closes it once no recording needs it.
@@ -93,7 +104,9 @@ public actor DictationRecorder {
         isRecording = false
         let recording = Recording(samples: samples, truncated: truncated, failure: failure)
         samples = []
-        if !keepReady {
+        if keepReady {
+            await reopenIfTheChoiceChanged()
+        } else {
             await close()
         }
         return recording
@@ -110,7 +123,8 @@ public actor DictationRecorder {
         guard source == nil, !isOpening else { return }
         isOpening = true
         defer { isOpening = false }
-        let source = makeSource()
+        let deviceUID = configuration.inputDeviceUID
+        let source = makeSource(deviceUID)
         let stream: AsyncThrowingStream<[Float], Error>
         do {
             stream = try await source.start()
@@ -124,6 +138,7 @@ public actor DictationRecorder {
             return
         }
         self.source = source
+        sourceDeviceUID = deviceUID
         pump = Task { [weak self] in
             do {
                 for try await buffer in stream {
@@ -133,6 +148,19 @@ public actor DictationRecorder {
             } catch {
                 await self?.captureEnded(failure: error)
             }
+        }
+    }
+
+    /// Capture kept ready for another microphone than the one now chosen is closed and opened
+    /// again for the new one.
+    private func reopenIfTheChoiceChanged() async {
+        guard keepReady, source != nil, sourceDeviceUID != configuration.inputDeviceUID else { return }
+        Log.dictation.info("Microphone choice changed; reopening the microphone kept ready")
+        await close()
+        do {
+            try await openIfNeeded()
+        } catch {
+            Log.dictation.error("Could not reopen the microphone kept ready: \(error.localizedDescription, privacy: .public)")
         }
     }
 

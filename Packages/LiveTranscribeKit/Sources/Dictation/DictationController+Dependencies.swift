@@ -24,6 +24,8 @@ extension DictationController {
         public var microphonePermission: any MicrophonePermissionProviding
         public var accessibility: any AccessibilityPermissionProviding
         public var now: @Sendable () -> ContinuousClock.Instant
+        /// The microphone chosen in Settings, `nil` for the system default.
+        public var inputDeviceUID: @Sendable () -> String?
 
         public init(
             hotkeys: any HotkeyMonitor,
@@ -38,7 +40,8 @@ extension DictationController {
             readiness: @escaping @Sendable () async -> DictationReadiness,
             microphonePermission: any MicrophonePermissionProviding,
             accessibility: any AccessibilityPermissionProviding,
-            now: @escaping @Sendable () -> ContinuousClock.Instant
+            now: @escaping @Sendable () -> ContinuousClock.Instant,
+            inputDeviceUID: @escaping @Sendable () -> String? = { nil }
         ) {
             self.hotkeys = hotkeys
             self.recorder = recorder
@@ -53,6 +56,7 @@ extension DictationController {
             self.microphonePermission = microphonePermission
             self.accessibility = accessibility
             self.now = now
+            self.inputDeviceUID = inputDeviceUID
         }
     }
 }

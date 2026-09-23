@@ -124,7 +124,8 @@ public final class DictationController {
         let keepReady = isStarted && settings.dictation.enabled && settings.dictation.keepMicrophoneReady
         let configuration = DictationRecorder.Configuration(
             preRollMs: settings.dictation.preRollMs,
-            maxDurationSeconds: settings.dictation.maxRecordingSeconds
+            maxDurationSeconds: settings.dictation.maxRecordingSeconds,
+            inputDeviceUID: dependencies.inputDeviceUID()
         )
         enqueue {
             await recorder.update(configuration)

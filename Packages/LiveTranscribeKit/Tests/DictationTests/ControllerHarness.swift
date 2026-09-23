@@ -68,7 +68,7 @@ struct Harness {
         })
         controller = DictationController(dependencies: .init(
             hotkeys: hotkeys,
-            recorder: DictationRecorder(makeSource: { source }, configuration: .init(preRollMs: 0, maxDurationSeconds: 60)),
+            recorder: DictationRecorder(makeSource: { _ in source }, configuration: .init(preRollMs: 0, maxDurationSeconds: 60)),
             processor: processor,
             focus: focus,
             delivery: delivery,
