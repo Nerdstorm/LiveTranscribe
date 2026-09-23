@@ -147,11 +147,21 @@ struct DictationControllerTests {
 
     @Test func textLeftOnTheClipboardIsExplained() async {
         let h = Harness()
-        await h.delivery.set(result: .copiedToClipboard)
+        await h.delivery.set(result: .copiedToClipboard(.notAccepted))
         h.controller.start()
         await h.hold(milliseconds: 500)
         await h.release()
         #expect(h.controller.notice == .copiedToClipboard(app: "Notes"))
+    }
+
+    /// The app that was dictated into isn't blamed: Accessibility is on, so reopening is what's left.
+    @Test func textLeftOnTheClipboardBecausePastingIsNotAllowedSaysToReopen() async {
+        let h = Harness()
+        await h.delivery.set(result: .copiedToClipboard(.pasteNotPermitted))
+        h.controller.start()
+        await h.hold(milliseconds: 500)
+        await h.release()
+        #expect(h.controller.notice == .pasteNotAllowed(needsReopen: true))
     }
 
     @Test func historyCanBeTurnedOff() async throws {

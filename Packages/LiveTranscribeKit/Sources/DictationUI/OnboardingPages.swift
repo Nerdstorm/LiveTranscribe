@@ -83,9 +83,11 @@ struct OnboardingAccessibilityPage: View {
             systemImage: "hand.raised",
             title: "Accessibility",
             message: RequiredPermission.accessibility.reason,
-            status: model.accessibilityGranted ? ("Accessibility access is on", true) : ("Not allowed yet", false)
+            status: status
         ) {
-            if !model.accessibilityGranted {
+            if model.needsReopen {
+                OnboardingReopenPrompt(reopen: model.reopen)
+            } else if !model.accessibilityGranted {
                 Button("Grant Access…", action: model.grantAccessibility)
                 if model.hasAskedForAccessibility {
                     Text("Turn on Live Transcribe in the list. If it's already on, select it, remove it with −, then add it again.")
@@ -96,6 +98,29 @@ struct OnboardingAccessibilityPage: View {
             }
             OnboardingErrorMessage(message: model.errorMessage)
         }
+    }
+
+    private var status: (text: String, isDone: Bool) {
+        if model.needsReopen {
+            (OnboardingModel.reopenStatus, false)
+        } else if model.accessibilityGranted {
+            ("Accessibility access is on", true)
+        } else {
+            ("Not allowed yet", false)
+        }
+    }
+}
+
+/// Why the app must reopen before it can paste, and the button that reopens it.
+private struct OnboardingReopenPrompt: View {
+    let reopen: @MainActor () -> Void
+
+    var body: some View {
+        Text(PermissionsSettingsModel.reopenHint)
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        Button("Reopen Live Transcribe", action: reopen)
     }
 }
 
@@ -148,8 +173,13 @@ private struct OnboardingErrorMessage: View {
 struct OnboardingTryItPage: View {
     let hotkeyName: String
     let handsFreeEnabled: Bool
-    /// Why dictating might not work yet, from ``OnboardingModel/tryItNote(permissionsGranted:session:)``.
+    /// Why dictating might not work yet, from ``OnboardingModel/tryItNote(permissionsGranted:hotkey:session:)``.
     let note: String?
+    /// Reopens the app while it can't paste into other apps (``OnboardingModel/needsReopen``);
+    /// `nil` when it can.
+    let reopen: (@MainActor () -> Void)?
+    /// Reopening failed, and what to do instead.
+    let errorMessage: String?
     @State private var practiceText = ""
 
     var body: some View {
@@ -168,6 +198,10 @@ struct OnboardingTryItPage: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if let reopen {
+                OnboardingReopenPrompt(reopen: reopen)
+            }
+            OnboardingErrorMessage(message: errorMessage)
         }
     }
 

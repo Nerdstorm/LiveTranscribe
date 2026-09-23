@@ -124,12 +124,13 @@ focus context, Command Mode, multilingual) is not started.
   released, and paste goes wherever the focus is when ⌘V is posted, up to seconds later. So paste
   reads the focus again just before it writes the pasteboard. A secure field now gets nothing,
   not even a clipboard copy, as if it had been focused all along. Another app now (a different
-  process, so a relaunch counts) gets nothing either: the text goes on the clipboard with the
-  usual *didn't accept the text* notice, which names the app dictated into. Only the app is
-  compared, not the field: tabbing to another field of the same app pastes there, as typing
-  would, and a stricter element comparison could turn pastes into clipboard copies in the apps
-  that are pasted into, whose Accessibility elements are the least dependable. Accessibility
-  insertion writes to the field that was read, wherever the focus is, so it needs no check.
+  process, so a relaunch counts) gets nothing either: the text goes on the clipboard, and the
+  notice says another app took focus rather than that the app dictated into refused it. Only
+  the app is compared, not the field: tabbing to another field of the same app pastes there, as
+  typing would, and a stricter element comparison could turn pastes into clipboard copies in the
+  apps that are pasted into, whose Accessibility elements are the least dependable.
+  Accessibility insertion writes to the field that was read, wherever the focus is, so it needs
+  no check.
 - **The automatic space needs `AXStringForRange`.** Deciding whether dictated text needs a leading
   space reads the selection and then at most 16 UTF-16 units before it, never the whole field,
   which can be a multi-megabyte document. An app without that attribute gets no automatic space.
@@ -149,6 +150,18 @@ focus context, Command Mode, multilingual) is not started.
 - **The Accessibility prompt is remembered for the launch** by setup and Settings alike: macOS
   shows it once per launch, so after either has shown it, *Grant Access…* in Settings opens
   System Settings instead.
+- **Pasting that macOS refuses is fixed by reopening the app.** Inferred from one Mac's logs,
+  not yet confirmed: after the Accessibility entry was removed and added back while the app ran,
+  `AXIsProcessTrusted` returned true and the keyboard tap restarted, but
+  `CGPreflightPostEventAccess` stayed false, so every ⌘V was dropped and pasted apps got nothing.
+  A new process is assumed to be checked afresh. So paste checks `CGPreflightPostEventAccess`
+  before it touches the pasteboard (`pasteNotPermitted`), and the notice says *Quit and reopen
+  Live Transcribe so it can paste* when Accessibility is on (*Allow Live Transcribe in
+  Accessibility* when it is off) instead of blaming the app. Setup and Settings › Permissions
+  show the state (*Allowed, but can't paste yet*) with *Reopen Live Transcribe*, which starts a
+  shell that waits for this process to exit before opening the app again, so two instances never
+  hold the microphone and the keyboard tap at once. Setup counts Accessibility as done only once
+  pasting is allowed too; the menu's *Set Up Dictation…* still follows the permissions alone.
 
 ## Architecture
 
@@ -163,7 +176,7 @@ New package targets (vertical slices), each with its own test target:
 | `Insertion` | `TextInserter`, `AXTextInserter`, `PasteboardTextInserter`, `InsertionRouter`, `InserterOverrides`, `FocusedElement` | Shared |
 | `Permissions` | Microphone and Accessibility status, prompts, System Settings links | Shared |
 | `Dictation` | `DictationController` (the flow, including Undo AI edit), `DictationRecorder`, `DictationProcessor`, `TextDelivery` | all of the above, Capture, Transcription, Cleanup, Persistence |
-| `DictationUI` | menu bar content and icon, HUD panel, history window, onboarding, Settings tabs, readiness from the session | Dictation, TranscriptUI, Session, … |
+| `DictationUI` | menu bar content and icon, HUD panel, history window, onboarding, Settings tabs, readiness from the session, reopening the app | Dictation, TranscriptUI, Session, … |
 
 Changed slices:
 
@@ -239,9 +252,11 @@ dictation.
    re-reading its value. Used only when the value is readable before and after.
 2. `PasteboardTextInserter`: snapshot every pasteboard item and type, read the focus again,
    write the text (marked transient so clipboard managers skip it), post ⌘V, restore the snapshot
-   after 250 ms unless the pasteboard changed in the meantime. If the focus is now secure, or in
-   another app, nothing is written or pasted (`focusBecameSecure`, `focusMovedToAnotherApp`).
-3. Otherwise the text stays on the clipboard and the HUD says so.
+   after 250 ms unless the pasteboard changed in the meantime. If macOS doesn't let the app post
+   keystrokes, or the focus is now secure or in another app, nothing is written or pasted
+   (`pasteNotPermitted`, `focusBecameSecure`, `focusMovedToAnotherApp`).
+3. Otherwise the text stays on the clipboard, and the HUD says why (`ClipboardReason`): the app
+   refused it, another app took focus, or macOS doesn't let the app paste.
 
 Per-app overrides (bundled defaults for terminals, Electron and Chromium apps; user entries in
 Settings) pick paste first. Secure fields (`AXSecureTextField`, or secure event input active)

@@ -3,6 +3,9 @@ import Shared
 
 /// Posts the two shortcuts insertion needs, behind a protocol so tests never press real keys.
 public protocol KeystrokeSender: Sendable {
+    /// Whether macOS lets this process post keystrokes at all. When it doesn't, ``sendPaste()``
+    /// and ``sendUndo()`` post nothing and return `false`.
+    func canPost() -> Bool
     /// Posts ⌘V. `true` means the events were posted, not that the app pasted.
     func sendPaste() -> Bool
     /// Posts ⌘Z. `true` means the events were posted, not that the app undid anything.
@@ -21,6 +24,10 @@ public struct CGEventKeystrokeSender: KeystrokeSender {
 
     public init() {}
 
+    public func canPost() -> Bool {
+        CGPreflightPostEventAccess()
+    }
+
     public func sendPaste() -> Bool {
         post(commandWith: Self.vKeyCode, name: "⌘V")
     }
@@ -32,7 +39,7 @@ public struct CGEventKeystrokeSender: KeystrokeSender {
     private func post(commandWith keyCode: CGKeyCode, name: String) -> Bool {
         // Without permission to post events the system drops them silently; checking first lets
         // the caller fall back to the clipboard instead of reporting a paste that never happened.
-        guard CGPreflightPostEventAccess() else {
+        guard canPost() else {
             Log.insertion.error("\(name, privacy: .public) not sent: no permission to post keyboard events")
             return false
         }

@@ -7,8 +7,8 @@ import Shared
 /// The live state of the permissions dictation needs, for Settings › Permissions.
 ///
 /// Accessibility is followed through ``AccessibilityPermissionProviding/changes()``; the
-/// microphone has no change notification, so the view calls ``refreshMicrophone()`` whenever
-/// the app becomes active (the user is back from System Settings).
+/// microphone has no change notification, so the view calls ``refresh()`` whenever the app
+/// becomes active (the user is back from System Settings).
 @MainActor
 @Observable
 final class PermissionsSettingsModel {
@@ -19,21 +19,34 @@ final class PermissionsSettingsModel {
         case request
         /// Opens the permission's pane in System Settings.
         case openSettings
+        /// Quits and reopens the app, for a permission macOS applies only at launch.
+        case reopen
     }
 
     private(set) var microphone: MicrophonePermissionStatus
     private(set) var accessibilityGranted: Bool
+    /// Whether macOS lets the app post the ⌘V of a paste; see ``needsReopen``.
+    private(set) var canPostKeystrokes: Bool
     /// Whether this launch already asked for Accessibility, here or in setup. After that the
     /// prompt shows nothing more, so the button opens System Settings instead. Read from the
     /// shared memory, so a prompt shown while this window is open counts too.
     var accessibilityPrompted: Bool { promptMemory.accessibilityPrompted }
-    /// System Settings could not be opened; says where to go by hand. Cleared by the next action.
+    /// System Settings could not be opened, or the app could not reopen; says what to do by
+    /// hand. Cleared by the next action.
     private(set) var errorMessage: String?
+
+    /// Accessibility is on, but macOS still doesn't let the app paste: it applies that part of
+    /// the permission to a running app only once it reopens.
+    var needsReopen: Bool { accessibilityGranted && !canPostKeystrokes }
+
+    /// Says why a reopen is needed, under the Accessibility row and in setup.
+    static let reopenHint = "macOS doesn't let Live Transcribe paste into other apps until it reopens."
 
     @ObservationIgnored private let microphonePermission: any MicrophonePermissionProviding
     @ObservationIgnored private let accessibility: any AccessibilityPermissionProviding
     @ObservationIgnored private let promptMemory: PermissionsSettingsPromptMemory
     @ObservationIgnored private let openSettings: @MainActor (RequiredPermission) -> Bool
+    @ObservationIgnored private let reopenApp: @MainActor () -> Bool
 
     /// - Parameters:
     ///   - promptMemory: Remembers the Accessibility prompt for the whole launch, so a Settings
@@ -41,18 +54,22 @@ final class PermissionsSettingsModel {
     ///     their own.
     ///   - openSettings: Opens a permission's System Settings pane and reports whether it
     ///     opened; tests pass a fake.
+    ///   - reopenApp: Quits and reopens the app, or returns `false` if it can't; tests pass a fake.
     init(
         microphonePermission: any MicrophonePermissionProviding,
         accessibility: any AccessibilityPermissionProviding,
         promptMemory: PermissionsSettingsPromptMemory = .shared,
-        openSettings: @escaping @MainActor (RequiredPermission) -> Bool = { PrivacySettings.open($0) }
+        openSettings: @escaping @MainActor (RequiredPermission) -> Bool = { PrivacySettings.open($0) },
+        reopenApp: @escaping @MainActor () -> Bool = { AppRelauncher.relaunch() }
     ) {
         self.microphonePermission = microphonePermission
         self.accessibility = accessibility
         self.promptMemory = promptMemory
         self.openSettings = openSettings
+        self.reopenApp = reopenApp
         microphone = microphonePermission.status()
         accessibilityGranted = accessibility.isGranted()
+        canPostKeystrokes = accessibility.canPostKeystrokes()
     }
 
     // MARK: - Status
@@ -74,7 +91,7 @@ final class PermissionsSettingsModel {
             case .undetermined: "Not asked yet"
             }
         case .accessibility:
-            accessibilityGranted ? "Allowed" : "Not allowed"
+            if needsReopen { "Allowed, but can't paste yet" } else if accessibilityGranted { "Allowed" } else { "Not allowed" }
         }
     }
 
@@ -88,7 +105,15 @@ final class PermissionsSettingsModel {
             case .denied: .openSettings
             }
         case .accessibility:
-            if accessibilityGranted { nil } else if accessibilityPrompted { .openSettings } else { .request }
+            if needsReopen {
+                .reopen
+            } else if accessibilityGranted {
+                nil
+            } else if accessibilityPrompted {
+                .openSettings
+            } else {
+                .request
+            }
         }
     }
 
@@ -101,26 +126,39 @@ final class PermissionsSettingsModel {
         case (.request, .microphone):
             let granted = await microphonePermission.request()
             Log.ui.info("Microphone access requested from Settings; granted: \(granted)")
-            refreshMicrophone()
+            refresh()
         case (.request, .accessibility):
             promptMemory.prompt(accessibility)
-            accessibilityGranted = accessibility.isGranted()
+            updateAccessibility(accessibility.isGranted())
         case (.openSettings, _):
             if !openSettings(permission) {
                 errorMessage = permission.settingsFailureMessage
             }
+        case (.reopen, _):
+            if !reopenApp() {
+                errorMessage = AppRelauncher.failureMessage
+            }
         }
     }
 
-    func refreshMicrophone() {
+    /// Reads both permissions again, for when the user comes back from System Settings.
+    func refresh() {
         microphone = microphonePermission.status()
+        updateAccessibility(accessibility.isGranted())
     }
 
     /// Follows Accessibility until the calling task is cancelled (the view disappears).
     func followAccessibility() async {
         for await granted in accessibility.changes() {
-            accessibilityGranted = granted
+            updateAccessibility(granted)
         }
+    }
+
+    /// Takes a new Accessibility state, and reads again whether the app may paste, which only
+    /// changes with it (or with a reopen).
+    private func updateAccessibility(_ granted: Bool) {
+        accessibilityGranted = granted
+        canPostKeystrokes = accessibility.canPostKeystrokes()
     }
 }
 

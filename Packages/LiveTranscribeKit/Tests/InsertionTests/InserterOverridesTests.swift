@@ -9,14 +9,14 @@ struct InserterOverridesTests {
         "io.alacritty", "net.kovidgoyal.kitty", "com.github.wez.wezterm",
         "com.microsoft.VSCode", "com.todesktop.230313mzl4w4u92", "com.tinyspeck.slackmacgap", "com.hnc.Discord",
         "notion.id", "com.figma.Desktop", "com.google.Chrome", "com.brave.Browser", "com.microsoft.edgemac",
-        "company.thebrowser.Browser",
+        "company.thebrowser.Browser", "com.anthropic.claudefordesktop",
     ])
     func bundledAppsPaste(bundleIdentifier: String) {
         #expect(InserterOverrides.bundled.method(for: bundleIdentifier) == .paste)
     }
 
     @Test func bundledListHasNothingElse() {
-        #expect(InserterOverrides.bundled.methods.count == 17)
+        #expect(InserterOverrides.bundled.methods.count == 18)
         #expect(InserterOverrides.bundled.method(for: "com.apple.TextEdit") == nil)
     }
 
@@ -26,7 +26,7 @@ struct InserterOverridesTests {
         #expect(merged.method(for: "com.apple.Terminal") == .accessibility)
         #expect(merged.method(for: "com.apple.Notes") == .paste)
         #expect(merged.method(for: "com.google.Chrome") == .paste)
-        #expect(merged.methods.count == 18)
+        #expect(merged.methods.count == 19)
     }
 
     @Test func lookupIgnoresCaseButPrefersAnExactMatch() {

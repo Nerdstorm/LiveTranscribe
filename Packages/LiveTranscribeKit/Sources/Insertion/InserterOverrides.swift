@@ -74,6 +74,7 @@ public struct InserterOverrides: Codable, Sendable, Equatable {
         "com.brave.Browser",
         "com.microsoft.edgemac",
         "company.thebrowser.Browser", // Arc
+        "com.anthropic.claudefordesktop", // Claude
     ]
 
     /// These overrides with `user`'s entries on top: for an app in both, the user's choice wins.

@@ -26,9 +26,8 @@ public enum InsertionResult: Sendable, Equatable {
     /// The text went into the field. `range` is the UTF-16 range it now occupies when the method
     /// can know it (Accessibility); `nil` for paste, which cannot be verified.
     case inserted(InsertionMethod, range: NSRange?)
-    /// No method worked, or focus moved to another app before the paste, so the text was left
-    /// on the clipboard for the user to paste themselves.
-    case copiedToClipboard
+    /// The text was left on the clipboard for the user to paste themselves, for `reason`.
+    case copiedToClipboard(ClipboardReason)
     /// The focused field is a password field (or secure event input is on), either when the
     /// target was read or when focus was checked again just before pasting: nothing was typed
     /// and nothing was copied, so dictated text never lands somewhere hidden.
@@ -44,6 +43,18 @@ public enum InsertionResult: Sendable, Equatable {
         if case .inserted = self { return true }
         return false
     }
+}
+
+/// Why ``InsertionResult/copiedToClipboard(_:)`` left the text on the clipboard: the HUD tells
+/// the user what to do about it, which differs by cause.
+public enum ClipboardReason: Sendable, Equatable {
+    /// The app took neither an Accessibility insertion nor a paste, or the text may be partly in
+    /// the field already.
+    case notAccepted
+    /// Another app had keyboard focus by the time the text was ready, so ⌘V would have gone there.
+    case focusMoved
+    /// macOS does not let Live Transcribe post keystrokes, so no paste was tried.
+    case pasteNotPermitted
 }
 
 /// Why one insertion method did not put the text in the field.
@@ -62,8 +73,12 @@ public enum InsertionError: LocalizedError, Equatable, Sendable {
     case verificationFailed
     /// The text could not be put on the pasteboard, so there was nothing to paste.
     case pasteboardWriteFailed
-    /// ⌘V could not be posted (usually missing Accessibility permission).
+    /// ⌘V could not be created or posted.
     case keystrokeFailed
+    /// macOS does not let this process post keystrokes, so ⌘V was not tried and the pasteboard
+    /// was not touched. The permission comes with Accessibility, but a running app can be trusted
+    /// for Accessibility and still be refused here until it is reopened.
+    case pasteNotPermitted
     /// Just before ⌘V, the focused field turned out to be secure (focus moved to a password
     /// field, or secure event input came on, after the target was read). Nothing was pasted and
     /// the pasteboard was not touched.
@@ -89,7 +104,9 @@ public enum InsertionError: LocalizedError, Equatable, Sendable {
         case .pasteboardWriteFailed:
             "The text could not be put on the clipboard for pasting."
         case .keystrokeFailed:
-            "The paste shortcut could not be sent. Check that Live Transcribe has Accessibility permission."
+            "The paste shortcut could not be sent."
+        case .pasteNotPermitted:
+            "macOS doesn't let Live Transcribe send the paste shortcut."
         case .focusBecameSecure:
             "Focus moved to a password field before the text could be pasted."
         case .focusMovedToAnotherApp:
@@ -103,6 +120,15 @@ public enum InsertionError: LocalizedError, Equatable, Sendable {
     /// leaves the text on the clipboard instead. Every other failure leaves the field as it was.
     public var mayHaveChangedField: Bool {
         self == .verificationFailed
+    }
+
+    /// What to tell the user when this was the last failure before the text went to the clipboard.
+    public var clipboardReason: ClipboardReason {
+        switch self {
+        case .pasteNotPermitted: .pasteNotPermitted
+        case .focusMovedToAnotherApp: .focusMoved
+        default: .notAccepted
+        }
     }
 }
 

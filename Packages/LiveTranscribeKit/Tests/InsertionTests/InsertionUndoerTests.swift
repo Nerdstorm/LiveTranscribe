@@ -310,7 +310,7 @@ struct InsertionUndoerTests {
     }
 
     @Test("Only an insertion into the field leaves a record", arguments: [
-        InsertionResult.copiedToClipboard, .refusedSecureField, .nothingToInsert, .failed,
+        InsertionResult.copiedToClipboard(.notAccepted), .refusedSecureField, .nothingToInsert, .failed,
     ])
     func onlyInsertionsAreRecorded(result: InsertionResult) {
         #expect(InsertionRecord(text: "x", result: result, target: Fixtures.target(nil), insertedAt: .now) == nil)

@@ -111,7 +111,10 @@ public struct InsertionUndoer: Sendable {
             return .done(.replacedInPlace(range: replaced))
         } catch where error.mayHaveChangedField {
             Log.insertion.error("Undo in place changed the field unexpectedly; the original is on the clipboard")
-            return .done(router.copyToClipboard(uncleaned) == .copiedToClipboard ? .copiedToClipboard : .failed)
+            guard case .copiedToClipboard = router.copyToClipboard(uncleaned, because: .notAccepted) else {
+                return .done(.failed)
+            }
+            return .done(.copiedToClipboard)
         } catch {
             Log.insertion.info("Undo in place failed (\(error.localizedDescription, privacy: .public)); using ⌘Z")
             return .notApplicable

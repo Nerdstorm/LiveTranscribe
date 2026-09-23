@@ -1,5 +1,6 @@
 @testable import Dictation
 import Foundation
+import Insertion
 import Shared
 import Testing
 
@@ -36,7 +37,7 @@ struct DictationNoticeFlowTests {
 
     @Test func aMicrophoneNoticeFollowsTheDictationsOwnNotice() async {
         let h = briefNotices()
-        await h.delivery.set(result: .copiedToClipboard)
+        await h.delivery.set(result: .copiedToClipboard(.notAccepted))
         h.controller.start()
         await h.hold(milliseconds: 500)
         h.controller.showMicrophoneNotice(Self.fallback.message)
@@ -88,7 +89,7 @@ struct DictationNoticeFlowTests {
     @Test func aNoticeStillWaitingIsDroppedWhenTheNextDictationStarts() async {
         // Long enough for the next recording to start while the first notice is up.
         let h = Harness { $0.dictation.noticeSeconds = 0.3 }
-        await h.delivery.set(result: .copiedToClipboard)
+        await h.delivery.set(result: .copiedToClipboard(.notAccepted))
         h.controller.start()
         await h.hold(milliseconds: 500)
         h.controller.showMicrophoneNotice(Self.fallback.message)
@@ -124,7 +125,7 @@ struct DictationNoticeFlowTests {
 
     @Test func aTruncatedRecordingLeftOnTheClipboardSaysSoFirst() async {
         let h = briefNotices { $0.dictation.maxRecordingSeconds = 1 }
-        await h.delivery.set(result: .copiedToClipboard)
+        await h.delivery.set(result: .copiedToClipboard(.notAccepted))
         h.controller.start()
         await h.hold(milliseconds: 1_500)
         await h.release()
@@ -150,6 +151,29 @@ struct DictationNoticeTests {
         #expect(DictationNotice.recordingTruncated(seconds: 90).message == "Recording stopped at 1 min 30 s; the rest wasn't heard")
         #expect(DictationNotice.captureStoppedEarly(afterSeconds: 12).message == "The microphone stopped after 12 s; the rest wasn't heard")
         #expect(DictationNotice.captureStoppedEarly(afterSeconds: 12).isProblem)
+    }
+
+    @Test("Text left on the clipboard is explained by why it is there", arguments: [
+        (ClipboardReason.notAccepted, true, DictationNotice.copiedToClipboard(app: "Slack")),
+        (.focusMoved, true, .copiedAfterFocusMoved),
+        (.pasteNotPermitted, true, .pasteNotAllowed(needsReopen: true)),
+        (.pasteNotPermitted, false, .pasteNotAllowed(needsReopen: false)),
+    ])
+    func clipboardNotice(reason: ClipboardReason, accessibilityGranted: Bool, notice: DictationNotice) {
+        let mapped = DictationController.notice(
+            for: .copiedToClipboard(reason), app: "Slack", accessibilityGranted: accessibilityGranted
+        )
+        #expect(mapped == notice)
+    }
+
+    @Test func clipboardNoticesSayWhatToDo() {
+        #expect(DictationNotice.pasteNotAllowed(needsReopen: true).message
+            == "Quit and reopen Live Transcribe so it can paste. The text is on the clipboard: press ⌘V")
+        #expect(DictationNotice.pasteNotAllowed(needsReopen: false).message
+            == "Allow Live Transcribe in Accessibility so it can paste. The text is on the clipboard: press ⌘V")
+        #expect(DictationNotice.copiedAfterFocusMoved.message == "Another app took focus, so the text is on the clipboard: press ⌘V")
+        #expect(DictationNotice.pasteNotAllowed(needsReopen: true).isProblem, "Live Transcribe needs fixing")
+        #expect(!DictationNotice.copiedAfterFocusMoved.isProblem, "nothing is wrong: the user moved on")
     }
 
     private func recording(ms: Int, truncated: Bool = false, failure: String? = nil) -> DictationRecorder.Recording {

@@ -50,7 +50,9 @@ struct DictationUndoRefusalTests {
     @Test("After ⌘Z, the notice follows what the insert did", arguments: [
         (InsertionResult.inserted(.paste, range: nil), DictationNotice.undone),
         (.nothingToInsert, .undone),
-        (.copiedToClipboard, .undoCopiedToClipboard),
+        (.copiedToClipboard(.notAccepted), .undoCopiedToClipboard),
+        (.copiedToClipboard(.focusMoved), .undoCopiedToClipboard),
+        (.copiedToClipboard(.pasteNotPermitted), .undoCopiedToClipboard),
         (.refusedSecureField, .secureField),
         (.failed, .undoFailed),
     ])
