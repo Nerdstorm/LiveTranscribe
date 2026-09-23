@@ -42,6 +42,28 @@ focus context, Command Mode, multilingual) is not started.
 - **The `AudioDevices/` slice stays inside `Capture`**, which already owns device listing and
   selection; splitting it would move code without changing behaviour.
 - **History lives in `Persistence`** as the handoff says (a `DictationRecord` type), as JSON Lines.
+- **The microphone opens while the focused field is read.** Reading it through Accessibility can
+  wait up to `accessibilityTimeoutMs` on a busy app, which would lose the first word. If the
+  field turns out to be a password field, the recording is thrown away before anything is
+  transcribed; the microphone indicator may flash.
+- **One dictation at a time.** Pressing the shortcut while the last dictation is still being
+  transcribed or inserted shows *Still inserting the last dictation* and records nothing, rather
+  than opening the microphone late and losing the first words.
+- **A dictation started from the menu** is hands-free: the shortcut stops it and Esc cancels it.
+- **Undo AI edit** works only between dictations, never during one.
+- **The self-correction adapter is on only at Medium and High.** It resolves corrections
+  whatever the prompt says, so at Light (every word kept) it is switched off per request and
+  the base model cleans up.
+- **Microphone notices** (a new default, a fallback, a skipped virtual default) appear in the
+  HUD once, and again only after the set of microphones changes, since dictation reopens the
+  microphone on every press. A chosen microphone that reconnects is switched back to
+  automatically. When the macOS default input is a virtual device, a physical microphone is used
+  unless none is connected.
+- **Settings apply after a short settle** (`settingsApplyDelayMs`, 300 ms), and the hotkey
+  monitor restarts only when a shortcut changes, so editing other settings never interrupts a
+  dictation. New timing takes effect once the current gesture ends.
+- **Models are shared.** Dictation uses the transcript session's transcriber and cleaner, so they
+  load once; dictation is available as soon as the session's models are.
 
 ## Architecture
 
@@ -55,8 +77,8 @@ New package targets (vertical slices), each with its own test target:
 | `Hotkey` | `HotkeyBinding`, `HotkeyGesture` (pure state machine), `HotkeyMonitor`, `CGEventTapHotkeyMonitor` | Shared |
 | `Insertion` | `TextInserter`, `AXTextInserter`, `PasteboardTextInserter`, `InsertionRouter`, `InserterOverrides`, `FocusedElement` | Shared |
 | `Permissions` | Microphone and Accessibility status, prompts, System Settings links | Shared |
-| `Dictation` | `DictationController` (the flow), `DictationRecorder`, `DictationProcessor`, `UndoController` | all of the above, Capture, Transcription, Cleanup, Persistence |
-| `DictationUI` | menu bar content, HUD panel, history window, onboarding, settings panes | Dictation, TranscriptUI, … |
+| `Dictation` | `DictationController` (the flow, including Undo AI edit), `DictationRecorder`, `DictationProcessor`, `TextDelivery` | all of the above, Capture, Transcription, Cleanup, Persistence |
+| `DictationUI` | menu bar content and icon, HUD panel, history window, onboarding, Settings tabs, readiness from the session | Dictation, TranscriptUI, Session, … |
 
 Changed slices:
 
@@ -70,7 +92,8 @@ Changed slices:
   *Show other devices* is on; capture follows the default input (M1).
 - **Persistence**: `DictationRecord` and `DictationHistory` (JSON Lines, pruning).
 - **Session**: the continuous pipeline passes `CleanupOptions` from settings.
-- **App**: no sandbox, menu-bar app, composition of the dictation flow.
+- **App**: no sandbox, menu-bar app (`LSUIElement`), composition of the dictation flow, and
+  `WindowPresenter`, which opens every window with AppKit and switches the activation policy.
 
 ### Dictation flow
 
@@ -122,32 +145,64 @@ it with the raw transcript; otherwise send ⌘Z and insert the raw transcript.
 
 ## Settings
 
-| Setting | Default | Where |
-|---|---|---|
-| `dictationHotkey` | Fn | UserDefaults |
-| `handsFreeDoubleTap` | on | UserDefaults |
-| `cleanupLevel` | Medium | UserDefaults |
-| `undoWindowSeconds` | 30 | UserDefaults |
-| `keepMicrophoneReady` | off | UserDefaults |
-| `showVirtualInputDevices` | off | UserDefaults |
-| `historyEnabled` / `historyRetentionDays` | on / 0 (keep everything) | UserDefaults |
-| `inputDeviceUID` | system default | UserDefaults |
-| snippets | none | `Application Support/org.nerdstorm.LiveTranscribe/snippets.json` |
-| vocabulary | none | `…/vocabulary.json` |
-| per-app insertion | bundled list + user entries | `…/insertion-overrides.json` |
+All in UserDefaults (keys are `AppSettingsKey` raw values), read at each use.
 
-Dictation settings apply immediately; model and segmentation settings still apply at the next
-launch.
+| Setting | Default |
+|---|---|
+| `dictationEnabled` | on |
+| `dictationHotkey` / `undoHotkey` | Fn / ⌃⌥Z |
+| `handsFreeEnabled` | on |
+| `cleanupLevel` | Medium |
+| `hotkeyTapMaxMs` / `hotkeyDoubleTapWindowMs` | 300 / 300 |
+| `dictationMinUtteranceMs` / `dictationMaxRecordingSeconds` | 300 / 300 |
+| `keepMicrophoneReady` / `dictationPreRollMs` | off / 300 |
+| `undoWindowSeconds` / `undoSettleDelayMs` | 30 / 150 |
+| `pasteRestoreDelayMs` | 250 |
+| `accessibilityTimeoutMs` / `accessibilityVerificationDelayMs` | 250 / 75 |
+| `permissionPollMs` / `settingsApplyDelayMs` | 1000 / 300 |
+| `vocabularyPromptLimit` / `vocabularySimilarityThreshold` | 50 / 0.8 |
+| `showVirtualInputDevices` | off |
+| `historyEnabled` / `historyRetentionDays` | on / 0 (keep everything) |
+| `dictationNoticeSeconds` | 2.5 |
+| `inputDeviceUID` | system default |
+
+Files in `~/Library/Application Support/org.nerdstorm.LiveTranscribe/`, owner-only (0600):
+`snippets.json`, `vocabulary.json`, `insertion-overrides.json` (user entries; the bundled list
+is in code) and `History/dictations.jsonl`.
+
+Dictation settings apply immediately; model and segmentation settings (Settings › Advanced)
+still apply at the next launch.
 
 ## Testing
 
 - Unit tests with fakes for every slice: gesture state machine, prompt composition per level,
   snippet matching and placeholder round trips (including a property test with random
   snippets), vocabulary replacement, level guard bounds, filler removal, list formatting,
-  inserter ordering with a fake AX layer, pasteboard snapshot and restore, device fallback,
-  history pruning, and the whole dictation flow with fake audio, transcriber, cleaner and
-  inserter.
-- Eval set (`.models` tag and `Bench --dictation`): 40+ generated clips covering fillers,
-  self-corrections, lists, dictionary terms, snippets and code dictation, with the expected
-  output per level. Reports per-level WER, snippet integrity, fallback rate and latency.
-- Manual QA (needs a person): the F2 app list, full screen, multiple displays, light and dark.
+  inserter ordering with a fake AX layer, pasteboard snapshot and restore, device policy and
+  fallback, history pruning, the dictation controller with fake audio, transcriber, cleaner and
+  inserter, and the Settings, menu and editor models.
+- Eval set: `Tests/IntegrationTests/Fixtures/Dictation/clips.tsv`, 44 clips (plain,
+  fillers, self-corrections, long, questions), each with what is said and what is meant.
+  `scripts/generate-dictation-audio.sh` synthesises them; `Bench --dictation` runs each through
+  the dictation processor at every level and reports WER against both references, fallbacks and
+  latency. Snippets, vocabulary and lists are covered by unit tests rather than clips.
+- Manual QA (needs a person): the F2 app list, full screen, multiple displays, light and dark,
+  plugging in and removing microphones mid-dictation, a virtual default input.
+
+### Eval results
+
+M4 Pro, macOS 27, synthetic speech (Samantha), latency = speech-to-text + cleanup
+(be4d502):
+
+| Level | WER vs said | WER vs meant | Fallbacks | p50 | p95 |
+|---|---:|---:|---:|---:|---:|
+| None | 1.9% | 24.2% | 0 | 32 ms | 59 ms |
+| Light | 2.1% | 23.9% | 0 | 159 ms | 308 ms |
+| Medium | 15.5% | 1.8% | 1 | 184 ms | 386 ms |
+| High | 15.5% | 1.8% | 1 | 199 ms | 388 ms |
+
+Every level is well under the p95 target of 1.2 s. At Medium and High all 12 self-corrections
+and all 10 filler clips come out as meant. The one fallback ("I've attached the invoice and the
+signed agreement.") is the adapter mistaking a plain sentence for a correction; OutputGuard
+rejects it and the transcript is used. The time from releasing the key to the text appearing
+adds the recorder stop and insertion, a few milliseconds each, which the controller logs.
