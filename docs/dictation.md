@@ -88,8 +88,12 @@ Changed slices:
   placeholder rule + prior context, each a separately tested function. `Cleaner.clean` takes
   `CleanupOptions` (level, vocabulary terms, placeholder tokens, multi-line). `OutputGuard`
   takes the level's word-ratio bounds and rejects output that alters a placeholder.
-- **Capture**: devices report whether they are virtual; the picker hides virtual devices unless
-  *Show other devices* is on; capture follows the default input (M1).
+- **Capture**: devices report whether they are virtual; capture follows the default input (M1).
+  `MicrophonePickerList` is the one rule for what the three microphone pickers (the menu bar,
+  Settings › General, the live transcript window) list: virtual devices only with
+  *Show other devices* on, unless one is chosen, and a chosen microphone that is not connected,
+  by the name last seen. *System Default* names the microphone capture would open for it at the
+  next start, so a virtual default input is not named when a physical one is used.
 - **Persistence**: `DictationRecord` and `DictationHistory` (JSON Lines, pruning).
 - **Session**: the continuous pipeline passes `CleanupOptions` from settings.
 - **App**: no sandbox, menu-bar app (`LSUIElement`), composition of the dictation flow, and

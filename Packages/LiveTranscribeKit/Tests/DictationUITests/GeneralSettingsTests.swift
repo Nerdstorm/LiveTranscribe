@@ -1,4 +1,3 @@
-import Capture
 @testable import DictationUI
 import Foundation
 import Hotkey
@@ -92,47 +91,6 @@ struct GeneralSettingsTests {
         #expect(adapterOff.contains("Self-corrections are kept"))
         let lightWithoutAdapter = GeneralSettingsCleanupNotes.text(level: .light, cleanupEnabled: true, adapterEnabled: false)
         #expect(!lightWithoutAdapter.contains("Self-corrections"))
-    }
-
-    // MARK: - Microphone choices
-
-    private let builtIn = AudioInputDevice(id: "built-in", name: "MacBook Pro Microphone")
-    private let usb = AudioInputDevice(id: "usb", name: "USB Mic")
-    private let loopback = AudioInputDevice(id: "loop", name: "Meeting Audio", isVirtual: true)
-
-    @Test func systemDefaultComesFirstWithItsName() {
-        let choices = GeneralSettingsMicrophoneChoice.choices(
-            devices: [builtIn], selectedUID: nil, showVirtualDevices: false, systemDefaultName: "USB Mic"
-        )
-        #expect(choices.first == GeneralSettingsMicrophoneChoice(uid: nil, name: "System Default (USB Mic)"))
-        let unnamed = GeneralSettingsMicrophoneChoice.choices(devices: [], selectedUID: nil, showVirtualDevices: false, systemDefaultName: nil)
-        #expect(unnamed.map(\.name) == ["System Default"])
-    }
-
-    @Test func virtualDevicesAreHiddenUnlessAskedFor() {
-        let hidden = GeneralSettingsMicrophoneChoice.choices(
-            devices: [builtIn, loopback, usb], selectedUID: nil, showVirtualDevices: false, systemDefaultName: nil
-        )
-        #expect(hidden.map(\.uid) == [nil, "built-in", "usb"])
-        let shown = GeneralSettingsMicrophoneChoice.choices(
-            devices: [builtIn, loopback, usb], selectedUID: nil, showVirtualDevices: true, systemDefaultName: nil
-        )
-        #expect(shown.map(\.uid) == [nil, "built-in", "loop", "usb"])
-    }
-
-    @Test func aChosenVirtualDeviceStaysListed() {
-        let choices = GeneralSettingsMicrophoneChoice.choices(
-            devices: [builtIn, loopback], selectedUID: "loop", showVirtualDevices: false, systemDefaultName: nil
-        )
-        #expect(choices.map(\.uid) == [nil, "built-in", "loop"])
-    }
-
-    @Test func aDisconnectedChoiceIsListedSoTheSelectionStaysVisible() {
-        let choices = GeneralSettingsMicrophoneChoice.choices(
-            devices: [builtIn], selectedUID: "gone", showVirtualDevices: false, systemDefaultName: nil
-        )
-        #expect(choices.last == GeneralSettingsMicrophoneChoice(uid: "gone", name: "Disconnected microphone"))
-        #expect(Set(choices.map(\.id)).count == choices.count)
     }
 
     // MARK: - fn key warning

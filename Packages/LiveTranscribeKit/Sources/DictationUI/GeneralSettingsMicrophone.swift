@@ -3,43 +3,12 @@ import Shared
 import SwiftUI
 import TranscriptUI
 
-/// The entries of the microphone picker in Settings › General.
-///
-/// *System Default* comes first (decision M1: it follows macOS's default input). Physical
-/// microphones follow; virtual and aggregate devices only with *Show other devices* on, because
-/// they often carry other apps' audio or silence. The chosen device is always listed, even when
-/// it is virtual or disconnected, so the picker never shows a blank selection.
-struct GeneralSettingsMicrophoneChoice: Identifiable, Equatable {
-    /// The device UID, or `nil` for System Default.
-    let uid: String?
-    let name: String
-
-    var id: String { uid ?? "" }
-
-    static func choices(
-        devices: [AudioInputDevice],
-        selectedUID: String?,
-        showVirtualDevices: Bool,
-        systemDefaultName: String?
-    ) -> [GeneralSettingsMicrophoneChoice] {
-        var choices = [GeneralSettingsMicrophoneChoice(
-            uid: nil,
-            name: systemDefaultName.map { "System Default (\($0))" } ?? "System Default"
-        )]
-        for device in devices where !device.isVirtual || showVirtualDevices || device.id == selectedUID {
-            choices.append(GeneralSettingsMicrophoneChoice(uid: device.id, name: device.name))
-        }
-        if let selectedUID, !devices.contains(where: { $0.id == selectedUID }) {
-            choices.append(GeneralSettingsMicrophoneChoice(uid: selectedUID, name: "Disconnected microphone"))
-        }
-        return choices
-    }
-}
-
 /// Settings › General › Microphone: keeping the microphone ready, and which one to use.
 ///
 /// The microphone choice is the live transcript's (``TranscriptViewModel``), shared by both
-/// modes; it is stored by the input selection, not through `@AppStorage`.
+/// modes; it is stored by the input selection, not through `@AppStorage`. The picker lists the
+/// same rows as the menu bar's and the transcript window's (``MicrophonePickerList``), grouped
+/// the same way, so the three always agree.
 struct GeneralSettingsMicrophoneSection: View {
     let transcript: TranscriptViewModel
 
@@ -49,10 +18,17 @@ struct GeneralSettingsMicrophoneSection: View {
     private var showVirtualInputDevices = AppSettings.defaults.dictation.showVirtualInputDevices
 
     var body: some View {
+        let list = transcript.microphoneList(showVirtualDevices: showVirtualInputDevices)
         Section("Microphone") {
             Picker("Microphone", selection: selection) {
-                ForEach(choices) { choice in
-                    Text(choice.name).tag(choice.uid)
+                item(list.systemDefault)
+                if !list.microphones.isEmpty {
+                    Divider()
+                    ForEach(list.microphones) { item($0) }
+                }
+                if !list.otherDevices.isEmpty {
+                    Divider()
+                    ForEach(list.otherDevices) { item($0) }
                 }
             }
             .disabled(!transcript.canChangeInputDevice)
@@ -71,13 +47,8 @@ struct GeneralSettingsMicrophoneSection: View {
         }
     }
 
-    private var choices: [GeneralSettingsMicrophoneChoice] {
-        GeneralSettingsMicrophoneChoice.choices(
-            devices: transcript.inputDevices,
-            selectedUID: transcript.selectedInputDeviceUID,
-            showVirtualDevices: showVirtualInputDevices,
-            systemDefaultName: transcript.systemDefaultInputName
-        )
+    private func item(_ row: MicrophonePickerList.Row) -> some View {
+        Text(row.title).tag(row.uid)
     }
 
     private var selection: Binding<String?> {

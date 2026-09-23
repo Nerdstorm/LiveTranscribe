@@ -10,8 +10,8 @@ import TranscriptUI
 ///
 /// Made for `MenuBarExtra { MenuBarContent(context:) } label: { MenuBarLabel(context:) }` with
 /// `.menuBarExtraStyle(.menu)`, so it uses only views a menu can show. What it says and allows
-/// comes from ``MenuBarStatus`` and ``MicrophoneMenu``; settings go through `UserDefaults`, which
-/// the app applies to the controller.
+/// comes from ``MenuBarStatus`` and, for the microphone, ``MicrophonePickerList``; settings go
+/// through `UserDefaults`, which the app applies to the controller.
 public struct MenuBarContent: View {
     private static let d = AppSettings.defaults
 
@@ -110,44 +110,5 @@ public struct MenuBarContent: View {
             return
         }
         action(windows)
-    }
-}
-
-/// The *Microphone* submenu: System Default, the microphones, and *Show Other Devices*.
-///
-/// Locked while the live transcript is listening, because the microphone is fixed for a session.
-private struct MenuMicrophoneSubmenu: View {
-    let transcript: TranscriptViewModel
-    @Binding var showOtherDevices: Bool
-
-    var body: some View {
-        let menu = MicrophoneMenu(
-            devices: transcript.inputDevices,
-            selectedUID: transcript.selectedInputDeviceUID,
-            systemDefaultName: transcript.systemDefaultInputName,
-            showOtherDevices: showOtherDevices
-        )
-        Menu("Microphone") {
-            item(menu.systemDefault)
-            if !menu.devices.isEmpty {
-                Divider()
-                ForEach(menu.devices) { item($0) }
-            }
-            if !menu.otherDevices.isEmpty {
-                Divider()
-                ForEach(menu.otherDevices) { item($0) }
-            }
-            Divider()
-            Toggle("Show Other Devices", isOn: $showOtherDevices)
-        }
-        .disabled(!transcript.canChangeInputDevice)
-    }
-
-    /// A checkable item. Choosing the one already checked keeps it, like a radio group.
-    private func item(_ item: MicrophoneMenu.Item) -> some View {
-        Toggle(item.title, isOn: Binding(
-            get: { item.isSelected },
-            set: { _ in transcript.selectInputDevice(item.uid) }
-        ))
     }
 }

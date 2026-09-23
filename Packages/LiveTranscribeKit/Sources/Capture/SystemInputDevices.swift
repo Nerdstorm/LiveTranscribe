@@ -5,8 +5,8 @@ import Shared
 /// through ``AppSettingsStore``.
 ///
 /// The list is the one ``CaptureSessionSource`` opens devices from, so every entry in the picker
-/// can be captured from. Virtual devices are listed and flagged; the picker decides whether to
-/// show them.
+/// can be captured from. Virtual devices are listed and flagged; ``MicrophonePickerList``
+/// decides whether a picker shows them.
 public struct SystemInputDevices: InputDeviceSelecting {
     private let store: AppSettingsStore
     private let catalog = SystemInputDeviceCatalog()
@@ -15,12 +15,8 @@ public struct SystemInputDevices: InputDeviceSelecting {
         self.store = store
     }
 
-    public func availableDevices() -> [AudioInputDevice] {
-        catalog.connectedDevices()
-    }
-
-    public func systemDefaultName() -> String? {
-        catalog.systemDefaultDevice()?.name
+    public func snapshot() -> InputDeviceSnapshot {
+        catalog.snapshot()
     }
 
     public var selectedDeviceUID: String? {

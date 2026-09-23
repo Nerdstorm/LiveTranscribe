@@ -15,11 +15,10 @@ public final class TranscriptViewModel {
     public private(set) var lines: [TranscriptLine] = []
     public private(set) var warning: String?
     public private(set) var transcriptFile: URL?
-    /// Connected microphones, for the picker.
-    public private(set) var inputDevices: [AudioInputDevice] = []
+    /// Connected microphones and the system default input, for the pickers.
+    public private(set) var inputDevices = InputDeviceSnapshot(connected: [], systemDefault: nil)
     /// The chosen microphone's UID; `nil` follows the system default input.
     public private(set) var selectedInputDeviceUID: String?
-    public private(set) var systemDefaultInputName: String?
 
     private let session: any SessionControlling
     public let sessionsDirectory: URL?
@@ -28,6 +27,10 @@ public final class TranscriptViewModel {
     @ObservationIgnored private var deviceChangesTask: Task<Void, Never>?
     /// Cleanup state captured when the current session started; decides whether raw lines wait.
     @ObservationIgnored private var sessionCleansText = false
+    /// Every microphone seen connected since launch, as last seen, by UID. Only a chosen
+    /// microphone's UID is saved, so this lets the pickers name and group it while it is
+    /// disconnected. In memory only; it holds one entry per device ever connected.
+    @ObservationIgnored private var seenDevices: [String: AudioInputDevice] = [:]
 
     public init(
         session: any SessionControlling,
@@ -121,11 +124,18 @@ public final class TranscriptViewModel {
         inputSelection != nil && phase != .listening && phase != .stopping
     }
 
-    /// The saved microphone is not connected. Capture falls back to the system default, and says
-    /// so, until it reconnects or another is chosen.
-    public var selectedInputDeviceIsMissing: Bool {
-        guard let selectedInputDeviceUID else { return false }
-        return !inputDevices.contains { $0.id == selectedInputDeviceUID }
+    /// What a microphone picker lists. The menu bar, Settings and the transcript window all
+    /// build their pickers from it, so they agree.
+    ///
+    /// - Parameter showVirtualDevices: the `showVirtualInputDevices` setting, which each picker
+    ///   reads with `@AppStorage` and can change.
+    public func microphoneList(showVirtualDevices: Bool) -> MicrophonePickerList {
+        MicrophonePickerList(
+            snapshot: inputDevices,
+            selectedUID: selectedInputDeviceUID,
+            showVirtualDevices: showVirtualDevices,
+            lastSeenChoice: selectedInputDeviceUID.flatMap { seenDevices[$0] }
+        )
     }
 
     /// Final text of every line, one per paragraph, for copying.
@@ -182,9 +192,13 @@ public final class TranscriptViewModel {
 
     private func refreshInputDevices() {
         guard let inputSelection else { return }
-        inputDevices = inputSelection.availableDevices()
-        systemDefaultInputName = inputSelection.systemDefaultName()
+        let snapshot = inputSelection.snapshot()
+        for device in snapshot.connected {
+            seenDevices[device.id] = device
+        }
+        inputDevices = snapshot
         selectedInputDeviceUID = inputSelection.selectedDeviceUID
+        Log.ui.debug("Microphone list refreshed: \(snapshot.connected.count, privacy: .public) connected")
     }
 
     private func upsert(_ line: TranscriptLine) {

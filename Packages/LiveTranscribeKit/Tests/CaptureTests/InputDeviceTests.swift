@@ -12,7 +12,7 @@ struct InputDeviceTests {
     private let devices = SystemInputDevices(store: AppSettingsStore(suiteName: "LiveTranscribeTests.\(UUID().uuidString)"))
 
     @Test func everyListedMicrophoneCanBeOpenedByItsID() {
-        let listed = devices.availableDevices()
+        let listed = devices.snapshot().connected
         for device in listed {
             #expect(!device.id.isEmpty)
             #expect(!device.name.isEmpty)
@@ -29,7 +29,7 @@ struct InputDeviceTests {
     }
 
     @Test func coreAudioAgreesWithAVFoundationOnEveryTransport() throws {
-        for device in devices.availableDevices() {
+        for device in devices.snapshot().connected {
             let captureDevice = try #require(AVCaptureDevice(uniqueID: device.id))
             let avFoundation = UInt32(bitPattern: captureDevice.transportType)
             #expect(AudioTransport.transportType(forUID: device.id) == avFoundation, "the UID lookup finds the same device")
