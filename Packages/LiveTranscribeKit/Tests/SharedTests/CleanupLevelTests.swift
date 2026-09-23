@@ -18,6 +18,19 @@ struct CleanupLevelTests {
         #expect(CleanupLevel.allCases.filter(\.allowsRewording) == [.high])
     }
 
+    /// Snippets and vocabulary run before the level is looked at, so None's line must not
+    /// promise the text exactly as heard. The same line shows for the live transcript, which
+    /// applies neither, so it says they are dictation's.
+    @Test func noneSaysSnippetsAndVocabularyStillApplyToDictation() {
+        let summary = CleanupLevel.none.summary
+        #expect(summary.contains("snippets") && summary.contains("vocabulary"))
+        #expect(summary.contains("dictation"))
+        #expect(!summary.localizedCaseInsensitiveContains("exactly"))
+        for level in CleanupLevel.allCases {
+            #expect(!level.summary.isEmpty && !level.summary.hasSuffix("."), "one line, no full stop, like the others")
+        }
+    }
+
     @Test func wordRatioBoundsWidenWithTheLevel() {
         #expect(CleanupLevel.light.wordRatioBounds == 0.8...1.2)
         #expect(CleanupLevel.medium.wordRatioBounds == 0.5...1.2)

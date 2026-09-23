@@ -9,9 +9,10 @@ import Shared
 /// The store keeps only the user's entries; the built-in ones live in code. For an app in both,
 /// the user's entry wins (``InserterOverrides/merged(with:)``), and the built-in row says so.
 ///
-/// Every change re-reads the file and changes only the one app, because the store's `save`
-/// replaces the whole file: writing the copy loaded when the tab opened would drop an entry added
-/// by hand since.
+/// Every change goes through ``InserterOverridesStore/update(_:)``, which re-reads the file and
+/// changes only the one app in a single step on the store: writing the copy loaded when the tab
+/// opened would drop an entry added by hand since, and a separate read and write could lose one
+/// saved in between.
 @MainActor
 @Observable
 final class AppOverridesModel {
@@ -122,13 +123,15 @@ final class AppOverridesModel {
     @discardableResult
     func save(_ draft: AppOverrideDraft) async -> Bool {
         guard validation(of: draft).canSave, let app = draft.app else { return false }
+        let bundleIdentifier = app.bundleIdentifier
+        let method = draft.method
         return await status.perform(draft.isNew ? "add a per-app setting" : "save a per-app setting") {
-            var overrides = try await store.load()
-            overrides.methods = overrides.methods.filter {
-                $0.key.caseInsensitiveCompare(app.bundleIdentifier) != .orderedSame
+            let overrides = try await store.update { overrides in
+                overrides.methods = overrides.methods.filter {
+                    $0.key.caseInsensitiveCompare(bundleIdentifier) != .orderedSame
+                }
+                overrides.methods[bundleIdentifier] = method
             }
-            overrides.methods[app.bundleIdentifier] = draft.method
-            try await store.save(overrides)
             apply(overrides)
         }
     }
@@ -140,9 +143,7 @@ final class AppOverridesModel {
     @discardableResult
     func delete(bundleIdentifier: String) async -> Bool {
         await status.perform("remove a per-app setting") {
-            var overrides = try await store.load()
-            overrides.methods[bundleIdentifier] = nil
-            try await store.save(overrides)
+            let overrides = try await store.update { $0.methods[bundleIdentifier] = nil }
             apply(overrides)
         }
     }

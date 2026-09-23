@@ -206,6 +206,23 @@ struct AppOverridesModelTests {
         #expect(model.builtInRows.allSatisfy { !$0.isReplacedByUser })
     }
 
+    /// The change runs inside the store's update, so removing a setting that another window
+    /// already removed writes nothing, and an entry this version skipped stays in the file.
+    @Test func removingASettingThatIsAlreadyGoneLeavesTheFileAlone() async throws {
+        let folder = EditableListTemporaryFolder()
+        defer { folder.cleanUp() }
+        let (model, _) = makeModel(in: folder)
+        try folder.write(#"{"methods": {"com.apple.Notes": "paste", "org.example.Future": "dictate"}}"#, to: Self.fileName)
+        await model.load()
+        try folder.write(#"{"methods": {"org.example.Future": "dictate"}}"#, to: Self.fileName)
+        let before = folder.contents(of: Self.fileName)
+
+        #expect(await model.delete(bundleIdentifier: "com.apple.Notes"))
+
+        #expect(folder.contents(of: Self.fileName) == before)
+        #expect(model.userRows.isEmpty)
+    }
+
     @Test func anAppWithoutABundleIdentifierCannotBeChosen() async {
         let folder = EditableListTemporaryFolder()
         defer { folder.cleanUp() }

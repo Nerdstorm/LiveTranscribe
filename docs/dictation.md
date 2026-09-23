@@ -30,6 +30,7 @@ focus context, Command Mode, multilingual) is not started.
 - **Continuous mode and dictation don't overlap.** While the live transcript is listening, the
   dictation hotkey shows *Stop the live transcript to dictate* instead of recording.
 - **The cleanup level applies to both modes.** Medium removes fillers in the live transcript too.
+  Snippets and vocabulary apply only to dictation.
 - **A chosen microphone that disconnects** falls back to the system default with a notice
   (the handoff's F6), replacing the old behaviour of stopping capture.
 - **Fillers are removed deterministically** (um, uh, er, …) before the LLM at Medium and High,
@@ -182,7 +183,9 @@ Files in `~/Library/Application Support/org.nerdstorm.LiveTranscribe/`, owner-on
 is in code) and `History/dictations.jsonl`.
 
 Dictation settings apply immediately; model and segmentation settings (Settings › Advanced)
-still apply at the next launch.
+still apply at the next launch. Advanced's Restore Defaults resets only the settings on that tab
+(`AppSettingsKey.advancedTab`): the dictation settings, shortcuts, cleanup level, history and
+microphone stay as they are.
 
 ## Testing
 

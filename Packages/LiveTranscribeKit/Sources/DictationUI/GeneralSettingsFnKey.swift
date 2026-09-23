@@ -1,6 +1,6 @@
-import AppKit
 import Hotkey
 import Observation
+import Permissions
 import Shared
 import SwiftUI
 
@@ -10,25 +10,22 @@ import SwiftUI
 @MainActor
 @Observable
 final class GeneralSettingsFnKeyModel {
-    /// System Settings › Keyboard, where "Press 🌐 key to" lives.
-    static let keyboardSettingsURL = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")
-
     private(set) var usage: FnKeyUsage
     /// Set when System Settings could not be opened.
     private(set) var errorMessage: String?
 
     @ObservationIgnored private let readUsage: @MainActor () -> FnKeyUsage
-    @ObservationIgnored private let openURL: @MainActor (URL) -> Bool
+    @ObservationIgnored private let openSettings: @MainActor () -> Bool
 
     /// - Parameters:
     ///   - readUsage: Reads the current macOS setting; tests pass a fake.
-    ///   - openURL: Opens a System Settings link and reports whether it worked.
+    ///   - openKeyboardSettings: Opens System Settings › Keyboard and reports whether it worked.
     init(
         readUsage: @escaping @MainActor () -> FnKeyUsage = { FnKeyUsage.current() },
-        openURL: @escaping @MainActor (URL) -> Bool = { NSWorkspace.shared.open($0) }
+        openKeyboardSettings: @escaping @MainActor () -> Bool = { PrivacySettings.openKeyboardSettings() }
     ) {
         self.readUsage = readUsage
-        self.openURL = openURL
+        openSettings = openKeyboardSettings
         usage = readUsage()
     }
 
@@ -58,13 +55,9 @@ final class GeneralSettingsFnKeyModel {
         return "Pressing fn also makes macOS \(action). To dictate with fn, set \(usage.fixHint)."
     }
 
+    /// Opens System Settings › Keyboard, or says how to get there when it can't.
     func openKeyboardSettings() {
-        errorMessage = nil
-        guard let url = Self.keyboardSettingsURL, openURL(url) else {
-            Log.ui.error("Could not open Keyboard settings")
-            errorMessage = "Couldn't open System Settings. Open it from the Apple menu, then choose Keyboard."
-            return
-        }
+        errorMessage = openSettings() ? nil : PrivacySettings.keyboardSettingsFailureMessage
     }
 }
 

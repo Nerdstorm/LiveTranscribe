@@ -1,8 +1,11 @@
 import Shared
 import SwiftUI
 
-/// Edits ``AppSettings`` through UserDefaults. Values are read at launch, so changes apply on
-/// the next launch.
+/// Settings › Advanced: edits the ``AppSettings`` in ``AppSettingsKey/advancedTab`` through
+/// UserDefaults. Values are read at launch, so changes apply on the next launch.
+///
+/// Every key bound here must be in ``AppSettingsKey/advancedTab``, which is what Restore Defaults
+/// resets; the settings other tabs show are left alone.
 public struct SettingsView: View {
     private static let d = AppSettings.defaults
 
@@ -77,13 +80,17 @@ public struct SettingsView: View {
                     Text("Changes apply the next time Live Transcribe starts.")
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Button("Restore Defaults") {
-                        AppSettingsStore().resetToDefaults()
-                    }
+                    Button("Restore Defaults", action: restoreDefaults)
+                        .help("Puts the settings on this tab back to their defaults. Your dictation settings, shortcuts, cleanup level, history and microphone stay as they are.")
                 }
             }
         }
         .formStyle(.grouped)
         .frame(width: 480)
+    }
+
+    private func restoreDefaults() {
+        AppSettingsStore().resetToDefaults(AppSettingsKey.advancedTab)
+        Log.ui.info("Restored the Advanced settings to their defaults")
     }
 }

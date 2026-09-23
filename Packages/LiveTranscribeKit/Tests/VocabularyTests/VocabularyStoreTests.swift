@@ -5,17 +5,17 @@ import Vocabulary
 @Suite("VocabularyStore")
 struct VocabularyStoreTests {
     /// 2026-09-21 14:13:20 UTC.
-    private static let fixedDate = Date(timeIntervalSince1970: 1_790_000_000)
+    static let fixedDate = Date(timeIntervalSince1970: 1_790_000_000)
 
-    private func temporaryDirectory() -> URL {
+    func temporaryDirectory() -> URL {
         FileManager.default.temporaryDirectory.appendingPathComponent("LiveTranscribeTests-\(UUID().uuidString)")
     }
 
-    private func makeStore(in directory: URL) -> VocabularyStore {
+    func makeStore(in directory: URL) -> VocabularyStore {
         VocabularyStore(fileURL: directory.appendingPathComponent("vocabulary.json"), now: { Self.fixedDate })
     }
 
-    private func permissions(of url: URL) throws -> Int {
+    func permissions(of url: URL) throws -> Int {
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         return try #require(attributes[.posixPermissions] as? Int)
     }
@@ -214,19 +214,6 @@ struct VocabularyStoreTests {
 
         #expect(stored == [first, second])
         #expect(try await store.all() == [first, second])
-    }
-
-    @Test func deleteRemovesOnlyTheEntryWithTheId() async throws {
-        let directory = temporaryDirectory()
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let store = makeStore(in: directory)
-        let first = VocabularyEntry(term: "Nerdstorm")
-        let second = VocabularyEntry(term: "GitHub")
-        try await store.save([first, second])
-
-        #expect(try await store.delete(id: first.id) == [second])
-        #expect(try await store.delete(id: UUID()) == [second])
-        #expect(try await store.all() == [second])
     }
 
     @Test func anUnreadableFileIsAReadError() async throws {

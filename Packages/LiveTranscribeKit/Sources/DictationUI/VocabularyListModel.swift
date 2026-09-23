@@ -7,8 +7,9 @@ import Vocabulary
 ///
 /// An edit is checked here first with ``VocabularyValidator``, the store's own rules, against the
 /// entries on screen, so the sheet can say what is wrong as the user types. The store re-reads the
-/// file and checks the whole vocabulary again before it writes, so a file changed behind the
-/// screen's back is never overwritten with a conflict; its error is shown instead.
+/// file and checks the whole vocabulary again before it saves an add or an edit, so a file
+/// changed behind the screen's back is never overwritten with a conflict; its error is shown
+/// instead.
 @MainActor
 @Observable
 final class VocabularyListModel {
@@ -70,10 +71,11 @@ final class VocabularyListModel {
     /// What to say when the other entries break a rule without the draft, which only a
     /// hand-edited file can cause.
     ///
-    /// The store checks the whole vocabulary before it writes, so such a problem blocks every
+    /// The store checks the whole vocabulary before it saves, so such a problem blocks every
     /// save until it is fixed. The store's sentence for a repeated term ("… is already in your
     /// vocabulary") would read as if it were about the draft, so this names the other entries
-    /// instead.
+    /// instead. Deleting one of them always works (the store's delete skips validation), and
+    /// editing one works once the rest are valid without it.
     static func problemElsewhere(_ error: any Error) -> String {
         switch error as? VocabularyError {
         case .duplicateTerm(let term):
@@ -100,21 +102,14 @@ final class VocabularyListModel {
         }
     }
 
-    /// Deletes the entry with `id`.
-    ///
-    /// The store checks the entries that are left before it writes, so a problem among the others
-    /// (only a hand edit can make one) refuses the delete. Removing an entry cannot cause a
-    /// problem, so the store's sentence is always about another entry, and is reworded as one.
+    /// Deletes the entry with `id`. The store does not check the entries that are left, so a
+    /// conflict elsewhere in a hand-edited file never blocks it.
     ///
     /// - Returns: Whether it was deleted; when it wasn't, ``status`` holds the reason.
     @discardableResult
     func delete(id: VocabularyEntry.ID) async -> Bool {
         await status.perform("delete a vocabulary term") {
-            do {
-                entries = Self.sorted(try await store.delete(id: id))
-            } catch {
-                throw VocabularyListProblem(message: Self.problemElsewhere(error))
-            }
+            entries = Self.sorted(try await store.delete(id: id))
         }
     }
 
@@ -129,11 +124,4 @@ final class VocabularyListModel {
             }
         }
     }
-}
-
-/// A store error reworded for the vocabulary screen (see ``VocabularyListModel/delete(id:)``).
-private struct VocabularyListProblem: LocalizedError {
-    let message: String
-
-    var errorDescription: String? { message }
 }

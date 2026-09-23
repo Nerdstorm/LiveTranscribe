@@ -74,10 +74,12 @@ struct GeneralSettingsTests {
 
     // MARK: - Cleanup notes
 
+    /// The level applies to both modes, but snippets and vocabulary only to dictation (the live
+    /// transcript applies neither), so the note names dictation.
     @Test func cleanupNotesSaySnippetsAndVocabularyAlwaysApply() {
         for level in CleanupLevel.allCases {
             let text = GeneralSettingsCleanupNotes.text(level: level, cleanupEnabled: true, adapterEnabled: true)
-            #expect(text.contains("Snippets and vocabulary apply at every level"), "\(level)")
+            #expect(text.contains("Dictation applies your snippets and vocabulary at every level"), "\(level)")
             #expect(!text.contains("Advanced"), "nothing is off, so nothing points to Advanced (\(level))")
         }
     }
@@ -98,7 +100,7 @@ struct GeneralSettingsTests {
     @MainActor
     @Test func warnsOnlyForFnWhenMacOSAlsoUsesIt() {
         let usage = Box(FnKeyUsage.showEmojiAndSymbols)
-        let model = GeneralSettingsFnKeyModel(readUsage: { usage.value }, openURL: { _ in true })
+        let model = GeneralSettingsFnKeyModel(readUsage: { usage.value }, openKeyboardSettings: { true })
         #expect(model.showsWarning(forStoredHotkey: HotkeyBinding.defaultDictation.storageString))
         #expect(model.showsWarning(forStoredHotkey: "damaged"), "a damaged value falls back to fn")
         #expect(!model.showsWarning(forStoredHotkey: HotkeyBinding.modifierKey(.rightOption).storageString))
@@ -113,25 +115,26 @@ struct GeneralSettingsTests {
     @MainActor
     @Test func everyConflictingUsageExplainsItself() {
         for usage in FnKeyUsage.allCases where usage.conflictsWithFnHotkey {
-            let model = GeneralSettingsFnKeyModel(readUsage: { usage }, openURL: { _ in true })
+            let model = GeneralSettingsFnKeyModel(readUsage: { usage }, openKeyboardSettings: { true })
             #expect(model.warningMessage.contains(usage.fixHint))
         }
     }
 
     @MainActor
     @Test func opensKeyboardSettingsAndReportsAFailure() {
-        let opened = Box<[URL]>([])
+        let opened = Box(0)
         let succeeds = Box(false)
-        let model = GeneralSettingsFnKeyModel(readUsage: { .changeInputSource }, openURL: { url in
-            opened.value.append(url)
+        let model = GeneralSettingsFnKeyModel(readUsage: { .changeInputSource }, openKeyboardSettings: {
+            opened.value += 1
             return succeeds.value
         })
         model.openKeyboardSettings()
-        #expect(opened.value.map(\.absoluteString) == ["x-apple.systempreferences:com.apple.Keyboard-Settings.extension"])
-        #expect(model.errorMessage != nil)
+        #expect(opened.value == 1)
+        #expect(model.errorMessage == "Couldn't open System Settings. Open it from the Apple menu, then choose Keyboard.")
 
         succeeds.value = true
         model.openKeyboardSettings()
+        #expect(opened.value == 2)
         #expect(model.errorMessage == nil)
     }
 }

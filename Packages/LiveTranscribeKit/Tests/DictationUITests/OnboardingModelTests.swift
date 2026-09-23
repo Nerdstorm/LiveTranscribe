@@ -74,18 +74,18 @@ private final class FakeAccessibility: AccessibilityPermissionProviding {
 @MainActor
 private final class SystemSpy {
     var fnUsage: FnKeyUsage = .doNothing
-    var opensURLs = true
+    var opensKeyboardSettings = true
     private(set) var openedPermissions: [RequiredPermission] = []
-    private(set) var openedURLs: [URL] = []
+    private(set) var keyboardSettingsOpened = 0
     private(set) var announcements: [String] = []
 
     var system: OnboardingModel.System {
         OnboardingModel.System(
             fnKeyUsage: { self.fnUsage },
             openPrivacySettings: { self.openedPermissions.append($0) },
-            openURL: { url in
-                self.openedURLs.append(url)
-                return self.opensURLs
+            openKeyboardSettings: {
+                self.keyboardSettingsOpened += 1
+                return self.opensKeyboardSettings
             },
             announce: { self.announcements.append($0) }
         )
@@ -263,12 +263,13 @@ struct OnboardingModelTests {
     @Test func opensKeyboardSettingsOrSaysItCouldNot() {
         let model = makeModel(fn: .changeInputSource)
         model.openKeyboardSettings()
-        #expect(spy.openedURLs == [OnboardingModel.keyboardSettingsURL].compactMap { $0 })
+        #expect(spy.keyboardSettingsOpened == 1)
         #expect(model.errorMessage == nil)
 
-        spy.opensURLs = false
+        spy.opensKeyboardSettings = false
         model.openKeyboardSettings()
-        #expect(model.errorMessage != nil)
+        #expect(spy.keyboardSettingsOpened == 2)
+        #expect(model.errorMessage == "Couldn't open System Settings. Open it from the Apple menu, then choose Keyboard.")
         // Moving on clears it.
         model.goForward()
         #expect(model.errorMessage == nil)

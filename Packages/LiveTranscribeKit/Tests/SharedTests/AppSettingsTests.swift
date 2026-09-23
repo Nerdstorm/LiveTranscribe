@@ -47,9 +47,80 @@ struct AppSettingsTests {
         defer { UserDefaults().removePersistentDomain(forName: suite) }
         var settings = AppSettings.defaults
         settings.contextSegments = 7
+        settings.dictation.undoWindowSeconds = 60
         store.save(settings)
-        store.resetToDefaults()
+        store.resetToDefaults([.contextSegments, .undoWindowSeconds])
         #expect(store.load() == AppSettings.defaults)
+    }
+
+    /// Settings › Advanced resets only what it shows; the dictation settings, both shortcuts, the
+    /// cleanup level and history are set on other tabs and must survive its Restore Defaults.
+    @Test func restoringTheAdvancedTabResetsOnlyItsOwnSettings() {
+        let (store, suite) = makeStore()
+        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        var advanced = AppSettings.defaults
+        advanced.sttModel = "example/stt"
+        advanced.llmModel = "example/llm"
+        advanced.vadModel = "example/vad"
+        advanced.cleanupEnabled = false
+        advanced.cleanupAdapterEnabled = false
+        advanced.vadSilenceMs = 900
+        advanced.vadSpeechThreshold = 0.7
+        advanced.vadPreRollMs = 400
+        advanced.vadMinSpeechMs = 300
+        advanced.maxSegmentSeconds = 30
+        advanced.partialIntervalMs = 500
+        advanced.contextSegments = 7
+        advanced.cleanupTimeoutSeconds = 2.5
+        advanced.cleanupQueueCapacity = 4
+        advanced.gpuCacheLimitMB = 1_024
+        advanced.captureRestartAttempts = 2
+        advanced.captureRestartDelaySeconds = 3
+        advanced.captureMaxRestartsPerMinute = 12
+        var elsewhere = AppSettings.defaults
+        elsewhere.cleanupLevel = .high
+        elsewhere.dictation.enabled = false
+        elsewhere.dictation.hotkey = "modifier:rightOption"
+        elsewhere.dictation.undoHotkey = "combo:7:control,option"
+        elsewhere.dictation.handsFreeEnabled = false
+        elsewhere.dictation.keepMicrophoneReady = true
+        elsewhere.dictation.undoWindowSeconds = 60
+        elsewhere.dictation.historyEnabled = false
+        elsewhere.dictation.historyRetentionDays = 30
+        var both = advanced
+        both.cleanupLevel = elsewhere.cleanupLevel
+        both.dictation = elsewhere.dictation
+        store.save(both)
+        store.setInputDeviceUID("00-11-22:input")
+        #expect(store.load() == both, "every value above is in range, so the check below means something")
+
+        store.resetToDefaults(AppSettingsKey.advancedTab)
+
+        #expect(store.load() == elsewhere)
+        #expect(store.inputDeviceUID == "00-11-22:input")
+    }
+
+    /// Only the keys passed are removed; everything else stays stored.
+    @Test func resettingKeysRemovesOnlyThoseKeys() throws {
+        let (store, suite) = makeStore()
+        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        store.save(AppSettings.defaults)
+        store.setInputDeviceUID("00-11-22:input")
+
+        store.resetToDefaults(AppSettingsKey.advancedTab)
+
+        let stored = try #require(UserDefaults(suiteName: suite)?.persistentDomain(forName: suite))
+        let kept = Set(AppSettingsKey.allCases.filter { stored[$0.rawValue] != nil })
+        #expect(kept == Set(AppSettingsKey.allCases).subtracting(AppSettingsKey.advancedTab))
+    }
+
+    /// Settings › Advanced shows every top-level ``AppSettings`` value but the cleanup level
+    /// (chosen in General and the menu); the dictation settings live on other tabs. A new
+    /// top-level setting fails this until it is added to the tab and its key set, or excluded
+    /// here on purpose.
+    @Test func theAdvancedTabIsEveryTopLevelSettingButTheCleanupLevel() {
+        let topLevel = Set(Mirror(reflecting: AppSettings.defaults).children.compactMap(\.label))
+        #expect(Set(AppSettingsKey.advancedTab.map(\.rawValue)) == topLevel.subtracting(["cleanupLevel", "dictation"]))
     }
 
     @Test func sanitizedClampsOutOfRangeValues() {
@@ -139,7 +210,7 @@ struct AppSettingsTests {
         settings.vadSilenceMs = 900
         store.save(settings)
         store.setInputDeviceUID("00-11-22:input")
-        store.resetToDefaults()
+        store.resetToDefaults(AppSettingsKey.advancedTab)
         #expect(store.load() == AppSettings.defaults)
         #expect(store.inputDeviceUID == "00-11-22:input", "the microphone is chosen in the main window, not in Settings")
     }

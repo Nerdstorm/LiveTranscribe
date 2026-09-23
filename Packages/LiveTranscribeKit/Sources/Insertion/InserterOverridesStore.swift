@@ -28,7 +28,8 @@ public enum InserterOverridesStoreError: LocalizedError, Equatable, Sendable {
 /// The file holds only the user's entries; the bundled defaults live in code, so an update can
 /// change them without a migration. Combine with ``InserterOverrides/merged(with:)``.
 ///
-/// An actor so a save from Settings and a load at launch never interleave on the file.
+/// An actor so a save from Settings and a load at launch never interleave on the file. A change
+/// to some entries goes through ``update(_:)``, which reads, changes and writes in one step.
 public actor InserterOverridesStore {
     public static let fileName = "insertion-overrides.json"
     /// Owner read and write only, like the other files the user edits in Settings.
@@ -113,6 +114,32 @@ public actor InserterOverridesStore {
                 """)
             throw .writeFailed(error.localizedDescription)
         }
+    }
+
+    /// Reads the file, applies `change` to the user's overrides, and saves the result, as one
+    /// step on the actor: no other load, save or update can run in between, so a change made
+    /// elsewhere is never lost to a stale copy.
+    ///
+    /// Reading works as in ``load()``: a missing file starts empty, and a corrupt one is set
+    /// aside first. When `change` leaves the overrides as they were, nothing is written.
+    ///
+    /// - Returns: The overrides as they now are.
+    /// - Throws: ``InserterOverridesStoreError/readFailed(_:)`` from the read, in which case
+    ///   `change` is not called and the file is untouched, or
+    ///   ``InserterOverridesStoreError/writeFailed(_:)``.
+    @discardableResult
+    public func update(
+        _ change: @Sendable (inout InserterOverrides) -> Void
+    ) throws(InserterOverridesStoreError) -> InserterOverrides {
+        let current = try load()
+        var updated = current
+        change(&updated)
+        guard updated != current else {
+            Log.insertion.debug("Per-app insertion overrides unchanged; nothing written")
+            return current
+        }
+        try save(updated)
+        return updated
     }
 
     /// Renames the damaged file to `insertion-overrides.json.corrupt-<timestamp>` and returns the

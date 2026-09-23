@@ -1,4 +1,3 @@
-import AppKit
 import Capture
 import Dictation
 import Foundation
@@ -41,14 +40,11 @@ final class OnboardingModel {
         /// Reads macOS's *Press 🌐 key to* setting.
         var fnKeyUsage: @MainActor () -> FnKeyUsage
         var openPrivacySettings: @MainActor (RequiredPermission) -> Void
-        /// Opens a URL; `false` if nothing could open it.
-        var openURL: @MainActor (URL) -> Bool
+        /// Opens System Settings › Keyboard; `false` if it could not.
+        var openKeyboardSettings: @MainActor () -> Bool
         /// Reads a status change out to VoiceOver users.
         var announce: @MainActor (String) -> Void
     }
-
-    /// System Settings › Keyboard, where *Press 🌐 key to* is.
-    static let keyboardSettingsURL = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")
 
     private(set) var step: OnboardingStep
     private(set) var microphone: MicrophonePermissionStatus
@@ -207,13 +203,10 @@ final class OnboardingModel {
     /// The fn step's status, and what *Check Again* says, once macOS leaves the key alone.
     static let fnKeyReadyStatus = "The fn key is ready"
 
+    /// Opens System Settings › Keyboard, where *Press 🌐 key to* is, or says how to get there
+    /// when it can't.
     func openKeyboardSettings() {
-        guard let url = Self.keyboardSettingsURL, system.openURL(url) else {
-            Log.ui.error("Couldn't open Keyboard settings")
-            errorMessage = "Couldn't open System Settings. Open it from the Apple menu, then choose Keyboard."
-            return
-        }
-        errorMessage = nil
+        errorMessage = system.openKeyboardSettings() ? nil : PrivacySettings.keyboardSettingsFailureMessage
     }
 
     // MARK: - Try it
@@ -254,7 +247,7 @@ extension OnboardingModel.System {
         Self(
             fnKeyUsage: { FnKeyUsage.current() },
             openPrivacySettings: { PrivacySettings.open($0) },
-            openURL: { NSWorkspace.shared.open($0) },
+            openKeyboardSettings: { PrivacySettings.openKeyboardSettings() },
             announce: { HUDAnnouncer.post($0) }
         )
     }

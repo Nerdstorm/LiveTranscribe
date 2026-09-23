@@ -49,6 +49,20 @@ public enum AppSettingsKey: String, CaseIterable, Sendable {
     case inputDeviceUID
 }
 
+extension AppSettingsKey {
+    /// What Settings › Advanced shows: the models, segmentation, cleanup tuning and capture
+    /// recovery. Its Restore Defaults resets exactly these (``AppSettingsStore/resetToDefaults(_:)``),
+    /// so the settings other tabs and windows own (dictation, both shortcuts, the cleanup level,
+    /// history, the chosen microphone) are left alone. A setting added to that tab belongs here.
+    public static let advancedTab: Set<AppSettingsKey> = [
+        .sttModel, .llmModel, .vadModel, .cleanupEnabled, .cleanupAdapterEnabled,
+        .vadSilenceMs, .vadSpeechThreshold, .vadPreRollMs, .vadMinSpeechMs, .maxSegmentSeconds,
+        .partialIntervalMs,
+        .contextSegments, .cleanupTimeoutSeconds, .cleanupQueueCapacity,
+        .gpuCacheLimitMB, .captureRestartAttempts, .captureRestartDelaySeconds, .captureMaxRestartsPerMinute,
+    ]
+}
+
 /// Loads and saves ``AppSettings`` in UserDefaults, with defaults registered at launch.
 public struct AppSettingsStore: Sendable {
     /// `nil` uses the standard defaults; tests pass a throwaway suite.
@@ -161,10 +175,12 @@ public struct AppSettingsStore: Sendable {
         }
     }
 
-    /// Removes every stored setting so the registered defaults apply again. The chosen
-    /// microphone stays: it is picked in the main window, not in Settings.
-    public func resetToDefaults() {
-        for key in AppSettingsKey.allCases where key != .inputDeviceUID {
+    /// Removes the stored values of `keys`, so their registered defaults apply again; every
+    /// other setting stays as it is. A Restore Defaults button passes the keys its own screen
+    /// shows, such as ``AppSettingsKey/advancedTab``, so it never resets what the user set
+    /// somewhere else.
+    public func resetToDefaults(_ keys: Set<AppSettingsKey>) {
+        for key in keys {
             defaults.removeObject(forKey: key.rawValue)
         }
     }

@@ -83,20 +83,7 @@ public actor VocabularyStore {
             Log.vocabulary.info("Vocabulary not saved: \(error.localizedDescription, privacy: .private)")
             throw error
         }
-        do {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-            let data = try encoder.encode(validated)
-            try FileManager.default.createDirectory(
-                at: fileURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            try AtomicFileWriter.write(data, to: fileURL, permissions: Self.filePermissions)
-        } catch {
-            Log.vocabulary.error("Could not save the vocabulary: \(error.localizedDescription, privacy: .private)")
-            throw VocabularyError.writeFailed(error.localizedDescription)
-        }
-        Log.vocabulary.info("Saved \(validated.count, privacy: .public) vocabulary entries")
+        try write(validated)
         return validated
     }
 
@@ -114,18 +101,51 @@ public actor VocabularyStore {
         return try save(entries)
     }
 
-    /// Removes the entry with `id`. Removing an entry that is not there changes nothing.
+    /// Removes the entry with `id`. Removing an entry that is not there changes nothing, so
+    /// deleting twice is safe.
+    ///
+    /// Removing an entry cannot make the rest invalid, so this skips validation, like
+    /// `SnippetStore.delete(id:)`: a hand-edited file with a conflict (one term twice, a variant
+    /// two terms claim) never stops the user deleting an unrelated entry, and deleting one of the
+    /// pair repairs it. The entries that are left are written as they were read, not sanitised,
+    /// so the ones the user did not touch keep their exact text. Every entry with this id goes,
+    /// so a hand-edited file that repeats an id can be repaired too.
     ///
     /// - Returns: The whole vocabulary as stored.
+    /// - Throws: ``VocabularyError/readFailed(_:)``, ``VocabularyError/backupFailed(_:)`` or
+    ///   ``VocabularyError/writeFailed(_:)``; never a validation error.
     @discardableResult
     public func delete(id: UUID) throws -> [VocabularyEntry] {
         var entries = try all()
-        guard let index = entries.firstIndex(where: { $0.id == id }) else {
+        let countBefore = entries.count
+        entries.removeAll { $0.id == id }
+        guard entries.count != countBefore else {
             Log.vocabulary.debug("No vocabulary entry to delete with id \(id.uuidString, privacy: .public)")
             return entries
         }
-        entries.remove(at: index)
-        return try save(entries)
+        try write(entries)
+        return entries
+    }
+
+    // MARK: - Private
+
+    /// Writes `entries` as they are, atomically and owner-only. ``save(_:)`` validates and tidies
+    /// them first; ``delete(id:)`` deliberately does neither.
+    private func write(_ entries: [VocabularyEntry]) throws {
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+            let data = try encoder.encode(entries)
+            try FileManager.default.createDirectory(
+                at: fileURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try AtomicFileWriter.write(data, to: fileURL, permissions: Self.filePermissions)
+        } catch {
+            Log.vocabulary.error("Could not save the vocabulary: \(error.localizedDescription, privacy: .private)")
+            throw VocabularyError.writeFailed(error.localizedDescription)
+        }
+        Log.vocabulary.info("Saved \(entries.count, privacy: .public) vocabulary entries")
     }
 
     private func moveCorruptFileAside(decodingError: Error) throws {

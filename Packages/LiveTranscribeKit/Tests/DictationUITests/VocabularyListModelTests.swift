@@ -152,7 +152,7 @@ struct VocabularyListModelTests {
         #expect(try await store.all().map(\.term).sorted() == ["Nerdstorm", "Nerdstorm Labs"])
     }
 
-    @Test func aDeleteRefusedForAConflictElsewhereSaysWhichEntriesClash() async throws {
+    @Test func anUnrelatedTermCanBeDeletedWhileTheFileHasAConflict() async throws {
         let folder = EditableListTemporaryFolder()
         defer { folder.cleanUp() }
         let (model, store) = makeModel(in: folder)
@@ -164,18 +164,16 @@ struct VocabularyListModelTests {
              {"id": "\(github.id)", "term": "GitHub"}]
             """, to: Self.fileName)
         await model.load()
-        let before = folder.contents(of: Self.fileName)
 
-        // The store refuses to write the two that are left with GitHub gone. It checks them in
-        // file order, so it names the later spelling.
-        #expect(!(await model.delete(id: github.id)))
-        #expect(model.status.errorMessage
-            == "\u{201C}nerdstorm\u{201D} is in your vocabulary twice. Change or delete one of them first.")
-        #expect(folder.contents(of: Self.fileName) == before)
+        // The store does not check the two that are left, so the conflict doesn't block it.
+        #expect(await model.delete(id: github.id))
+        #expect(model.status.errorMessage == nil)
+        #expect(Set(model.entries.map(\.id)) == [lower.id, nerdstorm.id])
+        #expect(try await store.all().map(\.term) == ["Nerdstorm", "nerdstorm"])
 
         // Deleting one of the pair fixes the file.
         #expect(await model.delete(id: lower.id))
-        #expect(try await store.all().map(\.term) == ["Nerdstorm", "GitHub"])
+        #expect(try await store.all().map(\.term) == ["Nerdstorm"])
     }
 
     @Test func aVariantConflictAlreadyInTheFileSaysWhichTermsClash() {

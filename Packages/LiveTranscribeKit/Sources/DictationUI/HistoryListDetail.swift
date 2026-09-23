@@ -15,7 +15,7 @@ struct HistoryListRow: View {
                 if record.fellBack {
                     Image(systemName: "exclamationmark.triangle")
                         .foregroundStyle(.orange)
-                        .help("Cleanup didn't apply; the text was inserted as heard")
+                        .help(HistoryListFormat.fellBackHelp)
                         .accessibilityLabel("Cleanup didn't apply")
                 }
             }

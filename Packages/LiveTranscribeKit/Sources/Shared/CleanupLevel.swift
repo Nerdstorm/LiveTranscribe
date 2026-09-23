@@ -3,7 +3,9 @@ import Foundation
 /// How much the cleanup step may change what was said. Applies to dictation and to the live
 /// transcript alike.
 public enum CleanupLevel: String, CaseIterable, Codable, Sendable, Identifiable {
-    /// The speech-to-text output as is; the language model is not used.
+    /// No cleanup: the language model is not used. Dictation still applies the user's snippets
+    /// and vocabulary, which run before this level is looked at; the live transcript applies
+    /// neither, so it shows what speech-to-text heard.
     case none
     /// Punctuation, casing and misheard words. Every spoken word stays, including fillers and
     /// self-corrections.
@@ -25,10 +27,12 @@ public enum CleanupLevel: String, CaseIterable, Codable, Sendable, Identifiable 
         }
     }
 
-    /// One line for pickers and menus.
+    /// One line for pickers and menus, shown for dictation and the live transcript alike. None's
+    /// line says that dictation still applies snippets and vocabulary: they run at every level,
+    /// but only in dictation, so the live transcript at None shows what speech-to-text heard.
     public var summary: String {
         switch self {
-        case .none: "Exactly what speech-to-text heard"
+        case .none: "No cleanup, but dictation still applies your snippets and vocabulary"
         case .light: "Punctuation, casing and misheard words"
         case .medium: "Also removes fillers, resolves self-corrections and formats lists"
         case .high: "Also rewords lightly for clarity"

@@ -1,4 +1,5 @@
 import Capture
+import Foundation
 @testable import Permissions
 import os
 import Testing
@@ -20,6 +21,28 @@ struct PermissionsTests {
             #expect(!permission.reason.isEmpty)
             #expect(!permission.title.isEmpty)
         }
+    }
+
+    @Test func theKeyboardLinkOpensSystemSettingsAtKeyboard() {
+        #expect(PrivacySettings.keyboardSettingsURL?.absoluteString
+            == "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")
+        #expect(PrivacySettings.keyboardSettingsFailureMessage.contains("Keyboard"))
+    }
+
+    /// Nothing here opens System Settings: a fake stands in for the workspace.
+    @MainActor
+    @Test func openingReportsWhetherSystemSettingsOpened() throws {
+        let link = try #require(PrivacySettings.keyboardSettingsURL)
+        var opened: [URL] = []
+
+        #expect(PrivacySettings.open(link, pane: "keyboard") { opened.append($0); return true })
+        #expect(opened == [link])
+
+        #expect(!PrivacySettings.open(link, pane: "keyboard") { opened.append($0); return false })
+        #expect(opened == [link, link])
+
+        #expect(!PrivacySettings.open(nil, pane: "keyboard") { opened.append($0); return true })
+        #expect(opened == [link, link], "no link, nothing to open")
     }
 
     @Test func thePollerYieldsTheCurrentStateThenOnlyChanges() async {

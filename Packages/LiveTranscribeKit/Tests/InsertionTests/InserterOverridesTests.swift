@@ -49,7 +49,7 @@ struct InserterOverridesTests {
 @Suite("InserterOverridesStore")
 struct InserterOverridesStoreTests {
     /// A fresh folder per test, removed afterwards.
-    private final class TemporaryFolder {
+    final class TemporaryFolder {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("InserterOverridesStoreTests-\(UUID().uuidString)", isDirectory: true)
 
@@ -80,8 +80,8 @@ struct InserterOverridesStoreTests {
         #expect(try folder.contents() == [InserterOverridesStore.fileName])
     }
 
-    private static let fixedNow = Date(timeIntervalSince1970: 1_790_000_000) // 2026-09-21T14:13:20Z
-    private static let corruptName = "insertion-overrides.json.corrupt-20260921T141320Z"
+    static let fixedNow = Date(timeIntervalSince1970: 1_790_000_000) // 2026-09-21T14:13:20Z
+    static let corruptName = "insertion-overrides.json.corrupt-20260921T141320Z"
 
     @Test("A corrupt file is set aside and read as empty", arguments: [
         "not json",
