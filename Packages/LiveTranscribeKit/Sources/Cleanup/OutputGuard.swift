@@ -134,12 +134,14 @@ public struct OutputGuard: Sendable {
             return .rejected(.thinkingLeaked)
         }
 
-        let rawLowered = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if let phrase = policy.preambles.first(where: { lowered.hasPrefix($0) && !rawLowered.hasPrefix($0) }) {
+        let rawWords = EditDistance.words(in: EditDistance.normalize(raw))
+        // An opening the speaker said is not a preamble, however either side punctuates it.
+        if let phrase = policy.preambles.first(where: {
+            lowered.hasPrefix($0) && !rawWords.starts(with: EditDistance.words(in: EditDistance.normalize($0)))
+        }) {
             return .rejected(.preamble(phrase))
         }
 
-        let rawWords = EditDistance.words(in: EditDistance.normalize(raw))
         let cleanedWords = EditDistance.words(in: EditDistance.normalize(cleaned))
         if selfCorrection.dropsCue(raw: rawWords, cleaned: cleanedWords) {
             return selfCorrection.isCorrection(raw: rawWords, cleaned: cleanedWords)
