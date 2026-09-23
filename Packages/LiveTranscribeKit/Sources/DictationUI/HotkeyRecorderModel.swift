@@ -7,7 +7,8 @@ import Hotkey
 /// - a **lone modifier**: one modifier key pressed and released with nothing else pressed in
 ///   between (fn, right ⌘, left ⌥, …; see ``ModifierKey``), when the configuration allows it, or
 /// - a **key combination**: a key pressed with ⌘, ⌥ or ⌃ held, checked by
-///   ``HotkeyBinding/validatedKeyCombo(keyCode:modifiers:)``.
+///   ``HotkeyBinding/validatedKeyCombo(keyCode:modifiers:)``, which also refuses standard macOS
+///   shortcuts such as ⌘C.
 ///
 /// Esc on its own cancels. Anything else that cannot be used sets ``problem`` and keeps
 /// recording, so the user can try again straight away.

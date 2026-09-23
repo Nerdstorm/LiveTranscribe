@@ -6,6 +6,7 @@ import Testing
 struct HotkeyBindingTests {
     private static let space: UInt16 = 49
     private static let keyZ: UInt16 = 6
+    private static let f5: UInt16 = 96
 
     // MARK: - Defaults and display names
 
@@ -60,8 +61,9 @@ struct HotkeyBindingTests {
         ModifierSet.command, .option, .control, [.shift, .command], [.control, .option],
     ])
     func combosWithAGuardModifierAreAccepted(modifiers: ModifierSet) throws {
-        let binding = try HotkeyBinding.validatedKeyCombo(keyCode: Self.space, modifiers: modifiers)
-        #expect(binding == .keyCombo(keyCode: Self.space, modifiers: modifiers))
+        // F5 is in no standard shortcut, so only the modifiers decide.
+        let binding = try HotkeyBinding.validatedKeyCombo(keyCode: Self.f5, modifiers: modifiers)
+        #expect(binding == .keyCombo(keyCode: Self.f5, modifiers: modifiers))
     }
 
     @Test("A modifier cannot be the main key", arguments: Array(UInt16(54)...63))
@@ -78,6 +80,8 @@ struct HotkeyBindingTests {
     @Test func errorsExplainTheFix() {
         #expect(HotkeyBindingError.needsCommandOptionOrControl.errorDescription?.contains("⌘ Command") == true)
         #expect(HotkeyBindingError.modifierAsMainKey.errorDescription?.isEmpty == false)
+        #expect(HotkeyBindingError.reserved(shortcut: "⌘C", action: "Copy").errorDescription
+            == "⌘C is the standard macOS shortcut for Copy. Choose another combination.")
     }
 
     // MARK: - Storage
@@ -119,6 +123,11 @@ struct HotkeyBindingTests {
         let data = try JSONEncoder().encode(bindings)
         #expect(String(decoding: data, as: UTF8.self) == #"["modifier:fn","combo:6:control,option"]"#)
         #expect(try JSONDecoder().decode([HotkeyBinding].self, from: data) == bindings)
+    }
+
+    @Test func aStoredStandardShortcutIsRejected() {
+        // A hand-edited ⌘C falls back to the default instead of taking Copy from every app.
+        #expect(HotkeyBinding(storageString: "combo:8:command") == nil)
     }
 
     @Test func decodingAnInvalidBindingFails() {

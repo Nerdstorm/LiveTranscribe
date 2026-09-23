@@ -44,7 +44,8 @@ public enum HotkeyError: LocalizedError, Equatable {
     case permissionDenied
     /// The monitor was started while already running.
     case alreadyRunning
-    /// The dictation shortcut would capture ordinary typing or could never fire.
+    /// The dictation shortcut would capture ordinary typing or a standard shortcut, or could
+    /// never fire.
     case invalidBinding(HotkeyBindingError)
     /// The event tap was created but could not be attached to its run loop.
     case startFailed(String)

@@ -1,4 +1,3 @@
-import Capture
 import CoreGraphics
 import Foundation
 import Hotkey
@@ -7,8 +6,6 @@ import Observation
 import Permissions
 import Persistence
 import Shared
-import Snippets
-import Vocabulary
 
 /// System-wide dictation: turns hotkey gestures into recordings, and recordings into text at the
 /// cursor. Owns the flow and its state for the HUD and the menu; every step it drives lives in
@@ -25,52 +22,6 @@ public final class DictationController {
         case processing
     }
 
-    public struct Dependencies: Sendable {
-        public var hotkeys: any HotkeyMonitor
-        public var recorder: DictationRecorder
-        public var processor: DictationProcessor
-        public var focus: any FocusedTargetProvider
-        public var delivery: any TextDelivery
-        public var history: any DictationHistory
-        public var snippets: @Sendable () async -> [Snippet]
-        public var vocabulary: @Sendable () async -> [VocabularyEntry]
-        public var settings: @Sendable () -> AppSettings
-        public var readiness: @Sendable () async -> DictationReadiness
-        public var microphonePermission: any MicrophonePermissionProviding
-        public var accessibility: any AccessibilityPermissionProviding
-        public var now: @Sendable () -> ContinuousClock.Instant
-
-        public init(
-            hotkeys: any HotkeyMonitor,
-            recorder: DictationRecorder,
-            processor: DictationProcessor,
-            focus: any FocusedTargetProvider,
-            delivery: any TextDelivery,
-            history: any DictationHistory,
-            snippets: @escaping @Sendable () async -> [Snippet],
-            vocabulary: @escaping @Sendable () async -> [VocabularyEntry],
-            settings: @escaping @Sendable () -> AppSettings,
-            readiness: @escaping @Sendable () async -> DictationReadiness,
-            microphonePermission: any MicrophonePermissionProviding,
-            accessibility: any AccessibilityPermissionProviding,
-            now: @escaping @Sendable () -> ContinuousClock.Instant
-        ) {
-            self.hotkeys = hotkeys
-            self.recorder = recorder
-            self.processor = processor
-            self.focus = focus
-            self.delivery = delivery
-            self.history = history
-            self.snippets = snippets
-            self.vocabulary = vocabulary
-            self.settings = settings
-            self.readiness = readiness
-            self.microphonePermission = microphonePermission
-            self.accessibility = accessibility
-            self.now = now
-        }
-    }
-
     /// What was last inserted, for *Undo AI edit*.
     struct UndoEntry {
         let record: InsertionRecord
@@ -78,19 +29,20 @@ public final class DictationController {
         let uncleaned: String
     }
 
-    /// The hotkey settings the monitor is running with; a change restarts it.
-    private struct HotkeyBindings: Equatable {
-        let binding: HotkeyBinding
-        let undo: HotkeyBinding
-    }
-
     public private(set) var phase: Phase = .idle
-    public private(set) var hotkeyState: HotkeyState = .stopped
+    /// Whether the dictation shortcut works, for the menu and Settings. It keeps its value while
+    /// the shortcuts are suspended (see ``hotkeysSuspended``): a pause lasts only while a shortcut
+    /// is recorded, and the shortcut works again as soon as it ends.
+    public internal(set) var hotkeyState: HotkeyState = .stopped
+    /// Whether the shortcuts are paused by ``suspendHotkeys()``. No dictation runs meanwhile.
+    public var hotkeysSuspended: Bool { !activeSuspensions.isEmpty }
     /// The latest message for the HUD; cleared after the notice time in Settings.
     public private(set) var notice: DictationNotice?
     /// Microphone level while recording, 0...1.
     public private(set) var inputLevel: Float = 0
-    /// Where the caret was when recording started, for placing the HUD; `nil` if unknown.
+    /// The caret in the field the HUD is about (the one being dictated into, or undone in), for
+    /// placing it. `nil` when unknown or when no field is concerned: from the start of each
+    /// attempt until its field has been read, and for a notice between dictations.
     public private(set) var caretRect: CGRect?
     /// The last dictated text, for the menu's *Copy Last Dictation*.
     public private(set) var lastText: String?
@@ -99,15 +51,21 @@ public final class DictationController {
     @ObservationIgnored var gesture: HotkeyGesture
     /// Bumped whenever ``gesture`` is replaced, so a timer the old gesture asked for is dropped
     /// instead of reaching the new one.
-    @ObservationIgnored private var gestureGeneration = 0
+    @ObservationIgnored var gestureGeneration = 0
     /// Timing from Settings that changed mid-gesture; applied once the gesture is idle.
-    @ObservationIgnored private var pendingGestureConfiguration: HotkeyGestureConfiguration?
-    @ObservationIgnored private var runningBindings: HotkeyBindings?
+    @ObservationIgnored var pendingGestureConfiguration: HotkeyGestureConfiguration?
+    @ObservationIgnored var runningBindings: HotkeyBindings?
+    /// Between ``start()`` and ``stop()``. While stopped, neither a settings change nor the end
+    /// of a suspension starts the hotkey monitor or keeps the microphone ready.
+    @ObservationIgnored var isStarted = false
+    /// The suspensions that have not ended yet, by identifier; see ``suspendHotkeys()``.
+    var activeSuspensions: Set<Int> = []
+    @ObservationIgnored var lastSuspensionID = 0
     /// The recording was started from the menu, not the hotkey, so the gesture knows nothing of it.
     @ObservationIgnored var startedFromMenu = false
     @ObservationIgnored private var started: ContinuousClock.Instant
     @ObservationIgnored private var operations: Task<Void, Never>?
-    @ObservationIgnored private var eventsTask: Task<Void, Never>?
+    @ObservationIgnored var eventsTask: Task<Void, Never>?
     @ObservationIgnored private var permissionTask: Task<Void, Never>?
     @ObservationIgnored private var levelTask: Task<Void, Never>?
     @ObservationIgnored private var noticeTask: Task<Void, Never>?
@@ -126,6 +84,7 @@ public final class DictationController {
 
     /// Starts listening for the hotkey, and again whenever Accessibility is granted.
     public func start() {
+        isStarted = true
         applySettings()
         guard permissionTask == nil else { return }
         let changes = dependencies.accessibility.changes()
@@ -154,13 +113,15 @@ public final class DictationController {
     /// Applies changed settings: the hotkeys and gestures, and whether the microphone stays ready.
     ///
     /// The hotkey monitor restarts only when its bindings changed (or it is not running), so a
-    /// change elsewhere in Settings never interrupts a dictation.
+    /// change elsewhere in Settings never interrupts a dictation. While the shortcuts are
+    /// suspended it stays stopped, and starts with the settings current when they resume. After
+    /// ``stop()`` nothing starts until ``start()``.
     public func applySettings() {
         let settings = dependencies.settings()
         startHotkeys(settings.dictation)
         let recorder = dependencies.recorder
         let permission = dependencies.microphonePermission
-        let keepReady = settings.dictation.enabled && settings.dictation.keepMicrophoneReady
+        let keepReady = isStarted && settings.dictation.enabled && settings.dictation.keepMicrophoneReady
         let configuration = DictationRecorder.Configuration(
             preRollMs: settings.dictation.preRollMs,
             maxDurationSeconds: settings.dictation.maxRecordingSeconds
@@ -178,6 +139,7 @@ public final class DictationController {
 
     /// Stops the hotkey and releases the microphone.
     public func stop() {
+        isStarted = false
         stopHotkeys()
         permissionTask?.cancel()
         permissionTask = nil
@@ -191,143 +153,10 @@ public final class DictationController {
         }
     }
 
-    private func startHotkeys(_ settings: DictationSettings) {
-        updateGesture(Self.gestureConfiguration(settings))
-        guard settings.enabled else {
-            stopHotkeys()
-            hotkeyState = .disabled
-            return
-        }
-        let bindings = HotkeyBindings(
-            binding: HotkeyBinding(storageString: settings.hotkey) ?? .defaultDictation,
-            undo: HotkeyBinding(storageString: settings.undoHotkey) ?? .defaultUndo
-        )
-        if bindings == runningBindings, case .running = hotkeyState { return }
-        // Stop, start with the new binding, then reset the gesture: a release the old tap never
-        // delivered must not leave it held.
-        stopHotkeys()
-        do {
-            let events = try dependencies.hotkeys.start(binding: bindings.binding, undoBinding: bindings.undo)
-            runningBindings = bindings
-            hotkeyState = .running(hotkey: bindings.binding.displayName)
-            eventsTask = Task { [weak self] in
-                for await event in events {
-                    self?.handle(event)
-                }
-            }
-        } catch HotkeyError.permissionDenied {
-            hotkeyState = .needsAccessibility
-        } catch {
-            Log.dictation.error("The dictation hotkey could not start: \(error.localizedDescription, privacy: .public)")
-            hotkeyState = .failed(error.localizedDescription)
-        }
-        gesture.reset()
-    }
+    // MARK: - Gesture steps
 
-    /// Ends the monitor. A recording the hotkey was driving is discarded, since its release can
-    /// no longer arrive.
-    private func stopHotkeys() {
-        eventsTask?.cancel()
-        eventsTask = nil
-        runningBindings = nil
-        dependencies.hotkeys.stop()
-        if gesture.isRecording {
-            gesture.reset()
-            enqueue { await self.discardRecording(notice: nil) }
-        }
-    }
-
-    /// Takes new gesture timing now if idle, otherwise once the current gesture ends.
-    private func updateGesture(_ configuration: HotkeyGestureConfiguration) {
-        guard configuration != gesture.configuration else {
-            pendingGestureConfiguration = nil
-            return
-        }
-        guard !gesture.isRecording else {
-            pendingGestureConfiguration = configuration
-            return
-        }
-        gesture = HotkeyGesture(configuration: configuration)
-        gestureGeneration += 1
-        pendingGestureConfiguration = nil
-    }
-
-    static func gestureConfiguration(_ settings: DictationSettings) -> HotkeyGestureConfiguration {
-        HotkeyGestureConfiguration(
-            tapMaxMs: settings.tapMaxMs,
-            doubleTapWindowMs: settings.doubleTapWindowMs,
-            handsFreeEnabled: settings.handsFreeEnabled
-        )
-    }
-
-    // MARK: - Hotkey events
-
-    func handle(_ event: HotkeyEvent) {
-        guard let input = event.gestureInput else {
-            undoLastEdit()
-            return
-        }
-        if phase == .processing, !gesture.isRecording {
-            // One dictation at a time: a recording started now would open the microphone only
-            // after this one is inserted, and lose the first words.
-            switch input {
-            case .escape: cancelProcessing()
-            case .pressed: show(.stillProcessing)
-            default: break
-            }
-            return
-        }
-        if startedFromMenu, !gesture.isRecording {
-            // A menu dictation is hands-free: Esc cancels it and the hotkey stops it.
-            switch input {
-            case .escape: cancel()
-            case .pressed: toggleDictation()
-            default: break
-            }
-            return
-        }
-        apply(gesture.handle(input, atMs: elapsedMs()), cause: input)
-    }
-
-    private func apply(_ actions: [HotkeyAction], cause: HotkeyInput) {
-        for action in actions {
-            perform(action, cause: cause)
-        }
-        if let pending = pendingGestureConfiguration, !gesture.isRecording {
-            updateGesture(pending)
-        }
-    }
-
-    private func perform(_ action: HotkeyAction, cause: HotkeyInput) {
-        switch action {
-        case .startRecording:
-            enqueue { await self.beginRecording(handsFree: false) }
-        case .enteredHandsFree:
-            enqueue { self.enterHandsFree() }
-        case .stopAndProcess:
-            enqueue { await self.finishRecording() }
-        case .cancel:
-            // A lone tap or a shortcut typed with the hotkey held is not a mistake worth a message.
-            let notice: DictationNotice? = cause == .escape ? .cancelled : nil
-            enqueue { await self.discardRecording(notice: notice) }
-        case .scheduleTimer(let ms):
-            // Every timer the gesture asks for fires exactly once and is never cancelled; the
-            // gesture recognises one left over from an earlier tap. Only a timer that outlived
-            // its gesture (replaced when the timing changed) is dropped.
-            let generation = gestureGeneration
-            Task { [weak self] in
-                try? await Task.sleep(for: .milliseconds(ms))
-                self?.timerFired(generation: generation)
-            }
-        }
-    }
-
-    private func timerFired(generation: Int) {
-        guard generation == gestureGeneration else { return }
-        apply(gesture.handle(.timerFired, atMs: elapsedMs()), cause: .timerFired)
-    }
-
-    private func enterHandsFree() {
+    /// Marks the recording hands-free after a double tap; see ``handle(_:)``.
+    func enterHandsFree() {
         if case .recording = phase { phase = .recording(handsFree: true) }
     }
 
@@ -337,6 +166,11 @@ public final class DictationController {
     public func toggleDictation() {
         switch phase {
         case .idle:
+            guard !hotkeysSuspended else {
+                // A shortcut is being recorded in Settings; a dictation now would type into it.
+                setCaret(nil)
+                return show(.recordingShortcut)
+            }
             gesture.reset()
             startedFromMenu = true
             enqueue { await self.beginRecording(handsFree: true) }
@@ -365,7 +199,9 @@ public final class DictationController {
     }
 
     /// Shows a microphone change reported by capture, such as a fallback to the system default.
+    /// Between dictations it concerns no field, so it is not placed at the last one's caret.
     public func showMicrophoneNotice(_ message: String) {
+        if phase == .idle { setCaret(nil) }
         show(.microphone(message))
     }
 

@@ -1,4 +1,5 @@
 import AppKit
+import Dictation
 @testable import DictationUI
 import Foundation
 import Hotkey
@@ -11,12 +12,18 @@ struct HotkeyRecorderEventMonitorTests {
     private let window = NSObject()
     private let center = NotificationCenter()
 
-    private func startedMonitor(interruptions: Counter) -> HotkeyRecorderEventMonitor {
+    private func startedMonitor(interruptions: Counter, resumes: Counter = Counter()) -> HotkeyRecorderEventMonitor {
         let monitor = HotkeyRecorderEventMonitor()
-        monitor.start(window: window, notificationCenter: center, handler: { _ in false }) {
+        start(monitor, interruptions: interruptions, resumes: resumes)
+        return monitor
+    }
+
+    /// Starts `monitor` holding a suspension that counts its end in `resumes`.
+    private func start(_ monitor: HotkeyRecorderEventMonitor, interruptions: Counter, resumes: Counter) {
+        let suspension = HotkeySuspension { resumes.count += 1 }
+        monitor.start(window: window, notificationCenter: center, suspension: suspension, handler: { _ in false }) {
             interruptions.count += 1
         }
-        return monitor
     }
 
     // MARK: - Stopping with the window
@@ -52,6 +59,48 @@ struct HotkeyRecorderEventMonitorTests {
         #expect(!monitor.isRunning)
         center.post(name: NSWindow.willCloseNotification, object: window)
         #expect(interruptions.count == 0)
+    }
+
+    // MARK: - Pausing the global shortcuts
+
+    @Test func theShortcutsStayPausedWhileItRunsAndResumeWhenTheOwnerStopsIt() {
+        let resumes = Counter()
+        let monitor = startedMonitor(interruptions: Counter(), resumes: resumes)
+        #expect(resumes.count == 0)
+        monitor.stop()
+        #expect(resumes.count == 1)
+        monitor.stop()
+        #expect(resumes.count == 1, "stopping again resumes nothing more")
+    }
+
+    @Test(arguments: [NSWindow.didResignKeyNotification, NSWindow.willCloseNotification])
+    func theShortcutsResumeWhenItsWindowResignsKeyOrCloses(_ name: Notification.Name) {
+        let resumes = Counter()
+        let monitor = startedMonitor(interruptions: Counter(), resumes: resumes)
+        center.post(name: name, object: window)
+        #expect(resumes.count == 1)
+        withExtendedLifetime(monitor) {}
+    }
+
+    @Test func restartingEndsTheEarlierPauseOnly() {
+        let first = Counter(), second = Counter()
+        let monitor = startedMonitor(interruptions: Counter(), resumes: first)
+        start(monitor, interruptions: Counter(), resumes: second)
+        #expect(first.count == 1)
+        #expect(second.count == 0)
+        monitor.stop()
+        #expect(second.count == 1)
+    }
+
+    @Test func aMonitorDroppedWhileRunningStillResumesTheShortcuts() async throws {
+        let resumes = Counter()
+        do {
+            _ = startedMonitor(interruptions: Counter(), resumes: resumes)
+        }
+        for _ in 0..<100 where resumes.count == 0 {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(resumes.count == 1)
     }
 
     // MARK: - Converting events

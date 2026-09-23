@@ -124,6 +124,13 @@ and nothing is recorded in history for a cancelled dictation.
   typing a shortcut, so the recording is cancelled silently.
 - Fn conflicts with macOS's *Press 🌐 key to* setting; Settings shows a warning with the fix
   unless it is set to *Do Nothing*.
+- Standard macOS shortcuts (⌘C, ⌘V, ⌘Z, ⇧⌘Z, ⌘W, ⌘Q, ⌘Tab, ⌘Space, ⌃Space, ⌃ and an arrow,
+  and a few more, listed in `Hotkey/ReservedShortcuts.swift`) can't be chosen for dictation or
+  undo: the tap would take them from every app. ⌃⌥Space stays allowed: macOS uses it only to
+  step through several input sources, and apps leave it alone.
+- While Settings records a new shortcut, the shortcuts are paused so every key reaches the
+  recorder. A dictation being recorded then is dropped silently, and the menu's *Start
+  Dictation* says to finish recording first. They resume however recording ends.
 
 ### Insertion
 

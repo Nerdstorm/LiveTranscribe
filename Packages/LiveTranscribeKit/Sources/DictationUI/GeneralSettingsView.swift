@@ -61,7 +61,8 @@ struct GeneralSettingsView: View {
                         otherShortcut: HotkeyRecorderModel.binding(storage: undoHotkey, fallback: .defaultUndo),
                         otherShortcutPurpose: "Undo AI edit"
                     ),
-                    activeRecorder: $activeRecorder
+                    activeRecorder: $activeRecorder,
+                    suspendHotkeys: context.controller.suspendHotkeys
                 )
             }
             if fnKey.showsWarning(forStoredHotkey: dictationHotkey) {
@@ -82,7 +83,8 @@ struct GeneralSettingsView: View {
                         otherShortcut: HotkeyRecorderModel.binding(storage: dictationHotkey, fallback: .defaultDictation),
                         otherShortcutPurpose: "dictation"
                     ),
-                    activeRecorder: $activeRecorder
+                    activeRecorder: $activeRecorder,
+                    suspendHotkeys: context.controller.suspendHotkeys
                 )
             }
             .help("Puts back what you said, without cleanup, shortly after a dictation.")

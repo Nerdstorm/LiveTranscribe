@@ -3,7 +3,8 @@ import Foundation
 /// The key a user holds (or presses) to dictate, or to undo the last AI edit.
 ///
 /// Either a modifier on its own (fn, right ⌥, …), which is held for push-to-talk, or a key
-/// combination guarded by ⌘, ⌥ or ⌃, so that ordinary typing can never trigger it.
+/// combination guarded by ⌘, ⌥ or ⌃, so that ordinary typing can never trigger it, and not a
+/// standard macOS shortcut such as ⌘C.
 ///
 /// Encodes as its ``storageString``, so a stored value stays readable and stable.
 public enum HotkeyBinding: Sendable, Hashable {
@@ -34,15 +35,21 @@ public enum HotkeyBinding: Sendable, Hashable {
 
     // MARK: - Validation
 
-    /// Throws when the binding would capture ordinary typing or could never fire.
+    /// Throws when the binding would capture ordinary typing or a standard shortcut, or could
+    /// never fire. Applies to the dictation and the undo shortcut alike.
     ///
     /// A combination must include ⌘, ⌥ or ⌃: without one, the event tap would swallow a plain
     /// key (or ⇧ plus a key, which is a capital letter) in every app. Its main key must not be a
-    /// modifier, because modifiers never send the key-down event a combination waits for.
+    /// modifier, because modifiers never send the key-down event a combination waits for. It
+    /// must not be a standard macOS shortcut such as ⌘C (see `ReservedShortcuts`), which the tap
+    /// would take away from every app.
     public func validate() throws(HotkeyBindingError) {
         guard case .keyCombo(let keyCode, let modifiers) = self else { return }
         guard !KeyNames.isModifier(keyCode) else { throw .modifierAsMainKey }
         guard modifiers.containsCommandOptionOrControl else { throw .needsCommandOptionOrControl }
+        if let action = ReservedShortcuts.action(forKeyCode: keyCode, modifiers: modifiers) {
+            throw .reserved(shortcut: displayName, action: action)
+        }
     }
 
     /// Whether ``validate()`` accepts the binding.
@@ -130,6 +137,8 @@ public enum HotkeyBindingError: LocalizedError, Equatable {
     case needsCommandOptionOrControl
     /// The main key is itself a modifier, which never sends a key-down event.
     case modifierAsMainKey
+    /// A standard macOS shortcut ("⌘C", for "Copy"), which every app would lose.
+    case reserved(shortcut: String, action: String)
 
     public var errorDescription: String? {
         switch self {
@@ -137,6 +146,8 @@ public enum HotkeyBindingError: LocalizedError, Equatable {
             "Include ⌘ Command, ⌥ Option or ⌃ Control in the shortcut, so that ordinary typing never triggers it."
         case .modifierAsMainKey:
             "Finish the shortcut with a key that isn't a modifier, or choose the modifier on its own."
+        case .reserved(let shortcut, let action):
+            "\(shortcut) is the standard macOS shortcut for \(action). Choose another combination."
         }
     }
 }

@@ -1,4 +1,5 @@
 import AppKit
+import Dictation
 import Hotkey
 import SwiftUI
 
@@ -8,6 +9,9 @@ import SwiftUI
 /// Only one recorder in a window records at a time: they share `activeRecorder`, and starting
 /// one cancels the other. Recording also stops when its window loses focus or closes, when the
 /// app loses focus, or when the view goes away, so the key monitor never outlives it.
+///
+/// While recording, the app's global shortcuts are paused through `suspendHotkeys`, and they
+/// resume however recording ends (see ``HotkeyRecorderEventMonitor``).
 struct HotkeyRecorderView: View {
     /// Names this recorder in `activeRecorder`; also its accessibility label ("Dictation shortcut").
     let title: String
@@ -16,6 +20,8 @@ struct HotkeyRecorderView: View {
     /// Read when recording starts, so a change to the other shortcut is always taken into account.
     let configuration: HotkeyRecorderModel.Configuration
     @Binding var activeRecorder: String?
+    /// Pauses the global shortcuts, normally ``DictationController/suspendHotkeys()``.
+    let suspendHotkeys: @MainActor () -> HotkeySuspension
 
     @State private var model: HotkeyRecorderModel
     @State private var monitor = HotkeyRecorderEventMonitor()
@@ -25,13 +31,15 @@ struct HotkeyRecorderView: View {
         storage: Binding<String>,
         defaultBinding: HotkeyBinding,
         configuration: HotkeyRecorderModel.Configuration,
-        activeRecorder: Binding<String?>
+        activeRecorder: Binding<String?>,
+        suspendHotkeys: @escaping @MainActor () -> HotkeySuspension
     ) {
         self.title = title
         _storage = storage
         self.defaultBinding = defaultBinding
         self.configuration = configuration
         _activeRecorder = activeRecorder
+        self.suspendHotkeys = suspendHotkeys
         _model = State(initialValue: HotkeyRecorderModel(configuration: configuration))
     }
 
@@ -88,8 +96,9 @@ struct HotkeyRecorderView: View {
         model = HotkeyRecorderModel(configuration: configuration)
         model.start()
         activeRecorder = title
-        // The window being clicked is key, so it is the recorder's own.
-        monitor.start(window: NSApp.keyWindow) { event in
+        // The window being clicked is key, so it is the recorder's own. The shortcuts are paused
+        // before the first key can arrive, and the monitor resumes them when it stops.
+        monitor.start(window: NSApp.keyWindow, suspension: suspendHotkeys()) { event in
             let swallow = model.swallows(event)
             let problemBefore = model.problem
             handle(model.handle(event), problemBefore: problemBefore)
@@ -128,6 +137,8 @@ struct HotkeyRecorderView: View {
         endRecording()
     }
 
+    /// Every way recording ends comes here or through the monitor's own interruption, both of
+    /// which stop the monitor and so resume the global shortcuts.
     private func endRecording() {
         monitor.stop()
         if activeRecorder == title { activeRecorder = nil }

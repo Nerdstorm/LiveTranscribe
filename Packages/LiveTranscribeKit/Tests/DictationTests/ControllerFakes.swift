@@ -32,6 +32,14 @@ final class FakeHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
     func denyPermission(_ deny: Bool) { state.withLock { $0.denyPermission = deny } }
     var capturingEscape: Bool { state.withLock { $0.capturingEscape } }
     var startedBindings: [HotkeyBinding] { state.withLock { $0.starts.map(\.0) } }
+    /// Started and not stopped since.
+    var isRunning: Bool { state.withLock { $0.continuation != nil } }
+
+    /// Delivers an event, as a key press would; `false` if the monitor is not running.
+    @discardableResult
+    func send(_ event: HotkeyEvent) -> Bool {
+        state.withLock { $0.continuation?.yield(event) } != nil
+    }
 
     func start(binding: HotkeyBinding, undoBinding: HotkeyBinding?) throws -> AsyncStream<HotkeyEvent> {
         try state.withLock { state in
@@ -70,6 +78,8 @@ struct FakeElement: AccessibilityElement {
 
 final class FakeFocus: FocusedTargetProvider, @unchecked Sendable {
     private let target = OSAllocatedUnfairLock(initialState: FakeFocus.field(value: "", secure: false))
+    /// While set, lookups wait for ``releaseLookups()``, so a test can see the state in between.
+    private let gate = OSAllocatedUnfairLock<DispatchSemaphore?>(initialState: nil)
 
     static let app = AppInfo(bundleIdentifier: "com.example.Notes", name: "Notes", processIdentifier: 42)
 
@@ -78,8 +88,28 @@ final class FakeFocus: FocusedTargetProvider, @unchecked Sendable {
         return InsertionTarget(app: app, element: element, secureEventInputEnabled: false)
     }
 
+    /// A focused field whose caret is drawn at `caret`.
+    static func field(caret: CGRect) -> InsertionTarget {
+        InsertionTarget(app: app, element: nil, isSecure: false, isMultiline: false, caretRect: caret)
+    }
+
     func set(_ target: InsertionTarget) { self.target.withLock { $0 = target } }
-    func currentTarget() -> InsertionTarget { target.withLock { $0 } }
+
+    func currentTarget() -> InsertionTarget {
+        // Runs on a detached task, never the main actor, so waiting here blocks nothing the test needs.
+        gate.withLock { $0 }?.wait()
+        return target.withLock { $0 }
+    }
+
+    func holdLookups() { gate.withLock { $0 = DispatchSemaphore(value: 0) } }
+
+    func releaseLookups() {
+        let semaphore = gate.withLock { gate in
+            defer { gate = nil }
+            return gate
+        }
+        semaphore?.signal()
+    }
 }
 
 actor FakeDelivery: TextDelivery {

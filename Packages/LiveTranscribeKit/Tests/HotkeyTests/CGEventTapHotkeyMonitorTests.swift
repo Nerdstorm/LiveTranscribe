@@ -101,6 +101,7 @@ struct CGEventTapHotkeyMonitorTests {
         (HotkeyBinding.keyCombo(keyCode: Keys.keyA, modifiers: []), HotkeyBindingError.needsCommandOptionOrControl),
         (.keyCombo(keyCode: Keys.keyA, modifiers: [.shift]), .needsCommandOptionOrControl),
         (.keyCombo(keyCode: 56, modifiers: [.command]), .modifierAsMainKey),
+        (.keyCombo(keyCode: Keys.space, modifiers: [.command]), .reserved(shortcut: "⌘Space", action: "Spotlight")),
     ])
     func invalidBindingIsRefused(binding: HotkeyBinding, reason: HotkeyBindingError) {
         let (monitor, taps) = Self.monitor()

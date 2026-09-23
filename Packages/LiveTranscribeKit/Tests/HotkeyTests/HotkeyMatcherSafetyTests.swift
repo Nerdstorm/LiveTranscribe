@@ -8,6 +8,7 @@ struct HotkeyMatcherSafetyTests {
         HotkeyBinding.keyCombo(keyCode: Keys.keyA, modifiers: []),
         .keyCombo(keyCode: Keys.keyA, modifiers: [.shift]),
         .keyCombo(keyCode: 55, modifiers: [.command]),
+        .keyCombo(keyCode: 8, modifiers: [.command]), // ⌘C, a standard shortcut
     ])
     func invalidDictationCombo(binding: HotkeyBinding) {
         guard case .keyCombo(let keyCode, let modifiers) = binding else { return }
@@ -28,6 +29,7 @@ struct HotkeyMatcherSafetyTests {
         (.some(.modifierKey(.rightCommand)), nil),
         (.some(.keyCombo(keyCode: Keys.keyZ, modifiers: [.shift])), nil),
         (.some(.defaultDictation), nil),
+        (.some(.keyCombo(keyCode: Keys.keyZ, modifiers: [.command])), nil), // ⌘Z is Undo everywhere
     ])
     func effectiveUndo(undo: HotkeyBinding?, expected: HotkeyBinding?) {
         #expect(HotkeyMatcher.effectiveUndoBinding(undo, dictation: .defaultDictation) == expected)

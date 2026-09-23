@@ -23,6 +23,8 @@ public enum DictationNotice: Sendable, Equatable {
     case microphone(String)
     /// The hotkey was pressed while the last dictation was still being inserted.
     case stillProcessing
+    /// Dictation was started from the menu while a shortcut is being recorded in Settings.
+    case recordingShortcut
 
     public var message: String {
         switch self {
@@ -46,6 +48,7 @@ public enum DictationNotice: Sendable, Equatable {
         case .undoFailed: "Couldn't undo the edit"
         case .microphone(let message): message
         case .stillProcessing: "Still inserting the last dictation"
+        case .recordingShortcut: "Finish recording the shortcut in Settings first"
         }
     }
 
@@ -53,7 +56,7 @@ public enum DictationNotice: Sendable, Equatable {
     public var isProblem: Bool {
         switch self {
         case .cancelled, .undone, .nothingToUndo, .nothingHeard, .copiedToClipboard, .undoCopiedToClipboard, .microphone,
-             .stillProcessing:
+             .stillProcessing, .recordingShortcut:
             false
         default:
             true

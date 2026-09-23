@@ -11,6 +11,13 @@ extension DictationController {
             gesture.reset()
             return
         }
+        // A new attempt: the last dictation's caret may be in another app or on another display.
+        // Until the new field is read, the HUD and any refusal show where the pointer is.
+        setCaret(nil)
+        guard !hotkeysSuspended else {
+            // Queued just before a shortcut recorder paused the hotkeys; dropped silently.
+            return refuse(nil)
+        }
         switch await dependencies.readiness() {
         case .ready:
             break
@@ -175,6 +182,9 @@ extension DictationController {
     func performUndo() async {
         // Undo only between dictations: during one, ⌘Z would land in the middle of it.
         guard phase == .idle else { return }
+        // Its notice goes by the field it acts on, once read; the last dictation's caret may be
+        // in another app by now.
+        setCaret(nil)
         let settings = dependencies.settings().dictation
         guard let entry = undoEntry,
               entry.record.insertedAt.duration(to: dependencies.now()) <= .seconds(settings.undoWindowSeconds)
@@ -187,6 +197,7 @@ extension DictationController {
             return show(.nothingToUndo)
         }
         let target = await currentTarget()
+        setCaret(target.caretRect)
         let result = await dependencies.delivery.undo(entry.record, replacingWith: entry.uncleaned, in: target)
         if result.succeeded || result == .copiedToClipboard {
             undoEntry = nil

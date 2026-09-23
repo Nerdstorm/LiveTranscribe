@@ -1,4 +1,5 @@
 import AppKit
+import Dictation
 import Hotkey
 
 /// Delivers this app's key presses and modifier changes to a shortcut recorder, as
@@ -9,9 +10,16 @@ import Hotkey
 /// says so through `onInterrupted`: a closed or hidden Settings window does not always make its
 /// SwiftUI views disappear, and a monitor left installed would keep swallowing typing.
 /// The owner still calls ``stop()`` when recording ends and when its view disappears.
+///
+/// While it runs it holds a ``HotkeySuspension``, so the app's global shortcuts are paused and
+/// every key reaches the recorder: pressing fn to record it must not start a dictation, and the
+/// current shortcuts must not be swallowed before the recorder sees them. Every way of stopping
+/// ends the suspension, and one dropped with the monitor ends itself.
 @MainActor
 final class HotkeyRecorderEventMonitor {
     private var token: Any?
+    /// Pauses the global shortcuts while recording; ended by ``stop()``.
+    private var suspension: HotkeySuspension?
     private var windowObservers: [any NSObjectProtocol] = []
     private var notificationCenter: NotificationCenter?
     /// The recorder's window; events for other windows pass through untouched.
@@ -27,16 +35,20 @@ final class HotkeyRecorderEventMonitor {
     ///   - window: The recorder's window (normally `NSApp.keyWindow` when recording starts).
     ///     `nil` delivers every window's events and relies on the owner to stop.
     ///   - notificationCenter: Where the window posts resign-key and close; tests pass their own.
+    ///   - suspension: The pause of the global shortcuts for this recording; the monitor ends it
+    ///     when it stops, however that happens.
     ///   - handler: Returns whether to swallow the event, so it never reaches the window.
     ///   - onInterrupted: Called once if the window stops being key or closes; the monitor has
     ///     already stopped by then.
     func start(
         window: AnyObject?,
         notificationCenter: NotificationCenter = .default,
+        suspension: HotkeySuspension,
         handler: @escaping @MainActor (KeyEventInfo) -> Bool,
         onInterrupted: @escaping @MainActor () -> Void
     ) {
         stop()
+        self.suspension = suspension
         self.window = window
         self.handler = handler
         self.onInterrupted = onInterrupted
@@ -58,12 +70,15 @@ final class HotkeyRecorderEventMonitor {
         }
     }
 
-    /// Removes the monitor and the window observers. Safe to call when it is not running.
+    /// Removes the monitor and the window observers, and resumes the global shortcuts. Safe to
+    /// call when it is not running.
     func stop() {
         if let token {
             NSEvent.removeMonitor(token)
             self.token = nil
         }
+        suspension?.end()
+        suspension = nil
         for observer in windowObservers {
             notificationCenter?.removeObserver(observer)
         }

@@ -14,6 +14,7 @@ struct HotkeyRecorderModelTests {
     private static let capsLockCode: UInt16 = 57
     private static let spaceCode: UInt16 = 49
     private static let zCode: UInt16 = 6
+    private static let cCode: UInt16 = 8
     private static let escapeCode: UInt16 = 53
 
     /// A modifier going down or up; `others` are the flags of modifiers still held.
@@ -164,8 +165,18 @@ struct HotkeyRecorderModelTests {
         #expect(model.problem == .invalidCombination(.needsCommandOptionOrControl))
         #expect(model.isRecording)
         // The next attempt can succeed, and clears the problem.
-        #expect(model.handle(key(Self.zCode, [.command])) == .recorded(.keyCombo(keyCode: Self.zCode, modifiers: [.command])))
+        #expect(model.handle(key(Self.zCode, [.command, .option])) == .recorded(.keyCombo(keyCode: Self.zCode, modifiers: [.command, .option])))
         #expect(model.problem == nil)
+    }
+
+    @Test("A standard shortcut is refused by name and recording continues", arguments: [true, false])
+    func aStandardShortcutIsRefused(modifierOnly: Bool) {
+        // Both recorders: the dictation and the undo shortcut would each take ⌘C from every app.
+        var model = recorder(modifierOnly: modifierOnly)
+        #expect(model.handle(key(Self.cCode, [.command, .leftCommand])) == .updated)
+        #expect(model.problem == .invalidCombination(.reserved(shortcut: "⌘C", action: "Copy")))
+        #expect(model.problem?.message == "⌘C is the standard macOS shortcut for Copy. Choose another combination.")
+        #expect(model.isRecording)
     }
 
     @Test func shiftAloneDoesNotGuardACombination() {
@@ -253,6 +264,7 @@ struct HotkeyRecorderModelTests {
     @Test func everyProblemHasAMessage() {
         let problems: [HotkeyRecorderModel.Problem] = [
             .invalidCombination(.needsCommandOptionOrControl), .invalidCombination(.modifierAsMainKey),
+            .invalidCombination(.reserved(shortcut: "⌘C", action: "Copy")),
             .needsKeyCombination, .modifierNotAllowedAlone, .alreadyUsed(purpose: "dictation"),
         ]
         for problem in problems {
