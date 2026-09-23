@@ -36,4 +36,24 @@ struct HubDownloaderTests {
         #expect(downloader.resolvedRevision("dev", of: repo, useLatest: false) == "dev")
         #expect(downloader.resolvedRevision(commit, of: repo, useLatest: false) == commit)
     }
+
+    @Test func aBranchDownloadRecordsTheFileListOfItsCommit() throws {
+        let (downloader, directory) = try downloader()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        #expect(downloader.commitToRecord(after: "main", of: repo) == commit)
+    }
+
+    @Test func aCommitDownloadHasRecordedItsFileListAlready() throws {
+        let (downloader, directory) = try downloader()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        #expect(downloader.commitToRecord(after: commit, of: repo) == nil)
+        #expect(downloader.commitToRecord(after: "dev", of: repo) == nil, "a branch that was never downloaded has no commit")
+    }
+
+    @Test func onlyFortyHexDigitsAreACommit() {
+        #expect(HubDownloader.isCommit(commit))
+        #expect(!HubDownloader.isCommit("main"))
+        #expect(!HubDownloader.isCommit(String(commit.dropLast())))
+        #expect(!HubDownloader.isCommit("v1.0.0-" + String(commit.prefix(33))))
+    }
 }

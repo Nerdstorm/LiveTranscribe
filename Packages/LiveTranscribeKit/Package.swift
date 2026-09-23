@@ -132,6 +132,7 @@ let package = Package(
             dependencies: [
                 "Shared", "Capture", "Segmentation", "Transcription", "Cleanup",
                 "Persistence", "Session", "MLXSupport",
+                .product(name: "HuggingFace", package: "swift-huggingface"),
             ],
             resources: [.copy("Fixtures")],
             swiftSettings: strictSwift
