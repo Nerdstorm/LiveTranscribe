@@ -147,6 +147,16 @@ struct CleanupExecutorTests {
         #expect(cleaned.fallbackReason == "changed a snippet placeholder")
         #expect(cleaned.cleanedText == "email ⟦S1⟧ to the team")
     }
+
+    /// Dictation with the cleanup model off inserts this, so it must match what a level does
+    /// without the model: fillers go only at Medium and High.
+    @Test func deterministicCleanupRemovesFillersOnlyAtMediumAndHigh() {
+        let raw = "so um the build is uh broken"
+        #expect(CleanupExecutor.deterministicCleanup(of: raw, level: .none) == raw)
+        #expect(CleanupExecutor.deterministicCleanup(of: raw, level: .light) == raw)
+        #expect(CleanupExecutor.deterministicCleanup(of: raw, level: .medium) == "so the build is broken")
+        #expect(CleanupExecutor.deterministicCleanup(of: raw, level: .high) == "so the build is broken")
+    }
 }
 
 private actor RequestRecorder {

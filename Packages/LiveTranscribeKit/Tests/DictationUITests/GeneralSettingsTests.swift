@@ -74,25 +74,71 @@ struct GeneralSettingsTests {
 
     // MARK: - Cleanup notes
 
+    private typealias Switches = GeneralSettingsCleanupNotes.ModelSwitches
+    private static let allOn = Switches(cleanupEnabled: true, adapterEnabled: true)
+
+    private func notes(_ level: CleanupLevel, inEffect: Switches, stored: Switches? = nil) -> String {
+        GeneralSettingsCleanupNotes.text(level: level, inEffect: inEffect, stored: stored ?? inEffect)
+    }
+
     /// The level applies to both modes, but snippets and vocabulary only to dictation (the live
     /// transcript applies neither), so the note names dictation.
     @Test func cleanupNotesSaySnippetsAndVocabularyAlwaysApply() {
         for level in CleanupLevel.allCases {
-            let text = GeneralSettingsCleanupNotes.text(level: level, cleanupEnabled: true, adapterEnabled: true)
+            let text = notes(level, inEffect: Self.allOn)
             #expect(text.contains("Dictation applies your snippets and vocabulary at every level"), "\(level)")
             #expect(!text.contains("Advanced"), "nothing is off, so nothing points to Advanced (\(level))")
+            #expect(!text.contains("starts"), "nothing waits for a restart (\(level))")
         }
     }
 
-    @Test func cleanupNotesExplainWhatAdvancedTurnedOff() {
-        let modelOff = GeneralSettingsCleanupNotes.text(level: .light, cleanupEnabled: false, adapterEnabled: true)
-        #expect(modelOff.contains("works like None"))
+    /// Without the model, Medium and High still remove fillers and format lists, so the levels
+    /// do not work like None; the note says what does happen.
+    @Test func cleanupNotesSayWhatTheLevelsStillDoWithTheModelOff() {
+        let off = Switches(cleanupEnabled: false, adapterEnabled: true)
+        for level in CleanupLevel.allCases {
+            let text = notes(level, inEffect: off)
+            #expect(text.contains("The cleanup model is off in Advanced, so nothing is reworded"), "\(level)")
+            #expect(text.contains("still removes filler words and formats spoken lists at Medium and High"), "\(level)")
+            #expect(!text.contains("works like None"), "\(level)")
+            #expect(!text.contains("Self-corrections"), "the model being off says it all (\(level))")
+        }
+    }
 
-        // Self-corrections are resolved only by the adapter, and only at levels that ask for it.
-        let adapterOff = GeneralSettingsCleanupNotes.text(level: .medium, cleanupEnabled: true, adapterEnabled: false)
-        #expect(adapterOff.contains("Self-corrections are kept"))
-        let lightWithoutAdapter = GeneralSettingsCleanupNotes.text(level: .light, cleanupEnabled: true, adapterEnabled: false)
-        #expect(!lightWithoutAdapter.contains("Self-corrections"))
+    /// Self-corrections are resolved only by the adapter, and only at levels that ask for it.
+    @Test func cleanupNotesExplainTheAdapterBeingOff() {
+        let adapterOff = Switches(cleanupEnabled: true, adapterEnabled: false)
+        #expect(notes(.medium, inEffect: adapterOff).contains("Self-corrections are kept as spoken, because Resolve spoken self-corrections is off in Advanced."))
+        #expect(!notes(.light, inEffect: adapterOff).contains("Self-corrections"))
+    }
+
+    /// Advanced's switches apply at the next launch, so General describes the ones in effect and
+    /// says what changes once Live Transcribe restarts.
+    @Test func cleanupNotesSayWhenAChangeWaitsForARestart() {
+        let modelOff = Switches(cleanupEnabled: false, adapterEnabled: true)
+        let adapterOff = Switches(cleanupEnabled: true, adapterEnabled: false)
+
+        let turningOff = notes(.medium, inEffect: Self.allOn, stored: modelOff)
+        #expect(turningOff.contains("The cleanup model turns off the next time Live Transcribe starts."))
+        #expect(!turningOff.contains("nothing is reworded"), "the model still cleans up until then")
+
+        let turningOn = notes(.medium, inEffect: modelOff, stored: Self.allOn)
+        #expect(turningOn.contains("The cleanup model is off until Live Transcribe restarts, so nothing is reworded"))
+        #expect(!turningOn.contains("off in Advanced"), "Advanced already shows it on")
+
+        #expect(notes(.high, inEffect: Self.allOn, stored: adapterOff)
+            .contains("Resolve spoken self-corrections turns off the next time Live Transcribe starts."))
+        let adapterTurningOn = notes(.medium, inEffect: adapterOff, stored: Self.allOn)
+        #expect(adapterTurningOn.contains("Self-corrections are kept as spoken until Live Transcribe restarts"))
+        #expect(!adapterTurningOn.contains("off in Advanced"))
+    }
+
+    /// The switches in effect are the ones Live Transcribe started with.
+    @Test func switchesInEffectComeFromTheLaunchSettings() {
+        var settings = AppSettings.defaults
+        settings.cleanupEnabled = false
+        settings.cleanupAdapterEnabled = true
+        #expect(Switches(settings: settings) == Switches(cleanupEnabled: false, adapterEnabled: true))
     }
 
     // MARK: - fn key warning

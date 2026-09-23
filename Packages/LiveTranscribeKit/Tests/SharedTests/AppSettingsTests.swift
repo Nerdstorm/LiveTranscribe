@@ -87,6 +87,7 @@ struct AppSettingsTests {
         elsewhere.dictation.undoWindowSeconds = 60
         elsewhere.dictation.historyEnabled = false
         elsewhere.dictation.historyRetentionDays = 30
+        elsewhere.dictation.historyPruneIntervalMinutes = 15
         var both = advanced
         both.cleanupLevel = elsewhere.cleanupLevel
         both.dictation = elsewhere.dictation
@@ -156,6 +157,7 @@ struct AppSettingsTests {
         settings.dictation.keepMicrophoneReady = true
         settings.dictation.historyEnabled = false
         settings.dictation.historyRetentionDays = 30
+        settings.dictation.historyPruneIntervalMinutes = 15
         settings.dictation.vocabularySimilarityThreshold = 0.9
         settings.dictation.noticeSeconds = 4
         store.save(settings)
@@ -168,6 +170,7 @@ struct AppSettingsTests {
         #expect(d.hotkey == "modifier:fn")
         #expect(d.undoHotkey == "combo:6:control,option")
         #expect(d.historyRetentionDays == 0, "history keeps everything unless the user sets a limit")
+        #expect(d.historyPruneIntervalMinutes == 60)
         #expect(!d.keepMicrophoneReady && !d.showVirtualInputDevices)
         #expect(d.undoWindowSeconds == 30 && d.vocabularyPromptLimit == 50)
         #expect(d.sanitized() == d)
@@ -184,6 +187,16 @@ struct AppSettingsTests {
         #expect(sanitized.undoWindowSeconds == 5)
         #expect(sanitized.historyRetentionDays == 0)
         #expect(sanitized.vocabularySimilarityThreshold == 1)
+    }
+
+    /// A zero interval would prune in a tight loop; more than a day would outlast a one-day
+    /// retention by too much.
+    @Test func thePruneIntervalIsClamped() {
+        var settings = AppSettings.defaults
+        settings.dictation.historyPruneIntervalMinutes = 0
+        #expect(settings.sanitized().dictation.historyPruneIntervalMinutes == 1)
+        settings.dictation.historyPruneIntervalMinutes = 10_000
+        #expect(settings.sanitized().dictation.historyPruneIntervalMinutes == 1_440)
     }
 
     @Test func unknownCleanupLevelReadsAsTheDefault() {

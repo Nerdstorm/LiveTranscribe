@@ -18,6 +18,8 @@ struct Harness {
     let delivery = FakeDelivery()
     let history = MemoryDictationHistory()
     let accessibility: FakeAccessibility
+    /// The wait between periodic history prunes.
+    let pruneTimer = ManualTimer()
 
     init(
         transcript: String = "ship it on friday",
@@ -63,6 +65,7 @@ struct Harness {
         accessibility = FakeAccessibility(granted: accessibilityGranted)
         let source = self.source
         let clock = self.clock
+        let pruneTimer = self.pruneTimer
         let processor = DictationProcessor(transcriber: transcriber, cleaner: ScriptedCleaner { text in
             text.prefix(1).uppercased() + text.dropFirst() + "."
         })
@@ -79,7 +82,8 @@ struct Harness {
             readiness: { readiness.current },
             microphonePermission: FakeMicrophone(current: microphone),
             accessibility: accessibility,
-            now: { clock.now() }
+            now: { clock.now() },
+            sleep: { try await pruneTimer.sleep(for: $0) }
         ))
         if !accessibilityGranted { hotkeys.denyPermission(true) }
     }
@@ -108,4 +112,14 @@ func eventually(_ condition: () -> Bool) async -> Bool {
         try? await Task.sleep(for: .milliseconds(5))
     }
     return condition()
+}
+
+/// ``eventually(_:)`` for a condition that awaits, such as one reading the history actor.
+@MainActor
+func eventuallyAsync(_ condition: () async -> Bool) async -> Bool {
+    for _ in 0..<200 {
+        if await condition() { return true }
+        try? await Task.sleep(for: .milliseconds(5))
+    }
+    return await condition()
 }

@@ -26,6 +26,9 @@ extension DictationController {
         public var now: @Sendable () -> ContinuousClock.Instant
         /// The microphone chosen in Settings, `nil` for the system default.
         public var inputDeviceUID: @Sendable () -> String?
+        /// Waits between the periodic history prunes: `Task.sleep` in the app. It throws when
+        /// the waiting task is cancelled. Tests pass one they end by hand.
+        public var sleep: @Sendable (Duration) async throws -> Void
 
         public init(
             hotkeys: any HotkeyMonitor,
@@ -41,7 +44,8 @@ extension DictationController {
             microphonePermission: any MicrophonePermissionProviding,
             accessibility: any AccessibilityPermissionProviding,
             now: @escaping @Sendable () -> ContinuousClock.Instant,
-            inputDeviceUID: @escaping @Sendable () -> String? = { nil }
+            inputDeviceUID: @escaping @Sendable () -> String? = { nil },
+            sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
         ) {
             self.hotkeys = hotkeys
             self.recorder = recorder
@@ -57,6 +61,7 @@ extension DictationController {
             self.accessibility = accessibility
             self.now = now
             self.inputDeviceUID = inputDeviceUID
+            self.sleep = sleep
         }
     }
 }

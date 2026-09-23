@@ -23,9 +23,10 @@ final class PermissionsSettingsModel {
 
     private(set) var microphone: MicrophonePermissionStatus
     private(set) var accessibilityGranted: Bool
-    /// Whether this launch already asked for Accessibility. After that the prompt shows
-    /// nothing more, so the button opens System Settings instead.
-    private(set) var accessibilityPrompted: Bool
+    /// Whether this launch already asked for Accessibility, here or in setup. After that the
+    /// prompt shows nothing more, so the button opens System Settings instead. Read from the
+    /// shared memory, so a prompt shown while this window is open counts too.
+    var accessibilityPrompted: Bool { promptMemory.accessibilityPrompted }
     /// System Settings could not be opened; says where to go by hand. Cleared by the next action.
     private(set) var errorMessage: String?
 
@@ -52,7 +53,6 @@ final class PermissionsSettingsModel {
         self.openSettings = openSettings
         microphone = microphonePermission.status()
         accessibilityGranted = accessibility.isGranted()
-        accessibilityPrompted = promptMemory.accessibilityPrompted
     }
 
     // MARK: - Status
@@ -103,9 +103,7 @@ final class PermissionsSettingsModel {
             Log.ui.info("Microphone access requested from Settings; granted: \(granted)")
             refreshMicrophone()
         case (.request, .accessibility):
-            accessibility.prompt()
-            promptMemory.accessibilityPrompted = true
-            accessibilityPrompted = true
+            promptMemory.prompt(accessibility)
             accessibilityGranted = accessibility.isGranted()
         case (.openSettings, _):
             if !openSettings(permission) {
@@ -127,12 +125,21 @@ final class PermissionsSettingsModel {
 }
 
 /// Whether this launch of the app already showed the Accessibility prompt, which macOS shows
-/// at most once per launch. Shared by every Settings window; onboarding can use it too.
+/// at most once per launch. Shared by every Settings window and by setup, which all prompt
+/// through ``prompt(_:)``: whichever asks first, the others then open System Settings instead
+/// of a prompt that would not appear.
 @MainActor
+@Observable
 final class PermissionsSettingsPromptMemory {
     static let shared = PermissionsSettingsPromptMemory()
 
     var accessibilityPrompted = false
+
+    /// Shows the Accessibility prompt and remembers that this launch has used it.
+    func prompt(_ accessibility: any AccessibilityPermissionProviding) {
+        accessibility.prompt()
+        accessibilityPrompted = true
+    }
 }
 
 /// The dictation shortcut's state in words, from ``DictationController/hotkeyState``.

@@ -80,6 +80,30 @@ struct HistoryListModelTests {
         #expect(!model.isLoading)
     }
 
+    // MARK: - Retention
+
+    /// The controller prunes only every so often, so the window hides what is already past the
+    /// retention, by the rule the prune uses: a record made exactly at the cutoff is kept.
+    @Test func recordsPastTheRetentionAreHidden() async {
+        let history = MemoryDictationHistory(records: [first, second, third])
+        var cutoff: Date? = second.createdAt
+        let model = HistoryListModel(history: history, copyToPasteboard: { _ in true }, retentionCutoff: { cutoff })
+        model.selection = first.id
+        await model.reload()
+        #expect(model.records.map(\.id) == [third.id, second.id])
+        #expect(model.selection == nil, "a hidden record is not left selected")
+        #expect(await history.records.count == 3, "the window only hides; the controller deletes")
+
+        cutoff = nil
+        await model.reload()
+        #expect(model.records.map(\.id) == [third.id, second.id, first.id], "the cutoff is read at every load")
+    }
+
+    @Test func withinRetentionKeepsEverythingWithoutACutoff() {
+        #expect(HistoryListModel.withinRetention([third, second, first], cutoff: nil) == [third, second, first])
+        #expect(HistoryListModel.withinRetention([third, second, first], cutoff: third.createdAt.addingTimeInterval(1)).isEmpty)
+    }
+
     // MARK: - Search
 
     @Test func searchMatchesCleanedTextRawTextAndAppNameIgnoringCaseAndAccents() async {

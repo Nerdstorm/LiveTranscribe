@@ -62,7 +62,8 @@ enum DictationBench {
         if settings.cleanupEnabled {
             try await cleaner.load { _ in }
         }
-        let processor = DictationProcessor(transcriber: transcriber, cleaner: cleaner)
+        // As in the app: with cleanup off, the levels apply only their rules that need no model.
+        let processor = DictationProcessor(transcriber: transcriber, cleaner: settings.cleanupEnabled ? cleaner : nil)
         let samples = try clips.map { try FileAudioSource.readSamples(from: $0.audio) }
 
         // One untimed pass so the first timed clip does not pay for kernel compilation.

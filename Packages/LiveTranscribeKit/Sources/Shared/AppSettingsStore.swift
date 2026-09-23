@@ -43,6 +43,7 @@ public enum AppSettingsKey: String, CaseIterable, Sendable {
     case showVirtualInputDevices
     case historyEnabled
     case historyRetentionDays
+    case historyPruneIntervalMinutes
     case dictationNoticeSeconds
     /// The chosen microphone's Core Audio UID; absent means the system default input.
     /// Not part of ``AppSettings``: it is read at every Start rather than once at launch.
@@ -147,6 +148,7 @@ public struct AppSettingsStore: Sendable {
                 showVirtualInputDevices: bool(.showVirtualInputDevices),
                 historyEnabled: bool(.historyEnabled),
                 historyRetentionDays: int(.historyRetentionDays),
+                historyPruneIntervalMinutes: int(.historyPruneIntervalMinutes),
                 noticeSeconds: double(.dictationNoticeSeconds)
             )
         ).sanitized()
@@ -228,6 +230,7 @@ public struct AppSettingsStore: Sendable {
             .showVirtualInputDevices: s.dictation.showVirtualInputDevices,
             .historyEnabled: s.dictation.historyEnabled,
             .historyRetentionDays: s.dictation.historyRetentionDays,
+            .historyPruneIntervalMinutes: s.dictation.historyPruneIntervalMinutes,
             .dictationNoticeSeconds: s.dictation.noticeSeconds,
         ]
         return Dictionary(uniqueKeysWithValues: values.map { ($0.key.rawValue, $0.value) })

@@ -232,3 +232,45 @@ final class ReadinessSwitch: Sendable {
     var current: DictationReadiness { readiness.withLock { $0 } }
     func set(_ value: DictationReadiness) { readiness.withLock { $0 = value } }
 }
+
+/// Stands in for `Task.sleep`: each wait lasts until the test calls ``fire()``, or throws once
+/// the waiting task is cancelled. Records the durations asked for.
+final class ManualTimer: Sendable {
+    private struct State {
+        var waiting: [UUID: CheckedContinuation<Void, Error>] = [:]
+        var requested: [Duration] = []
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    /// Every duration asked for, in order.
+    var requested: [Duration] { state.withLock { $0.requested } }
+    /// Waits in progress.
+    var waiters: Int { state.withLock { $0.waiting.count } }
+
+    func sleep(for duration: Duration) async throws {
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                let cancelled = state.withLock { state in
+                    state.requested.append(duration)
+                    guard !Task.isCancelled else { return true }
+                    state.waiting[id] = continuation
+                    return false
+                }
+                if cancelled { continuation.resume(throwing: CancellationError()) }
+            }
+        } onCancel: {
+            state.withLock { $0.waiting.removeValue(forKey: id) }?.resume(throwing: CancellationError())
+        }
+    }
+
+    /// Ends every wait in progress.
+    func fire() {
+        let waiting = state.withLock { state in
+            defer { state.waiting = [:] }
+            return Array(state.waiting.values)
+        }
+        waiting.forEach { $0.resume() }
+    }
+}

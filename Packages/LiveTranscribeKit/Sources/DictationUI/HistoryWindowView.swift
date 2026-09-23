@@ -22,7 +22,10 @@ public struct HistoryWindowView: View {
 
     public init(context: DictationUIContext) {
         self.context = context
-        _model = State(initialValue: HistoryListModel(history: context.history))
+        let settingsStore = context.settingsStore
+        _model = State(initialValue: HistoryListModel(history: context.history, retentionCutoff: {
+            HistoryRetention.cutoff(now: Date(), retentionDays: settingsStore.load().dictation.historyRetentionDays)
+        }))
     }
 
     public var body: some View {

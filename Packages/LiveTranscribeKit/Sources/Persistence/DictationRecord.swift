@@ -102,8 +102,9 @@ extension DictationRecord {
 
     /// Whether ``DictationHistory/prune(olderThan:)`` removes this record: created strictly
     /// before `cutoff`, compared at the millisecond precision records keep. A record created
-    /// exactly at the cutoff is kept. Every history uses this one rule so they cannot drift.
-    func isPruned(olderThan cutoff: Date) -> Bool {
+    /// exactly at the cutoff is kept. Every history uses this one rule so they cannot drift, and
+    /// the history window uses it to hide records the next prune will remove.
+    public func isPruned(olderThan cutoff: Date) -> Bool {
         // Written as "less than" so an invalid (NaN) cutoff removes nothing rather than everything.
         createdAt < Self.millisecondPrecision(cutoff)
     }

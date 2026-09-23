@@ -5,7 +5,8 @@ import Persistence
 import Shared
 
 /// State for the history window: the records, the search, the selection and what can be done
-/// to them. Records come from ``DictationHistory/all()``, newest first.
+/// to them. Records come from ``DictationHistory/all()``, newest first, less any past the
+/// retention set in Settings.
 @MainActor
 @Observable
 final class HistoryListModel {
@@ -19,7 +20,7 @@ final class HistoryListModel {
         case noMatches(String)
     }
 
-    /// Every record, newest first, as last loaded.
+    /// Every record within the retention, newest first, as last loaded.
     private(set) var records: [DictationRecord] = [] {
         didSet { updateFilteredRecords() }
     }
@@ -39,17 +40,23 @@ final class HistoryListModel {
 
     @ObservationIgnored private let history: any DictationHistory
     @ObservationIgnored private let copyToPasteboard: @MainActor (String) -> Bool
+    @ObservationIgnored private let retentionCutoff: @MainActor () -> Date?
     /// Bumped by every load, so an older load that finishes late cannot overwrite a newer one.
     @ObservationIgnored private var loadGeneration = 0
 
-    /// - Parameter copyToPasteboard: Puts text on the clipboard and reports whether it worked;
-    ///   tests pass a fake.
+    /// - Parameters:
+    ///   - copyToPasteboard: Puts text on the clipboard and reports whether it worked; tests
+    ///     pass a fake.
+    ///   - retentionCutoff: The oldest creation date to show, read at every load, or `nil` to
+    ///     show everything (see ``HistoryRetention/cutoff(now:retentionDays:calendar:)``).
     init(
         history: any DictationHistory,
-        copyToPasteboard: @escaping @MainActor (String) -> Bool = HistoryListModel.writeToGeneralPasteboard
+        copyToPasteboard: @escaping @MainActor (String) -> Bool = HistoryListModel.writeToGeneralPasteboard,
+        retentionCutoff: @escaping @MainActor () -> Date? = { nil }
     ) {
         self.history = history
         self.copyToPasteboard = copyToPasteboard
+        self.retentionCutoff = retentionCutoff
     }
 
     // MARK: - Derived state
@@ -82,20 +89,29 @@ final class HistoryListModel {
         }
     }
 
+    /// `records` without those past the retention `cutoff`, by the rule
+    /// ``DictationHistory/prune(olderThan:)`` deletes them with. The dictation controller prunes
+    /// only every so often, so the window hides what is due meanwhile.
+    static func withinRetention(_ records: [DictationRecord], cutoff: Date?) -> [DictationRecord] {
+        guard let cutoff else { return records }
+        return records.filter { !$0.isPruned(olderThan: cutoff) }
+    }
+
     private func updateFilteredRecords() {
         filteredRecords = Self.filter(records, query: searchText)
     }
 
     // MARK: - Intents
 
-    /// Loads every record again. The selection is kept while its record still exists.
+    /// Loads every record within the retention again. The selection is kept while its record
+    /// is still shown.
     func reload() async {
         loadGeneration += 1
         let generation = loadGeneration
         isLoading = true
         defer { if generation == loadGeneration { isLoading = false } }
         do {
-            let loaded = try await history.all()
+            let loaded = Self.withinRetention(try await history.all(), cutoff: retentionCutoff())
             guard generation == loadGeneration else { return }
             records = loaded
             errorMessage = nil

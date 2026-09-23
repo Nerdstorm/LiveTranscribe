@@ -1,6 +1,7 @@
 import Capture
 import Dictation
 @testable import DictationUI
+import Observation
 import os
 import Permissions
 import Testing
@@ -147,6 +148,22 @@ struct PermissionsSettingsModelTests {
         await model().perform(.request, for: .accessibility)
         let reopened = model()
         #expect(reopened.action(for: .accessibility) == .openSettings)
+        #expect(accessibility.prompts == 1)
+    }
+
+    /// Setup can show the prompt while this window is open; the button follows at once. The
+    /// window redraws only because reading the button observes the shared memory.
+    @Test func aPromptShownElsewhereSwitchesAnOpenWindowToSystemSettings() {
+        let model = model()
+        let redrawn = OSAllocatedUnfairLock(initialState: false)
+        withObservationTracking {
+            #expect(model.action(for: .accessibility) == .request)
+        } onChange: {
+            redrawn.withLock { $0 = true }
+        }
+        promptMemory.prompt(accessibility)  // as setup does
+        #expect(redrawn.withLock { $0 }, "an open window redraws its button")
+        #expect(model.action(for: .accessibility) == .openSettings)
         #expect(accessibility.prompts == 1)
     }
 

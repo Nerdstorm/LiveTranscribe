@@ -16,7 +16,6 @@ public struct CleanupExecutor: Sendable {
     public let timeoutSeconds: Double
     public let outputGuard: OutputGuard
     public let prompts: PromptBuilder
-    private let fillerRemover = FillerRemover()
 
     public init(
         contextLimit: Int,
@@ -40,7 +39,7 @@ public struct CleanupExecutor: Sendable {
         guard options.level.usesLanguageModel else {
             return CleanedSegment(segment: segment, cleanedText: segment.rawText, fellBack: false, fallbackReason: nil, latencyMs: 0)
         }
-        let input = options.level.removesFillers ? fillerRemover.removingFillers(from: segment.rawText) : segment.rawText
+        let input = Self.deterministicCleanup(of: segment.rawText, level: options.level)
         guard !EditDistance.words(in: input).isEmpty else {
             return CleanedSegment(segment: segment, cleanedText: input, fellBack: false, fallbackReason: nil, latencyMs: 0)
         }
@@ -76,5 +75,12 @@ public struct CleanupExecutor: Sendable {
             Log.cleanup.notice("Cleanup fell back to the uncorrected text: \(reason.description, privacy: .public)")
             return CleanedSegment(segment: segment, cleanedText: input, fellBack: true, fallbackReason: reason.description, latencyMs: latencyMs)
         }
+    }
+
+    /// What `level` does without the model: fillers removed at Medium and High, otherwise the
+    /// text unchanged. It is what the model is given, what a fallback returns, and what
+    /// dictation inserts when the cleanup model is turned off, so all three agree.
+    public static func deterministicCleanup(of text: String, level: CleanupLevel) -> String {
+        level.removesFillers ? FillerRemover().removingFillers(from: text) : text
     }
 }

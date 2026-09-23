@@ -50,6 +50,10 @@ public struct DictationSettings: Sendable, Equatable {
     public var historyEnabled: Bool
     /// History older than this many days is deleted; 0 keeps everything.
     public var historyRetentionDays: Int
+    /// How often, while the app runs, history past ``historyRetentionDays`` is deleted. It is
+    /// also deleted at launch, when a setting changes, and at most this often after a dictation
+    /// is saved, so a menu bar app left running for weeks still keeps to the retention.
+    public var historyPruneIntervalMinutes: Int
     /// How long a HUD message stays up.
     public var noticeSeconds: Double
 
@@ -76,6 +80,7 @@ public struct DictationSettings: Sendable, Equatable {
         showVirtualInputDevices: Bool,
         historyEnabled: Bool,
         historyRetentionDays: Int,
+        historyPruneIntervalMinutes: Int,
         noticeSeconds: Double
     ) {
         self.enabled = enabled
@@ -100,6 +105,7 @@ public struct DictationSettings: Sendable, Equatable {
         self.showVirtualInputDevices = showVirtualInputDevices
         self.historyEnabled = historyEnabled
         self.historyRetentionDays = historyRetentionDays
+        self.historyPruneIntervalMinutes = historyPruneIntervalMinutes
         self.noticeSeconds = noticeSeconds
     }
 
@@ -126,6 +132,7 @@ public struct DictationSettings: Sendable, Equatable {
         showVirtualInputDevices: false,
         historyEnabled: true,
         historyRetentionDays: 0,
+        historyPruneIntervalMinutes: 60,
         noticeSeconds: 2.5
     )
 
@@ -148,6 +155,7 @@ public struct DictationSettings: Sendable, Equatable {
         copy.vocabularyPromptLimit = vocabularyPromptLimit.clamped(to: 0...200)
         copy.vocabularySimilarityThreshold = vocabularySimilarityThreshold.clamped(to: 0.5...1)
         copy.historyRetentionDays = historyRetentionDays.clamped(to: 0...3_650)
+        copy.historyPruneIntervalMinutes = historyPruneIntervalMinutes.clamped(to: 1...1_440)
         copy.noticeSeconds = noticeSeconds.clamped(to: 0.5...10)
         return copy
     }

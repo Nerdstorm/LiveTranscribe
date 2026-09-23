@@ -65,6 +65,10 @@ public final class DictationUIContext {
     public let history: any DictationHistory
     public let microphonePermission: any MicrophonePermissionProviding
     public let accessibility: any AccessibilityPermissionProviding
+    /// The settings as read at launch. The models and the rest of Settings › Advanced keep
+    /// these values until Live Transcribe restarts (dictation settings are read at each use), so
+    /// Settings can tell what is in effect from a change still waiting for a restart.
+    public let settingsAtLaunch: AppSettings
     public weak var windows: (any DictationWindowActions)?
 
     public init(
@@ -76,7 +80,8 @@ public final class DictationUIContext {
         overrides: InserterOverridesStore,
         history: any DictationHistory,
         microphonePermission: any MicrophonePermissionProviding,
-        accessibility: any AccessibilityPermissionProviding
+        accessibility: any AccessibilityPermissionProviding,
+        settingsAtLaunch: AppSettings
     ) {
         self.controller = controller
         self.transcript = transcript
@@ -87,5 +92,6 @@ public final class DictationUIContext {
         self.history = history
         self.microphonePermission = microphonePermission
         self.accessibility = accessibility
+        self.settingsAtLaunch = settingsAtLaunch
     }
 }

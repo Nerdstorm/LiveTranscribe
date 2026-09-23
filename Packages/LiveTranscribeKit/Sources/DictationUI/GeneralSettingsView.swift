@@ -34,7 +34,7 @@ struct GeneralSettingsView: View {
                 }
             }
             shortcutsSection
-            GeneralSettingsCleanupSection()
+            GeneralSettingsCleanupSection(inEffect: .init(settings: context.settingsAtLaunch))
             GeneralSettingsMicrophoneSection(transcript: context.transcript)
             Section {
                 GeneralSettingsTimingSection()

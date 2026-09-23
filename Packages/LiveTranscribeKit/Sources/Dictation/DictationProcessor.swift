@@ -12,6 +12,10 @@ import Vocabulary
 /// Snippet triggers become opaque placeholders before the language model runs, so the model can
 /// neither see nor change an expansion. If cleanup is rejected or times out, the text before
 /// cleanup is used, with snippets and vocabulary still applied.
+///
+/// Without a cleaner (cleanup turned off in Settings › Advanced) each level still applies its
+/// rules that need no model, filler removal and list formatting at Medium and High, and nothing
+/// is reworded. That was chosen, so it is not reported as a fallback.
 public struct DictationProcessor: Sendable {
     /// Everything that shapes one dictation's text, read fresh for each dictation.
     public struct Configuration: Sendable {
@@ -60,9 +64,11 @@ public struct DictationProcessor: Sendable {
     }
 
     private let transcriber: any Transcriber
-    private let cleaner: any Cleaner
+    private let cleaner: (any Cleaner)?
 
-    public init(transcriber: any Transcriber, cleaner: any Cleaner) {
+    /// - Parameter cleaner: The cleanup model, or `nil` when cleanup is turned off. Like the
+    ///   model, that setting is read once at launch.
+    public init(transcriber: any Transcriber, cleaner: (any Cleaner)?) {
         self.transcriber = transcriber
         self.cleaner = cleaner
     }
@@ -94,7 +100,7 @@ public struct DictationProcessor: Sendable {
         transcript: String,
         transcriptionMs: Int,
         configuration: Configuration,
-        cleaner: any Cleaner
+        cleaner: (any Cleaner)?
     ) async -> Output {
         let raw = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !raw.isEmpty else {
@@ -110,16 +116,28 @@ public struct DictationProcessor: Sendable {
                           fallbackReason: nil, transcriptionMs: transcriptionMs, cleanupMs: 0)
         }
 
-        let options = CleanupOptions(
-            level: configuration.level,
-            vocabulary: VocabularySelector(
-                entries: configuration.vocabulary,
-                similarityThreshold: configuration.vocabularySimilarityThreshold
-            ).relevantTerms(for: replaced, limit: configuration.vocabularyPromptLimit),
-            placeholders: protected.tokens
-        )
         let segment = Segment(id: UUID(), sessionID: UUID(), startMs: 0, endMs: 0, rawText: replaced)
-        let cleaned = await cleaner.clean(segment, context: [], options: options)
+        let cleaned: CleanedSegment
+        if let cleaner {
+            let options = CleanupOptions(
+                level: configuration.level,
+                vocabulary: VocabularySelector(
+                    entries: configuration.vocabulary,
+                    similarityThreshold: configuration.vocabularySimilarityThreshold
+                ).relevantTerms(for: replaced, limit: configuration.vocabularyPromptLimit),
+                placeholders: protected.tokens
+            )
+            cleaned = await cleaner.clean(segment, context: [], options: options)
+        } else {
+            // Placeholders are single words that are never fillers, so they come through intact.
+            cleaned = CleanedSegment(
+                segment: segment,
+                cleanedText: CleanupExecutor.deterministicCleanup(of: replaced, level: configuration.level),
+                fellBack: false,
+                fallbackReason: nil,
+                latencyMs: 0
+            )
+        }
 
         var body = cleaned.cleanedText
         if configuration.level.formatsLists, configuration.multiline, let list = ListFormatter().formatted(body) {

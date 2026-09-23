@@ -117,7 +117,9 @@ final class AppComposition {
                     inputDeviceUID: inputDevices.selectedDeviceUID
                 )
             ),
-            processor: DictationProcessor(transcriber: transcriber, cleaner: cleaner),
+            // Cleanup turned off in Advanced (read at launch, like the model) is a choice, not a
+            // failure: dictation applies the level's rules that need no model.
+            processor: DictationProcessor(transcriber: transcriber, cleaner: settings.cleanupEnabled ? cleaner : nil),
             focus: focus,
             delivery: SystemTextDelivery(settings: currentSettings, overrides: overrides, focus: focus),
             history: history,
@@ -140,7 +142,8 @@ final class AppComposition {
             overrides: overrides,
             history: history,
             microphonePermission: microphonePermission,
-            accessibility: accessibility
+            accessibility: accessibility,
+            settingsAtLaunch: settings
         )
         hud = DictationHUD(controller: dictation)
         relay.deliver = { [weak self] notice, destination in self?.show(notice, in: destination) }

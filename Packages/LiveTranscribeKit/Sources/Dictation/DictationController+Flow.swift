@@ -184,12 +184,15 @@ extension DictationController {
         endDictation(showing: notices.compactMap { $0 })
     }
 
+    /// Saves the dictation, then prunes the history if its retention is due.
     private func save(_ record: DictationRecord) async {
         do {
             try await dependencies.history.append(record)
         } catch {
             Log.dictation.error("The dictation could not be saved to history: \(error.localizedDescription, privacy: .public)")
+            return
         }
+        pruneHistoryIfDue()
     }
 
     func performUndo() async {

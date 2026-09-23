@@ -64,15 +64,21 @@ final class OnboardingModel {
     @ObservationIgnored private let microphonePermission: any MicrophonePermissionProviding
     @ObservationIgnored private let accessibility: any AccessibilityPermissionProviding
     @ObservationIgnored private let system: System
+    @ObservationIgnored private let promptMemory: PermissionsSettingsPromptMemory
 
+    /// - Parameter promptMemory: Records the Accessibility prompt for the whole launch, so
+    ///   Settings › Permissions opens System Settings rather than a prompt macOS will no longer
+    ///   show; tests pass their own.
     init(
         microphonePermission: any MicrophonePermissionProviding,
         accessibility: any AccessibilityPermissionProviding,
-        system: System
+        system: System,
+        promptMemory: PermissionsSettingsPromptMemory = .shared
     ) {
         self.microphonePermission = microphonePermission
         self.accessibility = accessibility
         self.system = system
+        self.promptMemory = promptMemory
         microphone = microphonePermission.status()
         accessibilityGranted = accessibility.isGranted()
         fnUsage = system.fnKeyUsage()
@@ -153,9 +159,9 @@ final class OnboardingModel {
     }
 
     /// Shows the system's Accessibility alert, which also adds the app to the list, and opens
-    /// the list in System Settings.
+    /// the list in System Settings. The alert is recorded, since macOS shows it once per launch.
     func grantAccessibility() {
-        accessibility.prompt()
+        promptMemory.prompt(accessibility)
         openPrivacySettings(.accessibility)
         hasAskedForAccessibility = true
     }

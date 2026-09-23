@@ -81,6 +81,10 @@ public final class DictationController {
     /// The progress notices of the dictation in progress, the latest of each kind, in order;
     /// shown once it ends.
     @ObservationIgnored private var carriedNotices: [DictationNotice] = []
+    @ObservationIgnored private var historyPruneTask: Task<Void, Never>?
+    /// When the last history prune started, so a saved dictation prunes only once the prune
+    /// interval has passed since.
+    @ObservationIgnored private var lastHistoryPrune: ContinuousClock.Instant?
     @ObservationIgnored var processingTask: Task<DictationProcessor.Output, Error>?
     @ObservationIgnored var cancelRequested = false
     @ObservationIgnored var undoEntry: UndoEntry?
@@ -130,6 +134,7 @@ public final class DictationController {
                 }
             }
         }
+        startHistoryPruning()
     }
 
     /// Applies changed settings: the hotkeys and gestures, and whether the microphone stays ready.
@@ -170,6 +175,8 @@ public final class DictationController {
         levelTask = nil
         recorderEventTask?.cancel()
         recorderEventTask = nil
+        historyPruneTask?.cancel()
+        historyPruneTask = nil
         hotkeyState = .stopped
         let recorder = dependencies.recorder
         enqueue {
@@ -333,8 +340,46 @@ public final class DictationController {
         return await Task.detached { focus.currentTarget() }.value
     }
 
+    // MARK: - History retention
+
+    /// Prunes the history every ``DictationSettings/historyPruneIntervalMinutes`` until
+    /// ``stop()``, so a menu bar app left running for weeks keeps to the retention. The interval
+    /// is read before each wait, so a new one applies from the next.
+    private func startHistoryPruning() {
+        guard historyPruneTask == nil else { return }
+        let settings = dependencies.settings
+        let sleep = dependencies.sleep
+        historyPruneTask = Task { [weak self] in
+            while !Task.isCancelled {
+                let minutes = settings().dictation.historyPruneIntervalMinutes
+                do {
+                    try await sleep(.seconds(minutes * 60))
+                } catch {
+                    return // Cancelled by stop().
+                }
+                guard let self, !Task.isCancelled else { return }
+                self.pruneHistory(retentionDays: settings().dictation.historyRetentionDays)
+            }
+        }
+    }
+
+    /// Prunes after a dictation is saved, unless a prune started less than the prune interval
+    /// ago. Pruning reads the whole history file, and the periodic prune covers the time in
+    /// between; this catches a history that has not been pruned for longer, such as when the
+    /// periodic prune could not run.
+    func pruneHistoryIfDue() {
+        let settings = dependencies.settings().dictation
+        guard settings.historyRetentionDays > 0 else { return }
+        if let lastHistoryPrune,
+           lastHistoryPrune.duration(to: dependencies.now()) < .seconds(settings.historyPruneIntervalMinutes * 60) {
+            return
+        }
+        pruneHistory(retentionDays: settings.historyRetentionDays)
+    }
+
     private func pruneHistory(retentionDays: Int) {
         guard let cutoff = HistoryRetention.cutoff(now: Date(), retentionDays: retentionDays) else { return }
+        lastHistoryPrune = dependencies.now()
         let history = dependencies.history
         Task {
             do {

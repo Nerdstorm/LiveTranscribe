@@ -135,6 +135,20 @@ focus context, Command Mode, multilingual) is not started.
   which can be a multi-megabyte document. An app without that attribute gets no automatic space.
   The 16 is not a setting: it only has to hold one character (the longest standard emoji
   sequences are 15 units), and a longer one is cut to a tail that spacing treats the same way.
+- **History retention is kept while the app runs.** Besides at launch and on a settings change,
+  history past *Keep dictations for* is deleted every `historyPruneIntervalMinutes` (60) and
+  after a saved dictation once that long has passed since the last prune, so a menu bar app left
+  running for weeks keeps to it. The History window hides records past the retention whenever
+  it loads.
+  The interval is not shown in Settings.
+- **Cleanup turned off in Advanced is a choice, not a failure.** Like the model, the switch is
+  read at launch. Without the model, Medium and High still remove fillers and format spoken
+  lists, nothing is reworded, and dictations are not marked *Cleanup didn't apply*; the live
+  transcript shows the raw text. General's cleanup note describes the switches in effect since
+  launch and says when a change in Advanced waits for a restart.
+- **The Accessibility prompt is remembered for the launch** by setup and Settings alike: macOS
+  shows it once per launch, so after either has shown it, *Grant Access…* in Settings opens
+  System Settings instead.
 
 ## Architecture
 
@@ -184,7 +198,8 @@ Hotkey up ───▶ discard if < 300 ms
              ─▶ snippets: triggers → ⟦S1⟧ placeholders
              ─▶ vocabulary: known spoken variants → canonical spelling
              ─▶ level None: done; else remove fillers (Medium, High)
-             ─▶ LLM cleanup (level rules + vocabulary + placeholder rule + context)
+             ─▶ LLM cleanup (level rules + vocabulary + placeholder rule + context),
+                skipped with OutputGuard when cleanup is off in Advanced (read at launch)
              ─▶ OutputGuard (level bounds, placeholders intact) — else the pre-LLM text
              ─▶ placeholders → expansions; lists → numbered lines (Medium+, multi-line only)
              ─▶ insert at the cursor (AX, else paste, else clipboard + HUD)
@@ -269,6 +284,7 @@ All in UserDefaults (keys are `AppSettingsKey` raw values), read at each use.
 | `vocabularyPromptLimit` / `vocabularySimilarityThreshold` | 50 / 0.8 |
 | `showVirtualInputDevices` | off |
 | `historyEnabled` / `historyRetentionDays` | on / 0 (keep everything) |
+| `historyPruneIntervalMinutes` | 60 |
 | `dictationNoticeSeconds` | 2.5 |
 | `inputDeviceUID` | system default |
 

@@ -102,6 +102,8 @@ struct OnboardingModelTests {
     private let microphone: FakeMicrophone
     private let accessibility: FakeAccessibility
     private let spy = SystemSpy()
+    /// This test's launch: a fresh memory, so tests don't share the app-wide one.
+    private let promptMemory = PermissionsSettingsPromptMemory()
 
     init() {
         microphone = FakeMicrophone(.undetermined)
@@ -116,7 +118,12 @@ struct OnboardingModelTests {
         if let status { microphone.set(status) }
         if let granted { accessibility.set(granted) }
         spy.fnUsage = fn
-        return OnboardingModel(microphonePermission: microphone, accessibility: accessibility, system: spy.system)
+        return OnboardingModel(
+            microphonePermission: microphone,
+            accessibility: accessibility,
+            system: spy.system,
+            promptMemory: promptMemory
+        )
     }
 
     /// Lets the model's observation run until `condition` holds, for up to two seconds.
@@ -206,7 +213,12 @@ struct OnboardingModelTests {
 
     @Test func refusingTheMicrophoneIsShownAsOff() async {
         let refusing = FakeMicrophone(.undetermined, grantsWhenAsked: false)
-        let model = OnboardingModel(microphonePermission: refusing, accessibility: accessibility, system: spy.system)
+        let model = OnboardingModel(
+            microphonePermission: refusing,
+            accessibility: accessibility,
+            system: spy.system,
+            promptMemory: promptMemory
+        )
         await model.requestMicrophone()
         #expect(model.microphone == .denied)
         #expect(spy.announcements == ["Microphone access is off"])
@@ -221,6 +233,23 @@ struct OnboardingModelTests {
         #expect(accessibility.prompts == 1)
         #expect(spy.openedPermissions == [.accessibility])
         #expect(model.hasAskedForAccessibility)
+    }
+
+    /// macOS shows the Accessibility prompt once per launch. Once setup has shown it, Settings'
+    /// button must open System Settings, or its first click does nothing.
+    @Test func theAccessibilityPromptShownInSetupIsRememberedForSettings() {
+        let model = makeModel()
+        #expect(!promptMemory.accessibilityPrompted)
+        model.grantAccessibility()
+        #expect(promptMemory.accessibilityPrompted)
+
+        let settings = PermissionsSettingsModel(
+            microphonePermission: microphone,
+            accessibility: accessibility,
+            promptMemory: promptMemory,
+            openSettings: { _ in true }
+        )
+        #expect(settings.action(for: .accessibility) == .openSettings)
     }
 
     @Test func aPrivacyPaneThatWillNotOpenSaysWhereToGo() {

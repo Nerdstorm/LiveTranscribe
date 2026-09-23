@@ -22,7 +22,7 @@ struct DictationProcessorTests {
         )
     }
 
-    private func finish(_ transcript: String, _ configuration: DictationProcessor.Configuration, cleaner: any Cleaner) async -> DictationProcessor.Output {
+    private func finish(_ transcript: String, _ configuration: DictationProcessor.Configuration, cleaner: (any Cleaner)?) async -> DictationProcessor.Output {
         await DictationProcessor.finish(transcript: transcript, transcriptionMs: 40, configuration: configuration, cleaner: cleaner)
     }
 
@@ -73,6 +73,38 @@ struct DictationProcessorTests {
         #expect(singleLine.text == "We need three things: first, milk; second, eggs; and third, bread.")
         let light = await finish(transcript, configuration(.light, multiline: true), cleaner: cleaner)
         #expect(!light.text.contains("\n"), "Light keeps the words as spoken")
+    }
+
+    // MARK: - Cleanup model turned off
+
+    /// Turning the model off in Advanced is a choice, not a failure: Medium still removes
+    /// fillers and applies snippets and vocabulary, nothing is reworded, and nothing is flagged.
+    @Test func withTheCleanupModelOffMediumRemovesFillersWithoutFallingBack() async {
+        let output = await finish("um send my calendar link to nerd storm", configuration(.medium), cleaner: nil)
+        #expect(output.text == "send https://cal.example.com/me to Nerdstorm")
+        #expect(output.uncleanedText == "um send https://cal.example.com/me to Nerdstorm")
+        #expect(!output.fellBack)
+        #expect(output.fallbackReason == nil)
+        #expect(output.cleanupMs == 0)
+    }
+
+    @Test func withTheCleanupModelOffListsAreStillFormattedAndLightKeepsEveryWord() async {
+        let transcript = "um we need three things: first, milk; second, eggs; and third, bread."
+        let medium = await finish(transcript, configuration(.medium, multiline: true), cleaner: nil)
+        #expect(medium.text == "we need three things:\n1. Milk\n2. Eggs\n3. Bread")
+        #expect(!medium.fellBack)
+
+        let light = await finish(transcript, configuration(.light, multiline: true), cleaner: nil)
+        #expect(light.text == transcript, "Light removes nothing and formats nothing without the model")
+        #expect(!light.fellBack)
+    }
+
+    @Test func processWithoutACleanerStillTranscribes() async throws {
+        let processor = DictationProcessor(transcriber: FakeTranscriber(transcript: " um ship it on friday "), cleaner: nil)
+        let output = try await processor.process([0.1, 0.2], configuration: configuration(.high))
+        #expect(output.text == "ship it on friday")
+        #expect(output.rawTranscript == "um ship it on friday")
+        #expect(!output.fellBack)
     }
 
     @Test func anEmptyTranscriptIsNothingToInsert() async {
