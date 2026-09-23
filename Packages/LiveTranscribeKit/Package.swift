@@ -76,6 +76,8 @@ let package = Package(
                 .product(name: "HuggingFace", package: "swift-huggingface"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
             ],
+            // The fine-tuned LoRA adapter that resolves spoken self-corrections (see Training/).
+            resources: [.copy("Adapter")],
             swiftSettings: strictSwift
         ),
 

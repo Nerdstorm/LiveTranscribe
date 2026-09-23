@@ -121,7 +121,7 @@ Packages/LiveTranscribeKit/   all feature code, as vertical slices
     Capture/         AVCaptureSession microphone capture → 16 kHz mono; microphone list and choice
     Segmentation/    Silero VAD + segmentation state machine (pre-roll, hysteresis, max length)
     Transcription/   Parakeet via mlx-audio-swift
-    Cleanup/         Qwen3 via mlx-swift-lm, prompt, OutputGuard fallbacks
+    Cleanup/         Qwen3 via mlx-swift-lm, prompt, OutputGuard fallbacks, fine-tuned adapter
     Persistence/     JSONL session files
     Session/         SessionCoordinator (lifecycle) + SessionPipeline (3 concurrent stages)
     TranscriptUI/    view model and views
@@ -177,6 +177,7 @@ Options:
 
 - `--fixtures <dir>`: a folder of `.wav` clips, each with a matching `.txt` transcript.
 - `--no-cleanup`: speech-to-text only.
+- `--no-adapter`: clean up without the fine-tuned self-correction adapter.
 - `--fast`: feed audio as fast as possible instead of in real time. Latency numbers are then
   meaningless.
 

@@ -21,6 +21,7 @@ struct AppSettingsTests {
         var settings = AppSettings.defaults
         settings.llmModel = "mlx-community/Qwen3-0.6B-4bit"
         settings.cleanupEnabled = false
+        settings.cleanupAdapterEnabled = false
         settings.vadSilenceMs = 800
         settings.cleanupTimeoutSeconds = 2.5
         store.save(settings)

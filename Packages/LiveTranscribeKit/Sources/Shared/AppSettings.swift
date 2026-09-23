@@ -12,6 +12,9 @@ public struct AppSettings: Sendable, Equatable {
     public var vadModel: String
     /// Kill switch for cleanup. When `false` the LLM is never loaded and output is raw-only.
     public var cleanupEnabled: Bool
+    /// Fuses the bundled fine-tuned adapter, which resolves spoken self-corrections ("cars,
+    /// sorry, buses" → "buses"), into the cleanup LLM. Applies only to the model it was trained on.
+    public var cleanupAdapterEnabled: Bool
     /// Silence that ends a segment.
     public var vadSilenceMs: Int
     /// Silero speech probability that starts a segment.
@@ -45,6 +48,7 @@ public struct AppSettings: Sendable, Equatable {
         llmModel: String,
         vadModel: String,
         cleanupEnabled: Bool,
+        cleanupAdapterEnabled: Bool,
         vadSilenceMs: Int,
         vadSpeechThreshold: Double,
         vadPreRollMs: Int,
@@ -63,6 +67,7 @@ public struct AppSettings: Sendable, Equatable {
         self.llmModel = llmModel
         self.vadModel = vadModel
         self.cleanupEnabled = cleanupEnabled
+        self.cleanupAdapterEnabled = cleanupAdapterEnabled
         self.vadSilenceMs = vadSilenceMs
         self.vadSpeechThreshold = vadSpeechThreshold
         self.vadPreRollMs = vadPreRollMs
@@ -83,6 +88,7 @@ public struct AppSettings: Sendable, Equatable {
         llmModel: "mlx-community/Qwen3-1.7B-4bit",
         vadModel: "mlx-community/silero-vad",
         cleanupEnabled: true,
+        cleanupAdapterEnabled: true,
         vadSilenceMs: 600,
         vadSpeechThreshold: 0.5,
         vadPreRollMs: 200,

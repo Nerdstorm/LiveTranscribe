@@ -70,6 +70,22 @@ public enum Prompt {
         examples: []
     )
 
+    /// Used with the bundled fine-tuned adapter (``CleanupAdapter``), which was trained on
+    /// exactly this prompt. The one removal it allows is a spoken self-correction; the adapter
+    /// supplies the ability the base model lacks, and ``OutputGuard`` checks that nothing else
+    /// was removed.
+    public static let adapted = PromptTemplate(
+        system: """
+            Correct transcription errors, punctuation, casing and grammar in the TEXT.
+            Preserve meaning, tone, hedging and filler intent exactly.
+            Do not add, summarise or rephrase content.
+            When the speaker corrects themselves, keep only the correction.
+            If the text is already correct, return it unchanged.
+            Output only the corrected text.
+            """,
+        examples: []
+    )
+
     /// Qwen3's chat template reads `enable_thinking`. Thinking must be off: with it on, latency
     /// grows by seconds and `<think>` blocks leak into the output.
     public static let templateContext: [String: Bool] = ["enable_thinking": false]

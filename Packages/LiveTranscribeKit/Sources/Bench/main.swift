@@ -1,7 +1,7 @@
 // Bench: runs fixture clips through the real pipeline and reports WER (raw vs cleaned) and
 // per-stage latency. Build with xcodebuild (MLX needs its Metal library); see README.md.
 //
-//   Bench [--fixtures <dir>] [--no-cleanup] [--fast]
+//   Bench [--fixtures <dir>] [--no-cleanup] [--no-adapter] [--fast]
 
 import Capture
 import Cleanup
@@ -16,6 +16,7 @@ import Transcription
 struct BenchOptions {
     var fixturesDirectory = URL(fileURLWithPath: "Tests/IntegrationTests/Fixtures/Audio", isDirectory: true)
     var cleanupEnabled = true
+    var adapterEnabled = true
     var pacing = FileAudioSource.Pacing.realTime
 
     static func parse(_ arguments: [String]) throws -> BenchOptions {
@@ -28,6 +29,8 @@ struct BenchOptions {
                 options.fixturesDirectory = URL(fileURLWithPath: path, isDirectory: true)
             case "--no-cleanup":
                 options.cleanupEnabled = false
+            case "--no-adapter":
+                options.adapterEnabled = false
             case "--fast":
                 options.pacing = .asFastAsPossible
             default:
@@ -45,7 +48,7 @@ enum BenchError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .usage(let detail): "\(detail)\nusage: Bench [--fixtures <dir>] [--no-cleanup] [--fast]"
+        case .usage(let detail): "\(detail)\nusage: Bench [--fixtures <dir>] [--no-cleanup] [--no-adapter] [--fast]"
         case .noFixtures(let path):
             "No .wav files with matching .txt references in \(path). Run scripts/generate-test-audio.sh first."
         case .sessionFailed(let detail): "Session failed: \(detail)"
@@ -78,6 +81,7 @@ struct Fixture {
 let options = try BenchOptions.parse(Array(CommandLine.arguments.dropFirst()))
 var settings = AppSettings.defaults
 settings.cleanupEnabled = options.cleanupEnabled
+settings.cleanupAdapterEnabled = options.adapterEnabled
 MLXRuntime.configure(gpuCacheLimitMB: settings.gpuCacheLimitMB)
 
 let fixtures = try Fixture.load(from: options.fixturesDirectory)
