@@ -48,6 +48,9 @@ let package = Package(
         // The deterministic text rules the cleanup levels turn on (fillers, lists).
         .target(name: "Styles", dependencies: ["Shared"], swiftSettings: strictSwift),
 
+        // Microphone and Accessibility status for dictation, and links to System Settings.
+        .target(name: "Permissions", dependencies: ["Shared", "Capture"], swiftSettings: strictSwift),
+
         .target(
             name: "Segmentation",
             dependencies: [
@@ -137,6 +140,7 @@ let package = Package(
 
         .testTarget(name: "SharedTests", dependencies: ["Shared"], swiftSettings: strictSwift),
         .testTarget(name: "StylesTests", dependencies: ["Styles"], swiftSettings: strictSwift),
+        .testTarget(name: "PermissionsTests", dependencies: ["Permissions", "Capture"], swiftSettings: strictSwift),
         .testTarget(name: "CaptureTests", dependencies: ["Capture", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "SegmentationTests", dependencies: ["Segmentation", "Shared"], swiftSettings: strictSwift),
         .testTarget(
