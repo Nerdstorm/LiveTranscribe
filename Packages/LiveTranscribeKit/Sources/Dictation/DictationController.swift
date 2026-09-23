@@ -267,8 +267,14 @@ public final class DictationController {
             undoLastEdit()
             return
         }
-        if input == .escape, phase == .processing {
-            cancelProcessing()
+        if phase == .processing, !gesture.isRecording {
+            // One dictation at a time: a recording started now would open the microphone only
+            // after this one is inserted, and lose the first words.
+            switch input {
+            case .escape: cancelProcessing()
+            case .pressed: show(.stillProcessing)
+            default: break
+            }
             return
         }
         if startedFromMenu, !gesture.isRecording {

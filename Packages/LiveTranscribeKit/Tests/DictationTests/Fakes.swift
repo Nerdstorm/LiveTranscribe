@@ -3,11 +3,15 @@ import Foundation
 import Shared
 import Transcription
 
-/// Returns a fixed transcript, or throws.
+/// Returns a fixed transcript, or throws. ``hold()`` keeps a transcription waiting until
+/// ``release()``, so a test can act while a dictation is processing.
 actor FakeTranscriber: Transcriber {
     var transcript: String
     var error: Error?
     private(set) var calls = 0
+    private var held = false
+    private var heldCalls: [CheckedContinuation<Void, Never>] = []
+    private var callWaiters: [CheckedContinuation<Void, Never>] = []
 
     init(transcript: String = "", error: Error? = nil) {
         self.transcript = transcript
@@ -20,8 +24,27 @@ actor FakeTranscriber: Transcriber {
 
     func transcribe(_ samples: [Float], sampleRate: Int) async throws -> String {
         calls += 1
+        callWaiters.forEach { $0.resume() }
+        callWaiters = []
+        if held {
+            await withCheckedContinuation { heldCalls.append($0) }
+        }
         if let error { throw error }
         return transcript
+    }
+
+    func hold() { held = true }
+
+    func release() {
+        held = false
+        heldCalls.forEach { $0.resume() }
+        heldCalls = []
+    }
+
+    /// Returns once a transcription has started.
+    func waitForCall() async {
+        guard calls == 0 else { return }
+        await withCheckedContinuation { callWaiters.append($0) }
     }
 }
 

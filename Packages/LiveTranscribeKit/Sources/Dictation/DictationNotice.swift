@@ -21,6 +21,8 @@ public enum DictationNotice: Sendable, Equatable {
     case undoFailed
     /// The microphone changed or fell back; the message names the device.
     case microphone(String)
+    /// The hotkey was pressed while the last dictation was still being inserted.
+    case stillProcessing
 
     public var message: String {
         switch self {
@@ -43,13 +45,15 @@ public enum DictationNotice: Sendable, Equatable {
         case .undoRefused(let reason): reason
         case .undoFailed: "Couldn't undo the edit"
         case .microphone(let message): message
+        case .stillProcessing: "Still inserting the last dictation"
         }
     }
 
     /// Shown as a problem rather than as information.
     public var isProblem: Bool {
         switch self {
-        case .cancelled, .undone, .nothingToUndo, .nothingHeard, .copiedToClipboard, .undoCopiedToClipboard, .microphone:
+        case .cancelled, .undone, .nothingToUndo, .nothingHeard, .copiedToClipboard, .undoCopiedToClipboard, .microphone,
+             .stillProcessing:
             false
         default:
             true

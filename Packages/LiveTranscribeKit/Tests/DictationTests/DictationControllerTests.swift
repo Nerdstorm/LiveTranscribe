@@ -412,4 +412,23 @@ struct DictationControllerTests {
         await h.release()
         #expect(h.controller.phase == .idle, "with hands-free off a tap is cancelled at once")
     }
+
+    @Test func aPressWhileProcessingSaysSoInsteadOfRecordingLate() async {
+        let h = Harness()
+        await h.transcriber.hold()
+        h.controller.start()
+        await h.hold(milliseconds: 500)
+        h.controller.handle(.released)
+        await h.transcriber.waitForCall()
+        #expect(h.controller.phase == .processing)
+
+        h.controller.handle(.pressed)
+        #expect(h.controller.notice == .stillProcessing)
+        h.controller.handle(.released)
+        await h.transcriber.release()
+        await h.controller.settle()
+        #expect(await h.delivery.inserted == ["Ship it on friday."])
+        #expect(h.controller.phase == .idle)
+        #expect(await h.source.starts == 1, "the press during processing never opened the microphone")
+    }
 }
