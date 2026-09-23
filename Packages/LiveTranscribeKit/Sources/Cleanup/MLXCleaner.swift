@@ -2,6 +2,7 @@ import Foundation
 @preconcurrency import MLX
 import MLXLLM
 import MLXLMCommon
+import os
 import Shared
 
 /// ``Cleaner`` backed by an MLX LLM (Qwen3-1.7B-4bit by default) via mlx-swift-lm.
@@ -16,6 +17,11 @@ import Shared
 /// (held-out self-corrections resolved: 97% unfused, 13% fused). The unfused layers add no
 /// measurable latency. If that fails, the base model is used, and ``PromptBuilder`` gives every
 /// level the strict rules.
+///
+/// The adapter is in the model only for levels that resolve self-corrections (Medium, High).
+/// Trained to resolve them whatever the prompt says, it would otherwise do so at Light too, where
+/// every word must stay, and OutputGuard would reject the result. At None and Light its layers are
+/// turned off before generating, which leaves the base model and costs no model compute.
 public actor MLXCleaner: Cleaner {
     public struct Configuration: Sendable, Equatable {
         public let modelID: String
@@ -73,6 +79,8 @@ public actor MLXCleaner: Cleaner {
     private let outputGuard: OutputGuard
     private var executor: CleanupExecutor
     private var container: ModelContainer?
+    /// The loaded adapter's layers, switched in and out per request; `nil` without an adapter.
+    private var adapterLayers: AdapterLayers?
     /// The adapter in use once loaded: `nil` without one, or when loading it failed and the
     /// base model took over.
     public private(set) var activeAdapter: CleanupAdapter?
@@ -89,10 +97,11 @@ public actor MLXCleaner: Cleaner {
 
         let loaded: ModelContainer
         var applied: CleanupAdapter?
+        var layers: AdapterLayers?
         if let adapter = configuration.adapter {
             do {
                 let pinned = try await Self.loadModel(modelID, revision: adapter.baseRevision, progress: progress)
-                try await Self.apply(adapter, to: pinned)
+                layers = try await Self.apply(adapter, to: pinned)
                 loaded = pinned
                 applied = adapter
                 Log.cleanup.info(
@@ -120,11 +129,13 @@ public actor MLXCleaner: Cleaner {
             contextLimit: 0,
             template: prompts.template(for: CleanupOptions(level: .medium))
         )
+        let warmUpLayers = layers
         _ = try await withDeadline(seconds: Self.warmUpTimeoutSeconds) {
-            try await Self.generate(with: loaded, request: warmUp)
+            try await Self.generate(with: loaded, request: warmUp, adapter: warmUpLayers, useAdapter: true)
         }
         executor = Self.executor(for: configuration, adapted: applied != nil, outputGuard: outputGuard)
         container = loaded
+        adapterLayers = layers
         activeAdapter = applied
         progress(ModelLoadProgress(modelID: modelID, stage: .ready, fractionCompleted: 1))
         Log.cleanup.info(
@@ -136,9 +147,11 @@ public actor MLXCleaner: Cleaner {
     /// is marked as a fallback.
     public func clean(_ segment: Segment, context: [String], options: CleanupOptions) async -> CleanedSegment {
         let container = self.container
+        let adapter = adapterLayers
+        let useAdapter = options.level.resolvesSelfCorrections
         return await executor.run(segment, context: context, options: options) { request in
             guard let container else { throw CleanupModelNotLoaded() }
-            return try await Self.generate(with: container, request: request)
+            return try await Self.generate(with: container, request: request, adapter: adapter, useAdapter: useAdapter)
         }
     }
 
@@ -166,18 +179,35 @@ public actor MLXCleaner: Cleaner {
         }
     }
 
-    private static func apply(_ adapter: CleanupAdapter, to container: ModelContainer) async throws {
-        let lora = try adapter.loRAContainer()
-        try await container.perform(values: lora) { context, lora in
-            try context.model.load(adapter: lora)
+    private static func apply(_ adapter: CleanupAdapter, to container: ModelContainer) async throws -> AdapterLayers {
+        let layers = AdapterLayers(lora: try adapter.loRAContainer())
+        try await container.perform(values: layers) { context, layers in
+            try layers.use(true, in: context.model)
             eval(context.model)
         }
+        return layers
     }
 
     /// Greedy generation of the corrected text. Cancelling the calling task stops generation:
     /// the token stream ends and mlx-swift-lm cancels its generation task.
-    private static func generate(with container: ModelContainer, request: CleanupRequest) async throws -> String {
+    ///
+    /// The adapter is switched in or out inside the same `perform` as the generation, so no
+    /// other request can change the model in between.
+    private static func generate(
+        with container: ModelContainer,
+        request: CleanupRequest,
+        adapter: AdapterLayers?,
+        useAdapter: Bool
+    ) async throws -> String {
         try await container.perform(values: request) { context, request in
+            if let adapter {
+                do {
+                    try adapter.use(useAdapter, in: context.model)
+                } catch {
+                    // The base model still cleans up; the prompt's rules and OutputGuard hold.
+                    Log.cleanup.error("Could not switch the cleanup adapter: \(error.localizedDescription, privacy: .public)")
+                }
+            }
             let chat: [Chat.Message] = request.messages.map { message in
                 switch message.role {
                 case .system: .system(message.content)
@@ -198,6 +228,35 @@ public actor MLXCleaner: Cleaner {
             try Task.checkCancellation()
             return text
         }
+    }
+}
+
+/// A LoRA adapter loaded into the model once, then turned on or off per request.
+///
+/// Only used inside `ModelContainer.perform`, which runs one closure at a time; the lock makes
+/// the flag safe to share with those closures, not to switch concurrently.
+private final class AdapterLayers: Sendable {
+    let lora: LoRAContainer
+    /// `nil` until the layers are in the model.
+    private let enabled = OSAllocatedUnfairLock<Bool?>(initialState: nil)
+
+    init(lora: LoRAContainer) {
+        self.lora = lora
+    }
+
+    /// Loads the layers the first time, then turns the adapter on or off with mlx-swift-lm's
+    /// per-layer toggle, which leaves the base weights untouched. Does nothing when the model is
+    /// already that way.
+    func use(_ wanted: Bool, in model: any LanguageModel) throws {
+        let current = enabled.withLock { $0 }
+        if current == nil {
+            try model.load(adapter: lora)
+        } else if current == wanted {
+            return
+        }
+        model.setLoRAEnabled(wanted)
+        enabled.withLock { $0 = wanted }
+        Log.cleanup.debug("Cleanup adapter \(wanted ? "on" : "off", privacy: .public)")
     }
 }
 
