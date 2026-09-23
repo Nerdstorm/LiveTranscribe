@@ -2,8 +2,7 @@ import Foundation
 
 /// Locations of persisted sessions.
 public enum SessionStorage {
-    /// `Application Support/<bundle id>/Sessions`. Inside the app sandbox this resolves to the
-    /// app's container.
+    /// `~/Library/Application Support/<bundle id>/Sessions`.
     public static func sessionsDirectory(bundleIdentifier: String) throws -> URL {
         do {
             let applicationSupport = try FileManager.default.url(

@@ -48,8 +48,8 @@ Or open `LiveTranscribe.xcodeproj` in Xcode and choose Run. The shared scheme ru
 build Xcode asks you to trust mlx-swift's `CudaBuild` build-tool plugin, which only does work in
 CUDA builds; `-skipPackagePluginValidation` skips that prompt on the command line.
 
-On first launch the app downloads the models into its sandbox container
-(`~/Library/Containers/org.nerdstorm.LiveTranscribe/Data/Library/Caches/huggingface`) and shows
+On first launch the app downloads the models into the Hugging Face cache
+(`~/.cache/huggingface`, shared with the tests, the bench and other Hugging Face tools) and shows
 their progress. **Start Transcribing** becomes available once the models have loaded. If the
 cleanup model fails to load, the app transcribes without cleanup and offers **Retry**. The first
 Start asks for microphone access.
@@ -66,10 +66,16 @@ time the app starts.** **Restore Defaults** resets these and keeps your micropho
 
 ### Signing and Gatekeeper
 
-Builds are ad-hoc signed ("Sign to Run Locally") and not notarized, so they run on the Mac that
-built them. Gatekeeper blocks a copy downloaded onto another Mac; build it there instead, or allow
-it under System Settings › Privacy & Security. The ad-hoc signature changes with every build, so
-macOS may ask for microphone access again after a rebuild.
+The app is built for Developer ID distribution: it runs outside the App Sandbox (inserting text
+into other apps needs the Accessibility permission, which sandboxed apps cannot use), with the
+Hardened Runtime. That rules out the Mac App Store.
+
+Builds from this repository are ad-hoc signed ("Sign to Run Locally") and not notarized, so they
+run on the Mac that built them. Gatekeeper blocks a copy downloaded onto another Mac; build it
+there instead, or allow it under System Settings › Privacy & Security. To distribute a build, sign
+it with your Developer ID and notarize it. The ad-hoc signature changes with every build, so
+macOS asks for microphone access again after a rebuild, and the Accessibility permission must be
+granted again (remove the old entry and add the new build).
 
 ## Privacy
 
@@ -79,12 +85,18 @@ macOS may ask for microphone access again after a rebuild.
   a different model in Settings. Downloaded models are reused without contacting Hugging Face
   again.
 - Every session is saved as an unencrypted JSONL file in
-  `~/Library/Containers/org.nerdstorm.LiveTranscribe/Data/Library/Application Support/org.nerdstorm.LiveTranscribe/Sessions/`,
+  `~/Library/Application Support/org.nerdstorm.LiveTranscribe/Sessions/`,
   which the **Sessions** button opens. Each line holds one segment: the raw and cleaned text,
   whether and why cleanup fell back to the raw text, start and end times, per-stage latencies,
   a timestamp and IDs. Files are kept until you delete them.
-- Deleting the app does not delete its data. To remove the models, sessions and settings, delete
-  the `~/Library/Containers/org.nerdstorm.LiveTranscribe` folder.
+- Deleting the app does not delete its data. To remove it, delete
+  `~/Library/Application Support/org.nerdstorm.LiveTranscribe` (sessions),
+  `~/Library/Preferences/org.nerdstorm.LiveTranscribe.plist` (settings) and the models in
+  `~/.cache/huggingface/hub` (folders named `models--mlx-community--…`, and `mlx-audio`).
+- Earlier builds ran in the App Sandbox and kept their data in
+  `~/Library/Containers/org.nerdstorm.LiveTranscribe`. The current app doesn't read it: move old
+  sessions from its `Data/Library/Application Support/org.nerdstorm.LiveTranscribe/Sessions`
+  folder if you want them, then delete the folder to free the models' space.
 
 ## Models and credits
 
@@ -113,7 +125,7 @@ redistributed build must carry those notices too.
 
 ```
 App/                          SwiftUI app target: window, settings, composition root
-LiveTranscribe.xcodeproj      app project (ad-hoc signed, sandboxed, hardened runtime)
+LiveTranscribe.xcodeproj      app project (ad-hoc signed, hardened runtime, no App Sandbox)
 scripts/                      generate-test-audio.sh
 Packages/LiveTranscribeKit/   all feature code, as vertical slices
   Sources/
@@ -249,10 +261,8 @@ hardware before relying on these numbers.
   transcribed but not yet cleaned are lost: their raw text was on screen but not yet saved.
 - The models come from each repository's `main` branch at first launch and are then reused, so
   Macs that install at different times can end up with different model versions.
-- The sandboxed app keeps its own model copy in its container, separate from
-  `~/.cache/huggingface`, which the tests and the bench use. mlx-audio-swift also copies the
-  speech-to-text weights into a second folder; on APFS the copy is a clone, so `du` counts it
-  twice but it takes no extra space.
+- mlx-audio-swift copies the speech-to-text weights into a second folder of the Hugging Face
+  cache; on APFS the copy is a clone, so `du` counts it twice but it takes no extra space.
 
 ## License
 
