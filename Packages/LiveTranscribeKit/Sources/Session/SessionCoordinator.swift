@@ -16,6 +16,8 @@ public actor SessionCoordinator: SessionControlling {
         public var segmenter: any SpeechSegmenter
         public var transcriber: any Transcriber
         public var cleaner: any Cleaner
+        /// Read at every Start, so a change of cleanup level applies to the next session.
+        public var cleanupOptions: @Sendable () -> CleanupOptions
         public var makeSink: @Sendable (UUID) async throws -> any SessionSink
         public var microphonePermission: any MicrophonePermissionProviding
 
@@ -24,6 +26,7 @@ public actor SessionCoordinator: SessionControlling {
             segmenter: any SpeechSegmenter,
             transcriber: any Transcriber,
             cleaner: any Cleaner,
+            cleanupOptions: @escaping @Sendable () -> CleanupOptions,
             makeSink: @escaping @Sendable (UUID) async throws -> any SessionSink,
             microphonePermission: any MicrophonePermissionProviding
         ) {
@@ -31,6 +34,7 @@ public actor SessionCoordinator: SessionControlling {
             self.segmenter = segmenter
             self.transcriber = transcriber
             self.cleaner = cleaner
+            self.cleanupOptions = cleanupOptions
             self.makeSink = makeSink
             self.microphonePermission = microphonePermission
         }
@@ -51,6 +55,10 @@ public actor SessionCoordinator: SessionControlling {
     private var cleanupAvailability: CleanupAvailability
     private var loadTask: Task<Void, Never>?
     private var activeRun: ActiveRun?
+    /// A ``start()`` is under way: it awaits permission, the session file and the microphone
+    /// before `activeRun` is set, so without this a second Start would open a second capture
+    /// that nothing tracks or stops.
+    private var isStarting = false
 
     public init(settings: AppSettings, dependencies: Dependencies) {
         (events, eventInput) = AsyncStream.makeStream(of: SessionEvent.self)
@@ -143,12 +151,14 @@ public actor SessionCoordinator: SessionControlling {
         default:
             return
         }
+        guard !isStarting, activeRun == nil else { return }
+        isStarting = true
+        defer { isStarting = false }
         guard await dependencies.microphonePermission.request() else {
             Log.session.notice("Microphone permission denied")
             setPhase(.failed(.microphonePermissionDenied))
             return
         }
-        guard activeRun == nil else { return }
 
         let sessionID = UUID()
         let sink: any SessionSink
@@ -174,7 +184,8 @@ public actor SessionCoordinator: SessionControlling {
             configuration: .init(
                 sessionID: sessionID,
                 contextSegments: settings.contextSegments,
-                cleanupQueueCapacity: settings.cleanupQueueCapacity
+                cleanupQueueCapacity: settings.cleanupQueueCapacity,
+                cleanupOptions: dependencies.cleanupOptions()
             ),
             segmenter: dependencies.segmenter,
             transcriber: dependencies.transcriber,

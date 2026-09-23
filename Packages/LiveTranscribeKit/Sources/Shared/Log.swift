@@ -17,8 +17,16 @@ public enum Log {
     public static let persistence = Logger(subsystem: subsystem, category: "Persistence")
     public static let session = Logger(subsystem: subsystem, category: "Session")
     public static let ui = Logger(subsystem: subsystem, category: "UI")
+    public static let dictation = Logger(subsystem: subsystem, category: "Dictation")
+    public static let hotkey = Logger(subsystem: subsystem, category: "Hotkey")
+    public static let insertion = Logger(subsystem: subsystem, category: "Insertion")
+    public static let permissions = Logger(subsystem: subsystem, category: "Permissions")
+    public static let snippets = Logger(subsystem: subsystem, category: "Snippets")
+    public static let vocabulary = Logger(subsystem: subsystem, category: "Vocabulary")
 
     /// Signposts for Instruments: STT and LLM calls are wrapped in intervals.
     public static let transcriptionSignposter = OSSignposter(logger: transcription)
     public static let cleanupSignposter = OSSignposter(logger: cleanup)
+    /// Dictation intervals: hotkey down to first audio, and hotkey up to inserted text.
+    public static let dictationSignposter = OSSignposter(logger: dictation)
 }

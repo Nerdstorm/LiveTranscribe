@@ -1,3 +1,4 @@
+import Permissions
 import Shared
 import SwiftUI
 
@@ -65,6 +66,8 @@ private struct ModelProgressRow: View {
 
 struct PermissionDeniedView: View {
     let onRetry: () -> Void
+    /// System Settings could not be opened; says where to go by hand.
+    @State private var openFailure: String?
 
     var body: some View {
         ContentUnavailableView {
@@ -72,9 +75,16 @@ struct PermissionDeniedView: View {
         } description: {
             Text("Live Transcribe needs the microphone to transcribe your speech. Audio never leaves this Mac.")
         } actions: {
-            Button("Open System Settings", action: SystemActions.openMicrophoneSettings)
-                .buttonStyle(.borderedProminent)
+            Button("Open System Settings") {
+                openFailure = SystemActions.openMicrophoneSettings() ? nil : RequiredPermission.microphone.settingsFailureMessage
+            }
+            .buttonStyle(.borderedProminent)
             Button("Try Again", action: onRetry)
+            if let openFailure {
+                Label(openFailure, systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 }

@@ -20,6 +20,7 @@ xcuserdata/
 # Test audio is synthesised locally with macOS text-to-speech (scripts/generate-test-audio.sh);
 # Apple's licence does not allow redistributing it.
 Packages/LiveTranscribeKit/Tests/IntegrationTests/Fixtures/Audio/*.wav
+Packages/LiveTranscribeKit/Tests/IntegrationTests/Fixtures/Dictation/*.wav
 
 # Adapter training: generated data and run output are reproducible with the Train tool
 # (see Packages/LiveTranscribeKit/Training/README.md).

@@ -2,7 +2,9 @@ import Foundation
 
 /// Every tunable in the app. Slices receive the values they need through their initialisers.
 ///
-/// Values are read once at launch; changes made in the Settings window apply on the next launch.
+/// Model and pipeline values are read once at launch, so changes to them apply on the next
+/// launch. Values documented as "read at each use" are loaded again whenever they are needed,
+/// so they apply immediately.
 public struct AppSettings: Sendable, Equatable {
     /// Speech-to-text model repository.
     public var sttModel: String
@@ -15,6 +17,9 @@ public struct AppSettings: Sendable, Equatable {
     /// Loads the bundled fine-tuned adapter, which resolves spoken self-corrections ("cars,
     /// sorry, buses" → "buses"), into the cleanup LLM. Applies only to the model it was trained on.
     public var cleanupAdapterEnabled: Bool
+    /// How much cleanup may change what was said, for dictation and the live transcript alike.
+    /// Read at each use: every dictation and every Start.
+    public var cleanupLevel: CleanupLevel
     /// Silence that ends a segment.
     public var vadSilenceMs: Int
     /// Silero speech probability that starts a segment.
@@ -42,6 +47,8 @@ public struct AppSettings: Sendable, Equatable {
     /// Capture restarts allowed in any 60 s window before capture stops with an error, instead of
     /// looping on a microphone that keeps failing.
     public var captureMaxRestartsPerMinute: Int
+    /// System-wide dictation: read at each use.
+    public var dictation: DictationSettings
 
     public init(
         sttModel: String,
@@ -49,6 +56,7 @@ public struct AppSettings: Sendable, Equatable {
         vadModel: String,
         cleanupEnabled: Bool,
         cleanupAdapterEnabled: Bool,
+        cleanupLevel: CleanupLevel,
         vadSilenceMs: Int,
         vadSpeechThreshold: Double,
         vadPreRollMs: Int,
@@ -61,13 +69,15 @@ public struct AppSettings: Sendable, Equatable {
         gpuCacheLimitMB: Int,
         captureRestartAttempts: Int,
         captureRestartDelaySeconds: Double,
-        captureMaxRestartsPerMinute: Int
+        captureMaxRestartsPerMinute: Int,
+        dictation: DictationSettings
     ) {
         self.sttModel = sttModel
         self.llmModel = llmModel
         self.vadModel = vadModel
         self.cleanupEnabled = cleanupEnabled
         self.cleanupAdapterEnabled = cleanupAdapterEnabled
+        self.cleanupLevel = cleanupLevel
         self.vadSilenceMs = vadSilenceMs
         self.vadSpeechThreshold = vadSpeechThreshold
         self.vadPreRollMs = vadPreRollMs
@@ -81,6 +91,7 @@ public struct AppSettings: Sendable, Equatable {
         self.captureRestartAttempts = captureRestartAttempts
         self.captureRestartDelaySeconds = captureRestartDelaySeconds
         self.captureMaxRestartsPerMinute = captureMaxRestartsPerMinute
+        self.dictation = dictation
     }
 
     public static let defaults = AppSettings(
@@ -89,6 +100,7 @@ public struct AppSettings: Sendable, Equatable {
         vadModel: "mlx-community/silero-vad",
         cleanupEnabled: true,
         cleanupAdapterEnabled: true,
+        cleanupLevel: .medium,
         vadSilenceMs: 600,
         vadSpeechThreshold: 0.5,
         vadPreRollMs: 200,
@@ -101,7 +113,8 @@ public struct AppSettings: Sendable, Equatable {
         gpuCacheLimitMB: 512,
         captureRestartAttempts: 5,
         captureRestartDelaySeconds: 1,
-        captureMaxRestartsPerMinute: 6
+        captureMaxRestartsPerMinute: 6,
+        dictation: .defaults
     )
 
     /// The same settings with every value clamped to a range the pipeline can run with.
@@ -124,6 +137,7 @@ public struct AppSettings: Sendable, Equatable {
         copy.captureRestartAttempts = captureRestartAttempts.clamped(to: 0...20)
         copy.captureRestartDelaySeconds = captureRestartDelaySeconds.clamped(to: 0...30)
         copy.captureMaxRestartsPerMinute = captureMaxRestartsPerMinute.clamped(to: 1...60)
+        copy.dictation = dictation.sanitized()
         return copy
     }
 }
@@ -132,11 +146,5 @@ private extension String {
     func trimmed(or fallback: String) -> String {
         let value = trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? fallback : value
-    }
-}
-
-private extension Comparable {
-    func clamped(to range: ClosedRange<Self>) -> Self {
-        min(max(self, range.lowerBound), range.upperBound)
     }
 }

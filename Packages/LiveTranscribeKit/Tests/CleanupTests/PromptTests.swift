@@ -68,4 +68,8 @@ struct PromptTests {
         #expect(Prompt.maxTokens(for: "one two three") == 2 * 3 + 16)
         #expect(Prompt.request(for: "a b c d e", context: [], contextLimit: 0).maxTokens == 26)
     }
+
+    @Test func placeholdersGetExtraTokenBudget() {
+        #expect(Prompt.maxTokens(for: "send ⟦S1⟧ and ⟦S2⟧") == 2 * 4 + 2 * 6 + 16)
+    }
 }

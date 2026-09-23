@@ -1,29 +1,22 @@
-@preconcurrency import AVFoundation
 import Foundation
 import Shared
 
-/// ``InputDeviceSelecting`` backed by AVFoundation's microphone list, with the choice saved
+/// ``InputDeviceSelecting`` backed by ``SystemInputDeviceCatalog``, with the choice saved
 /// through ``AppSettingsStore``.
 ///
-/// Devices are listed by the same API ``CaptureSessionSource`` opens them with, so every entry
-/// in the picker can be captured from. Their ids are `AVCaptureDevice.uniqueID`s, which on
-/// macOS are Core Audio device UIDs.
+/// The list is the one ``CaptureSessionSource`` opens devices from, so every entry in the picker
+/// can be captured from. Virtual devices are listed and flagged; ``MicrophonePickerList``
+/// decides whether a picker shows them.
 public struct SystemInputDevices: InputDeviceSelecting {
     private let store: AppSettingsStore
+    private let catalog = SystemInputDeviceCatalog()
 
     public init(store: AppSettingsStore) {
         self.store = store
     }
 
-    public func availableDevices() -> [AudioInputDevice] {
-        AVCaptureDevice.DiscoverySession(deviceTypes: [.microphone], mediaType: .audio, position: .unspecified)
-            .devices
-            .map { AudioInputDevice(id: $0.uniqueID, name: $0.localizedName) }
-            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-    }
-
-    public func systemDefaultName() -> String? {
-        AVCaptureDevice.default(for: .audio)?.localizedName
+    public func snapshot() -> InputDeviceSnapshot {
+        catalog.snapshot()
     }
 
     public var selectedDeviceUID: String? {
@@ -36,9 +29,6 @@ public struct SystemInputDevices: InputDeviceSelecting {
     }
 
     public func changes() -> AsyncStream<Void> {
-        let (stream, continuation) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
-        let observation = DeviceChangeObservation { continuation.yield() }
-        continuation.onTermination = { _ in observation.cancel() }
-        return stream
+        catalog.changes()
     }
 }

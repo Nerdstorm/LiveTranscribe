@@ -25,22 +25,23 @@ private final class FakeSession: SessionControlling, @unchecked Sendable {
     func shutdown() async {}
 }
 
-/// Microphones in memory; `connect` simulates a device appearing.
+/// Microphones in memory; `connect` and `disconnect` simulate a device appearing and going.
 private final class FakeInputDevices: InputDeviceSelecting, @unchecked Sendable {
     // @unchecked: mutated only from the main actor in tests; the stream pair is immutable.
     var devices: [AudioInputDevice]
+    var systemDefault: AudioInputDevice?
     var selected: String?
     private let stream: AsyncStream<Void>
     private let continuation: AsyncStream<Void>.Continuation
 
-    init(devices: [AudioInputDevice], selected: String? = nil) {
+    init(devices: [AudioInputDevice], systemDefault: AudioInputDevice? = builtIn, selected: String? = nil) {
         self.devices = devices
+        self.systemDefault = systemDefault
         self.selected = selected
         (stream, continuation) = AsyncStream.makeStream(of: Void.self)
     }
 
-    func availableDevices() -> [AudioInputDevice] { devices }
-    func systemDefaultName() -> String? { "MacBook Pro Microphone" }
+    func snapshot() -> InputDeviceSnapshot { InputDeviceSnapshot(connected: devices, systemDefault: systemDefault) }
     var selectedDeviceUID: String? { selected }
     func select(_ uid: String?) { selected = uid }
     func changes() -> AsyncStream<Void> { stream }
@@ -49,10 +50,16 @@ private final class FakeInputDevices: InputDeviceSelecting, @unchecked Sendable 
         devices.append(device)
         continuation.yield()
     }
+
+    func disconnect(_ device: AudioInputDevice) {
+        devices.removeAll { $0.id == device.id }
+        continuation.yield()
+    }
 }
 
 private let builtIn = AudioInputDevice(id: "BuiltInMicrophoneDevice", name: "MacBook Pro Microphone")
 private let headset = AudioInputDevice(id: "00-11-22:input", name: "OpenComm2")
+private let loopback = AudioInputDevice(id: "ZoomAudioDevice", name: "ZoomAudioDevice", isVirtual: true)
 
 private func segment(_ id: UUID, _ text: String) -> Segment {
     Segment(id: id, sessionID: UUID(), startMs: 0, endMs: 1_000, rawText: text)
@@ -177,6 +184,47 @@ struct TranscriptViewModelTests {
         try await waitUntil { session.stopCalls == 1 }
     }
 
+    @Test func stopListeningStopsAListeningSessionAndNeverStartsOne() async throws {
+        let model = self.model
+        model.apply(.phase(.listening))
+        model.stopListening()
+        try await waitUntil { session.stopCalls == 1 }
+
+        // Closing the window of a session that is not listening must not start one.
+        for phase in [SessionPhase.ready, .loading, .stopping, .failed(.audioCaptureFailed(message: "x"))] {
+            model.apply(.phase(phase))
+            model.stopListening()
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(session.startCalls == 0)
+        #expect(session.stopCalls == 1)
+    }
+
+    @Test func aStartUnderWayWhenAskedToStopIsStoppedOnceItListens() async throws {
+        let model = self.model
+        model.apply(.phase(.ready))
+        model.toggleListening()
+        try await waitUntil { session.startCalls == 1 }
+        // The window closes while the microphone is still opening.
+        model.stopListening()
+        #expect(session.stopCalls == 0)
+        model.apply(.phase(.listening))
+        try await waitUntil { session.stopCalls == 1 }
+    }
+
+    @Test func aNewStartIsNotStoppedByAnEarlierStopRequest() async throws {
+        let model = self.model
+        model.apply(.phase(.ready))
+        // Closed while nothing was starting, then started again from the window.
+        model.stopListening()
+        model.toggleListening()
+        try await waitUntil { session.startCalls == 1 }
+        model.apply(.phase(.listening))
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(session.stopCalls == 0)
+        #expect(model.isListening)
+    }
+
     @Test func warningsCanBeDismissed() {
         let model = self.model
         model.apply(.warning("disk full"))
@@ -190,12 +238,29 @@ struct TranscriptViewModelTests {
     @Test func attachLoadsDevicesAndTheSavedChoice() {
         let devices = FakeInputDevices(devices: [builtIn, headset], selected: headset.id)
         let model = TranscriptViewModel(session: session, sessionsDirectory: nil, inputSelection: devices)
-        #expect(model.inputDevices.isEmpty, "devices load on attach, not in init")
+        #expect(model.inputDevices.connected.isEmpty, "devices load on attach, not in init")
         model.attach()
-        #expect(model.inputDevices == [builtIn, headset])
+        #expect(model.inputDevices == InputDeviceSnapshot(connected: [builtIn, headset], systemDefault: builtIn))
         #expect(model.selectedInputDeviceUID == headset.id)
-        #expect(model.systemDefaultInputName == "MacBook Pro Microphone")
-        #expect(!model.selectedInputDeviceIsMissing)
+        let list = model.microphoneList(showVirtualDevices: false)
+        #expect(list.systemDefault.title == "System Default (MacBook Pro Microphone)")
+        #expect(list.selectedRow.uid == headset.id)
+        #expect(list.selectedRow.kind == .microphone)
+    }
+
+    @Test func thePickerListFollowsShowOtherDevices() {
+        let devices = FakeInputDevices(devices: [builtIn, loopback])
+        let model = TranscriptViewModel(session: session, sessionsDirectory: nil, inputSelection: devices)
+        model.attach()
+        #expect(model.microphoneList(showVirtualDevices: false).rows.map(\.uid) == [nil, builtIn.id])
+        #expect(model.microphoneList(showVirtualDevices: true).rows.map(\.uid) == [nil, builtIn.id, loopback.id])
+    }
+
+    @Test func systemDefaultNamesThePhysicalMicrophoneWhenTheDefaultIsVirtual() {
+        let devices = FakeInputDevices(devices: [builtIn, loopback], systemDefault: loopback)
+        let model = TranscriptViewModel(session: session, sessionsDirectory: nil, inputSelection: devices)
+        model.attach()
+        #expect(model.microphoneList(showVirtualDevices: true).systemDefault.title == "System Default (MacBook Pro Microphone)")
     }
 
     @Test func selectingAMicrophonePersistsIt() {
@@ -226,10 +291,34 @@ struct TranscriptViewModelTests {
         let devices = FakeInputDevices(devices: [builtIn], selected: headset.id)
         let model = TranscriptViewModel(session: session, sessionsDirectory: nil, inputSelection: devices)
         model.attach()
-        #expect(model.selectedInputDeviceIsMissing)
+        let missing = model.microphoneList(showVirtualDevices: false).selectedRow
+        #expect(missing.kind == .disconnected)
+        #expect(missing.title == "Disconnected microphone", "never seen, so only its UID is known")
         devices.connect(headset)
-        try await waitUntil { model.inputDevices.count == 2 }
-        #expect(!model.selectedInputDeviceIsMissing)
+        try await waitUntil { model.inputDevices.connected.count == 2 }
+        #expect(model.microphoneList(showVirtualDevices: false).selectedRow.kind == .microphone)
+    }
+
+    @Test func aChoiceThatDisconnectsKeepsItsName() async throws {
+        let devices = FakeInputDevices(devices: [builtIn, headset], selected: headset.id)
+        let model = TranscriptViewModel(session: session, sessionsDirectory: nil, inputSelection: devices)
+        model.attach()
+        devices.disconnect(headset)
+        try await waitUntil { model.inputDevices.connected.count == 1 }
+        let missing = model.microphoneList(showVirtualDevices: false).selectedRow
+        #expect(missing.kind == .disconnected)
+        #expect(missing.title == "OpenComm2 (disconnected)")
+    }
+
+    @Test func aVirtualChoiceThatDisconnectsStaysAmongTheOtherDevices() async throws {
+        let devices = FakeInputDevices(devices: [builtIn, loopback], selected: loopback.id)
+        let model = TranscriptViewModel(session: session, sessionsDirectory: nil, inputSelection: devices)
+        model.attach()
+        devices.disconnect(loopback)
+        try await waitUntil { model.inputDevices.connected.count == 1 }
+        let list = model.microphoneList(showVirtualDevices: false)
+        #expect(list.otherDevices.map(\.uid) == [loopback.id])
+        #expect(list.selectedRow.title == "ZoomAudioDevice (disconnected)")
     }
 
     @Test func withoutDeviceSelectionThePickerIsUnavailable() {

@@ -54,6 +54,7 @@ struct EndToEndTests {
                     segmenter: segmenter,
                     transcriber: transcriber,
                     cleaner: cleaner,
+                    cleanupOptions: { CleanupOptions(level: settings.cleanupLevel) },
                     makeSink: { try JSONLSessionSink(directory: outputDirectory, sessionID: $0) },
                     microphonePermission: GrantedMicrophone()
                 )

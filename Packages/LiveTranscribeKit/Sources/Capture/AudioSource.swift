@@ -9,11 +9,15 @@ public protocol AudioSource: Actor {
     func stop() async
 }
 
+/// Why capture could not start, or stopped for good. Each description is shown to the user.
 public enum CaptureError: LocalizedError, Equatable {
+    /// Nothing capture may use on its own is connected.
     case noInputDevice
     case unsupportedFormat(String)
     case startFailed(String)
     case restartFailed(attempts: Int)
+    /// The chosen microphone is missing and there is no physical microphone to fall back to.
+    /// (With one, capture falls back and reports ``CaptureNotice/fellBackToDefault(missing:using:)``.)
     case inputDeviceUnavailable
     case tooManyRestarts(restarts: Int)
     case alreadyRunning
@@ -30,7 +34,8 @@ public enum CaptureError: LocalizedError, Equatable {
         case .restartFailed(let attempts):
             "The microphone stopped and capture could not restart after \(attempts) attempts."
         case .inputDeviceUnavailable:
-            "The selected microphone isn't connected. Choose another one from the microphone menu."
+            "The selected microphone isn't connected and no other microphone can be used instead. "
+                + "Connect it, or choose another one from the microphone menu."
         case .tooManyRestarts(let restarts):
             "Audio capture failed and restarted \(restarts) times in a minute, so it was stopped. "
                 + "Choose a different microphone."
@@ -38,6 +43,18 @@ public enum CaptureError: LocalizedError, Equatable {
             "Capture is already running."
         case .unreadableFile(let detail):
             "The audio file could not be read: \(detail)"
+        }
+    }
+}
+
+extension CaptureError {
+    /// The error a recovery that gave up ends the stream with. A missing device says more than a
+    /// generic restart failure, so it is passed on as it is.
+    static func afterFailedRecovery(lastError: (any Error)?, attempts: Int) -> CaptureError {
+        switch lastError as? CaptureError {
+        case .noInputDevice?: .noInputDevice
+        case .inputDeviceUnavailable?: .inputDeviceUnavailable
+        default: .restartFailed(attempts: attempts)
         }
     }
 }

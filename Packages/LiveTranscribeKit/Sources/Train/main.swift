@@ -154,7 +154,7 @@ func evaluate(_ options: EvaluateCommandOptions) async throws {
         throw TrainError.adapterNotApplied
     }
 
-    let report = await AdapterEvaluator.evaluate(examples, with: cleaner) { print($0) }
+    let report = await AdapterEvaluator.evaluate(examples, with: cleaner, options: ExampleValidator.options) { print($0) }
     for miss in report.misses {
         print("MISS \(miss.category.rawValue)\(miss.fallbackReason.map { " (fell back: \($0))" } ?? "")")
         print("    raw:      \(miss.raw)")

@@ -61,11 +61,13 @@ struct CleanupAdapterTests {
 
     @Test func theAdapterGetsThePromptItWasTrainedOn() throws {
         let adapter = CleanupAdapter(baseModel: "m", baseRevision: commit, directory: URL(fileURLWithPath: "/"))
-        let withAdapter = MLXCleaner.Configuration(modelID: "m", contextSegments: 3, timeoutSeconds: 1, adapter: adapter)
-        let without = MLXCleaner.Configuration(modelID: "m", contextSegments: 3, timeoutSeconds: 1)
-        let explicit = MLXCleaner.Configuration(modelID: "m", contextSegments: 3, timeoutSeconds: 1, adapter: adapter, template: Prompt.cleanup)
-        #expect(withAdapter.template == Prompt.adapted)
-        #expect(without.template == Prompt.cleanup)
-        #expect(explicit.template == Prompt.cleanup)
+        let medium = CleanupOptions(level: .medium)
+        let configuration = MLXCleaner.Configuration(modelID: "m", contextSegments: 3, timeoutSeconds: 1, adapter: adapter)
+        let explicit = MLXCleaner.Configuration(
+            modelID: "m", contextSegments: 3, timeoutSeconds: 1, adapter: adapter, promptOverride: Prompt.cleanup
+        )
+        #expect(configuration.prompts(adapted: true).template(for: medium) == Prompt.adapted)
+        #expect(configuration.prompts(adapted: false).template(for: medium) == Prompt.cleanup)
+        #expect(explicit.prompts(adapted: true).template(for: medium) == Prompt.cleanup)
     }
 }

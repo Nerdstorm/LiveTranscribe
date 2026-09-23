@@ -15,11 +15,10 @@ public final class TranscriptViewModel {
     public private(set) var lines: [TranscriptLine] = []
     public private(set) var warning: String?
     public private(set) var transcriptFile: URL?
-    /// Connected microphones, for the picker.
-    public private(set) var inputDevices: [AudioInputDevice] = []
+    /// Connected microphones and the system default input, for the pickers.
+    public private(set) var inputDevices = InputDeviceSnapshot(connected: [], systemDefault: nil)
     /// The chosen microphone's UID; `nil` follows the system default input.
     public private(set) var selectedInputDeviceUID: String?
-    public private(set) var systemDefaultInputName: String?
 
     private let session: any SessionControlling
     public let sessionsDirectory: URL?
@@ -28,6 +27,14 @@ public final class TranscriptViewModel {
     @ObservationIgnored private var deviceChangesTask: Task<Void, Never>?
     /// Cleanup state captured when the current session started; decides whether raw lines wait.
     @ObservationIgnored private var sessionCleansText = false
+    /// Set by ``stopListening()`` when nothing is listening yet, so a Start still under way
+    /// (the microphone opening, the permission prompt) is stopped as soon as it reports
+    /// listening, instead of running with no window to stop it. The next Start clears it.
+    @ObservationIgnored private var stopWhenListening = false
+    /// Every microphone seen connected since launch, as last seen, by UID. Only a chosen
+    /// microphone's UID is saved, so this lets the pickers name and group it while it is
+    /// disconnected. In memory only; it holds one entry per device ever connected.
+    @ObservationIgnored private var seenDevices: [String: AudioInputDevice] = [:]
 
     public init(
         session: any SessionControlling,
@@ -66,9 +73,24 @@ public final class TranscriptViewModel {
         switch phase {
         case .listening: Task { await session.stop() }
         case .ready, .failed(.microphonePermissionDenied), .failed(.audioCaptureFailed), .failed(.persistenceFailed):
+            stopWhenListening = false
             Task { await session.start() }
         default: break
         }
+    }
+
+    /// Stops the live transcript, and never starts one: for closing the transcript window and
+    /// the menu's *Stop Live Transcript*.
+    ///
+    /// A Start that has not reported listening yet is stopped once it does, so closing the
+    /// window straight after pressing Start still leaves the microphone closed.
+    public func stopListening() {
+        guard phase == .listening else {
+            stopWhenListening = true
+            return
+        }
+        Log.ui.info("Stopping the live transcript")
+        Task { await session.stop() }
     }
 
     public func retryLoading() {
@@ -81,6 +103,12 @@ public final class TranscriptViewModel {
 
     public func retryCleanup() {
         Task { await session.retryCleanup() }
+    }
+
+    /// Shows a microphone change reported by capture (a new default, or a fallback) in the
+    /// warning banner.
+    public func showCaptureNotice(_ message: String) {
+        warning = message
     }
 
     public func dismissWarning() {
@@ -115,10 +143,18 @@ public final class TranscriptViewModel {
         inputSelection != nil && phase != .listening && phase != .stopping
     }
 
-    /// The saved microphone is not connected; starting would fail until another is chosen.
-    public var selectedInputDeviceIsMissing: Bool {
-        guard let selectedInputDeviceUID else { return false }
-        return !inputDevices.contains { $0.id == selectedInputDeviceUID }
+    /// What a microphone picker lists. The menu bar, Settings and the transcript window all
+    /// build their pickers from it, so they agree.
+    ///
+    /// - Parameter showVirtualDevices: the `showVirtualInputDevices` setting, which each picker
+    ///   reads with `@AppStorage` and can change.
+    public func microphoneList(showVirtualDevices: Bool) -> MicrophonePickerList {
+        MicrophonePickerList(
+            snapshot: inputDevices,
+            selectedUID: selectedInputDeviceUID,
+            showVirtualDevices: showVirtualDevices,
+            lastSeenChoice: selectedInputDeviceUID.flatMap { seenDevices[$0] }
+        )
     }
 
     /// Final text of every line, one per paragraph, for copying.
@@ -133,6 +169,11 @@ public final class TranscriptViewModel {
         case .phase(let newPhase):
             phase = newPhase
             if newPhase == .ready { modelProgress.removeAll() }
+            if newPhase == .listening, stopWhenListening {
+                stopWhenListening = false
+                Log.ui.info("Stopping a live transcript that started after it was asked to stop")
+                Task { await session.stop() }
+            }
         case .modelProgress(let progress):
             if let index = modelProgress.firstIndex(where: { $0.modelID == progress.modelID }) {
                 modelProgress[index] = progress
@@ -175,9 +216,13 @@ public final class TranscriptViewModel {
 
     private func refreshInputDevices() {
         guard let inputSelection else { return }
-        inputDevices = inputSelection.availableDevices()
-        systemDefaultInputName = inputSelection.systemDefaultName()
+        let snapshot = inputSelection.snapshot()
+        for device in snapshot.connected {
+            seenDevices[device.id] = device
+        }
+        inputDevices = snapshot
         selectedInputDeviceUID = inputSelection.selectedDeviceUID
+        Log.ui.debug("Microphone list refreshed: \(snapshot.connected.count, privacy: .public) connected")
     }
 
     private func upsert(_ line: TranscriptLine) {

@@ -9,6 +9,8 @@ import Shared
 /// way it describes.
 public struct ExampleValidator: Sendable {
     public static let maxWords = 60
+    /// The adapter is trained on the Medium level's prompt, so its targets must pass Medium's guard.
+    public static let options = CleanupOptions(level: .medium)
 
     private let outputGuard: OutputGuard
 
@@ -30,7 +32,7 @@ public struct ExampleValidator: Sendable {
         if example.context.contains(where: { words($0).isEmpty }) {
             problems.append("blank context line")
         }
-        if outputGuard.review(raw: example.raw, outcome: .completed(example.target)) != .accepted(example.target) {
+        if outputGuard.review(raw: example.raw, outcome: .completed(example.target), options: Self.options) != .accepted(example.target) {
             problems.append("the output guard rejects the target")
         }
 

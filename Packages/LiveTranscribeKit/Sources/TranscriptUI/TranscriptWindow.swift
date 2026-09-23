@@ -118,41 +118,6 @@ private struct StatusHeader: View {
     }
 }
 
-private struct MicrophonePicker: View {
-    let model: TranscriptViewModel
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "mic")
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-            Picker("Microphone", selection: selection) {
-                Text(defaultLabel).tag(String?.none)
-                if model.selectedInputDeviceIsMissing, let uid = model.selectedInputDeviceUID {
-                    Text("Disconnected microphone").tag(String?.some(uid))
-                }
-                Divider()
-                ForEach(model.inputDevices) { device in
-                    Text(device.name).tag(String?.some(device.id))
-                }
-            }
-            .labelsHidden()
-            .disabled(!model.canChangeInputDevice)
-            .help(model.canChangeInputDevice ? "Microphone to transcribe from" : "Stop transcribing to change the microphone")
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
-    }
-
-    private var selection: Binding<String?> {
-        Binding(get: { model.selectedInputDeviceUID }, set: { model.selectInputDevice($0) })
-    }
-
-    private var defaultLabel: String {
-        model.systemDefaultInputName.map { "System Default (\($0))" } ?? "System Default"
-    }
-}
-
 private struct ControlBar: View {
     let model: TranscriptViewModel
 

@@ -1,0 +1,276 @@
+import ApplicationServices
+import Capture
+@testable import Dictation
+import Foundation
+import Hotkey
+import Insertion
+import os
+import Permissions
+import Shared
+
+/// A clock the test moves by hand.
+final class ManualClock: Sendable {
+    private let base = ContinuousClock.now
+    private let offset = OSAllocatedUnfairLock(initialState: Duration.zero)
+
+    func now() -> ContinuousClock.Instant { base + offset.withLock { $0 } }
+    func advance(by duration: Duration) { offset.withLock { $0 += duration } }
+}
+
+/// Hotkey events pushed by the test.
+final class FakeHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
+    // Test-only: touched from the main actor and from the controller, never concurrently.
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    private struct State {
+        var continuation: AsyncStream<HotkeyEvent>.Continuation?
+        var denyPermission = false
+        var capturingEscape = false
+        var starts: [(HotkeyBinding, HotkeyBinding?)] = []
+    }
+
+    func denyPermission(_ deny: Bool) { state.withLock { $0.denyPermission = deny } }
+    var capturingEscape: Bool { state.withLock { $0.capturingEscape } }
+    var startedBindings: [HotkeyBinding] { state.withLock { $0.starts.map(\.0) } }
+    /// Started and not stopped since.
+    var isRunning: Bool { state.withLock { $0.continuation != nil } }
+
+    /// Delivers an event, as a key press would; `false` if the monitor is not running.
+    @discardableResult
+    func send(_ event: HotkeyEvent) -> Bool {
+        state.withLock { $0.continuation?.yield(event) } != nil
+    }
+
+    func start(binding: HotkeyBinding, undoBinding: HotkeyBinding?) throws -> AsyncStream<HotkeyEvent> {
+        try state.withLock { state in
+            if state.denyPermission { throw HotkeyError.permissionDenied }
+            let (stream, continuation) = AsyncStream.makeStream(of: HotkeyEvent.self)
+            state.continuation = continuation
+            state.starts.append((binding, undoBinding))
+            return stream
+        }
+    }
+
+    func stop() {
+        state.withLock { $0.continuation?.finish(); $0.continuation = nil }
+    }
+
+    func setCapturingEscape(_ capturing: Bool) { state.withLock { $0.capturingEscape = capturing } }
+}
+
+/// A focused field holding a value and a caret.
+struct FakeElement: AccessibilityElement {
+    var value: String
+    var caret: Int
+    var subrole: String?
+    var role: String? = kAXTextAreaRole
+    /// Records the text reads, when a test watches them.
+    var probe: ElementProbe?
+
+    func string(_ attribute: String) -> String? {
+        probe?.record(attribute)
+        return attribute == kAXValueAttribute ? value : nil
+    }
+    func range(_ attribute: String) -> NSRange? {
+        attribute == kAXSelectedTextRangeAttribute ? NSRange(location: caret, length: 0) : nil
+    }
+    func setString(_ value: String, for attribute: String) -> Bool { false }
+    func setRange(_ range: NSRange, for attribute: String) -> Bool { false }
+    func bounds(for range: NSRange) -> CGRect? { CGRect(x: 100, y: 200, width: 2, height: 16) }
+    func string(forRange range: NSRange) -> String? {
+        probe?.record(kAXStringForRangeParameterizedAttribute)
+        let text = value as NSString
+        guard range.location >= 0, range.length >= 0, NSMaxRange(range) <= text.length else { return nil }
+        return text.substring(with: range)
+    }
+    var processIdentifier: pid_t? { 42 }
+    func isSameElement(as other: any AccessibilityElement) -> Bool { true }
+}
+
+/// Which text attributes a ``FakeElement`` was asked for, and on which thread. While held, text
+/// reads for a range made off the main thread wait for ``release()``, so a test can act in
+/// between. A read on the main thread never waits: that would deadlock the test instead of
+/// failing it.
+final class ElementProbe: Sendable {
+    private struct State {
+        var attributes: [String] = []
+        var onMainThread = false
+        var gate: DispatchSemaphore?
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    var attributes: [String] { state.withLock { $0.attributes } }
+    /// Whether any read happened on the main thread, where it would stall the UI.
+    var readOnMainThread: Bool { state.withLock { $0.onMainThread } }
+
+    func record(_ attribute: String) {
+        let onMain = Thread.isMainThread
+        let gate = state.withLock { state in
+            state.attributes.append(attribute)
+            state.onMainThread = state.onMainThread || onMain
+            return attribute == kAXStringForRangeParameterizedAttribute && !onMain ? state.gate : nil
+        }
+        gate?.wait()
+    }
+
+    func hold() { state.withLock { $0.gate = DispatchSemaphore(value: 0) } }
+
+    func release() {
+        let gate = state.withLock { state in
+            defer { state.gate = nil }
+            return state.gate
+        }
+        gate?.signal()
+    }
+}
+
+final class FakeFocus: FocusedTargetProvider, @unchecked Sendable {
+    private let target = OSAllocatedUnfairLock(initialState: FakeFocus.field(value: "", secure: false))
+    /// While set, lookups wait for ``releaseLookups()``, so a test can see the state in between.
+    private let gate = OSAllocatedUnfairLock<DispatchSemaphore?>(initialState: nil)
+
+    static let app = AppInfo(bundleIdentifier: "com.example.Notes", name: "Notes", processIdentifier: 42)
+
+    static func field(value: String, secure: Bool, probe: ElementProbe? = nil) -> InsertionTarget {
+        let element = FakeElement(
+            value: value, caret: (value as NSString).length, subrole: secure ? kAXSecureTextFieldSubrole : nil, probe: probe
+        )
+        return InsertionTarget(app: app, element: element, secureEventInputEnabled: false)
+    }
+
+    /// A focused field whose caret is drawn at `caret`.
+    static func field(caret: CGRect) -> InsertionTarget {
+        InsertionTarget(app: app, element: nil, isSecure: false, isMultiline: false, caretRect: caret)
+    }
+
+    func set(_ target: InsertionTarget) { self.target.withLock { $0 = target } }
+
+    func currentTarget() -> InsertionTarget {
+        // Runs on a detached task, never the main actor, so waiting here blocks nothing the test needs.
+        gate.withLock { $0 }?.wait()
+        return target.withLock { $0 }
+    }
+
+    func holdLookups() { gate.withLock { $0 = DispatchSemaphore(value: 0) } }
+
+    func releaseLookups() {
+        let semaphore = gate.withLock { gate in
+            defer { gate = nil }
+            return gate
+        }
+        semaphore?.signal()
+    }
+}
+
+actor FakeDelivery: TextDelivery {
+    private(set) var inserted: [String] = []
+    private(set) var undone: [String] = []
+    var result: InsertionResult = .inserted(.accessibility, range: NSRange(location: 0, length: 0))
+    var undoResult: UndoResult = .replacedInPlace(range: NSRange(location: 0, length: 0))
+
+    func set(result: InsertionResult) { self.result = result }
+    func set(undoResult: UndoResult) { self.undoResult = undoResult }
+
+    func insert(_ text: String, into target: InsertionTarget) async -> InsertionResult {
+        inserted.append(text)
+        return result
+    }
+
+    func undo(_ record: InsertionRecord, replacingWith text: String, in target: InsertionTarget) async -> UndoResult {
+        undone.append(text)
+        return undoResult
+    }
+}
+
+struct FakeMicrophone: MicrophonePermissionProviding {
+    let current: MicrophonePermissionStatus
+    func status() -> MicrophonePermissionStatus { current }
+    func request() async -> Bool { current == .granted }
+}
+
+final class FakeAccessibility: AccessibilityPermissionProviding, @unchecked Sendable {
+    private let continuation: AsyncStream<Bool>.Continuation
+    private let stream: AsyncStream<Bool>
+    private let granted: OSAllocatedUnfairLock<Bool>
+
+    init(granted: Bool) {
+        self.granted = OSAllocatedUnfairLock(initialState: granted)
+        (stream, continuation) = AsyncStream.makeStream(of: Bool.self)
+        continuation.yield(granted)
+    }
+
+    func set(_ value: Bool) {
+        granted.withLock { $0 = value }
+        continuation.yield(value)
+    }
+
+    func isGranted() -> Bool { granted.withLock { $0 } }
+    func prompt() {}
+    func changes() -> AsyncStream<Bool> { stream }
+}
+
+/// Settings the test can change while the controller runs.
+final class SettingsBox: Sendable {
+    private let settings = OSAllocatedUnfairLock(initialState: AppSettings.defaults)
+
+    var current: AppSettings { settings.withLock { $0 } }
+    func update(_ change: (inout AppSettings) -> Void) {
+        var copy = current
+        change(&copy)
+        let updated = copy
+        settings.withLock { $0 = updated }
+    }
+}
+
+/// Model readiness the test can change.
+final class ReadinessSwitch: Sendable {
+    private let readiness: OSAllocatedUnfairLock<DictationReadiness>
+
+    init(_ readiness: DictationReadiness) { self.readiness = OSAllocatedUnfairLock(initialState: readiness) }
+
+    var current: DictationReadiness { readiness.withLock { $0 } }
+    func set(_ value: DictationReadiness) { readiness.withLock { $0 = value } }
+}
+
+/// Stands in for `Task.sleep`: each wait lasts until the test calls ``fire()``, or throws once
+/// the waiting task is cancelled. Records the durations asked for.
+final class ManualTimer: Sendable {
+    private struct State {
+        var waiting: [UUID: CheckedContinuation<Void, Error>] = [:]
+        var requested: [Duration] = []
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    /// Every duration asked for, in order.
+    var requested: [Duration] { state.withLock { $0.requested } }
+    /// Waits in progress.
+    var waiters: Int { state.withLock { $0.waiting.count } }
+
+    func sleep(for duration: Duration) async throws {
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                let cancelled = state.withLock { state in
+                    state.requested.append(duration)
+                    guard !Task.isCancelled else { return true }
+                    state.waiting[id] = continuation
+                    return false
+                }
+                if cancelled { continuation.resume(throwing: CancellationError()) }
+            }
+        } onCancel: {
+            state.withLock { $0.waiting.removeValue(forKey: id) }?.resume(throwing: CancellationError())
+        }
+    }
+
+    /// Ends every wait in progress.
+    func fire() {
+        let waiting = state.withLock { state in
+            defer { state.waiting = [:] }
+            return Array(state.waiting.values)
+        }
+        waiting.forEach { $0.resume() }
+    }
+}

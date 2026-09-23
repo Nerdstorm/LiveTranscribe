@@ -6,6 +6,7 @@ import Testing
 struct DroppedWordsTests {
     private let outputGuard = OutputGuard()
     private let droppedWords = DroppedWords(policy: .default)
+    private let medium = CleanupOptions(level: .medium)
 
     private func words(_ text: String) -> [String] {
         EditDistance.words(in: EditDistance.normalize(text))
@@ -18,7 +19,7 @@ struct DroppedWordsTests {
         ("we could meet at the cafe on the corner or at the office", "We could meet at the office.", 7),
     ])
     func rejectsADeletedRun(raw: String, cleaned: String, count: Int) {
-        #expect(outputGuard.review(raw: raw, outcome: .completed(cleaned)) == .rejected(.droppedWords(count: count)))
+        #expect(outputGuard.review(raw: raw, outcome: .completed(cleaned), options: medium) == .rejected(.droppedWords(count: count)))
     }
 
     @Test("Removing a negation is rejected", arguments: [
@@ -27,7 +28,7 @@ struct DroppedWordsTests {
         ("we never ship on a friday", "We ship on a Friday."),
     ])
     func rejectsALostNegation(raw: String, cleaned: String) {
-        #expect(outputGuard.review(raw: raw, outcome: .completed(cleaned)) == .rejected(.lostNegation))
+        #expect(outputGuard.review(raw: raw, outcome: .completed(cleaned), options: medium) == .rejected(.lostNegation))
     }
 
     @Test("Ordinary corrections are still accepted", arguments: [
@@ -35,10 +36,19 @@ struct DroppedWordsTests {
         ("um i think its fine", "I think it's fine."),
         ("i really think we should go", "I think we should go."),
         ("i cannot make it", "I can't make it."),
-        ("we won't ship it", "We will not ship it."),
+        ("we won't ship it before the review on friday", "We will not ship it before the review on Friday."),
     ])
     func acceptsOrdinaryCorrections(raw: String, cleaned: String) {
-        #expect(outputGuard.review(raw: raw, outcome: .completed(cleaned)) == .accepted(cleaned))
+        #expect(outputGuard.review(raw: raw, outcome: .completed(cleaned), options: medium) == .accepted(cleaned))
+    }
+
+    @Test func highMayDeleteWordsWhenRewordingButNotANegation() {
+        let high = CleanupOptions(level: .high)
+        let cleaned = "We could meet at the cafe or the office."
+        #expect(outputGuard.review(raw: "we could meet at the cafe on the corner or at the office", outcome: .completed(cleaned), options: high)
+            == .accepted(cleaned))
+        #expect(outputGuard.review(raw: "i do not agree with that plan", outcome: .completed("I do agree with that plan."), options: high)
+            == .rejected(.lostNegation))
     }
 
     @Test func aReplacementIsNotADeletion() {

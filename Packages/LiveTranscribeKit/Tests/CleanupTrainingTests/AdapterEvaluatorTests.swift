@@ -16,7 +16,7 @@ struct AdapterEvaluatorTests {
 
         func load(progress: @escaping ModelLoadProgressHandler) async throws {}
 
-        func clean(_ segment: Segment, context: [String]) async -> CleanedSegment {
+        func clean(_ segment: Segment, context: [String], options: CleanupOptions) async -> CleanedSegment {
             guard let answer = answers[segment.rawText] else {
                 return .fallback(segment, reason: "no answer", latencyMs: 5)
             }
@@ -34,7 +34,7 @@ struct AdapterEvaluatorTests {
             "cars sorry buses": "buses",  // casing and punctuation are ignored
             "sorry i'm late": "Sorry, I'm late.",
         ])
-        let report = await AdapterEvaluator.evaluate(examples, with: cleaner)
+        let report = await AdapterEvaluator.evaluate(examples, with: cleaner, options: CleanupOptions(level: .light))
 
         #expect(report.scores[.correction] == EvaluationReport.Score(total: 2, matched: 1, fellBack: 1))
         #expect(report.scores[.control] == EvaluationReport.Score(total: 1, matched: 1, fellBack: 0))
@@ -42,6 +42,16 @@ struct AdapterEvaluatorTests {
         #expect(report.misses.count == 1)
         #expect(report.misses.first?.shown == "two i mean three")
         #expect(report.misses.first?.fallbackReason == "no answer")
+    }
+
+    @Test func atALevelThatRemovesFillersTheTargetLosesThemToo() async {
+        let examples = [TrainingExample(category: .cleanup, raw: "so um it works", target: "So, um, it works.", source: "test")]
+        let cleaner = TableCleaner(["so um it works": "So it works."])
+        let medium = await AdapterEvaluator.evaluate(examples, with: cleaner, options: CleanupOptions(level: .medium))
+        #expect(medium.overall.matched == 1)
+        let light = await AdapterEvaluator.evaluate(examples, with: cleaner, options: CleanupOptions(level: .light))
+        #expect(light.overall.matched == 0)
+        #expect(light.misses.first?.expected == "So, um, it works.")
     }
 
     @Test func percentilesUseTheNearestRank() {

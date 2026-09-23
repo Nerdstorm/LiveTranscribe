@@ -21,7 +21,8 @@ let package = Package(
             name: "LiveTranscribeKit",
             targets: [
                 "Shared", "Capture", "Segmentation", "Transcription", "Cleanup",
-                "Persistence", "Session", "TranscriptUI", "MLXSupport",
+                "Persistence", "Session", "TranscriptUI", "MLXSupport", "Styles",
+                "Snippets", "Vocabulary", "Insertion", "Hotkey", "Permissions", "Dictation", "DictationUI",
             ]
         ),
         .executable(name: "Bench", targets: ["Bench"]),
@@ -44,6 +45,37 @@ let package = Package(
         .target(name: "Shared", swiftSettings: strictSwift),
 
         .target(name: "Capture", dependencies: ["Shared"], swiftSettings: strictSwift),
+
+        // The deterministic text rules the cleanup levels turn on (fillers, lists).
+        .target(name: "Styles", dependencies: ["Shared"], swiftSettings: strictSwift),
+
+        // Spoken trigger phrases replaced by saved text, kept away from the language model
+        // behind placeholder tokens.
+        .target(name: "Snippets", dependencies: ["Shared"], swiftSettings: strictSwift),
+
+        // The user's vocabulary: spoken-variant replacement and prompt term selection. Named
+        // Vocabulary because a module named Dictionary would shadow Swift.Dictionary.
+        .target(name: "Vocabulary", dependencies: ["Shared"], swiftSettings: strictSwift),
+
+        // Dictated text into the focused field of any app (Accessibility, then paste, then the
+        // clipboard), per-app overrides, and the insertion half of Undo AI edit.
+        .target(name: "Insertion", dependencies: ["Shared"], swiftSettings: strictSwift),
+
+        // Push-to-talk global hotkey: bindings, the gesture state machine and the event tap.
+        .target(name: "Hotkey", dependencies: ["Shared"], swiftSettings: strictSwift),
+
+        // Microphone and Accessibility status for dictation, and links to System Settings.
+        .target(name: "Permissions", dependencies: ["Shared", "Capture"], swiftSettings: strictSwift),
+
+        // System-wide dictation: hotkey → record → transcribe → clean → insert at the cursor.
+        .target(
+            name: "Dictation",
+            dependencies: [
+                "Shared", "Capture", "Transcription", "Cleanup", "Styles", "Snippets", "Vocabulary",
+                "Hotkey", "Insertion", "Permissions", "Persistence",
+            ],
+            swiftSettings: strictSwift
+        ),
 
         .target(
             name: "Segmentation",
@@ -70,7 +102,7 @@ let package = Package(
         .target(
             name: "Cleanup",
             dependencies: [
-                "Shared",
+                "Shared", "Styles",
                 .product(name: "MLXLLM", package: "mlx-swift-lm"),
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
                 .product(name: "MLX", package: "mlx-swift"),
@@ -90,7 +122,17 @@ let package = Package(
             swiftSettings: strictSwift
         ),
 
-        .target(name: "TranscriptUI", dependencies: ["Shared", "Session", "Capture"], swiftSettings: strictSwift),
+        .target(name: "TranscriptUI", dependencies: ["Shared", "Session", "Capture", "Permissions"], swiftSettings: strictSwift),
+
+        // The menu bar, dictation HUD, Settings tabs, history window and onboarding.
+        .target(
+            name: "DictationUI",
+            dependencies: [
+                "Shared", "Capture", "Dictation", "Hotkey", "Insertion", "Permissions", "Persistence",
+                "Snippets", "Vocabulary", "Styles", "Session", "TranscriptUI",
+            ],
+            swiftSettings: strictSwift
+        ),
 
         // Process-wide MLX configuration (GPU buffer cache). Kept out of Shared so Shared
         // stays dependency-free.
@@ -104,7 +146,7 @@ let package = Package(
             name: "Bench",
             dependencies: [
                 "Shared", "Capture", "Segmentation", "Transcription", "Cleanup",
-                "Persistence", "Session", "MLXSupport",
+                "Persistence", "Session", "MLXSupport", "Dictation",
             ],
             swiftSettings: strictSwift
         ),
@@ -114,7 +156,7 @@ let package = Package(
         .target(
             name: "CleanupTraining",
             dependencies: [
-                "Shared", "Cleanup", "MLXSupport",
+                "Shared", "Cleanup", "MLXSupport", "Styles",
                 .product(name: "MLX", package: "mlx-swift"),
                 .product(name: "MLXNN", package: "mlx-swift"),
                 .product(name: "MLXOptimizers", package: "mlx-swift"),
@@ -133,6 +175,20 @@ let package = Package(
         // MARK: - Tests
 
         .testTarget(name: "SharedTests", dependencies: ["Shared"], swiftSettings: strictSwift),
+        .testTarget(name: "StylesTests", dependencies: ["Styles"], swiftSettings: strictSwift),
+        .testTarget(name: "SnippetsTests", dependencies: ["Snippets", "Shared"], swiftSettings: strictSwift),
+        .testTarget(name: "VocabularyTests", dependencies: ["Vocabulary", "Shared"], swiftSettings: strictSwift),
+        .testTarget(name: "InsertionTests", dependencies: ["Insertion", "Shared"], swiftSettings: strictSwift),
+        .testTarget(name: "HotkeyTests", dependencies: ["Hotkey", "Shared"], swiftSettings: strictSwift),
+        .testTarget(name: "PermissionsTests", dependencies: ["Permissions", "Capture"], swiftSettings: strictSwift),
+        .testTarget(
+            name: "DictationTests",
+            dependencies: [
+                "Dictation", "Capture", "Shared", "Transcription", "Cleanup", "Snippets", "Vocabulary",
+                "Hotkey", "Insertion", "Permissions", "Persistence",
+            ],
+            swiftSettings: strictSwift
+        ),
         .testTarget(name: "CaptureTests", dependencies: ["Capture", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "SegmentationTests", dependencies: ["Segmentation", "Shared"], swiftSettings: strictSwift),
         .testTarget(
@@ -152,6 +208,14 @@ let package = Package(
         .testTarget(
             name: "SessionTests",
             dependencies: ["Session", "Shared", "Capture", "Segmentation", "Transcription", "Cleanup", "Persistence"],
+            swiftSettings: strictSwift
+        ),
+        .testTarget(
+            name: "DictationUITests",
+            dependencies: [
+                "DictationUI", "Dictation", "Shared", "Capture", "Hotkey", "Insertion", "Permissions",
+                "Persistence", "Snippets", "Vocabulary", "Styles", "Session",
+            ],
             swiftSettings: strictSwift
         ),
         .testTarget(
