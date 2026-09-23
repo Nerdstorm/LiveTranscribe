@@ -60,6 +60,9 @@ let package = Package(
         // clipboard), per-app overrides, and the insertion half of Undo AI edit.
         .target(name: "Insertion", dependencies: ["Shared"], swiftSettings: strictSwift),
 
+        // Push-to-talk global hotkey: bindings, the gesture state machine and the event tap.
+        .target(name: "Hotkey", dependencies: ["Shared"], swiftSettings: strictSwift),
+
         // Microphone and Accessibility status for dictation, and links to System Settings.
         .target(name: "Permissions", dependencies: ["Shared", "Capture"], swiftSettings: strictSwift),
 
@@ -162,6 +165,7 @@ let package = Package(
         .testTarget(name: "SnippetsTests", dependencies: ["Snippets", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "VocabularyTests", dependencies: ["Vocabulary", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "InsertionTests", dependencies: ["Insertion", "Shared"], swiftSettings: strictSwift),
+        .testTarget(name: "HotkeyTests", dependencies: ["Hotkey"], swiftSettings: strictSwift),
         .testTarget(name: "PermissionsTests", dependencies: ["Permissions", "Capture"], swiftSettings: strictSwift),
         .testTarget(
             name: "DictationTests",
