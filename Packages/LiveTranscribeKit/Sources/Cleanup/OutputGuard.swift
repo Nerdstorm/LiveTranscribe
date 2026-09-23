@@ -117,6 +117,17 @@ public struct OutputGuard: Sendable {
         self.selfCorrection = SelfCorrection(policy: policy)
     }
 
+    /// Whether `cleaned` has fewer correction cues than `raw`, so that ``review(raw:outcome:)``
+    /// judges it as a self-correction removal.
+    public func dropsCorrectionCue(raw: String, cleaned: String) -> Bool {
+        correctionCueCount(in: cleaned) < correctionCueCount(in: raw)
+    }
+
+    /// Occurrences of the policy's correction cues in `text`.
+    public func correctionCueCount(in text: String) -> Int {
+        selfCorrection.cueCount(in: EditDistance.words(in: EditDistance.normalize(text)))
+    }
+
     public func review(raw: String, outcome: GenerationOutcome) -> GuardVerdict {
         let output: String
         switch outcome {

@@ -108,6 +108,21 @@ let package = Package(
             swiftSettings: strictSwift
         ),
 
+        // Development only: builds the self-correction dataset and trains, saves and evaluates
+        // the cleanup adapter. The app does not depend on it.
+        .target(
+            name: "CleanupTraining",
+            dependencies: [
+                "Shared", "Cleanup", "MLXSupport",
+                .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXNN", package: "mlx-swift"),
+                .product(name: "MLXOptimizers", package: "mlx-swift"),
+                .product(name: "MLXLLM", package: "mlx-swift-lm"),
+                .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
+            ],
+            swiftSettings: strictSwift
+        ),
+
         // MARK: - Tests
 
         .testTarget(name: "SharedTests", dependencies: ["Shared"], swiftSettings: strictSwift),
@@ -116,6 +131,14 @@ let package = Package(
         .testTarget(
             name: "CleanupTests",
             dependencies: ["Cleanup", "Shared", .product(name: "HuggingFace", package: "swift-huggingface")],
+            swiftSettings: strictSwift
+        ),
+        .testTarget(
+            name: "CleanupTrainingTests",
+            dependencies: [
+                "CleanupTraining", "Cleanup", "Shared",
+                .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
+            ],
             swiftSettings: strictSwift
         ),
         .testTarget(name: "PersistenceTests", dependencies: ["Persistence", "Shared"], swiftSettings: strictSwift),

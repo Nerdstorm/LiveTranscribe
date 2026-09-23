@@ -127,6 +127,7 @@ Packages/LiveTranscribeKit/   all feature code, as vertical slices
     TranscriptUI/    view model and views
     MLXSupport/      MLX runtime configuration (GPU cache limit)
     Bench/           command-line tool: WER and per-stage latency over test clips
+    CleanupTraining/ dataset, LoRA training and evaluation for the cleanup adapter
   Tests/             Swift Testing; tests that need the models run only when enabled
 ```
 

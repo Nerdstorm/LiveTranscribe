@@ -59,7 +59,7 @@ struct SelfCorrection: Sendable {
         return matches[0][0]
     }
 
-    private func cueCount(in words: [String]) -> Int {
+    func cueCount(in words: [String]) -> Int {
         cues.reduce(0) { count, cue in count + occurrences(of: cue, in: words).count }
     }
 

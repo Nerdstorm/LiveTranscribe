@@ -82,6 +82,16 @@ struct SelfCorrectionTests {
         }
     }
 
+    @Test func countsCuesIncludingMultiWordOnes() {
+        #expect(outputGuard.correctionCueCount(in: "Send it to John, I mean Jane, no wait, Jill.") == 3)
+        #expect(outputGuard.correctionCueCount(in: "The build is green.") == 0)
+    }
+
+    @Test func dropsCorrectionCueComparesCueCounts() {
+        #expect(outputGuard.dropsCorrectionCue(raw: "cars sorry buses", cleaned: "Buses."))
+        #expect(!outputGuard.dropsCorrectionCue(raw: "sorry I'm late", cleaned: "Sorry, I'm late."))
+    }
+
     @Test func invalidSelfCorrectionIsReadable() {
         #expect(FallbackReason.invalidSelfCorrection.description == "removed words that were not a self-correction")
     }
