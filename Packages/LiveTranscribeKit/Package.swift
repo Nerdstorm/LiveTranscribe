@@ -22,6 +22,7 @@ let package = Package(
             targets: [
                 "Shared", "Capture", "Segmentation", "Transcription", "Cleanup",
                 "Persistence", "Session", "TranscriptUI", "MLXSupport", "Styles",
+                "Snippets", "Vocabulary", "Insertion", "Hotkey", "Permissions", "Dictation", "DictationUI",
             ]
         ),
         .executable(name: "Bench", targets: ["Bench"]),
@@ -123,6 +124,16 @@ let package = Package(
 
         .target(name: "TranscriptUI", dependencies: ["Shared", "Session", "Capture"], swiftSettings: strictSwift),
 
+        // The menu bar, dictation HUD, Settings tabs, history window and onboarding.
+        .target(
+            name: "DictationUI",
+            dependencies: [
+                "Shared", "Capture", "Dictation", "Hotkey", "Insertion", "Permissions", "Persistence",
+                "Snippets", "Vocabulary", "Styles", "Session", "TranscriptUI",
+            ],
+            swiftSettings: strictSwift
+        ),
+
         // Process-wide MLX configuration (GPU buffer cache). Kept out of Shared so Shared
         // stays dependency-free.
         .target(
@@ -197,6 +208,14 @@ let package = Package(
         .testTarget(
             name: "SessionTests",
             dependencies: ["Session", "Shared", "Capture", "Segmentation", "Transcription", "Cleanup", "Persistence"],
+            swiftSettings: strictSwift
+        ),
+        .testTarget(
+            name: "DictationUITests",
+            dependencies: [
+                "DictationUI", "Dictation", "Shared", "Capture", "Hotkey", "Insertion", "Permissions",
+                "Persistence", "Snippets", "Vocabulary", "Styles",
+            ],
             swiftSettings: strictSwift
         ),
         .testTarget(
