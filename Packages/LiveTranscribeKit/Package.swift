@@ -25,6 +25,7 @@ let package = Package(
             ]
         ),
         .executable(name: "Bench", targets: ["Bench"]),
+        .executable(name: "Train", targets: ["Train"]),
     ],
     dependencies: [
         // Pinned exactly. mlx-audio-swift must be pinned by revision (tag v0.1.3) because its
@@ -76,6 +77,8 @@ let package = Package(
                 .product(name: "HuggingFace", package: "swift-huggingface"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
             ],
+            // The fine-tuned LoRA adapter that resolves spoken self-corrections (see Training/).
+            resources: [.copy("Adapter")],
             swiftSettings: strictSwift
         ),
 
@@ -106,6 +109,27 @@ let package = Package(
             swiftSettings: strictSwift
         ),
 
+        // Development only: builds the self-correction dataset and trains, saves and evaluates
+        // the cleanup adapter. The app does not depend on it.
+        .target(
+            name: "CleanupTraining",
+            dependencies: [
+                "Shared", "Cleanup", "MLXSupport",
+                .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXNN", package: "mlx-swift"),
+                .product(name: "MLXOptimizers", package: "mlx-swift"),
+                .product(name: "MLXLLM", package: "mlx-swift-lm"),
+                .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
+            ],
+            swiftSettings: strictSwift
+        ),
+
+        .executableTarget(
+            name: "Train",
+            dependencies: ["Shared", "Cleanup", "CleanupTraining", "MLXSupport"],
+            swiftSettings: strictSwift
+        ),
+
         // MARK: - Tests
 
         .testTarget(name: "SharedTests", dependencies: ["Shared"], swiftSettings: strictSwift),
@@ -114,6 +138,14 @@ let package = Package(
         .testTarget(
             name: "CleanupTests",
             dependencies: ["Cleanup", "Shared", .product(name: "HuggingFace", package: "swift-huggingface")],
+            swiftSettings: strictSwift
+        ),
+        .testTarget(
+            name: "CleanupTrainingTests",
+            dependencies: [
+                "CleanupTraining", "Cleanup", "Shared",
+                .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
+            ],
             swiftSettings: strictSwift
         ),
         .testTarget(name: "PersistenceTests", dependencies: ["Persistence", "Shared"], swiftSettings: strictSwift),

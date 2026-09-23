@@ -47,6 +47,17 @@ struct SelfCorrectionTests {
         #expect(review(raw, cleaned) == .rejected(.invalidSelfCorrection))
     }
 
+    @Test func acceptsAFullRetractionEndingInBackToBackCues() {
+        let cleaned = "I returned the jacket to the shop in the shopping centre."
+        let raw = "i returned the jacket to the shop on high street wait no to the shop in the shopping centre"
+        #expect(review(raw, cleaned) == .accepted(cleaned))
+    }
+
+    @Test func backToBackCuesStillLimitTheRetractedWords() {
+        let raw = "i returned the jacket to the big shop on high street wait no to the shop in the centre"
+        #expect(review(raw, "I returned the jacket to the shop in the centre.") == .rejected(.invalidSelfCorrection))
+    }
+
     @Test func rejectsRetractingMoreThanTheLimit() {
         let verdict = review("I want to talk about fuel efficiency in cars sorry busses", "Buses.")
         #expect(verdict == .rejected(.invalidSelfCorrection))
@@ -65,10 +76,18 @@ struct SelfCorrectionTests {
     @Test func keptCuesUseTheUsualLimits() {
         let cleaned = "Sorry to interrupt, but can I ask a question?"
         #expect(review("sorry to interrupt but can i ask a question", cleaned) == .accepted(cleaned))
-        guard case .rejected(.wordRatio) = review("sorry to interrupt but can i ask a question", "Sorry, a question?") else {
-            Issue.record("expected a word-ratio rejection")
-            return
-        }
+        // Keeping the cue means no self-correction was resolved, so the deleted words count.
+        #expect(review("sorry to interrupt but can i ask a question", "Sorry, a question?") == .rejected(.droppedWords(count: 6)))
+    }
+
+    @Test func countsCuesIncludingMultiWordOnes() {
+        #expect(outputGuard.correctionCueCount(in: "Send it to John, I mean Jane, no wait, Jill.") == 3)
+        #expect(outputGuard.correctionCueCount(in: "The build is green.") == 0)
+    }
+
+    @Test func dropsCorrectionCueComparesCueCounts() {
+        #expect(outputGuard.dropsCorrectionCue(raw: "cars sorry buses", cleaned: "Buses."))
+        #expect(!outputGuard.dropsCorrectionCue(raw: "sorry I'm late", cleaned: "Sorry, I'm late."))
     }
 
     @Test func invalidSelfCorrectionIsReadable() {

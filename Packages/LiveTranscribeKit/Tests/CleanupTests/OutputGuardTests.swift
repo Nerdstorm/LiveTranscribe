@@ -45,6 +45,21 @@ struct OutputGuardTests {
         #expect(verdict == .accepted("Sure, I can do that."))
     }
 
+    @Test("A spoken opening is kept however it is punctuated", arguments: [
+        ("sure so i was at a small startup for three years", "Sure. So I was at a small startup for three years."),
+        ("Of course we can ship it on Friday.", "Of course, we can ship it on Friday."),
+        ("certainly not before the review", "Certainly not before the review."),
+        ("Here's the plan for the launch", "Here's the plan for the launch."),
+    ])
+    func allowsASpokenOpeningWithDifferentPunctuation(raw: String, cleaned: String) {
+        #expect(outputGuard.review(raw: raw, outcome: .completed(cleaned)) == .accepted(cleaned))
+    }
+
+    @Test func stillRejectsAPreambleAddedAfterASpokenOpening() {
+        let cleaned = "Sure, here's the corrected text: Sure thing."
+        #expect(outputGuard.review(raw: "sure thing", outcome: .completed(cleaned)) != .accepted(cleaned))
+    }
+
     @Test func wordRatioBelowMinimumFallsBack() {
         let verdict = outputGuard.review(raw: words(100), outcome: .completed(words(69)))
         guard case .rejected(.wordRatio(let ratio)) = verdict else {

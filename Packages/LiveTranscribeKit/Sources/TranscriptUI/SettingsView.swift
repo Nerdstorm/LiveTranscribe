@@ -10,6 +10,7 @@ public struct SettingsView: View {
     @AppStorage(AppSettingsKey.llmModel.rawValue) private var llmModel = d.llmModel
     @AppStorage(AppSettingsKey.vadModel.rawValue) private var vadModel = d.vadModel
     @AppStorage(AppSettingsKey.cleanupEnabled.rawValue) private var cleanupEnabled = d.cleanupEnabled
+    @AppStorage(AppSettingsKey.cleanupAdapterEnabled.rawValue) private var cleanupAdapterEnabled = d.cleanupAdapterEnabled
     @AppStorage(AppSettingsKey.vadSilenceMs.rawValue) private var vadSilenceMs = d.vadSilenceMs
     @AppStorage(AppSettingsKey.vadSpeechThreshold.rawValue) private var vadSpeechThreshold = d.vadSpeechThreshold
     @AppStorage(AppSettingsKey.vadPreRollMs.rawValue) private var vadPreRollMs = d.vadPreRollMs
@@ -49,6 +50,9 @@ public struct SettingsView: View {
                 )
             }
             Section("Cleanup") {
+                Toggle("Resolve spoken self-corrections (\"cars, sorry, buses\" → \"buses\")", isOn: $cleanupAdapterEnabled)
+                    .disabled(!cleanupEnabled)
+                    .help("Uses the bundled fine-tuned adapter. It applies only to the model it was trained on.")
                 Stepper("Context segments: \(contextSegments)", value: $contextSegments, in: 0...20)
                 Stepper(
                     "Timeout: \(cleanupTimeoutSeconds, format: .number.precision(.fractionLength(1))) s",

@@ -29,7 +29,8 @@ struct SelfCorrection: Sendable {
     }
 
     /// Whether `cleaned` can be made from `raw` by keeping words in order and deleting:
-    /// - a self-correction: up to `maxRetractedWords` retracted words followed by a cue;
+    /// - a self-correction: up to `maxRetractedWords` retracted words followed by a cue, or by
+    ///   several cues in a row ("high street, wait, no, the shopping centre");
     /// - a filler word;
     /// - a word repeated straight after itself.
     ///
@@ -58,7 +59,7 @@ struct SelfCorrection: Sendable {
         return matches[0][0]
     }
 
-    private func cueCount(in words: [String]) -> Int {
+    func cueCount(in words: [String]) -> Int {
         cues.reduce(0) { count, cue in count + occurrences(of: cue, in: words).count }
     }
 
@@ -69,15 +70,24 @@ struct SelfCorrection: Sendable {
     }
 
     /// For each start index, the end indices (exclusive) of the self-corrections that can be
-    /// deleted from there: at least one retracted word, then a cue.
+    /// deleted from there: at least one retracted word, then one or more cues back to back.
     private func correctionSpans(in words: [String]) -> [Int: [Int]] {
-        var spans: [Int: [Int]] = [:]
+        var cueEnds: [Int: [Int]] = [:]
         for cue in cues {
             for cueStart in occurrences(of: cue, in: words) {
-                let end = cueStart + cue.count
-                for start in max(0, cueStart - maxRetractedWords)..<cueStart {
-                    spans[start, default: []].append(end)
-                }
+                cueEnds[cueStart, default: []].append(cueStart + cue.count)
+            }
+        }
+        // Where a run of back-to-back cues starting at `start` can end.
+        func runEnds(from start: Int) -> [Int] {
+            (cueEnds[start] ?? []).flatMap { end in [end] + runEnds(from: end) }
+        }
+
+        var spans: [Int: [Int]] = [:]
+        for cueStart in cueEnds.keys {
+            let ends = runEnds(from: cueStart)
+            for start in max(0, cueStart - maxRetractedWords)..<cueStart {
+                spans[start, default: []].append(contentsOf: ends)
             }
         }
         return spans
