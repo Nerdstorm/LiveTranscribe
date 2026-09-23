@@ -35,6 +35,7 @@ public enum AppSettingsKey: String, CaseIterable, Sendable {
     case pasteRestoreDelayMs
     case undoSettleDelayMs
     case accessibilityTimeoutMs
+    case accessibilityVerificationDelayMs
     case vocabularyPromptLimit
     case vocabularySimilarityThreshold
     case showVirtualInputDevices
@@ -108,6 +109,7 @@ public struct AppSettingsStore: Sendable {
                 pasteRestoreDelayMs: int(.pasteRestoreDelayMs),
                 undoSettleDelayMs: int(.undoSettleDelayMs),
                 accessibilityTimeoutMs: int(.accessibilityTimeoutMs),
+                accessibilityVerificationDelayMs: int(.accessibilityVerificationDelayMs),
                 vocabularyPromptLimit: int(.vocabularyPromptLimit),
                 vocabularySimilarityThreshold: double(.vocabularySimilarityThreshold),
                 showVirtualInputDevices: bool(.showVirtualInputDevices),
@@ -184,6 +186,7 @@ public struct AppSettingsStore: Sendable {
             .pasteRestoreDelayMs: s.dictation.pasteRestoreDelayMs,
             .undoSettleDelayMs: s.dictation.undoSettleDelayMs,
             .accessibilityTimeoutMs: s.dictation.accessibilityTimeoutMs,
+            .accessibilityVerificationDelayMs: s.dictation.accessibilityVerificationDelayMs,
             .vocabularyPromptLimit: s.dictation.vocabularyPromptLimit,
             .vocabularySimilarityThreshold: s.dictation.vocabularySimilarityThreshold,
             .showVirtualInputDevices: s.dictation.showVirtualInputDevices,

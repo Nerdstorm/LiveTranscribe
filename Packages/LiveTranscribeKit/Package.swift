@@ -69,7 +69,10 @@ let package = Package(
         // System-wide dictation: hotkey → record → transcribe → clean → insert at the cursor.
         .target(
             name: "Dictation",
-            dependencies: ["Shared", "Capture", "Transcription", "Cleanup", "Styles", "Snippets", "Vocabulary"],
+            dependencies: [
+                "Shared", "Capture", "Transcription", "Cleanup", "Styles", "Snippets", "Vocabulary",
+                "Hotkey", "Insertion", "Permissions", "Persistence",
+            ],
             swiftSettings: strictSwift
         ),
 
@@ -169,7 +172,10 @@ let package = Package(
         .testTarget(name: "PermissionsTests", dependencies: ["Permissions", "Capture"], swiftSettings: strictSwift),
         .testTarget(
             name: "DictationTests",
-            dependencies: ["Dictation", "Capture", "Shared", "Transcription", "Cleanup", "Snippets", "Vocabulary"],
+            dependencies: [
+                "Dictation", "Capture", "Shared", "Transcription", "Cleanup", "Snippets", "Vocabulary",
+                "Hotkey", "Insertion", "Permissions", "Persistence",
+            ],
             swiftSettings: strictSwift
         ),
         .testTarget(name: "CaptureTests", dependencies: ["Capture", "Shared"], swiftSettings: strictSwift),

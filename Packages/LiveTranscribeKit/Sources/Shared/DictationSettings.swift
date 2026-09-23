@@ -32,6 +32,9 @@ public struct DictationSettings: Sendable, Equatable {
     public var undoSettleDelayMs: Int
     /// Longest wait for another app to answer an Accessibility request.
     public var accessibilityTimeoutMs: Int
+    /// Wait before reading a field again when an Accessibility insertion seems ignored, for apps
+    /// that apply the write a moment after reporting the old value.
+    public var accessibilityVerificationDelayMs: Int
     /// Most vocabulary terms listed in the cleanup prompt.
     public var vocabularyPromptLimit: Int
     /// How similar a spoken word must be to a vocabulary term to list the term in the prompt.
@@ -60,6 +63,7 @@ public struct DictationSettings: Sendable, Equatable {
         pasteRestoreDelayMs: Int,
         undoSettleDelayMs: Int,
         accessibilityTimeoutMs: Int,
+        accessibilityVerificationDelayMs: Int,
         vocabularyPromptLimit: Int,
         vocabularySimilarityThreshold: Double,
         showVirtualInputDevices: Bool,
@@ -81,6 +85,7 @@ public struct DictationSettings: Sendable, Equatable {
         self.pasteRestoreDelayMs = pasteRestoreDelayMs
         self.undoSettleDelayMs = undoSettleDelayMs
         self.accessibilityTimeoutMs = accessibilityTimeoutMs
+        self.accessibilityVerificationDelayMs = accessibilityVerificationDelayMs
         self.vocabularyPromptLimit = vocabularyPromptLimit
         self.vocabularySimilarityThreshold = vocabularySimilarityThreshold
         self.showVirtualInputDevices = showVirtualInputDevices
@@ -104,6 +109,7 @@ public struct DictationSettings: Sendable, Equatable {
         pasteRestoreDelayMs: 250,
         undoSettleDelayMs: 150,
         accessibilityTimeoutMs: 250,
+        accessibilityVerificationDelayMs: 75,
         vocabularyPromptLimit: 50,
         vocabularySimilarityThreshold: 0.8,
         showVirtualInputDevices: false,
@@ -125,6 +131,7 @@ public struct DictationSettings: Sendable, Equatable {
         copy.pasteRestoreDelayMs = pasteRestoreDelayMs.clamped(to: 50...5_000)
         copy.undoSettleDelayMs = undoSettleDelayMs.clamped(to: 0...2_000)
         copy.accessibilityTimeoutMs = accessibilityTimeoutMs.clamped(to: 50...5_000)
+        copy.accessibilityVerificationDelayMs = accessibilityVerificationDelayMs.clamped(to: 0...1_000)
         copy.vocabularyPromptLimit = vocabularyPromptLimit.clamped(to: 0...200)
         copy.vocabularySimilarityThreshold = vocabularySimilarityThreshold.clamped(to: 0.5...1)
         copy.historyRetentionDays = historyRetentionDays.clamped(to: 0...3_650)
