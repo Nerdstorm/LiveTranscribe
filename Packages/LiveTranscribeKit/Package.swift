@@ -51,6 +51,9 @@ let package = Package(
         // Microphone and Accessibility status for dictation, and links to System Settings.
         .target(name: "Permissions", dependencies: ["Shared", "Capture"], swiftSettings: strictSwift),
 
+        // System-wide dictation: hotkey → record → transcribe → clean → insert at the cursor.
+        .target(name: "Dictation", dependencies: ["Shared", "Capture"], swiftSettings: strictSwift),
+
         .target(
             name: "Segmentation",
             dependencies: [
@@ -141,6 +144,7 @@ let package = Package(
         .testTarget(name: "SharedTests", dependencies: ["Shared"], swiftSettings: strictSwift),
         .testTarget(name: "StylesTests", dependencies: ["Styles"], swiftSettings: strictSwift),
         .testTarget(name: "PermissionsTests", dependencies: ["Permissions", "Capture"], swiftSettings: strictSwift),
+        .testTarget(name: "DictationTests", dependencies: ["Dictation", "Capture", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "CaptureTests", dependencies: ["Capture", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "SegmentationTests", dependencies: ["Segmentation", "Shared"], swiftSettings: strictSwift),
         .testTarget(
