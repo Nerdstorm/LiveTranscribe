@@ -9,6 +9,10 @@ import Shared
 /// punctuation, or after "and" / "then"), at least two of them; "finally" or "lastly" may end
 /// it. The last item runs to the end of its sentence, and any text after that follows the list
 /// on its own line. The lead-in and items are punctuated by ``ListStyle``.
+///
+/// Words that only introduce an item belong to its ordinal: "First of all, …", "First is …",
+/// "Second thing is …", "Third one's …". The "is" stays in the item after a comma ("First, is
+/// it ready?") or in a question ("First is it ready?").
 public struct ListFormatter: Sendable {
     private static let ordinals: [String: Int] = [
         "first": 1, "firstly": 1, "second": 2, "secondly": 2, "third": 3, "thirdly": 3,
@@ -17,6 +21,10 @@ public struct ListFormatter: Sendable {
     ]
     private static let closers: Set<String> = ["finally", "lastly"]
     private static let connectors: Set<String> = ["and", "then"]
+    /// "First is …", "Second was …".
+    private static let copulas: Set<String> = ["is", "was"]
+    /// "First thing is …", "Second one's …".
+    private static let markerNouns: Set<String> = ["one", "thing", "item", "task", "step"]
     private static let clauseEnders = PhraseGrammar.clauseEnders
     private static let sentenceEnders: Set<Character> = [".", "!", "?"]
 
@@ -38,12 +46,7 @@ public struct ListFormatter: Sendable {
 
         var items: [String] = []
         for (index, marker) in markers.enumerated() {
-            var start = marker + 1
-            // "First of all, …"
-            if Self.core(tokens[marker]) == "first", start + 1 < tokens.count,
-               Self.core(tokens[start]) == "of", Self.core(tokens[start + 1]) == "all" {
-                start += 2
-            }
+            let start = Self.itemStart(after: marker, in: tokens)
             var end: Int
             if index + 1 < markers.count {
                 end = markers[index + 1]
@@ -90,6 +93,31 @@ public struct ListFormatter: Sendable {
         return markers
     }
 
+    /// Where the item introduced by the ordinal at `marker` starts: after the words that belong
+    /// to the marker (see the type's rules).
+    private static func itemStart(after marker: Int, in tokens: [String]) -> Int {
+        let next = marker + 1
+        if next + 1 < tokens.count, core(tokens[marker]) == "first", core(tokens[next]) == "of", core(tokens[next + 1]) == "all" {
+            return next + 2
+        }
+        guard next < tokens.count, tokens[marker].last?.isPunctuation != true, !asksQuestion(from: next, in: tokens)
+        else { return next }
+        let word = core(tokens[next])
+        if copulas.contains(word) || (word.hasSuffix("'s") && markerNouns.contains(String(word.dropLast(2)))) {
+            return next + 1
+        }
+        if markerNouns.contains(word), tokens[next].last?.isPunctuation != true, next + 1 < tokens.count,
+           copulas.contains(core(tokens[next + 1])) {
+            return next + 2
+        }
+        return next
+    }
+
+    /// Whether the sentence from token `index` ends with a question mark.
+    private static func asksQuestion(from index: Int, in tokens: [String]) -> Bool {
+        tokens[index...].first(where: endsSentence)?.last == "?"
+    }
+
     private func startsClause(_ index: Int, in tokens: [String]) -> Bool {
         guard index > 0 else { return true }
         if let last = tokens[index - 1].last, Self.clauseEnders.contains(last) { return true }
@@ -103,8 +131,10 @@ public struct ListFormatter: Sendable {
         return false
     }
 
+    /// The token's word, lowercased, without the punctuation around it, with a typographic
+    /// apostrophe written as "'" ("one’s" → "one's").
     private static func core(_ token: String) -> String {
-        token.trimmingCharacters(in: .punctuationCharacters).lowercased()
+        token.trimmingCharacters(in: .punctuationCharacters).lowercased().replacingOccurrences(of: "\u{2019}", with: "'")
     }
 
     private static func endsSentence(_ token: String) -> Bool {

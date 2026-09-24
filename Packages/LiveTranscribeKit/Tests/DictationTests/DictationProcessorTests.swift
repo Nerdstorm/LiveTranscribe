@@ -148,6 +148,23 @@ struct DictationProcessorTests {
         #expect(output.uncleanedText == transcript)
     }
 
+    /// "First is …" and "Number one is …": the "is" introduces the item, so the line doesn't
+    /// start with it. Undo still puts back what was said.
+    @Test func anIsThatIntroducesAnItemIsNotPartOfIt() async {
+        let cleaner = ScriptedCleaner { $0 }
+        let ordinals = await finish(
+            "I have a few to-do items. First is work on getting the weed killer. Second is go to the hardware store and buy the weed killer.",
+            configuration(.medium, multiline: true),
+            cleaner: cleaner
+        )
+        #expect(ordinals.text
+            == "I have a few to-do items:\n1. Work on getting the weed killer.\n2. Go to the hardware store and buy the weed killer.")
+        let transcript = "Number one is ship the release. Number two is fix the build."
+        let numbered = await finish(transcript, configuration(.medium, multiline: true), cleaner: cleaner)
+        #expect(numbered.text == "1. Ship the release\n2. Fix the build")
+        #expect(numbered.uncleanedText == transcript)
+    }
+
     @Test func listMarkersStayWordsWhereNothingIsLaidOut() async {
         let transcript = "Number 1, milk. Number two, eggs."
         let cleaner = ScriptedCleaner { $0 }

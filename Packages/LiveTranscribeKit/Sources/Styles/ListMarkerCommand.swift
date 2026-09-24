@@ -10,7 +10,9 @@ import Shared
 /// too. Every marker needs words after it. A marker is talked about, not said, after a
 /// determiner ("the number one priority", "a bullet point"), after a form of "be" ("speed is
 /// number one and cost is number two"), and, for bullets, after an ordinal ("the second bullet
-/// point is wrong").
+/// point is wrong"). An "is" straight after a number belongs to the marker ("number one is ship
+/// the release"), but not after a comma ("number one, is it ready?") or in a question ("number
+/// one is it ready?").
 ///
 /// Used only where lists are laid out: Medium and High, in fields that take several lines.
 /// Elsewhere the model sees the words, and text that is not laid out gets them back.
@@ -24,6 +26,9 @@ public struct ListMarkerCommand: PhraseMatcher {
     static let bullet = ["bullet", "point"]
     /// Words after which "number one" is a predicate, not a list marker.
     static let copulas: Set<String> = ["is", "was", "are", "were", "be", "been", "being", "am", "isn't", "wasn't", "aren't", "weren't"]
+    /// Words after a number that introduce its item: "number one is ship the release".
+    static let itemCopulas: Set<String> = ["is", "was"]
+    private static let sentenceEnders: Set<Character> = [".", "!", "?"]
     /// Endings of contracted copulas: "we're", "I'm".
     static let copulaContractions = ["'re", "'m"]
     /// Words after which "bullet point" names a bullet on a slide or page.
@@ -48,14 +53,15 @@ public struct ListMarkerCommand: PhraseMatcher {
     private func numberedMarkers(in text: TokenizedText) -> [PhraseMatch] {
         var candidates: [Candidate] = []
         for position in text.words.indices.dropLast() where Self.numberedKeywords.contains(text.words[position].text) {
-            let words = position..<(position + 2)
-            guard text.coversWholeTokens(words),
-                  words.upperBound < text.words.count,
+            let marker = position..<(position + 2)
+            guard text.coversWholeTokens(marker),
                   !PhraseGrammar.endsClause(text.token(ofWord: position)),
                   !PhraseGrammar.followsDeterminer(position, in: text),
                   !Self.follows(position, in: text, oneOf: Self.copulas, orEndingIn: Self.copulaContractions),
                   let number = Self.number(text.words[position + 1].text)
             else { continue }
+            let words = Self.includingItemCopula(marker, in: text)
+            guard words.upperBound < text.words.count else { continue }
             candidates.append(Candidate(words: words, keyword: text.words[position].text, number: number))
         }
 
@@ -99,6 +105,26 @@ public struct ListMarkerCommand: PhraseMatcher {
             ),
             keptTrailing: PhraseGrammar.trailingAfterClausePunctuation(text.token(ofWord: words.upperBound - 1))
         )
+    }
+
+    /// `marker` and the "is" after it, when that "is" introduces the item (see the type's rules).
+    private static func includingItemCopula(_ marker: Range<Int>, in text: TokenizedText) -> Range<Int> {
+        let next = marker.upperBound
+        let withCopula = marker.lowerBound..<(next + 1)
+        guard next < text.words.count,
+              itemCopulas.contains(text.words[next].text),
+              text.coversWholeTokens(withCopula),
+              !PhraseGrammar.endsClause(text.token(ofWord: next - 1)),
+              !asksQuestion(from: next, in: text)
+        else { return marker }
+        return withCopula
+    }
+
+    /// Whether the sentence from word `position` ends with a question mark.
+    private static func asksQuestion(from position: Int, in text: TokenizedText) -> Bool {
+        let tokens = text.tokens.indices[text.words[position].token...]
+        let end = tokens.first { TokenEdges.trailing(of: text.token($0)).contains { sentenceEnders.contains($0) } }
+        return end.map { TokenEdges.trailing(of: text.token($0)).contains("?") } ?? false
     }
 
     /// Whether the word before `position`, in the same clause, is one of `words` or ends with

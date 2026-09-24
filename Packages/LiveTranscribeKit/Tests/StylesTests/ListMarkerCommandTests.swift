@@ -39,6 +39,20 @@ struct ListMarkerCommandTests {
         #expect(protected.placeholders.map(\.expansion) == ["1. ", "\n2. ", "\n1. ", "\n2. "])
     }
 
+    @Test func anIsAfterTheNumberBelongsToTheMarker() {
+        let protected = protector.protect("Number one is ship the release, number two is fix the build.")
+        #expect(protected.text == "⟦S1⟧ ship the release, ⟦S2⟧ fix the build.")
+        #expect(protected.placeholders.map(\.spoken) == ["Number one is", "number two is"], "unlaid text gets these back")
+    }
+
+    @Test("An \"is\" that asks stays in its item", arguments: [
+        "Number one, is it ready? Number two, is it tested?",
+        "Number one is it ready? Number two is it tested?",
+    ])
+    func anIsThatAsksStays(text: String) {
+        #expect(protector.protect(text).text == "⟦S1⟧ is it ready? ⟦S2⟧ is it tested?")
+    }
+
     @Test("Leaves numbers and bullets that are not a list", arguments: [
         "we're number one",
         "the number one priority is speed and number two is cost",
