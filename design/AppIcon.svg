@@ -1,6 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="100 100 824 824">
-  <!-- The site's mark: the app icon's body and glyphs from design/AppIcon.svg, filling the
-       square, without the shadows, which only blur at favicon sizes. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Live Transcribe's app icon: a waveform running into a text cursor, for "speak, and it
+       types at your cursor". Drawn on the macOS icon grid: an 824-point body with continuous
+       corners, centred on a 1024-point canvas, with the standard drop shadow. The master for
+       every size from 32 pixels up; 16 pixels uses AppIcon-16.svg. After editing, run
+       scripts/render-icons.sh. -->
   <defs>
     <path id="body" d="M 383.41 100.00
              L 640.59 100.00 C 722.19 100.00 763.00 100.00 799.79 112.14 C 854.88 131.21 892.79 169.12 911.86 224.21 C 924.00 261.00 924.00 301.81 924.00 383.41
@@ -30,17 +33,28 @@
       <stop offset="0" stop-color="#ffe066"/>
       <stop offset="1" stop-color="#ffb703"/>
     </linearGradient>
+    <filter id="icon-shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#000000" flood-opacity="0.32"/>
+    </filter>
+    <filter id="glyph-shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#062a66" flood-opacity="0.35"/>
+    </filter>
   </defs>
 
-  <use href="#body" fill="url(#background)"/>
+  <use href="#body" fill="url(#background)" filter="url(#icon-shadow)"/>
   <use href="#body" fill="url(#shine)"/>
+  <!-- A light edge along the top, drawn inside the body. -->
   <use href="#body" fill="none" stroke="url(#rim)" stroke-width="6" clip-path="url(#inside)"/>
 
-  <rect x="222" y="422" width="66" height="180" rx="33" fill="url(#wave)"/>
-  <rect x="330" y="332" width="66" height="360" rx="33" fill="url(#wave)"/>
-  <rect x="438" y="387" width="66" height="250" rx="33" fill="url(#wave)"/>
-  <rect x="546" y="447" width="66" height="130" rx="33" fill="url(#wave)"/>
-  <rect x="702" y="272" width="44" height="480" rx="22" fill="url(#cursor)"/>
-  <rect x="646" y="272" width="156" height="44" rx="22" fill="url(#cursor)"/>
-  <rect x="646" y="708" width="156" height="44" rx="22" fill="url(#cursor)"/>
+  <g filter="url(#glyph-shadow)">
+    <!-- The waveform: four bars, centred on the body's middle. -->
+    <rect x="222" y="422" width="66" height="180" rx="33" fill="url(#wave)"/>
+    <rect x="330" y="332" width="66" height="360" rx="33" fill="url(#wave)"/>
+    <rect x="438" y="387" width="66" height="250" rx="33" fill="url(#wave)"/>
+    <rect x="546" y="447" width="66" height="130" rx="33" fill="url(#wave)"/>
+    <!-- The text cursor: an I-beam, taller than the waveform. -->
+    <rect x="702" y="272" width="44" height="480" rx="22" fill="url(#cursor)"/>
+    <rect x="646" y="272" width="156" height="44" rx="22" fill="url(#cursor)"/>
+    <rect x="646" y="708" width="156" height="44" rx="22" fill="url(#cursor)"/>
+  </g>
 </svg>

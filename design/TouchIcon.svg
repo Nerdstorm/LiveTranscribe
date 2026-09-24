@@ -1,15 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="100 100 824 824">
-  <!-- The site's mark: the app icon's body and glyphs from design/AppIcon.svg, filling the
-       square, without the shadows, which only blur at favicon sizes. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="824" height="824" viewBox="100 100 824 824">
+  <!-- The icon for the website's apple-touch-icon.png: design/AppIcon.svg's background and
+       glyphs filling a square, which iOS and Safari round themselves. After editing, run
+       scripts/render-icons.sh. -->
   <defs>
-    <path id="body" d="M 383.41 100.00
-             L 640.59 100.00 C 722.19 100.00 763.00 100.00 799.79 112.14 C 854.88 131.21 892.79 169.12 911.86 224.21 C 924.00 261.00 924.00 301.81 924.00 383.41
-             L 924.00 640.59 C 924.00 722.19 924.00 763.00 911.86 799.79 C 892.79 854.88 854.88 892.79 799.79 911.86 C 763.00 924.00 722.19 924.00 640.59 924.00
-             L 383.41 924.00 C 301.81 924.00 261.00 924.00 224.21 911.86 C 169.12 892.79 131.21 854.88 112.14 799.79 C 100.00 763.00 100.00 722.19 100.00 640.59
-             L 100.00 383.41 C 100.00 301.81 100.00 261.00 112.14 224.21 C 131.21 169.12 169.12 131.21 224.21 112.14 C 261.00 100.00 301.81 100.00 383.41 100.00 Z"/>
-    <clipPath id="inside">
-      <use href="#body"/>
-    </clipPath>
     <linearGradient id="background" gradientUnits="userSpaceOnUse" x1="0" y1="100" x2="0" y2="924">
       <stop offset="0" stop-color="#3d8bff"/>
       <stop offset="1" stop-color="#0a4db8"/>
@@ -18,10 +11,6 @@
       <stop offset="0" stop-color="#ffffff" stop-opacity="0.28"/>
       <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="rim" gradientUnits="userSpaceOnUse" x1="0" y1="100" x2="0" y2="420">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.45"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </linearGradient>
     <linearGradient id="wave" gradientUnits="userSpaceOnUse" x1="0" y1="220" x2="0" y2="830">
       <stop offset="0" stop-color="#ffffff"/>
       <stop offset="1" stop-color="#dbe8ff"/>
@@ -32,9 +21,8 @@
     </linearGradient>
   </defs>
 
-  <use href="#body" fill="url(#background)"/>
-  <use href="#body" fill="url(#shine)"/>
-  <use href="#body" fill="none" stroke="url(#rim)" stroke-width="6" clip-path="url(#inside)"/>
+  <rect x="100" y="100" width="824" height="824" fill="url(#background)"/>
+  <rect x="100" y="100" width="824" height="824" fill="url(#shine)"/>
 
   <rect x="222" y="422" width="66" height="180" rx="33" fill="url(#wave)"/>
   <rect x="330" y="332" width="66" height="360" rx="33" fill="url(#wave)"/>

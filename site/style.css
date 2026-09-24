@@ -76,6 +76,15 @@ kbd + kbd {
   border-bottom: 1px solid var(--rule);
 }
 
+/* The app icon as macOS shows it. Its image has a transparent edge for the shadow, 100 of every
+   1024 pixels on each side, so it is pulled left to line the icon up with the heading. */
+.app-icon {
+  display: block;
+  width: 128px;
+  height: 128px;
+  margin: -1rem 0 1rem -12.5px;
+}
+
 h1 {
   margin: 0 0 1rem;
   font-size: clamp(2rem, 6vw, 2.75rem);
