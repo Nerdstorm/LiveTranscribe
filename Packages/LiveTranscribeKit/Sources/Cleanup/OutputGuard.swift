@@ -28,6 +28,9 @@ public enum FallbackReason: Sendable, Equatable, CustomStringConvertible {
     case droppedWords(count: Int)
     /// A negation ("not", "never", "can't") was removed.
     case lostNegation
+    /// A name the speaker said was dropped or moved, as when the sign-off's name ends up in the
+    /// greeting.
+    case movedOrDroppedName
     /// Words that carry what was said ("milk", "Tuesday", "cancel") were deleted with nothing in
     /// their place.
     case droppedContent(count: Int)
@@ -47,6 +50,7 @@ public enum FallbackReason: Sendable, Equatable, CustomStringConvertible {
         case .placeholderChanged: "changed a placeholder"
         case .droppedWords(let count): "dropped \(count) spoken words"
         case .lostNegation: "dropped a negation"
+        case .movedOrDroppedName: "dropped or moved a name"
         case .droppedContent(let count): count == 1 ? "dropped a word that carries meaning" : "dropped \(count) words that carry meaning"
         case .timedOut(let seconds): String(format: "timed out after %.1fs", seconds)
         case .cancelled: "cancelled"
@@ -76,8 +80,9 @@ public enum GuardVerdict: Sendable, Equatable {
 ///
 /// Output that keeps every cue may not remove a negation and, unless the level allows rewording
 /// (High), may not delete a run of spoken words outright (``DroppedWords``). At every level, it
-/// may not delete a word that carries meaning with nothing in its place (``ContentWords``):
-/// rewording replaces words, it does not leave them out.
+/// must keep each name where the speaker said it (``SpokenNames``) and may not delete a word that
+/// carries meaning with nothing in its place (``ContentWords``): rewording replaces words, it does
+/// not leave them out.
 public struct OutputGuard: Sendable {
     public struct Policy: Sendable, Equatable {
         /// Allowed ratio of the output's word count to the input's, per level. A level missing
@@ -109,6 +114,9 @@ public struct OutputGuard: Sendable {
         /// placeholder cannot be put back; the prompt probe turns it off to see what the model
         /// wrote.
         public var requiresIntactPlaceholders: Bool
+        /// Output must keep every name the speaker said where they said it. Always on in the app;
+        /// the prompt probe turns it off to see what the model wrote.
+        public var requiresNamesInPlace: Bool
 
         public init(
             wordRatioBounds: [CleanupLevel: ClosedRange<Double>],
@@ -122,7 +130,8 @@ public struct OutputGuard: Sendable {
             maxDroppedContent: Int,
             maxRetractedWords: Int,
             minRespellingSimilarity: Double,
-            requiresIntactPlaceholders: Bool = true
+            requiresIntactPlaceholders: Bool = true,
+            requiresNamesInPlace: Bool = true
         ) {
             self.wordRatioBounds = wordRatioBounds
             self.minSimilarity = minSimilarity
@@ -136,6 +145,7 @@ public struct OutputGuard: Sendable {
             self.maxRetractedWords = maxRetractedWords
             self.minRespellingSimilarity = minRespellingSimilarity
             self.requiresIntactPlaceholders = requiresIntactPlaceholders
+            self.requiresNamesInPlace = requiresNamesInPlace
         }
 
         /// The bounds for `level`.
@@ -168,12 +178,14 @@ public struct OutputGuard: Sendable {
     public let policy: Policy
     private let selfCorrection: SelfCorrection
     private let droppedWords: DroppedWords
+    private let spokenNames: SpokenNames
     private let contentWords: ContentWords
 
     public init(policy: Policy = .default) {
         self.policy = policy
         self.selfCorrection = SelfCorrection(policy: policy)
         self.droppedWords = DroppedWords(policy: policy)
+        self.spokenNames = SpokenNames(policy: policy)
         self.contentWords = ContentWords(policy: policy)
     }
 
@@ -233,6 +245,9 @@ public struct OutputGuard: Sendable {
             return .rejected(.lostNegation)
         }
         let placeholderWords = Set(options.placeholders.map(EditDistance.normalize))
+        if policy.requiresNamesInPlace, spokenNames.movesOrDropsName(in: raw, alignment: alignment, ignoring: placeholderWords) {
+            return .rejected(.movedOrDroppedName)
+        }
         let droppedContent = contentWords.droppedCount(in: alignment, ignoring: placeholderWords)
         if droppedContent > policy.maxDroppedContent {
             return .rejected(.droppedContent(count: droppedContent))

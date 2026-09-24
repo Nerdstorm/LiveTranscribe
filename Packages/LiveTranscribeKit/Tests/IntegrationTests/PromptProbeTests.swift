@@ -123,7 +123,8 @@ struct PromptProbeTests {
         maxDroppedContent: .max,
         maxRetractedWords: 0,
         minRespellingSimilarity: 1,
-        requiresIntactPlaceholders: false
+        requiresIntactPlaceholders: false,
+        requiresNamesInPlace: false
     ))
 
     @Test(.timeLimit(.minutes(10)))
