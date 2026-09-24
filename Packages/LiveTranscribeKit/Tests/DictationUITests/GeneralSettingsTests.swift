@@ -81,12 +81,12 @@ struct GeneralSettingsTests {
         GeneralSettingsCleanupNotes.text(level: level, inEffect: inEffect, stored: stored ?? inEffect)
     }
 
-    /// The level applies to both modes, but snippets and vocabulary only to dictation (the live
-    /// transcript applies neither), so the note names dictation.
-    @Test func cleanupNotesSaySnippetsAndVocabularyAlwaysApply() {
+    /// The level applies to both modes, but snippets, vocabulary and spoken commands only to
+    /// dictation (the live transcript applies none of them), so the note names dictation.
+    @Test func cleanupNotesSaySnippetsVocabularyAndCommandsAlwaysApply() {
         for level in CleanupLevel.allCases {
             let text = notes(level, inEffect: Self.allOn)
-            #expect(text.contains("Dictation applies your snippets and vocabulary at every level"), "\(level)")
+            #expect(text.contains("Dictation applies your snippets, vocabulary and spoken commands at every level"), "\(level)")
             #expect(!text.contains("Advanced"), "nothing is off, so nothing points to Advanced (\(level))")
             #expect(!text.contains("starts"), "nothing waits for a restart (\(level))")
         }
@@ -99,7 +99,7 @@ struct GeneralSettingsTests {
         for level in CleanupLevel.allCases {
             let text = notes(level, inEffect: off)
             #expect(text.contains("The cleanup model is off in Advanced, so nothing is reworded"), "\(level)")
-            #expect(text.contains("still removes filler words and formats spoken lists at Medium and High"), "\(level)")
+            #expect(text.contains("still removes filler words and lays out spoken lists and letters at Medium and High"), "\(level)")
             #expect(!text.contains("works like None"), "\(level)")
             #expect(!text.contains("Self-corrections"), "the model being off says it all (\(level))")
         }

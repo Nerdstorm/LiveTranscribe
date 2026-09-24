@@ -29,10 +29,10 @@ struct HistoryListFormatTests {
         #expect(HistoryListFormat.appName(HistoryListFixtures.record(text: "x", app: "  ")) == "Unknown app")
     }
 
-    /// A fallback inserts the text before cleanup, which has snippets and vocabulary applied, so
-    /// the tooltip must not say it is what was heard.
-    @Test func aFallbackSaysSnippetsAndVocabularyStillApplied() {
-        #expect(HistoryListFormat.fellBackHelp.contains("snippets and vocabulary"))
+    /// A fallback inserts the text before cleanup, which has snippets, vocabulary and spoken
+    /// commands applied, so the tooltip must not say it is what was heard.
+    @Test func aFallbackSaysSnippetsVocabularyAndCommandsStillApplied() {
+        #expect(HistoryListFormat.fellBackHelp.contains("snippets, vocabulary and spoken commands"))
         #expect(!HistoryListFormat.fellBackHelp.contains("as heard"))
     }
 

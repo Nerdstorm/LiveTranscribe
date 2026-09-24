@@ -112,7 +112,7 @@ struct TermSimilarity: Sendable {
     /// as two words ("nerd storm" for "Nerdstorm") is only similar as a pair.
     ///
     /// Words come from ``WordTokenizer``, the definition the replacer and the selector's first
-    /// ranking step use, so a snippet placeholder ("⟦S1⟧") never counts as something said.
+    /// ranking step use, so a placeholder ("⟦S1⟧") never counts as something said.
     static func units(in text: String) -> [String] {
         let words = WordTokenizer.words(in: text)
             .flatMap { EditDistance.words(in: EditDistance.normalize($0.key)) }

@@ -6,16 +6,19 @@ import Styles
 import Transcription
 import Vocabulary
 
-/// Turns one recording into the text to insert: speech-to-text, snippets, vocabulary, cleanup at
-/// the chosen level, then snippet expansions and list formatting.
+/// Turns one recording into the text to insert: speech-to-text, snippets, spoken commands and
+/// vocabulary, cleanup at the chosen level, then layout and the snippets' expansions.
 ///
-/// Snippet triggers become opaque placeholders before the language model runs, so the model can
-/// neither see nor change an expansion. If cleanup is rejected or times out, the text before
-/// cleanup is used, with snippets and vocabulary still applied.
+/// Snippet triggers, emoji, addresses and spoken line breaks become opaque placeholders before
+/// the language model runs, so the model can neither see nor change them (see
+/// ``PreparedDictation``). At Medium and High, in fields that take several lines, spoken lists
+/// and letters are laid out; a letter's greeting and sign-off are laid out before the model
+/// runs, and only its body is cleaned. If cleanup is rejected or times out, the text before
+/// cleanup is used, with snippets, commands, vocabulary and layout still applied.
 ///
 /// Without a cleaner (cleanup turned off in Settings › Advanced) each level still applies its
-/// rules that need no model, filler removal and list formatting at Medium and High, and nothing
-/// is reworded. That was chosen, so it is not reported as a fallback.
+/// rules that need no model, filler removal and layout at Medium and High, and nothing is
+/// reworded. That was chosen, so it is not reported as a fallback.
 public struct DictationProcessor: Sendable {
     /// Everything that shapes one dictation's text, read fresh for each dictation.
     public struct Configuration: Sendable {
@@ -26,7 +29,8 @@ public struct DictationProcessor: Sendable {
         public var vocabularyPromptLimit: Int
         /// How close a spoken word must be to a term for the term to be listed in the prompt.
         public var vocabularySimilarityThreshold: Double
-        /// The target field takes several lines, so spoken lists can become numbered lines.
+        /// The target field takes several lines, so spoken line breaks are newlines and spoken
+        /// lists and letters can be laid out on lines.
         public var multiline: Bool
 
         public init(
@@ -49,8 +53,8 @@ public struct DictationProcessor: Sendable {
     public struct Output: Sendable, Equatable {
         /// Exactly what speech-to-text heard.
         public let rawTranscript: String
-        /// The transcript with vocabulary and snippets applied but not cleaned: what Undo AI edit
-        /// puts back.
+        /// The transcript with snippets, spoken commands and vocabulary applied but neither
+        /// cleaned nor laid out: what Undo AI edit puts back.
         public let uncleanedText: String
         /// What to insert.
         public let text: String
@@ -108,15 +112,17 @@ public struct DictationProcessor: Sendable {
                           transcriptionMs: transcriptionMs, cleanupMs: 0)
         }
 
-        let protected = SnippetExpander(snippets: configuration.snippets).protect(raw)
-        let replaced = VocabularyReplacer(entries: configuration.vocabulary).apply(to: protected.text)
-        let uncleaned = protected.restore(in: replaced) ?? protected.expanded
+        let prepared = PreparedDictation(transcript: raw, configuration: configuration)
+        let uncleaned = prepared.uncleaned
         guard configuration.level.usesLanguageModel else {
             return Output(rawTranscript: raw, uncleanedText: uncleaned, text: uncleaned, fellBack: false,
                           fallbackReason: nil, transcriptionMs: transcriptionMs, cleanupMs: 0)
         }
 
-        let segment = Segment(id: UUID(), sessionID: UUID(), startMs: 0, endMs: 0, rawText: replaced)
+        // A letter's greeting and sign-off are laid out already; the model cleans the body.
+        let frame = prepared.frame(level: configuration.level)
+        let body = frame?.body ?? prepared.text
+        let segment = Segment(id: UUID(), sessionID: UUID(), startMs: 0, endMs: 0, rawText: body)
         let cleaned: CleanedSegment
         if let cleaner {
             let options = CleanupOptions(
@@ -124,30 +130,27 @@ public struct DictationProcessor: Sendable {
                 vocabulary: VocabularySelector(
                     entries: configuration.vocabulary,
                     similarityThreshold: configuration.vocabularySimilarityThreshold
-                ).relevantTerms(for: replaced, limit: configuration.vocabularyPromptLimit),
-                placeholders: protected.tokens
+                ).relevantTerms(for: body, limit: configuration.vocabularyPromptLimit),
+                placeholders: prepared.placeholders.filter { body.contains($0) }
             )
             cleaned = await cleaner.clean(segment, context: [], options: options)
         } else {
             // Placeholders are single words that are never fillers, so they come through intact.
             cleaned = CleanedSegment(
                 segment: segment,
-                cleanedText: CleanupExecutor.deterministicCleanup(of: replaced, level: configuration.level),
+                cleanedText: CleanupExecutor.deterministicCleanup(of: body, level: configuration.level),
                 fellBack: false,
                 fallbackReason: nil,
                 latencyMs: 0
             )
         }
 
-        var body = cleaned.cleanedText
-        if configuration.level.formatsLists, configuration.multiline, let list = ListFormatter().formatted(body) {
-            body = list
-        }
-        guard let text = protected.restore(in: body) else {
+        let assembled = frame?.assembled(body: cleaned.cleanedText) ?? cleaned.cleanedText
+        guard let text = prepared.finished(assembled) else {
             // The guard checks placeholders, so this means a later step damaged one.
-            Log.dictation.error("Snippet placeholders could not be restored; inserting the uncleaned text")
+            Log.dictation.error("Placeholders could not be restored; inserting the uncleaned text")
             return Output(rawTranscript: raw, uncleanedText: uncleaned, text: uncleaned, fellBack: true,
-                          fallbackReason: "snippets could not be restored", transcriptionMs: transcriptionMs,
+                          fallbackReason: "placeholders could not be restored", transcriptionMs: transcriptionMs,
                           cleanupMs: cleaned.latencyMs)
         }
         return Output(rawTranscript: raw, uncleanedText: uncleaned, text: text, fellBack: cleaned.fellBack,

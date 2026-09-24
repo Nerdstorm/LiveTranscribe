@@ -144,7 +144,7 @@ struct CleanupExecutorTests {
         let raw = makeSegment("email ⟦S1⟧ to the team")
         let cleaned = await executor().run(raw, context: [], options: options) { _ in "Email S1 to the team." }
         #expect(cleaned.fellBack)
-        #expect(cleaned.fallbackReason == "changed a snippet placeholder")
+        #expect(cleaned.fallbackReason == "changed a placeholder")
         #expect(cleaned.cleanedText == "email ⟦S1⟧ to the team")
     }
 

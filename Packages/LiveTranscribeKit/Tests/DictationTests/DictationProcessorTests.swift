@@ -11,10 +11,14 @@ struct DictationProcessorTests {
     private let calendar = Snippet(trigger: "my calendar link", expansion: "https://cal.example.com/me")
     private let nerdstorm = VocabularyEntry(term: "Nerdstorm", spokenVariants: ["nerd storm"])
 
-    private func configuration(_ level: CleanupLevel, multiline: Bool = false) -> DictationProcessor.Configuration {
+    private func configuration(
+        _ level: CleanupLevel,
+        multiline: Bool = false,
+        snippets: [Snippet]? = nil
+    ) -> DictationProcessor.Configuration {
         .init(
             level: level,
-            snippets: [calendar],
+            snippets: snippets ?? [calendar],
             vocabulary: [nerdstorm],
             vocabularyPromptLimit: 50,
             vocabularySimilarityThreshold: 0.8,
@@ -60,7 +64,7 @@ struct DictationProcessorTests {
         let cleaner = ScriptedCleaner { text in Self.tidy(text.replacingOccurrences(of: "⟦S1⟧", with: "S1")) }
         let output = await finish("um send my calendar link to nerd storm", configuration(.medium), cleaner: cleaner)
         #expect(output.fellBack)
-        #expect(output.fallbackReason == "changed a snippet placeholder")
+        #expect(output.fallbackReason == "changed a placeholder")
         #expect(output.text == "send https://cal.example.com/me to Nerdstorm")
     }
 
@@ -73,6 +77,123 @@ struct DictationProcessorTests {
         #expect(singleLine.text == "We need three things: first, milk; second, eggs; and third, bread.")
         let light = await finish(transcript, configuration(.light, multiline: true), cleaner: cleaner)
         #expect(!light.text.contains("\n"), "Light keeps the words as spoken")
+    }
+
+    // MARK: - Spoken commands and layout
+
+    @Test func emojiIsHiddenFromTheModelAndWrittenAfter() async {
+        let cleaner = ScriptedCleaner(reply: Self.tidy)
+        let output = await finish("hi emoji fireworks", configuration(.medium), cleaner: cleaner)
+        let request = await cleaner.requests.first
+        #expect(request?.text == "hi ⟦S1⟧")
+        #expect(request?.options.placeholders == ["⟦S1⟧"])
+        #expect(output.text == "Hi \u{1F386}.")
+        #expect(output.uncleanedText == "hi \u{1F386}")
+    }
+
+    @Test func commandsApplyAtNoneWithoutTheModel() async {
+        let output = await finish(
+            "is it ready question mark new line email sam at example dot com",
+            configuration(.none, multiline: true),
+            cleaner: nil
+        )
+        #expect(output.text == "is it ready?\nEmail sam@example.com")
+    }
+
+    @Test func aSpokenLineBreakIsANewlineOnlyWhereTheFieldTakesLines() async {
+        let cleaner = ScriptedCleaner(reply: Self.tidy)
+        let multiline = await finish("thanks new paragraph see you soon", configuration(.light, multiline: true), cleaner: cleaner)
+        #expect(multiline.text == "Thanks\n\nSee you soon.")
+        let singleLine = await finish("thanks new paragraph see you soon", configuration(.light), cleaner: cleaner)
+        #expect(singleLine.text == "Thanks see you soon.")
+    }
+
+    @Test func aSnippetWinsOverACommandWithTheSameWords() async {
+        let heart = Snippet(trigger: "heart emoji", expansion: "<3")
+        let output = await finish("thanks heart emoji", configuration(.none, snippets: [heart]), cleaner: nil)
+        #expect(output.text == "thanks <3")
+    }
+
+    /// "Number 1, … Number two, …" becomes a numbered list; Undo puts back what was said.
+    @Test func spokenListMarkersBecomeAList() async {
+        let transcript = "List of to-do tasks for Acme. Number 1, we have to work on the launch. "
+            + "Number two, need to fix the Android build."
+        let cleaner = ScriptedCleaner { $0 }
+        let output = await finish(transcript, configuration(.medium, multiline: true), cleaner: cleaner)
+        #expect(await cleaner.requests.first?.text
+            == "List of to-do tasks for Acme. ⟦S1⟧ we have to work on the launch. ⟦S2⟧ need to fix the Android build.")
+        #expect(output.text
+            == "List of to-do tasks for Acme:\n1. We have to work on the launch.\n2. Need to fix the Android build.")
+        #expect(output.uncleanedText == transcript)
+    }
+
+    @Test func listMarkersStayWordsWhereNothingIsLaidOut() async {
+        let transcript = "Number 1, milk. Number two, eggs."
+        let cleaner = ScriptedCleaner { $0 }
+        let singleLine = await finish(transcript, configuration(.medium), cleaner: cleaner)
+        #expect(singleLine.text == transcript)
+        let light = await finish(transcript, configuration(.light, multiline: true), cleaner: cleaner)
+        #expect(light.text == transcript)
+    }
+
+    /// The model sees only the body, so it cannot move names between the greeting and the
+    /// sign-off.
+    @Test func aLetterIsFramedAndOnlyItsBodyIsCleaned() async {
+        let transcript = "Dear sir oh madam, I'm writing about my passport renewal. Kind regards Jordan Lee."
+        let cleaner = ScriptedCleaner { $0.replacingOccurrences(of: "I'm", with: "I am") }
+        let output = await finish(transcript, configuration(.medium, multiline: true), cleaner: cleaner)
+        #expect(await cleaner.requests.first?.text == "I'm writing about my passport renewal.")
+        #expect(output.text == "Dear Sir or Madam,\n\nI am writing about my passport renewal.\n\nKind regards,\nJordan Lee")
+        #expect(output.uncleanedText == transcript)
+        #expect(!output.fellBack)
+    }
+
+    @Test func anUnpunctuatedNoteIsFramed() async {
+        let output = await finish(
+            "Hi John thanks for the update I will review it tomorrow cheers Sam.",
+            configuration(.medium, multiline: true),
+            cleaner: ScriptedCleaner(reply: Self.tidy)
+        )
+        #expect(output.text == "Hi John,\n\nThanks for the update I will review it tomorrow.\n\nCheers,\nSam")
+    }
+
+    @Test func aLetterIsStillFramedWhenCleanupFallsBack() async {
+        let output = await finish(
+            "Hi John thanks for the update cheers Sam.",
+            configuration(.medium, multiline: true),
+            cleaner: ScriptedCleaner { _ in "" }
+        )
+        #expect(output.fellBack)
+        #expect(output.text == "Hi John,\n\nThanks for the update\n\nCheers,\nSam")
+    }
+
+    @Test func aLetterIsNotFramedInASingleLineField() async {
+        let transcript = "Hi John thanks for the update cheers Sam."
+        let output = await finish(transcript, configuration(.medium), cleaner: ScriptedCleaner { $0 })
+        #expect(output.text == transcript)
+    }
+
+    @Test func placeholdersInTheSignatureStayOutOfTheModelsText() async {
+        let name = Snippet(trigger: "my name", expansion: "Jordan Lee")
+        let cleaner = ScriptedCleaner(reply: Self.tidy)
+        let output = await finish(
+            "Hi John, send my calendar link please. Cheers my name",
+            configuration(.medium, multiline: true, snippets: [calendar, name]),
+            cleaner: cleaner
+        )
+        let request = await cleaner.requests.first
+        #expect(request?.text == "send ⟦S1⟧ please.")
+        #expect(request?.options.placeholders == ["⟦S1⟧"])
+        #expect(output.text == "Hi John,\n\nSend https://cal.example.com/me please..\n\nCheers,\nJordan Lee")
+    }
+
+    @Test func aParagraphBreakAfterTheGreetingAddsNoBlankLines() async {
+        let output = await finish(
+            "Hi John new paragraph thanks for the update cheers Sam",
+            configuration(.medium, multiline: true),
+            cleaner: ScriptedCleaner { $0 }
+        )
+        #expect(output.text == "Hi John,\n\nThanks for the update\n\nCheers,\nSam")
     }
 
     // MARK: - Cleanup model turned off
@@ -97,6 +218,16 @@ struct DictationProcessorTests {
         let light = await finish(transcript, configuration(.light, multiline: true), cleaner: nil)
         #expect(light.text == transcript, "Light removes nothing and formats nothing without the model")
         #expect(!light.fellBack)
+    }
+
+    @Test func withTheCleanupModelOffALetterIsStillFramed() async {
+        let output = await finish(
+            "um dear team the build is green. Regards Sam",
+            configuration(.medium, multiline: true),
+            cleaner: nil
+        )
+        #expect(output.text == "Dear team,\n\nThe build is green.\n\nRegards,\nSam")
+        #expect(!output.fellBack)
     }
 
     @Test func processWithoutACleanerStillTranscribes() async throws {

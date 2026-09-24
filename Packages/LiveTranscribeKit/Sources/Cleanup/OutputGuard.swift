@@ -21,7 +21,8 @@ public enum FallbackReason: Sendable, Equatable, CustomStringConvertible {
     case invalidSelfCorrection
     /// A self-correction was resolved at a level that keeps every spoken word.
     case selfCorrectionNotAllowed
-    /// A snippet placeholder was dropped, repeated or altered.
+    /// A placeholder (for a snippet, emoji, address, line break or list marker) was dropped,
+    /// repeated or altered.
     case placeholderChanged
     /// A run of spoken words was deleted with nothing in its place, and no cue explains it.
     case droppedWords(count: Int)
@@ -40,7 +41,7 @@ public enum FallbackReason: Sendable, Equatable, CustomStringConvertible {
         case .lowSimilarity(let similarity): String(format: "similarity %.2f below threshold", similarity)
         case .invalidSelfCorrection: "removed words that were not a self-correction"
         case .selfCorrectionNotAllowed: "resolved a self-correction at a level that keeps every word"
-        case .placeholderChanged: "changed a snippet placeholder"
+        case .placeholderChanged: "changed a placeholder"
         case .droppedWords(let count): "dropped \(count) spoken words"
         case .lostNegation: "dropped a negation"
         case .timedOut(let seconds): String(format: "timed out after %.1fs", seconds)
@@ -59,7 +60,7 @@ public enum GuardVerdict: Sendable, Equatable {
 ///
 /// The model is asked only to correct, so output that is empty, chatty, much longer or shorter
 /// than the level allows, or substantially different from the input is treated as a meaning
-/// change and rejected. So is output that damaged a snippet placeholder, since the snippet could
+/// change and rejected. So is output that damaged a placeholder, since what it stands for could
 /// then not be put back.
 ///
 /// Output that drops a correction cue ("sorry", "I mean", …) is checked by ``SelfCorrection``

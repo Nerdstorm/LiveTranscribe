@@ -74,7 +74,7 @@ public enum Prompt {
     public static let templateContext: [String: Bool] = ["enable_thinking": false]
 
     /// Output budget: two tokens per input word plus a fixed allowance for punctuation, plus room
-    /// for each snippet placeholder, whose brackets take several tokens each.
+    /// for each placeholder, whose brackets take several tokens each.
     public static let maxTokensPerInputWord = 2
     public static let maxTokensAllowance = 16
     public static let maxTokensPerPlaceholder = 6

@@ -129,7 +129,7 @@ struct OutputGuardTests {
         #expect(FallbackReason.timedOut(seconds: 3).description == "timed out after 3.0s")
         #expect(FallbackReason.wordRatio(1.31).description == "word-count ratio 1.31 outside allowed range")
         #expect(FallbackReason.selfCorrectionNotAllowed.description == "resolved a self-correction at a level that keeps every word")
-        #expect(FallbackReason.placeholderChanged.description == "changed a snippet placeholder")
+        #expect(FallbackReason.placeholderChanged.description == "changed a placeholder")
     }
 
     // MARK: - Levels

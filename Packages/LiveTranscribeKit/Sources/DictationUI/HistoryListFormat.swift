@@ -22,9 +22,9 @@ enum HistoryListFormat {
     }
 
     /// The tooltip on a dictation whose cleanup was rejected or timed out. The text before
-    /// cleanup was inserted, and it still has the user's snippets and vocabulary applied
-    /// (`DictationProcessor`), so it is not simply what speech-to-text heard.
-    static let fellBackHelp = "Cleanup didn't apply; snippets and vocabulary still did"
+    /// cleanup was inserted, and it still has the user's snippets, vocabulary and spoken commands
+    /// applied (`DictationProcessor`), so it is not simply what speech-to-text heard.
+    static let fellBackHelp = "Cleanup didn't apply; snippets, vocabulary and spoken commands still did"
 
     /// The cleanup level's name for a stored raw value; the raw value itself if it is unknown.
     static func cleanupLevel(_ rawValue: String) -> String {
