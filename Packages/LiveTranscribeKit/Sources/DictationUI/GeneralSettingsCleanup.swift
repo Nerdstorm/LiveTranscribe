@@ -5,8 +5,9 @@ import SwiftUI
 /// settings stop from applying, and when a change there takes effect.
 ///
 /// The per-level lines come from ``CleanupLevel/summary``. These notes cover what those lines
-/// leave out: dictation applies snippets and vocabulary at every level (they run before the
-/// language model; None's line says so too, and the live transcript applies neither), and
+/// leave out: dictation applies snippets, vocabulary and spoken commands at every level (they run
+/// before the language model; None's line says so too, and the live transcript applies none of
+/// them), and
 /// self-corrections are resolved only with the fine-tuned adapter
 /// (`PromptBuilder.levelRules(for:adapted:)`), which Advanced can turn off.
 ///
@@ -35,7 +36,7 @@ enum GeneralSettingsCleanupNotes {
     static func text(level: CleanupLevel, inEffect: ModelSwitches, stored: ModelSwitches) -> String {
         var notes = [
             "Applies to dictation and the live transcript, on this Mac.",
-            "Dictation applies your snippets and vocabulary at every level.",
+            "Dictation applies your snippets, vocabulary and spoken commands at every level.",
         ]
         if let model = modelNote(inEffect: inEffect, stored: stored) {
             notes.append(model)
@@ -45,10 +46,10 @@ enum GeneralSettingsCleanupNotes {
         return notes.joined(separator: " ")
     }
 
-    /// What the levels do without the cleanup model. Filler removal and list formatting need no
-    /// model (`CleanupExecutor.deterministicCleanup`, `ListFormatter`); the live transcript runs
-    /// no cleanup at all without it.
-    static let withoutModel = "nothing is reworded: dictation still removes filler words and formats spoken lists at Medium and High, and the live transcript shows what was heard."
+    /// What the levels do without the cleanup model. Filler removal and layout need no model
+    /// (`CleanupExecutor.deterministicCleanup`, `Layout`); the live transcript runs no cleanup at
+    /// all without it.
+    static let withoutModel = "nothing is reworded: dictation still removes filler words and lays out spoken lists and letters at Medium and High, and the live transcript shows what was heard."
 
     /// The cleanup model when it is off or is about to change; `nil` while it is on and stays on.
     private static func modelNote(inEffect: ModelSwitches, stored: ModelSwitches) -> String? {

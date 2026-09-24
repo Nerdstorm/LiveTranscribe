@@ -8,22 +8,22 @@ struct CleanupLevelTests {
         #expect(CleanupLevel.allCases.filter { !$0.usesLanguageModel } == [.none])
     }
 
-    @Test func mediumAndHighRemoveFillersResolveCorrectionsAndFormatLists() {
+    @Test func mediumAndHighRemoveFillersResolveCorrectionsAndLayOutText() {
         for level in CleanupLevel.allCases {
             let expected = level == .medium || level == .high
             #expect(level.removesFillers == expected)
             #expect(level.resolvesSelfCorrections == expected)
-            #expect(level.formatsLists == expected)
+            #expect(level.formatsLayout == expected)
         }
         #expect(CleanupLevel.allCases.filter(\.allowsRewording) == [.high])
     }
 
-    /// Snippets and vocabulary run before the level is looked at, so None's line must not
-    /// promise the text exactly as heard. The same line shows for the live transcript, which
-    /// applies neither, so it says they are dictation's.
-    @Test func noneSaysSnippetsAndVocabularyStillApplyToDictation() {
+    /// Snippets, vocabulary and spoken commands run before the level is looked at, so None's line
+    /// must not promise the text exactly as heard. The same line shows for the live transcript,
+    /// which applies none of them, so it says they are dictation's.
+    @Test func noneSaysSnippetsVocabularyAndCommandsStillApplyToDictation() {
         let summary = CleanupLevel.none.summary
-        #expect(summary.contains("snippets") && summary.contains("vocabulary"))
+        #expect(summary.contains("snippets") && summary.contains("vocabulary") && summary.contains("spoken commands"))
         #expect(summary.contains("dictation"))
         #expect(!summary.localizedCaseInsensitiveContains("exactly"))
         for level in CleanupLevel.allCases {

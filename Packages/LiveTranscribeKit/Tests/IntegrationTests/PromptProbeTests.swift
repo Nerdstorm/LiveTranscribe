@@ -88,6 +88,28 @@ struct PromptProbeTests {
     /// The app's default level: fillers are removed before the model sees the text.
     static let options = CleanupOptions(level: .medium)
 
+    /// Text as dictation sends it, with placeholders for emoji, addresses, line breaks, list
+    /// markers and snippets, which the model must copy once each, unchanged.
+    static let placeholderCases = [
+        "Hi ⟦S1⟧.",
+        "Thanks so much ⟦S1⟧.",
+        "Great job ⟦S1⟧ see you tomorrow.",
+        "See you soon ⟦S1⟧.",
+        "Email me at ⟦S1⟧.",
+        "The pricing is on ⟦S1⟧.",
+        "Send it to ⟦S1⟧ please.",
+        "First line ⟦S1⟧ second line.",
+        "My goals for this week ⟦S1⟧ ship the release ⟦S2⟧ fix the login bug ⟦S3⟧ write the docs.",
+        "⟦S1⟧ the build is green ⟦S2⟧",
+        "um send ⟦S1⟧ to the team",
+        "please call me on ⟦S1⟧ tomorrow",
+        "I love it ⟦S1⟧ ⟦S2⟧",
+        "thanks ⟦S1⟧ see you ⟦S2⟧",
+        "the report is due friday ⟦S1⟧ and the invoice is attached",
+        "good morning ⟦S1⟧ how are you",
+        "happy birthday ⟦S1⟧ ⟦S2⟧ have a great day",
+    ]
+
     /// Accepts any non-empty answer, so the probe sees what the model actually wrote.
     static let permissiveGuard = OutputGuard(policy: .init(
         wordRatioBounds: Dictionary(uniqueKeysWithValues: CleanupLevel.allCases.map { ($0, 0...Double.greatestFiniteMagnitude) }),
@@ -98,7 +120,8 @@ struct PromptProbeTests {
         negations: [],
         maxDroppedRun: .max,
         maxRetractedWords: 0,
-        minRespellingSimilarity: 1
+        minRespellingSimilarity: 1,
+        requiresIntactPlaceholders: false
     ))
 
     @Test(.timeLimit(.minutes(10)))
@@ -113,6 +136,97 @@ struct PromptProbeTests {
             print("PROBE   cleaned: \(cleaned.cleanedText)")
         }
         print("PROBE fallbacks: \(fallbacks)/\(Self.cases.count)")
+    }
+
+    /// The model's answer to text with placeholders under the production prompt, which lists the
+    /// tokens, and whether the production guard would keep it.
+    @Test(.timeLimit(.minutes(10)))
+    func printPlaceholderOutputs() async throws {
+        let cleaner = try await Self.loadCleaner(template: nil, outputGuard: Self.permissiveGuard)
+        let productionGuard = OutputGuard()
+        var damaged = 0
+        for raw in Self.placeholderCases {
+            let tokens = raw.matches(of: /⟦S[0-9]+⟧/).map { String($0.output) }
+            let options = CleanupOptions(level: .medium, placeholders: tokens)
+            let segment = Segment(id: UUID(), sessionID: UUID(), startMs: 0, endMs: 1_000, rawText: raw)
+            let cleaned = await cleaner.clean(segment, context: [], options: options)
+            let verdict = productionGuard.review(raw: raw, outcome: .completed(cleaned.cleanedText), options: options)
+            if case .rejected(.placeholderChanged) = verdict { damaged += 1 }
+            print("PLACEHOLDER \(Self.describe(verdict)) [\(cleaned.latencyMs) ms] \(raw) → \(cleaned.cleanedText)")
+        }
+        print("PLACEHOLDER damaged \(damaged)/\(Self.placeholderCases.count)")
+    }
+
+    /// Token formats compared by ``comparePlaceholderFormats()``: the text before and after the
+    /// placeholder's number.
+    static let placeholderFormats: [(opening: String, closing: String)] = [
+        ("⟦S", "⟧"), ("S", ""), ("s", ""), ("#", ""), ("TOKEN", ""), ("ZQ", ""), ("S_", ""), ("@S", ""), ("{{S", "}}"),
+    ]
+
+    /// How often the model copies each token format exactly once, over ``placeholderCases``.
+    @Test(.timeLimit(.minutes(30)))
+    func comparePlaceholderFormats() async throws {
+        let cleaner = try await Self.loadCleaner(template: nil, outputGuard: Self.permissiveGuard)
+        for format in Self.placeholderFormats {
+            var kept = 0
+            var repunctuated = 0
+            var total = 0
+            for original in Self.placeholderCases {
+                var raw = original
+                var tokens: [String] = []
+                for match in original.matches(of: /⟦S([0-9]+)⟧/) {
+                    let token = format.opening + match.output.1 + format.closing
+                    raw = raw.replacingOccurrences(of: String(match.output.0), with: token)
+                    tokens.append(token)
+                }
+                let options = CleanupOptions(level: .medium, placeholders: tokens)
+                let segment = Segment(id: UUID(), sessionID: UUID(), startMs: 0, endMs: 1_000, rawText: raw)
+                let cleaned = await cleaner.clean(segment, context: [], options: options).cleanedText
+                let intact = tokens.filter { cleaned.components(separatedBy: $0).count == 2 }
+                let punctuated = intact.filter { Self.punctuation(around: $0, in: cleaned) != Self.punctuation(around: $0, in: raw) }
+                kept += intact.count
+                repunctuated += punctuated.count
+                total += tokens.count
+                print("FORMAT \(format.opening)n\(format.closing) \(intact.count)/\(tokens.count) \(punctuated.count) | \(raw) → \(cleaned)")
+            }
+            print("FORMAT \(format.opening)n\(format.closing) SUMMARY kept \(kept)/\(total), punctuated \(repunctuated)")
+        }
+    }
+
+    /// Emoji written into the text the model sees, in place of placeholders.
+    static let emojiCases = [
+        "Hi 🎆.", "Thanks so much ❤️.", "Great job 🎉 see you tomorrow.", "See you soon 🙂.",
+        "I love it 😍 🔥", "thanks 👋 see you 👍", "good morning ☀️ how are you",
+        "happy birthday 🎂 🎉 have a great day", "the report is due friday 😅 and the invoice is attached",
+    ]
+
+    /// Whether the model keeps emoji it can see, and the punctuation around them.
+    @Test(.timeLimit(.minutes(10)))
+    func printEmojiOutputs() async throws {
+        let cleaner = try await Self.loadCleaner(template: nil, outputGuard: Self.permissiveGuard)
+        var kept = 0
+        var repunctuated = 0
+        var total = 0
+        for raw in Self.emojiCases {
+            let emoji = raw.split(separator: " ").map(String.init).filter { $0.unicodeScalars.contains { $0.properties.isEmojiPresentation || $0.value > 0x2000 && $0.properties.isEmoji } }
+            let segment = Segment(id: UUID(), sessionID: UUID(), startMs: 0, endMs: 1_000, rawText: raw)
+            let cleaned = await cleaner.clean(segment, context: [], options: CleanupOptions(level: .medium)).cleanedText
+            let intact = emoji.map { $0.trimmingCharacters(in: .punctuationCharacters) }.filter { cleaned.components(separatedBy: $0).count == 2 }
+            let punctuated = intact.filter { Self.punctuation(around: $0, in: cleaned) != Self.punctuation(around: $0, in: raw) }
+            kept += intact.count
+            repunctuated += punctuated.count
+            total += emoji.count
+            print("EMOJI \(intact.count)/\(emoji.count) \(punctuated.count) | \(raw) → \(cleaned)")
+        }
+        print("EMOJI SUMMARY kept \(kept)/\(total), punctuated \(repunctuated)")
+    }
+
+    /// The punctuation next to `token` in `text`, ignoring spaces: what the model put around it.
+    private static func punctuation(around token: String, in text: String) -> String {
+        guard let range = text.range(of: token) else { return "" }
+        let before = text[..<range.lowerBound].reversed().drop { $0 == " " }.prefix { $0.isPunctuation }
+        let after = text[range.upperBound...].drop { $0 == " " }.prefix { $0.isPunctuation }
+        return String(before.reversed()) + "|" + String(after)
     }
 
     /// For each model and variant: the model's unguarded answer to every case, what the
@@ -161,9 +275,10 @@ struct PromptProbeTests {
         }
     }
 
+    /// - Parameter template: One prompt for every request, or `nil` for the production prompts.
     private static func loadCleaner(
         model: String = AppSettings.defaults.llmModel,
-        template: PromptTemplate = Prompt.cleanup,
+        template: PromptTemplate? = Prompt.cleanup,
         outputGuard: OutputGuard = OutputGuard()
     ) async throws -> MLXCleaner {
         var settings = AppSettings.defaults

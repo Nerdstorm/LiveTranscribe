@@ -20,11 +20,11 @@ struct TextWord: Sendable, Equatable {
 /// lost when the word is replaced. Replacer, selector and validation all share this one
 /// definition of a word, so a variant the store accepts is a variant the replacer can find.
 ///
-/// Snippet placeholders (``PlaceholderToken``, "⟦S1⟧") are already in the text when the
-/// replacer runs. They yield no words, so no vocabulary phrase can alter one and break the
-/// snippet's expansion.
+/// Placeholders (``PlaceholderToken``, "⟦S1⟧") for snippets and spoken commands are already in
+/// the text when the replacer runs. They yield no words, so no vocabulary phrase can alter one
+/// and break what it stands for.
 enum WordTokenizer {
-    /// The brackets around a snippet placeholder. Taken from ``PlaceholderToken`` so that a
+    /// The brackets around a placeholder. Taken from ``PlaceholderToken`` so that a
     /// change to the token format cannot leave placeholders unprotected here.
     static let placeholderOpening = PlaceholderToken.opening
     static let placeholderClosing = PlaceholderToken.closing

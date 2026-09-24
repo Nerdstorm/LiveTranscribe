@@ -23,7 +23,7 @@ struct ListFormatterTests {
 
     @Test func keepsTextAfterTheListOnItsOwnLine() {
         #expect(formatter.formatted("First, we fix the login bug. Second, we ship the release. Then we celebrate.")
-            == "1. We fix the login bug\n2. We ship the release\nThen we celebrate.")
+            == "1. We fix the login bug.\n2. We ship the release.\nThen we celebrate.")
     }
 
     @Test func finallyClosesTheList() {

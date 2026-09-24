@@ -2,7 +2,7 @@
 // per-stage latency. Build with xcodebuild (MLX needs its Metal library); see README.md.
 //
 //   Bench [--fixtures <dir>] [--level none|light|medium|high] [--no-cleanup] [--no-adapter] [--fast]
-//   Bench --dictation [--clips <dir>] [--level <level>]... [--p95-target-ms <ms>] [--verbose] [--no-adapter]
+//   Bench --dictation [--clips <dir>] [--level <level>]... [--multiline] [--p95-target-ms <ms>] [--verbose] [--no-adapter]
 
 import Capture
 import Cleanup
@@ -25,6 +25,9 @@ struct BenchOptions {
     var clipsDirectory = URL(fileURLWithPath: "Tests/IntegrationTests/Fixtures/Dictation", isDirectory: true)
     /// Levels given with --level; the dictation eval runs every level when none are.
     var levels: [CleanupLevel]?
+    /// Dictate into a field that takes several lines, where line breaks, lists and letters are
+    /// laid out, and score each clip's layout.
+    var multiline = false
     /// The dictation latency target from docs/dictation.md: p95 of release-to-text under 1.2 s.
     var p95TargetMs = 1_200
     var verbose = false
@@ -51,6 +54,8 @@ struct BenchOptions {
                 options.pacing = .asFastAsPossible
             case "--dictation":
                 options.dictation = true
+            case "--multiline":
+                options.multiline = true
             case "--clips":
                 guard let path = iterator.next() else { throw BenchError.usage("--clips needs a directory") }
                 options.clipsDirectory = URL(fileURLWithPath: path, isDirectory: true)
@@ -80,7 +85,7 @@ enum BenchError: LocalizedError {
             """
             \(detail)
             usage: Bench [--fixtures <dir>] [--level none|light|medium|high] [--no-cleanup] [--no-adapter] [--fast]
-                   Bench --dictation [--clips <dir>] [--level <level>]... [--p95-target-ms <ms>] [--verbose] [--no-adapter]
+                   Bench --dictation [--clips <dir>] [--level <level>]... [--multiline] [--p95-target-ms <ms>] [--verbose] [--no-adapter]
             """
         case .noFixtures(let path):
             "No .wav files with matching .txt references in \(path). Run scripts/generate-test-audio.sh first."

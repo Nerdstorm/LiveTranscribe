@@ -126,26 +126,102 @@ struct CleanupExecutorTests {
         #expect(cleaned.cleanedText.isEmpty)
     }
 
+    /// The model sees each placeholder as a word, listed in the prompt; the tokens come back
+    /// before the guard.
     @Test func optionsShapeThePrompt() async {
         let captured = RequestRecorder()
         let options = CleanupOptions(level: .high, vocabulary: ["Nerdstorm"], placeholders: ["⟦S1⟧"])
         let raw = makeSegment("email ⟦S1⟧ to the nerd storm team")
         let cleaned = await executor(adapted: true).run(raw, context: [], options: options) { request in
             await captured.record(request)
-            return "Email ⟦S1⟧ to the Nerdstorm team."
+            return "Email S1 to the Nerdstorm team."
         }
         let request = await captured.last
-        #expect(request?.messages.first == .init(role: .system, content: PromptBuilder(adapted: true).template(for: options).system))
+        var shown = options
+        shown.placeholders = ["S1"]
+        #expect(request?.messages.first == .init(role: .system, content: PromptBuilder(adapted: true).template(for: shown).system))
+        #expect(request?.messages.last == .init(role: .user, content: "TEXT:\nemail S1 to the nerd storm team"))
         #expect(cleaned.cleanedText == "Email ⟦S1⟧ to the Nerdstorm team.")
     }
 
     @Test func aDamagedPlaceholderFallsBackToTheTextWithPlaceholders() async {
         let options = CleanupOptions(level: .medium, placeholders: ["⟦S1⟧"])
         let raw = makeSegment("email ⟦S1⟧ to the team")
-        let cleaned = await executor().run(raw, context: [], options: options) { _ in "Email S1 to the team." }
+        let cleaned = await executor().run(raw, context: [], options: options) { _ in "Email S 1 to the team." }
         #expect(cleaned.fellBack)
-        #expect(cleaned.fallbackReason == "changed a snippet placeholder")
+        #expect(cleaned.fallbackReason == "changed a placeholder")
         #expect(cleaned.cleanedText == "email ⟦S1⟧ to the team")
+    }
+
+    // MARK: - High with a self-correction
+
+    private static let corrected = "meet on tuesday no wait wednesday at the office"
+    private static let resolved = "Meet on Wednesday at the office."
+
+    @Test func highResolvesACorrectionAtMediumThenRewords() async {
+        let captured = RequestRecorder()
+        let high = CleanupOptions(level: .high, vocabulary: ["Acme"])
+        let cleaned = await executor(adapted: true).run(makeSegment(Self.corrected), context: [], options: high) { request in
+            await captured.record(request) == 1 ? Self.resolved : "Let's meet on Wednesday at the office."
+        }
+        let requests = await captured.all
+        let prompts = PromptBuilder(adapted: true)
+        #expect(requests.map { $0.messages.first?.content } == [
+            prompts.template(for: CleanupOptions(level: .medium, vocabulary: ["Acme"])).system,
+            prompts.template(for: high).system,
+        ])
+        #expect(requests.last?.messages.last == .init(role: .user, content: "TEXT:\n\(Self.resolved)"))
+        #expect(cleaned.cleanedText == "Let's meet on Wednesday at the office.")
+        #expect(!cleaned.fellBack)
+    }
+
+    @Test func aRejectedRewordingKeepsTheResolvedText() async {
+        let captured = RequestRecorder()
+        let cleaned = await executor(adapted: true).run(makeSegment(Self.corrected), context: [], options: CleanupOptions(level: .high)) { request in
+            await captured.record(request) == 1 ? Self.resolved : "Here is the text: Let's meet on Wednesday."
+        }
+        #expect(cleaned.cleanedText == Self.resolved)
+        #expect(!cleaned.fellBack, "the resolved text passed Medium's review")
+        #expect(await captured.all.count == 2)
+    }
+
+    @Test func aRejectedResolutionFallsBackWithoutRewording() async {
+        let captured = RequestRecorder()
+        let cleaned = await executor(adapted: true).run(makeSegment(Self.corrected), context: [], options: CleanupOptions(level: .high)) { request in
+            await captured.record(request)
+            return "<think>hmm</think>"
+        }
+        #expect(cleaned.fellBack)
+        #expect(cleaned.cleanedText == Self.corrected)
+        #expect(await captured.all.count == 1)
+    }
+
+    @Test func theRewordingGetsOnlyTheTimeLeft() async {
+        let started = ContinuousClock.now
+        let captured = RequestRecorder()
+        let cleaned = await executor(timeout: 1, adapted: true).run(makeSegment(Self.corrected), context: [], options: CleanupOptions(level: .high)) { request in
+            guard await captured.record(request) == 1 else {
+                try await Task.sleep(for: .seconds(10))
+                return "too late"
+            }
+            return Self.resolved
+        }
+        #expect(cleaned.cleanedText == Self.resolved)
+        #expect(!cleaned.fellBack)
+        #expect(started.duration(to: .now) < .seconds(3), "both passes share one deadline")
+    }
+
+    @Test("One pass without a correction cue at High, and at Medium with one", arguments: [
+        (CleanupLevel.high, "i think the build is broken on main"),
+        (CleanupLevel.medium, corrected),
+    ])
+    func onePassOtherwise(level: CleanupLevel, text: String) async {
+        let captured = RequestRecorder()
+        _ = await executor(adapted: true).run(makeSegment(text), context: [], options: CleanupOptions(level: level)) { request in
+            await captured.record(request)
+            return text
+        }
+        #expect(await captured.all.count == 1)
     }
 
     /// Dictation with the cleanup model off inserts this, so it must match what a level does
@@ -160,6 +236,13 @@ struct CleanupExecutorTests {
 }
 
 private actor RequestRecorder {
-    private(set) var last: CleanupRequest?
-    func record(_ request: CleanupRequest) { last = request }
+    private(set) var all: [CleanupRequest] = []
+    var last: CleanupRequest? { all.last }
+
+    /// Records `request` and returns how many have been recorded, this one included.
+    @discardableResult
+    func record(_ request: CleanupRequest) -> Int {
+        all.append(request)
+        return all.count
+    }
 }

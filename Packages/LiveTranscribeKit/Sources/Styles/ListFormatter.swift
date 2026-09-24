@@ -1,4 +1,5 @@
 import Foundation
+import Shared
 
 /// Turns a spoken enumeration into a numbered list: "We need three things: first, milk; second,
 /// eggs; and third, bread." becomes "We need three things:\n1. Milk\n2. Eggs\n3. Bread".
@@ -7,7 +8,7 @@ import Foundation
 /// ordinals in order from "first", each starting a clause (at the start of the text, after
 /// punctuation, or after "and" / "then"), at least two of them; "finally" or "lastly" may end
 /// it. The last item runs to the end of its sentence, and any text after that follows the list
-/// on its own line.
+/// on its own line. The lead-in and items are punctuated by ``ListStyle``.
 public struct ListFormatter: Sendable {
     private static let ordinals: [String: Int] = [
         "first": 1, "firstly": 1, "second": 2, "secondly": 2, "third": 3, "thirdly": 3,
@@ -16,13 +17,22 @@ public struct ListFormatter: Sendable {
     ]
     private static let closers: Set<String> = ["finally", "lastly"]
     private static let connectors: Set<String> = ["and", "then"]
-    private static let clauseEnders: Set<Character> = [",", ".", ";", ":", "!", "?"]
+    private static let clauseEnders = PhraseGrammar.clauseEnders
     private static let sentenceEnders: Set<Character> = [".", "!", "?"]
 
-    public init() {}
+    private let style: ListStyle
+
+    public init(style: ListStyle = ListStyle()) {
+        self.style = style
+    }
 
     /// `text` as a numbered list, or `nil` when it is not a spoken enumeration.
     public func formatted(_ text: String) -> String? {
+        lines(for: text)?.joined(separator: "\n")
+    }
+
+    /// The list's lines: the lead-in if there is one, the items, and any text after the list.
+    func lines(for text: String) -> [String]? {
         let tokens = text.split(whereSeparator: \.isWhitespace).map(String.init)
         guard let markers = markers(in: tokens), markers.count >= 2 else { return nil }
 
@@ -43,20 +53,22 @@ public struct ListFormatter: Sendable {
             } else {
                 end = tokens[start...].firstIndex(where: Self.endsSentence).map { $0 + 1 } ?? tokens.count
             }
-            guard start < end, let item = Self.item(from: tokens[start..<end]) else { return nil }
-            items.append(item)
+            guard start < end else { return nil }
+            items.append(tokens[start..<end].joined(separator: " "))
         }
+        let styled = style.items(items)
+        guard !styled.contains(where: \.isEmpty) else { return nil }
 
         var lines: [String] = []
-        if let leadIn = Self.leadIn(from: tokens[..<markers[0]]) {
+        if let leadIn = style.leadIn(tokens[..<markers[0]].joined(separator: " ")) {
             lines.append(leadIn)
         }
-        lines += items.enumerated().map { "\($0.offset + 1). \($0.element)" }
+        lines += styled.enumerated().map { "\($0.offset + 1). \($0.element)" }
         let lastItemEnd = tokens[(markers.last! + 1)...].firstIndex(where: Self.endsSentence).map { $0 + 1 } ?? tokens.count
         if lastItemEnd < tokens.count {
             lines.append(tokens[lastItemEnd...].joined(separator: " "))
         }
-        return lines.joined(separator: "\n")
+        return lines
     }
 
     /// Token indices of the list's ordinals, in order, starting at "first".
@@ -89,31 +101,6 @@ public struct ListFormatter: Sendable {
             previous -= 1
         }
         return false
-    }
-
-    /// The words before the first ordinal, ending in a colon unless they end a sentence.
-    private static func leadIn(from tokens: ArraySlice<String>) -> String? {
-        guard !tokens.isEmpty else { return nil }
-        var text = tokens.joined(separator: " ")
-        if let last = text.last, sentenceEnders.contains(last) || last == ":" {
-            return text
-        }
-        while let last = text.last, ",;".contains(last) {
-            text.removeLast()
-        }
-        return text.isEmpty ? nil : text + ":"
-    }
-
-    private static func item(from tokens: ArraySlice<String>) -> String? {
-        var text = tokens.joined(separator: " ")
-        while let first = text.first, ",:;".contains(first) || first.isWhitespace {
-            text.removeFirst()
-        }
-        while let last = text.last, ",;.".contains(last) || last.isWhitespace {
-            text.removeLast()
-        }
-        guard let first = text.first else { return nil }
-        return first.uppercased() + text.dropFirst()
     }
 
     private static func core(_ token: String) -> String {

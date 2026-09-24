@@ -148,6 +148,8 @@ public actor MLXCleaner: Cleaner {
     public func clean(_ segment: Segment, context: [String], options: CleanupOptions) async -> CleanedSegment {
         let container = self.container
         let adapter = adapterLayers
+        // One flag serves both of High's passes (see CleanupExecutor): Medium and High both
+        // resolve self-corrections.
         let useAdapter = options.level.resolvesSelfCorrections
         return await executor.run(segment, context: context, options: options) { request in
             guard let container else { throw CleanupModelNotLoaded() }
