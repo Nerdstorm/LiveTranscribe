@@ -52,14 +52,8 @@ struct DroppedWordsTests {
     }
 
     @Test func aReplacementIsNotADeletion() {
-        #expect(droppedWords.droppedRun(raw: words("we need twenty five chairs"), cleaned: words("We need 25 chairs.")) == nil)
-        #expect(droppedWords.droppedRun(raw: words("email the nerd storm team"), cleaned: words("Email the Nerdstorm team.")) == nil)
-    }
-
-    @Test func gapsPairDeletionsWithWhatReplacedThem() {
-        let gaps = DroppedWords.gaps(raw: ["a", "b", "c", "d", "e"], cleaned: ["a", "x", "d", "e", "f"])
-        #expect(gaps.map(\.deleted) == [[1, 2], []])
-        #expect(gaps.map(\.inserted) == [1, 1])
+        #expect(droppedWords.droppedRun(in: WordAlignment(raw: words("we need twenty five chairs"), cleaned: words("We need 25 chairs."))) == nil)
+        #expect(droppedWords.droppedRun(in: WordAlignment(raw: words("email the nerd storm team"), cleaned: words("Email the Nerdstorm team."))) == nil)
     }
 
     @Test func fallbackReasonsDoNotRepeatWhatWasSaid() {

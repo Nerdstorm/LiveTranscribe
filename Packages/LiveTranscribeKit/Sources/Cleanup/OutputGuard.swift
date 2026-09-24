@@ -206,7 +206,8 @@ public struct OutputGuard: Sendable {
                 ? .accepted(cleaned)
                 : .rejected(.invalidSelfCorrection)
         }
-        if !options.level.allowsRewording, let count = droppedWords.droppedRun(raw: rawWords, cleaned: cleanedWords) {
+        let alignment = WordAlignment(raw: rawWords, cleaned: cleanedWords)
+        if !options.level.allowsRewording, let count = droppedWords.droppedRun(in: alignment) {
             return .rejected(.droppedWords(count: count))
         }
         if droppedWords.losesNegation(raw: rawWords, cleaned: cleanedWords) {

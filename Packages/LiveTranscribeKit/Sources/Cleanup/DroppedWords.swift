@@ -21,11 +21,10 @@ struct DroppedWords: Sendable {
     }
 
     /// The longest run of spoken words deleted without replacement, beyond the allowed run.
-    /// `raw` and `cleaned` are normalized words.
-    func droppedRun(raw: [String], cleaned: [String]) -> Int? {
-        let longest = Self.gaps(raw: raw, cleaned: cleaned)
-            .filter { $0.inserted == 0 }
-            .map { gap in gap.deleted.filter { !isDroppable(at: $0, in: raw) }.count }
+    func droppedRun(in alignment: WordAlignment) -> Int? {
+        let longest = alignment.gaps
+            .filter(\.inserted.isEmpty)
+            .map { gap in gap.deleted.filter { !isDroppable(at: $0, in: alignment.raw) }.count }
             .max() ?? 0
         return longest > maxDroppedRun ? longest : nil
     }
@@ -43,45 +42,5 @@ struct DroppedWords: Sendable {
         fillers.contains(words[index])
             || (index + 1 < words.count && words[index + 1] == words[index])
             || (index > 0 && words[index - 1] == words[index])
-    }
-
-    /// Between consecutive matched words of a longest-common-subsequence alignment: the raw
-    /// indices with no counterpart, and how many cleaned words stand in their place.
-    static func gaps(raw: [String], cleaned: [String]) -> [(deleted: [Int], inserted: Int)] {
-        let n = raw.count, m = cleaned.count
-        // lengths[i][j]: LCS length of raw[i...] and cleaned[j...].
-        var lengths = Array(repeating: Array(repeating: 0, count: m + 1), count: n + 1)
-        for i in stride(from: n - 1, through: 0, by: -1) {
-            for j in stride(from: m - 1, through: 0, by: -1) {
-                lengths[i][j] = raw[i] == cleaned[j]
-                    ? lengths[i + 1][j + 1] + 1
-                    : max(lengths[i + 1][j], lengths[i][j + 1])
-            }
-        }
-
-        var gaps: [(deleted: [Int], inserted: Int)] = []
-        var deleted: [Int] = []
-        var inserted = 0
-        func closeGap() {
-            if !deleted.isEmpty || inserted > 0 { gaps.append((deleted, inserted)) }
-            deleted = []
-            inserted = 0
-        }
-        var i = 0, j = 0
-        while i < n || j < m {
-            if i < n, j < m, raw[i] == cleaned[j] {
-                closeGap()
-                i += 1
-                j += 1
-            } else if j == m || (i < n && lengths[i + 1][j] >= lengths[i][j + 1]) {
-                deleted.append(i)
-                i += 1
-            } else {
-                inserted += 1
-                j += 1
-            }
-        }
-        closeGap()
-        return gaps
     }
 }
