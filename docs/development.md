@@ -1,7 +1,7 @@
 # Development
 
 Building and running the app is in the README's [Build and run](../README.md#build-and-run).
-This covers the tests, the bench, the adapter and the icons.
+This covers the tests, the bench, the adapter, the licence notices and the icons.
 
 ## Tests
 
@@ -139,6 +139,20 @@ examples of synthetic sentences it resolved 97.3% of self-corrections (the base 
 kept 98.4% of look-alike sentences as spoken. On the 95 curated held-out examples alone, written
 separately from the generator's templates, it resolved 39 of 40 corrections. Commands and full
 results are in [Training/README.md](../Packages/LiveTranscribeKit/Training/README.md).
+
+## Licence notices
+
+**About Live Transcribe** shows the licence of every Swift package the app is built with, from
+`Sources/About/Acknowledgements.json`. After adding, removing or updating a package, run:
+
+```bash
+scripts/generate-acknowledgements.sh
+```
+
+Commit what it writes: AboutTests fails while the file doesn't match `Package.resolved`. It takes
+each package's LICENSE, COPYING and NOTICE files. A licence kept in a source file's header instead,
+like the PocketFFT code in MLX, needs an entry in `embeddedNotices` in
+`scripts/generate-acknowledgements.swift`.
 
 ## Icons
 

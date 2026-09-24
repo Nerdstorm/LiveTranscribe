@@ -6,7 +6,7 @@ import SwiftUI
 import TranscriptUI
 
 /// The menu bar menu: dictation status and controls, stopping the live transcript, the cleanup
-/// level, the microphone, and the app's windows.
+/// level, the microphone, the app's windows and About.
 ///
 /// Made for `MenuBarExtra { MenuBarContent(context:) } label: { MenuBarLabel(context:) }` with
 /// `.menuBarExtraStyle(.menu)`, so it uses only views a menu can show. What it says and allows
@@ -91,6 +91,7 @@ public struct MenuBarContent: View {
 
         Divider()
 
+        Button("About Live Transcribe") { showWindow("About") { $0.showAbout() } }
         Button("Quit Live Transcribe") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
     }

@@ -47,6 +47,8 @@ public protocol DictationWindowActions: AnyObject {
     func showHistory()
     func showSettings(tab: SettingsTab?)
     func showOnboarding()
+    /// The About panel, with the version and the licence notices.
+    func showAbout()
 }
 
 /// Everything the dictation windows and the menu read and change, built once by the app.

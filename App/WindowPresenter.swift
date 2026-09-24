@@ -1,3 +1,4 @@
+import About
 import AppKit
 import DictationUI
 import Shared
@@ -57,6 +58,12 @@ final class WindowPresenter: NSObject, DictationWindowActions, NSWindowDelegate 
                 self?.windows[.onboarding]?.close()
             }
         }
+    }
+
+    /// The standard About panel. It is not one of the windows here: macOS keeps it, and the app
+    /// stays in the menu bar while it shows.
+    func showAbout() {
+        AboutPanel.show()
     }
 
     // MARK: - Windows

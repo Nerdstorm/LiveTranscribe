@@ -90,7 +90,7 @@ Every feature, in detail: [docs/features.md](docs/features.md).
 | [Privacy](docs/privacy.md) | What is kept where, what goes over the network, and how to remove it all |
 | [Signing and Gatekeeper](docs/signing.md) | Ad-hoc signing, keeping permissions across rebuilds, and distributing a build |
 | [Known limitations](docs/limitations.md) | What doesn't work well yet |
-| [Development](docs/development.md) | The tests and their audio clips, the bench and the dictation eval, training the adapter, and the icons |
+| [Development](docs/development.md) | The tests and their audio clips, the bench and the dictation eval, training the adapter, the licence notices, and the icons |
 | [Design notes](docs/design-notes.md) | Why it is built the way it is |
 | [Dictation design](docs/dictation.md) | Dictation's decisions, assumptions, architecture, settings and eval results |
 | [Training the adapter](Packages/LiveTranscribeKit/Training/README.md) | The self-correction adapter's dataset, training and evaluation |
@@ -252,7 +252,9 @@ Built with [mlx-swift](https://github.com/ml-explore/mlx-swift),
 [swift-transformers](https://github.com/huggingface/swift-transformers). Every package
 dependency, including indirect ones, is MIT or Apache-2.0 licensed. Some bundle third-party code
 under other permissive licences (MLX includes the BSD-licensed PocketFFT, for example), so a
-redistributed build must carry those notices too.
+redistributed build must carry those notices too. The app does: **About Live Transcribe** in the
+menu bar shows every package's licence, collected from `Package.resolved` by
+`scripts/generate-acknowledgements.sh`.
 
 ## License
 
