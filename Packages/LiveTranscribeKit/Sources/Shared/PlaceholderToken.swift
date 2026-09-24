@@ -1,10 +1,15 @@
 import Foundation
 
-/// The opaque tokens (`⟦S1⟧`, `⟦S2⟧`, …) that stand in for snippet text while a transcript goes
-/// through the language model, so the model can neither see nor change the expansion.
+/// The opaque tokens (`⟦S1⟧`, `⟦S2⟧`, …) that stand in for snippets, spoken commands and list
+/// markers while a transcript goes through the language model, so the model can neither see nor
+/// change what they stand for. Speech-to-text never writes the brackets.
 ///
-/// Defined once here because two slices must agree on it: Snippets makes the tokens and
-/// Cleanup's output guard checks that they came back intact.
+/// The model itself sees each token as a plain word ("S1"), since it strips or drops the
+/// brackets; Cleanup's `PlaceholderAliases` swaps the two either side of the model.
+///
+/// Defined once here because several slices must agree on it: the phrase protector makes the
+/// tokens, vocabulary replacement skips them, and Cleanup's output guard checks that they came
+/// back intact.
 public enum PlaceholderToken {
     public static let opening: Character = "⟦"
     public static let closing: Character = "⟧"

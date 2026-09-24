@@ -126,23 +126,28 @@ struct CleanupExecutorTests {
         #expect(cleaned.cleanedText.isEmpty)
     }
 
+    /// The model sees each placeholder as a word, listed in the prompt; the tokens come back
+    /// before the guard.
     @Test func optionsShapeThePrompt() async {
         let captured = RequestRecorder()
         let options = CleanupOptions(level: .high, vocabulary: ["Nerdstorm"], placeholders: ["⟦S1⟧"])
         let raw = makeSegment("email ⟦S1⟧ to the nerd storm team")
         let cleaned = await executor(adapted: true).run(raw, context: [], options: options) { request in
             await captured.record(request)
-            return "Email ⟦S1⟧ to the Nerdstorm team."
+            return "Email S1 to the Nerdstorm team."
         }
         let request = await captured.last
-        #expect(request?.messages.first == .init(role: .system, content: PromptBuilder(adapted: true).template(for: options).system))
+        var shown = options
+        shown.placeholders = ["S1"]
+        #expect(request?.messages.first == .init(role: .system, content: PromptBuilder(adapted: true).template(for: shown).system))
+        #expect(request?.messages.last == .init(role: .user, content: "TEXT:\nemail S1 to the nerd storm team"))
         #expect(cleaned.cleanedText == "Email ⟦S1⟧ to the Nerdstorm team.")
     }
 
     @Test func aDamagedPlaceholderFallsBackToTheTextWithPlaceholders() async {
         let options = CleanupOptions(level: .medium, placeholders: ["⟦S1⟧"])
         let raw = makeSegment("email ⟦S1⟧ to the team")
-        let cleaned = await executor().run(raw, context: [], options: options) { _ in "Email S1 to the team." }
+        let cleaned = await executor().run(raw, context: [], options: options) { _ in "Email S 1 to the team." }
         #expect(cleaned.fellBack)
         #expect(cleaned.fallbackReason == "changed a placeholder")
         #expect(cleaned.cleanedText == "email ⟦S1⟧ to the team")

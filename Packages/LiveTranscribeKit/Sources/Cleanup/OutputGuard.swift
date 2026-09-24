@@ -94,6 +94,10 @@ public struct OutputGuard: Sendable {
         /// Minimum similarity for a word that was not spoken to count as a respelling of one
         /// that was, inside a self-correction.
         public var minRespellingSimilarity: Double
+        /// Output must keep every placeholder intact. Always on in the app, where a damaged
+        /// placeholder cannot be put back; the prompt probe turns it off to see what the model
+        /// wrote.
+        public var requiresIntactPlaceholders: Bool
 
         public init(
             wordRatioBounds: [CleanupLevel: ClosedRange<Double>],
@@ -104,7 +108,8 @@ public struct OutputGuard: Sendable {
             negations: [String],
             maxDroppedRun: Int,
             maxRetractedWords: Int,
-            minRespellingSimilarity: Double
+            minRespellingSimilarity: Double,
+            requiresIntactPlaceholders: Bool = true
         ) {
             self.wordRatioBounds = wordRatioBounds
             self.minSimilarity = minSimilarity
@@ -115,6 +120,7 @@ public struct OutputGuard: Sendable {
             self.maxDroppedRun = maxDroppedRun
             self.maxRetractedWords = maxRetractedWords
             self.minRespellingSimilarity = minRespellingSimilarity
+            self.requiresIntactPlaceholders = requiresIntactPlaceholders
         }
 
         /// The bounds for `level`.
@@ -189,7 +195,7 @@ public struct OutputGuard: Sendable {
             return .rejected(.preamble(phrase))
         }
 
-        guard Self.keepsPlaceholders(options.placeholders, raw: raw, cleaned: cleaned) else {
+        guard !policy.requiresIntactPlaceholders || Self.keepsPlaceholders(options.placeholders, raw: raw, cleaned: cleaned) else {
             return .rejected(.placeholderChanged)
         }
 

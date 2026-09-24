@@ -5,7 +5,8 @@ import Foundation
 ///
 /// The token format is ``PlaceholderToken``'s, shared with Cleanup's output guard. Its brackets
 /// are mathematical white square brackets (U+27E6, U+27E7): speech-to-text never produces them,
-/// and a language model has no reason to "correct" them.
+/// so a token is never mistaken for speech. The cleanup model sees each token as a plain word
+/// instead, since it strips the brackets (see ``PlaceholderToken``).
 public struct Placeholder: Sendable, Equatable {
     /// What a token stands for, which decides when it is put back.
     public enum Role: Sendable, Equatable, CaseIterable {

@@ -64,13 +64,46 @@ struct PreparedDictation {
     /// a placeholder did not survive.
     func finished(_ cleaned: String) -> String? {
         let breaks: (Placeholder) -> String? = { $0.role == .content ? nil : $0.expansion }
-        guard let lines = protected.restore(in: cleaned, resolving: breaks) else { return nil }
+        guard let lines = protected.restore(in: withoutAddedCommasAroundEmoji(cleaned), resolving: breaks) else {
+            return nil
+        }
         let tidy = tidied(lines)
         let arranged = laysOut ? layout.arrange(tidy) : tidy
         return protected.restore(in: arranged, roles: [.content])
     }
 
     // MARK: - Private
+
+    /// `cleaned` without the commas the model put next to an emoji's placeholder and the speaker
+    /// did not say. The model sees the placeholder as a word and punctuates it like a name:
+    /// "Great job, S1, see you tomorrow."
+    private func withoutAddedCommasAroundEmoji(_ cleaned: String) -> String {
+        var result = cleaned
+        for placeholder in protected.placeholders where placeholder.role == .content && Self.isEmoji(placeholder.expansion) {
+            guard let said = text.range(of: placeholder.token) else { continue }
+            let saidCommaBefore = text[..<said.lowerBound].last { !$0.isWhitespace } == ","
+            let saidCommaAfter = text[said.upperBound...].first { !$0.isWhitespace } == ","
+            if !saidCommaAfter, let token = result.range(of: placeholder.token),
+               let after = result[token.upperBound...].firstIndex(where: { !$0.isWhitespace }), result[after] == "," {
+                result.remove(at: after)
+            }
+            if !saidCommaBefore, let token = result.range(of: placeholder.token),
+               let before = result[..<token.lowerBound].lastIndex(where: { !$0.isWhitespace }), result[before] == "," {
+                result.remove(at: before)
+            }
+        }
+        return result
+    }
+
+    /// Whether `text` is emoji and spaces only, such as an emoji command's expansion.
+    private static func isEmoji(_ text: String) -> Bool {
+        let glyphs = text.filter { !$0.isWhitespace }
+        return !glyphs.isEmpty && glyphs.allSatisfy { character in
+            guard let first = character.unicodeScalars.first else { return false }
+            return first.properties.isEmojiPresentation
+                || (first.properties.isEmoji && (first.value > 0xFF || character.unicodeScalars.contains("\u{FE0F}")))
+        }
+    }
 
     /// Line breaks and list markers leave stray spaces and punctuation around them.
     private func tidied(_ text: String) -> String {

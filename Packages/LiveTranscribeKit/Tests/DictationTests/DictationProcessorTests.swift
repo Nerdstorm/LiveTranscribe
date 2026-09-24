@@ -52,7 +52,7 @@ struct DictationProcessorTests {
         let output = await finish("um send my calendar link to nerd storm", configuration(.medium), cleaner: cleaner)
 
         let request = await cleaner.requests.first
-        #expect(request?.text == "send ⟦S1⟧ to Nerdstorm", "fillers, snippets and vocabulary are handled before the model")
+        #expect(request?.text == "send S1 to Nerdstorm", "fillers, snippets and vocabulary are handled before the model")
         #expect(request?.options.placeholders == ["⟦S1⟧"])
         #expect(request?.options.vocabulary == ["Nerdstorm"])
         #expect(output.text == "Send https://cal.example.com/me to Nerdstorm.")
@@ -61,7 +61,7 @@ struct DictationProcessorTests {
     }
 
     @Test func aDamagedPlaceholderFallsBackWithSnippetsStillExpanded() async {
-        let cleaner = ScriptedCleaner { text in Self.tidy(text.replacingOccurrences(of: "⟦S1⟧", with: "S1")) }
+        let cleaner = ScriptedCleaner { text in Self.tidy(text.replacingOccurrences(of: "S1", with: "S 1")) }
         let output = await finish("um send my calendar link to nerd storm", configuration(.medium), cleaner: cleaner)
         #expect(output.fellBack)
         #expect(output.fallbackReason == "changed a placeholder")
@@ -85,10 +85,31 @@ struct DictationProcessorTests {
         let cleaner = ScriptedCleaner(reply: Self.tidy)
         let output = await finish("hi emoji fireworks", configuration(.medium), cleaner: cleaner)
         let request = await cleaner.requests.first
-        #expect(request?.text == "hi ⟦S1⟧")
+        #expect(request?.text == "hi S1", "the model sees a word for the placeholder")
         #expect(request?.options.placeholders == ["⟦S1⟧"])
         #expect(output.text == "Hi \u{1F386}.")
         #expect(output.uncleanedText == "hi \u{1F386}")
+    }
+
+    /// The model punctuates a placeholder's word like a name; an emoji takes no commas the
+    /// speaker did not say.
+    @Test func commasTheModelPutsAroundAnEmojiGo() async {
+        let cleaner = ScriptedCleaner { _ in "Great job, S1, see you tomorrow." }
+        let output = await finish("great job emoji party popper see you tomorrow", configuration(.medium), cleaner: cleaner)
+        #expect(output.text == "Great job \u{1F389} see you tomorrow.")
+    }
+
+    @Test func aDictatedCommaNextToAnEmojiStays() async {
+        let cleaner = ScriptedCleaner { _ in "Great job, S1." }
+        let output = await finish("great job comma emoji party popper", configuration(.medium), cleaner: cleaner)
+        #expect(output.text == "Great job, \u{1F389}.")
+    }
+
+    @Test func commasAroundOtherPlaceholdersStay() async {
+        let name = Snippet(trigger: "my name", expansion: "Jordan Lee")
+        let cleaner = ScriptedCleaner { _ in "Thanks, S1." }
+        let output = await finish("thanks my name", configuration(.medium, snippets: [name]), cleaner: cleaner)
+        #expect(output.text == "Thanks, Jordan Lee.")
     }
 
     @Test func commandsApplyAtNoneWithoutTheModel() async {
@@ -121,7 +142,7 @@ struct DictationProcessorTests {
         let cleaner = ScriptedCleaner { $0 }
         let output = await finish(transcript, configuration(.medium, multiline: true), cleaner: cleaner)
         #expect(await cleaner.requests.first?.text
-            == "List of to-do tasks for Acme. ⟦S1⟧ we have to work on the launch. ⟦S2⟧ need to fix the Android build.")
+            == "List of to-do tasks for Acme. S1 we have to work on the launch. S2 need to fix the Android build.")
         #expect(output.text
             == "List of to-do tasks for Acme:\n1. We have to work on the launch.\n2. Need to fix the Android build.")
         #expect(output.uncleanedText == transcript)
@@ -182,7 +203,7 @@ struct DictationProcessorTests {
             cleaner: cleaner
         )
         let request = await cleaner.requests.first
-        #expect(request?.text == "send ⟦S1⟧ please.")
+        #expect(request?.text == "send S1 please.")
         #expect(request?.options.placeholders == ["⟦S1⟧"])
         #expect(output.text == "Hi John,\n\nSend https://cal.example.com/me please..\n\nCheers,\nJordan Lee")
     }

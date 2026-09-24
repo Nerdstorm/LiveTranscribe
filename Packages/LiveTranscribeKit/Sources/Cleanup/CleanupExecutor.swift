@@ -105,7 +105,8 @@ public struct CleanupExecutor: Sendable {
         return second
     }
 
-    /// One generation of `input` under `options`, within `seconds`, reviewed by the guard.
+    /// One generation of `input` under `options`, within `seconds`, reviewed by the guard. The
+    /// model sees the placeholders as words (see ``PlaceholderAliases``); the guard sees tokens.
     private func pass(
         _ input: String,
         context: [String],
@@ -113,11 +114,14 @@ public struct CleanupExecutor: Sendable {
         seconds: Double,
         generate: @escaping @Sendable (CleanupRequest) async throws -> String
     ) async -> GuardVerdict {
+        let aliases = PlaceholderAliases(tokens: options.placeholders, text: input)
+        var modelOptions = options
+        modelOptions.placeholders = aliases.aliases
         let request = Prompt.request(
-            for: input,
+            for: aliases.aliased(input),
             context: context,
             contextLimit: contextLimit,
-            template: prompts.template(for: options)
+            template: prompts.template(for: modelOptions)
         )
         let signposter = Log.cleanupSignposter
         let interval = signposter.beginInterval("LLM", id: signposter.makeSignpostID())
@@ -126,7 +130,7 @@ public struct CleanupExecutor: Sendable {
             let text = try await withDeadline(seconds: seconds) {
                 try await generate(request)
             }
-            outcome = Task.isCancelled ? .cancelled : .completed(text)
+            outcome = Task.isCancelled ? .cancelled : .completed(aliases.restored(text))
         } catch let deadline as DeadlineExceeded {
             outcome = .timedOut(seconds: deadline.seconds)
         } catch is CancellationError {
