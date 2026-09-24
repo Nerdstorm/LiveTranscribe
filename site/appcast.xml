@@ -1,0 +1,17 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>LiveTranscribe</title>
+        <item>
+            <title>0.1.0</title>
+            <pubDate>Thu, 24 Sep 2026 22:58:14 +1000</pubDate>
+            <link>https://github.com/Nerdstorm/LiveTranscribe/releases/tag/v0.1.0</link>
+            <sparkle:fullReleaseNotesLink>https://github.com/Nerdstorm/LiveTranscribe/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>117</sparkle:version>
+            <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/Nerdstorm/LiveTranscribe/releases/download/v0.1.0/LiveTranscribe.dmg" length="20674676" type="application/octet-stream" sparkle:edSignature="9EgQ7ecyYY5Hta6eU9ywF41Ntk/aKSq6LG0Aw6pyVk6Bjlt6DwJptzNeBX3YUEGHAltMd3E/9GO00IzjrX2oAw=="/>
+        </item>
+    </channel>
+</rss>
