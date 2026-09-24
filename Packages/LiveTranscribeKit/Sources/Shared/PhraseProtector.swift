@@ -182,6 +182,9 @@ private struct SegmentBuilder {
     private var joinsNext = false
     /// The previous inline text ended a sentence: capitalise the next word.
     private var capitalizesNext = false
+    /// The text so far ends with inline text, whose punctuation a following mark adds to rather
+    /// than replaces ("?!").
+    private var endsWithInline = false
 
     mutating func appendLiteral(_ literal: some StringProtocol) {
         var text = String(literal)
@@ -195,12 +198,14 @@ private struct SegmentBuilder {
             }
             capitalizesNext = false
         }
+        if text.contains(where: { !$0.isWhitespace }) { endsWithInline = false }
         append(text)
     }
 
     mutating func appendPlaceholder(trigger: String, spoken: String, expansion: String, role: Placeholder.Role) {
         joinsNext = false
         capitalizesNext = false
+        endsWithInline = false
         let placeholder = Placeholder(
             token: PlaceholderToken.make(index: placeholders.count + 1),
             trigger: trigger,
@@ -214,11 +219,12 @@ private struct SegmentBuilder {
 
     mutating func appendInline(_ inline: InlineText) {
         if inline.joinsPrevious {
-            trimTail(punctuation: inline.replacesPrecedingPunctuation)
+            trimTail(punctuation: inline.replacesPrecedingPunctuation && !endsWithInline)
         }
         append(inline.text)
         joinsNext = inline.joinsNext
         capitalizesNext = inline.capitalizesNext
+        endsWithInline = !inline.text.isEmpty
     }
 
     func build() -> ProtectedText {

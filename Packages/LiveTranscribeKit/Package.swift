@@ -22,7 +22,7 @@ let package = Package(
             targets: [
                 "Shared", "Capture", "Segmentation", "Transcription", "Cleanup",
                 "Persistence", "Session", "TranscriptUI", "MLXSupport", "Styles",
-                "Snippets", "Vocabulary", "Insertion", "Hotkey", "Permissions", "Dictation", "DictationUI",
+                "Snippets", "SpokenCommands", "Vocabulary", "Insertion", "Hotkey", "Permissions", "Dictation", "DictationUI",
             ]
         ),
         .executable(name: "Bench", targets: ["Bench"]),
@@ -53,6 +53,10 @@ let package = Package(
         // behind placeholder tokens.
         .target(name: "Snippets", dependencies: ["Shared"], swiftSettings: strictSwift),
 
+        // Phrases dictation treats as commands (emoji, punctuation, line breaks, addresses),
+        // hidden from the language model like snippets.
+        .target(name: "SpokenCommands", dependencies: ["Shared"], swiftSettings: strictSwift),
+
         // The user's vocabulary: spoken-variant replacement and prompt term selection. Named
         // Vocabulary because a module named Dictionary would shadow Swift.Dictionary.
         .target(name: "Vocabulary", dependencies: ["Shared"], swiftSettings: strictSwift),
@@ -71,7 +75,7 @@ let package = Package(
         .target(
             name: "Dictation",
             dependencies: [
-                "Shared", "Capture", "Transcription", "Cleanup", "Styles", "Snippets", "Vocabulary",
+                "Shared", "Capture", "Transcription", "Cleanup", "Styles", "Snippets", "SpokenCommands", "Vocabulary",
                 "Hotkey", "Insertion", "Permissions", "Persistence",
             ],
             swiftSettings: strictSwift
@@ -177,6 +181,7 @@ let package = Package(
         .testTarget(name: "SharedTests", dependencies: ["Shared"], swiftSettings: strictSwift),
         .testTarget(name: "StylesTests", dependencies: ["Styles"], swiftSettings: strictSwift),
         .testTarget(name: "SnippetsTests", dependencies: ["Snippets", "Shared"], swiftSettings: strictSwift),
+        .testTarget(name: "SpokenCommandsTests", dependencies: ["SpokenCommands", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "VocabularyTests", dependencies: ["Vocabulary", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "InsertionTests", dependencies: ["Insertion", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "HotkeyTests", dependencies: ["Hotkey", "Shared"], swiftSettings: strictSwift),
@@ -184,7 +189,7 @@ let package = Package(
         .testTarget(
             name: "DictationTests",
             dependencies: [
-                "Dictation", "Capture", "Shared", "Transcription", "Cleanup", "Snippets", "Vocabulary",
+                "Dictation", "Capture", "Shared", "Transcription", "Cleanup", "Snippets", "SpokenCommands", "Vocabulary",
                 "Hotkey", "Insertion", "Permissions", "Persistence",
             ],
             swiftSettings: strictSwift
