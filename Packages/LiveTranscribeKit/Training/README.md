@@ -39,8 +39,9 @@ and the generator's output.
 
 ## Commands
 
-Build the tool (MLX needs xcodebuild for its Metal library), then run it from
-`Packages/LiveTranscribeKit`:
+From the repository root, `make train ARGS="<command>"` builds the tool and runs one command, for
+example `make train ARGS="evaluate --no-adapter"`. To do it by hand, build the tool (MLX needs
+xcodebuild for its Metal library), then run it from `Packages/LiveTranscribeKit`:
 
 ```bash
 (cd Packages/LiveTranscribeKit && xcodebuild build -scheme Train -configuration Release -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/xcode -skipPackagePluginValidation)

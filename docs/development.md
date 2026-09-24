@@ -8,45 +8,35 @@ This covers the tests, the bench, the adapter, the licence notices and the icons
 The package has more than 1,000 Swift Testing tests. Unit tests need no models:
 
 ```bash
-(cd Packages/LiveTranscribeKit && xcodebuild test -scheme LiveTranscribeKit-Package -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/xcode -skipPackagePluginValidation -skip-testing:IntegrationTests)
+make test
 ```
 
 The end-to-end tests and the bench use short spoken clips. The clips are not in the repository,
-because Apple's licence does not allow publishing recordings of its system voices. Generate them
-with macOS text-to-speech before building the tests:
+because Apple's licence does not allow publishing recordings of its system voices. `make audio`
+generates them with macOS text-to-speech, and `make dictation-audio` generates the dictation
+eval's 65 clips (`Tests/IntegrationTests/Fixtures/Dictation/clips.tsv`). Each makes only the clips
+that are missing, and the targets that use them run it first. To make every clip again, run
+`scripts/generate-test-audio.sh` or `scripts/generate-dictation-audio.sh`.
+
+The end-to-end tests run the real models, downloading them into `~/.cache/huggingface`:
 
 ```bash
-scripts/generate-test-audio.sh
+make test-integration
 ```
 
-The dictation eval's 65 clips (`Tests/IntegrationTests/Fixtures/Dictation/clips.tsv`) are
-generated the same way:
-
-```bash
-scripts/generate-dictation-audio.sh
-```
-
-The end-to-end tests run the real models, downloading them into `~/.cache/huggingface`.
-xcodebuild passes environment variables to the test runner only with the `TEST_RUNNER_` prefix:
-
-```bash
-(cd Packages/LiveTranscribeKit && TEST_RUNNER_LT_RUN_MODEL_TESTS=1 xcodebuild test -scheme LiveTranscribeKit-Package -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/xcode -skipPackagePluginValidation -only-testing:IntegrationTests)
-```
-
-Set `TEST_RUNNER_LT_PROMPT_PROBE=1` instead to print the cleanup model's output for a set of
-hard prompt cases, a development aid for prompt changes.
+xcodebuild passes environment variables to the test runner only with the `TEST_RUNNER_` prefix,
+so this sets `TEST_RUNNER_LT_RUN_MODEL_TESTS=1`. `make prompt-probe` sets
+`TEST_RUNNER_LT_PROMPT_PROBE=1` instead, to print the cleanup model's output for a set of hard
+prompt cases, a development aid for prompt changes.
 
 ## Bench
 
 ```bash
-(cd Packages/LiveTranscribeKit && xcodebuild build -scheme Bench -configuration Release -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/xcode -skipPackagePluginValidation)
+make bench
 ```
 
-```bash
-(cd Packages/LiveTranscribeKit && .build/xcode/Build/Products/Release/Bench)
-```
-
-Options:
+It builds the `Bench` tool and runs it. Give it options with `ARGS`, for example
+`make bench ARGS="--level high --fast"`:
 
 - `--fixtures <dir>`: a folder of `.wav` clips, each with a matching `.txt` transcript.
 - `--level <none|light|medium|high>`: the cleanup level (default: Medium).
@@ -82,7 +72,7 @@ signpost intervals ("STT", "LLM") for Instruments.
 ### Dictation eval
 
 ```bash
-(cd Packages/LiveTranscribeKit && .build/xcode/Build/Products/Release/Bench --dictation)
+make eval
 ```
 
 Runs the 65 dictation clips (plain sentences, fillers, self-corrections, questions, longer
@@ -96,7 +86,7 @@ multi-line field, where line breaks, lists and letters are laid out, and adds ho
 out with the intended lines. `--level <none|light|medium|high>` (repeatable) limits the levels,
 `--clips <dir>` reads other clips, `--p95-target-ms <n>` changes the target, `--no-adapter`
 cleans up without the adapter and `--verbose` prints every output, with the reason for each
-fallback.
+fallback. Give them with `ARGS`, as for the bench: `make eval ARGS="--multiline --verbose"`.
 
 Last run, on an M4 Pro with macOS 27 and synthetic speech, with `--multiline`:
 
@@ -137,8 +127,9 @@ builds the synthetic dataset, `validate` checks every example against the app's 
 `train` fine-tunes the adapter and `evaluate` measures it as the app runs it. On 515 held-out
 examples of synthetic sentences it resolved 97.3% of self-corrections (the base model 0.8%) and
 kept 98.4% of look-alike sentences as spoken. On the 95 curated held-out examples alone, written
-separately from the generator's templates, it resolved 39 of 40 corrections. Commands and full
-results are in [Training/README.md](../Packages/LiveTranscribeKit/Training/README.md).
+separately from the generator's templates, it resolved 39 of 40 corrections. `make train
+ARGS="evaluate"` builds the tool and runs a step. Commands and full results are in
+[Training/README.md](../Packages/LiveTranscribeKit/Training/README.md).
 
 ## Licence notices
 
@@ -146,13 +137,13 @@ results are in [Training/README.md](../Packages/LiveTranscribeKit/Training/READM
 `Sources/About/Acknowledgements.json`. After adding, removing or updating a package, run:
 
 ```bash
-scripts/generate-acknowledgements.sh
+make acknowledgements
 ```
 
-Commit what it writes: AboutTests fails while the file doesn't match `Package.resolved`. It takes
-each package's LICENSE, COPYING and NOTICE files. A licence kept in a source file's header instead,
-like the PocketFFT code in MLX, needs an entry in `embeddedNotices` in
-`scripts/generate-acknowledgements.swift`.
+It runs `scripts/generate-acknowledgements.sh`. Commit what it writes: AboutTests fails while the
+file doesn't match `Package.resolved`. It takes each package's LICENSE, COPYING and NOTICE files.
+A licence kept in a source file's header instead, like the PocketFFT code in MLX, needs an entry in
+`embeddedNotices` in `scripts/generate-acknowledgements.swift`.
 
 ## Icons
 
@@ -165,10 +156,11 @@ The PNGs made from them are committed, so building the app doesn't need this. Af
 SVG, run:
 
 ```bash
-scripts/render-icons.sh
+make icons
 ```
 
-It writes the app icon set in `App/Assets.xcassets/AppIcon.appiconset`, and the website's
-`favicon-32.png`, `apple-touch-icon.png` and `images/app-icon.png`. WebKit draws each one, so it
-matches what a browser shows, at the screen's scale; the script then scales it down by averaging
-each block of pixels, which keeps edges on the pixel grid sharp. Commit what it writes.
+It runs `scripts/render-icons.sh`, which writes the app icon set in
+`App/Assets.xcassets/AppIcon.appiconset`, and the website's `favicon-32.png`,
+`apple-touch-icon.png` and `images/app-icon.png`. WebKit draws each one, so it matches what a
+browser shows, at the screen's scale; the script then scales it down by averaging each block of
+pixels, which keeps edges on the pixel grid sharp. Commit what it writes.

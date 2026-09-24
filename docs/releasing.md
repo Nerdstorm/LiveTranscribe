@@ -5,7 +5,7 @@ that opens on any Apple silicon Mac without a Gatekeeper warning. The app is sig
 Developer ID certificate and notarized by Apple, and both the app and the disk image carry their
 notarization ticket. Installed copies update themselves with [Sparkle](https://sparkle-project.org)
 from `appcast.xml` on the website. [`scripts/release.sh`](../scripts/release.sh) makes a release
-from a tag.
+from a tag, and the [Makefile](../Makefile) has a target for each step below.
 
 ## One-time setup
 
@@ -36,9 +36,9 @@ in it at all.
 **The update signing key.** Sparkle signs every update with an EdDSA key, and the app installs
 only updates signed with it. Its public half is `SUPublicEDKey` in `App/Info.plist`; the private
 half is in the login keychain of the Mac it was made on, under the account `LiveTranscribe`.
-Sparkle's tools come with its package: `swift package resolve` in `Packages/LiveTranscribeKit`
-puts them in `.build/artifacts/sparkle/Sparkle/bin/`. Export the private key to a file in your
-home folder, outside the repository:
+Sparkle's tools come with its package, and `make resolve` puts them in
+`Packages/LiveTranscribeKit/.build/artifacts/sparkle/Sparkle/bin/`. Export the private key to a
+file in your home folder, outside the repository:
 
 ```bash
 Packages/LiveTranscribeKit/.build/artifacts/sparkle/Sparkle/bin/generate_keys --account LiveTranscribe -x ~/LiveTranscribe-update-key.txt
@@ -53,25 +53,24 @@ Sparkle's tools first reads the key; allow it.
 **The team ID.** The script takes `DEVELOPMENT_TEAM` from `Config/Signing.local.xcconfig` (see
 [Signing and Gatekeeper](signing.md)), or `LT_TEAM_ID` from the environment.
 
-**For `--draft`,** the GitHub CLI, signed in with `gh auth login`.
+**For `make release`,** the GitHub CLI, signed in with `gh auth login`.
+
+`make doctor` checks all of these but the update signing key, which `make release` checks, as the
+keychain may ask before the key is read.
 
 ## Making a release
 
 1. Merge what goes into the release into main, and pick its version, x.y.z.
-2. Tag main's commit and push the tag:
+2. On main, up to date with origin, tag the release and push the tag:
 
    ```bash
-   git tag -a v0.1.0 -m "Live Transcribe 0.1.0"
-   ```
-
-   ```bash
-   git push origin v0.1.0
+   make tag VERSION=0.1.0
    ```
 
 3. Build the release and upload it to a draft:
 
    ```bash
-   scripts/release.sh 0.1.0 --draft
+   make release VERSION=0.1.0
    ```
 
    This takes about ten minutes, mostly waiting for Apple's notary service, which sometimes takes
@@ -85,12 +84,13 @@ Sparkle's tools first reads the key; allow it.
    next daily check or at **Check for Updates…**.
 
    ```bash
-   cp build/release/0.1.0/appcast.xml site/appcast.xml
+   make appcast VERSION=0.1.0
    ```
 
    **Only after the release is published.** The appcast points at the release's disk image, which
    GitHub serves only once the release is public, so an earlier appcast offers an update that
-   fails to download.
+   fails to download. `make appcast` checks that the download works before it copies
+   `build/release/0.1.0/appcast.xml` to `site/appcast.xml`.
 7. Keep `build/release/<version>/LiveTranscribe.xcarchive`. Its debug symbols turn crash reports
    from that version into readable stack traces.
 
@@ -138,10 +138,10 @@ rejects a submission, its reasons are in `logs/notary-app-findings.json` or
 
 ## Test builds
 
-`scripts/release.sh 0.1.0 --test` builds HEAD with ad-hoc signing, without notarization, and
-without signing an update or writing an appcast. It checks the build and the packaging without the
-certificate, the update signing key or Apple's service. Gatekeeper blocks the result on other
-Macs. Like a release, it checks the appcast for updates.
+`make release-test VERSION=0.1.0` (`scripts/release.sh 0.1.0 --test`) builds HEAD with ad-hoc
+signing, without notarization, and without signing an update or writing an appcast. It checks the
+build and the packaging without the certificate, the update signing key or Apple's service.
+Gatekeeper blocks the result on other Macs. Like a release, it checks the appcast for updates.
 
 ## A release on your own Mac
 
