@@ -21,6 +21,7 @@ focus context, Command Mode, multilingual) is not started.
 | M1 | With **System Default** selected, capture follows macOS's default input as it changes, including mid-session, so a newly connected microphone (which macOS usually makes the default) is picked up without a restart. Virtual and aggregate devices are never followed automatically. | Owner |
 | L1 | The structure of a dictation (a list, a letter) is found and laid out by deterministic rules; the D5 model only cleans the words. A new structure is one more rule in `Layout`. | Owner |
 | L2 | List items keep the speaker's words: layout moves and punctuates, never rewords. | Owner |
+| L4 | Line breaks (lists, letters, list markers, "new line") are decided per app: every app is multi-line unless the user, or the built-in list (terminals), sets it single-line. In a multi-line app a field that is certainly single-line stays single-line: a text field or combo box of the app's own interface, never one in a web page. This replaced laying out only in fields that report `AXTextArea`, which missed chat apps' message boxes such as Slack's. | Owner |
 | L3 | At High, a dictation with a correction cue is cleaned in two passes: Medium's prompt, which the adapter was trained on, resolves the correction, then High's rewords the result within the same deadline. A rejected rewording keeps the first pass, which is not a fallback. D5 stands. | Owner |
 
 ### Assumptions made without the owner (review these)
@@ -52,7 +53,8 @@ focus context, Command Mode, multilingual) is not started.
 - **A chosen microphone that disconnects** falls back to the system default with a notice
   (the handoff's F6), replacing the old behaviour of stopping capture.
 - **Fillers are removed deterministically** (um, uh, er, …) before the LLM at Medium and High,
-  and **spoken lists are laid out deterministically** after it, only for multi-line fields.
+  and **spoken lists are laid out deterministically** after it, only where line breaks are
+  allowed (L4).
   A 1.7B model does neither reliably, and a rule can be tested exhaustively.
 - **A letter's greeting and sign-off are laid out before the model runs**, and only the body is
   cleaned. Layout was planned to run after cleanup (L1), but given a whole letter the model moved
@@ -207,7 +209,7 @@ New package targets (vertical slices), each with its own test target:
 | `Snippets` | `Snippet`, `SnippetStore`, `SnippetExpander` | Shared |
 | `Vocabulary` | `VocabularyEntry`, `VocabularyStore`, `VocabularyReplacer`, `VocabularySelector` | Shared |
 | `Hotkey` | `HotkeyBinding`, `HotkeyGesture` (pure state machine), `HotkeyMonitor`, `CGEventTapHotkeyMonitor` | Shared |
-| `Insertion` | `TextInserter`, `AXTextInserter`, `PasteboardTextInserter`, `InsertionRouter`, `AppOverrides`, `FocusedElement` | Shared |
+| `Insertion` | `TextInserter`, `AXTextInserter`, `PasteboardTextInserter`, `InsertionRouter`, `AppOverrides` (per-app method and `LineMode`), `SingleLineField`, `FocusedElement` | Shared |
 | `Permissions` | Microphone and Accessibility status, prompts, System Settings links | Shared |
 | `Dictation` | `DictationController` (the flow, including Undo AI edit), `DictationRecorder`, `DictationProcessor` with `PreparedDictation` (phrases, placeholders and layout around cleanup), `TextDelivery` | all of the above, Capture, Transcription, Cleanup, Persistence |
 | `DictationUI` | menu bar content and icon, HUD panel, history window, onboarding, Settings tabs, readiness from the session, reopening the app | Dictation, TranscriptUI, Session, … |
@@ -247,24 +249,27 @@ Changed slices:
 
 ### Dictation flow
 
+"Line breaks" below is decided once, when the key is released, from the app's line setting and
+the focused field (L4, and *Line breaks* further down).
+
 ```
 Hotkey down ─▶ record (pre-roll if the mic is kept ready)
 Hotkey up ───▶ discard if < 300 ms
              ─▶ transcribe the whole buffer (Parakeet)
              ─▶ phrases → ⟦S1⟧ placeholders: snippets first, then emoji, addresses and
-                line breaks; list markers too (Medium+, multi-line only); punctuation said
+                line breaks; list markers too (Medium+, line breaks); punctuation said
                 by name is written in directly
              ─▶ vocabulary: known spoken variants → canonical spelling
              ─▶ level None: breaks and commands put back; done
              ─▶ remove fillers (Medium, High); a letter's greeting and sign-off laid out
-                (Medium+, multi-line only), only its body goes on
+                (Medium+, line breaks), only its body goes on
              ─▶ LLM cleanup (level rules + vocabulary + placeholder rule + context), tokens
                 shown as words; High with a correction cue: Medium pass, then High pass;
                 skipped with OutputGuard when cleanup is off in Advanced (read at launch)
              ─▶ OutputGuard (level bounds, placeholders intact, names in place, no content
                 word left out) — else the pre-LLM text
              ─▶ line breaks and list markers put back and tidied; lists laid out
-                (Medium+, multi-line only); then snippets, emoji and addresses
+                (Medium+, line breaks); then snippets, emoji and addresses
              ─▶ insert at the cursor (AX, else paste, else clipboard + HUD)
              ─▶ history (raw + cleaned), undo buffer
 ```
@@ -308,9 +313,30 @@ dictation.
 3. Otherwise the text stays on the clipboard, and the HUD says why (`ClipboardReason`): the app
    refused it, another app took focus, or macOS doesn't let the app paste.
 
-Per-app overrides (bundled defaults for terminals, Electron and Chromium apps; user entries in
-Settings) pick paste first. Secure fields (`AXSecureTextField`, or secure event input active)
-get nothing, whether they were focused when the key was released or only when the paste ran.
+Per-app settings (`AppOverrides`: bundled defaults for terminals, Electron and Chromium apps;
+user entries in Settings › Apps, stored in `insertion-overrides.json`) pick paste first and
+decide line breaks. Secure fields (`AXSecureTextField`, or secure event input active) get
+nothing, whether they were focused when the key was released or only when the paste ran.
+
+### Line breaks
+
+`TextDelivery.allowsLineBreaks(in:)` answers once per dictation, while the snippets and
+vocabulary load, and the answer is `DictationProcessor.Configuration.multiline`:
+
+1. An app set to **Single-line** (the seven terminals out of the box, since a pasted line break
+   can run a command) gets none: lists and letters stay in the sentence, list markers stay
+   words, and "new line" types a space.
+2. An app set to **Multi-line**, or with no setting, gets them, unless the field is certainly
+   single-line (`SingleLineField`): its role is `AXTextField` (search fields report it too) or
+   `AXComboBox`, and its ancestors reach `AXWindow` or `AXApplication` without passing
+   `AXWebArea`. Browsers and Electron apps report a rich text box that the page doesn't mark
+   `aria-multiline` as a text field, so a field in a web page is never certain. An ancestor that
+   can't be read, or no window within 64 levels, isn't certain either. The walk costs two
+   Accessibility calls a level, only for a field with a single-line role.
+3. With no focused element (an app that hides its fields), a multi-line app gets them.
+
+A user setting wins over the built-in one, setting by setting; `lines` is written to the file
+only when there are line settings, so earlier versions still read it.
 
 The leading space before dictated text comes from the character before the caret, read off the
 main actor with `kAXSelectedTextRangeAttribute` and `kAXStringForRangeParameterizedAttribute`
@@ -354,8 +380,8 @@ All in UserDefaults (keys are `AppSettingsKey` raw values), read at each use.
 | `inputDeviceUID` | system default |
 
 Files in `~/Library/Application Support/org.nerdstorm.LiveTranscribe/`, owner-only (0600):
-`snippets.json`, `vocabulary.json`, `insertion-overrides.json` (user entries; the bundled list
-is in code) and `History/dictations.jsonl`.
+`snippets.json`, `vocabulary.json`, `insertion-overrides.json` (the user's per-app insertion
+methods and line settings; the bundled ones are in code) and `History/dictations.jsonl`.
 
 Dictation settings apply immediately; model and segmentation settings (Settings › Advanced)
 still apply at the next launch. Advanced's Restore Defaults resets only the settings on that tab

@@ -32,7 +32,7 @@ Real outputs from the dictation eval, at the default **Medium** cleanup level:
 | hi emoji fireworks | Hi 🎆. |
 | email me at john dot smith at example dot com | Email me at john.smith@example.com. |
 
-And in a multi-line text area, such as a document or the body of an email:
+And in anything that takes several lines, such as a document, an email or a chat message:
 
 | You say | Live Transcribe types |
 |---|---|
@@ -65,14 +65,14 @@ lists, which were still laid out ([details](#dictation-eval)).
   sentences, such as "sorry I'm late", as spoken.
 - **Punctuation and capitals, done.** From **Light** up, the local model fixes punctuation,
   casing and misheard words.
-- **Spoken lists become lists.** In a multi-line text area (a field macOS reports as a text
-  area, such as a TextEdit document), at Medium or High, say "first… second… and third…",
-  "number one… number two…" or "bullet point… bullet point…" and each item gets its own
-  numbered or bulleted line, under a lead-in ending in a colon. The items keep your words.
+- **Spoken lists become lists.** At Medium or High, in any app that takes several lines, say
+  "first… second… and third…", "number one… number two…" or "bullet point… bullet point…" and
+  each item gets its own numbered or bulleted line, under a lead-in ending in a colon. The items
+  keep your words.
 - **Letters and emails laid out.** Start with a greeting ("Dear sir or madam", "Hi John") and
-  end with a sign-off ("Kind regards Jordan Lee", "Cheers Sam"), and in a multi-line text area,
-  at Medium or High, the greeting and the sign-off each get their own lines. The model cleans
-  only the body, so it cannot move the names around.
+  end with a sign-off ("Kind regards Jordan Lee", "Cheers Sam"), and at Medium or High, in any
+  app that takes several lines, the greeting and the sign-off each get their own lines. The
+  model cleans only the body, so it cannot move the names around.
 - **Emoji, punctuation and line breaks by voice.** At every level, say "hi emoji fireworks" for
   "hi 🎆", "thanks heart emoji" for "thanks ❤️", "is it ready question mark" for "is it ready?",
   "new line" or "new paragraph" for a line break, and "john dot smith at example dot com" for
@@ -134,6 +134,11 @@ lists, which were still laid out ([details](#dictation-eval)).
 - **Ready for your apps.** Seven terminals and eleven Electron and Chromium apps (VS Code,
   Cursor, Slack, Notion, Claude, Chrome, Arc and more) are set to paste out of the box, and any
   other app is a few clicks away in **Settings › Apps**.
+- **Line breaks where they belong.** Lists, letters and "new line" get line breaks in every app,
+  chat apps included, but not in a field that takes one line, such as a search box or an address
+  bar, and not in terminals, where a line break could run a command. Make any app single-line,
+  or a terminal multi-line, in **Settings › Apps**. See
+  [How each app is handled](#how-each-app-is-handled).
 - **Refused text isn't lost.** If an app accepts neither method, the text waits on the
   clipboard, a note at your cursor says to press ⌘V, and **Copy Last Dictation** in the menu
   copies it again later. When the fix is on your side, such as reopening Live Transcribe so
@@ -210,8 +215,8 @@ Ideas for a later phase. None of this is started, and **none of it is in the app
 - Bullet lists without spoken markers. Today a list needs "first… second…", "number one…" or
   "bullet point…".
 - Paragraph breaks in long dictations, without saying "new paragraph".
-- Per-app formatting. Letters are laid out in any multi-line text area today, whatever the app.
-- Per-app tone.
+- Per-app cleanup level and tone. Apps can be set single-line today, but every app gets the
+  same cleanup.
 - Awareness of the focused app's context.
 - **Command Mode**: select text and say how to change it.
 - Multilingual cleanup. Today dictation and cleanup are English only.
@@ -365,7 +370,7 @@ each build: grant them once more after switching, and they survive every rebuild
 |---|---|
 | **None** | Nothing. The transcript is inserted as heard, with your snippets, vocabulary and spoken commands applied. |
 | **Light** | Punctuation, casing and misheard words. Fillers and self-corrections are kept as spoken; the model is told not to add or remove words (it may drop a repeated word such as "the the"). |
-| **Medium** (default) | Light, plus: fillers such as "um" are removed, spoken self-corrections are resolved ("Monday, no wait, Tuesday" → "Tuesday"), and spoken lists and letters are laid out in multi-line text areas. |
+| **Medium** (default) | Light, plus: fillers such as "um" are removed, spoken self-corrections are resolved ("Monday, no wait, Tuesday" → "Tuesday"), and spoken lists and letters are laid out wherever line breaks are allowed. |
 | **High** | Medium, plus light rewording for grammar and clarity. On a 1.7B model it behaves close to Medium. A dictation with a self-correction is cleaned twice: Medium's pass resolves the correction, then High's rewords the result, and if that rewording is rejected, Medium's result is used. |
 
 - Choose the level from **Cleanup** in the menu bar or in **Settings › General › Cleanup**. It
@@ -381,8 +386,8 @@ each build: grant them once more after switching, and they survive every rebuild
   number two"), or for bullets after "first", "second", … ("the second bullet point is wrong").
   The markers become "1." or "-", each item starts with a capital, the line before the list ends
   with a colon, and items keep their full stops only if every item is a sentence of four words
-  or more. No other words change. Lists and letters are laid out only in multi-line text areas
-  (fields macOS reports as a text area).
+  or more. No other words change. Lists and letters are laid out only where line breaks are
+  allowed (see [How each app is handled](#how-each-app-is-handled)).
 - OutputGuard checks every output of the model. The uncleaned text is used instead, with fillers
   still removed and lists and letters still laid out, if the output:
   - is empty or chatty;
@@ -411,7 +416,7 @@ never sees an emoji, an address or a line break, only a placeholder it must copy
 | "emoji fireworks", "heart emoji", "emoji party popper" | 🎆, ❤️, 🎉: about 350 common names, then any Unicode emoji name |
 | "question mark", "exclamation mark", "full stop", "comma", "semicolon" | ? ! . , ; |
 | "open quote … close quote", "quote … unquote", "open bracket … close bracket" | "…" and (…) |
-| "new line", "new paragraph" | a line break or a blank line; a space in single-line fields |
+| "new line", "new paragraph" | a line break or a blank line; a space in single-line apps and fields |
 | "john dot smith at example dot com", "example dot com slash pricing", "w w w dot example dot org" | john.smith@example.com, example.com/pricing, www.example.org |
 
 - A command is a command only when it is not talked about: "a question mark", "the fire emoji",
@@ -434,12 +439,49 @@ never sees an emoji, an address or a line break, only a placeholder it must copy
   storm." → "I work at Nerdstorm."). Terms with distinctive casing, such as GitHub or macOS, are
   also re-cased wherever they appear. From Light up, each dictation also gives the cleanup model
   up to 50 of the most relevant terms (**Vocabulary terms per dictation** in **Timing**).
-- **Settings › Apps**: **Accessibility** or **Paste** for any app. Built in, paste is used for
-  Terminal, iTerm2, Warp, Ghostty, Alacritty, kitty, WezTerm, VS Code, Cursor, Slack, Discord,
-  Notion, Figma, Claude, Chrome, Brave, Edge and Arc. Your setting wins over a built-in one.
+- **Settings › Apps**: for any app, **Insert text with** **Accessibility** or **Paste**, and
+  **Line breaks** **Multi-line** or **Single-line**. Built in, paste is used for Terminal, iTerm2,
+  Warp, Ghostty, Alacritty, kitty, WezTerm, VS Code, Cursor, Slack, Discord, Notion, Figma,
+  Claude, Chrome, Brave, Edge and Arc, and the seven terminals are single-line. Your setting wins
+  over a built-in one. See [How each app is handled](#how-each-app-is-handled).
 - The three lists are JSON files you can also edit by hand. A damaged file (one that can't be
   decoded) is renamed to `<name>.corrupt-<timestamp>` rather than overwritten, and Settings says
   where it went.
+
+### How each app is handled
+
+Live Transcribe looks at the app and the field you dictate into. Two things can be set for each
+app in **Settings › Apps**; everything else happens by itself.
+
+| Setting | Choices | Out of the box |
+|---|---|---|
+| **Insert text with** | **Accessibility**: typed into the field and checked, clipboard untouched, and pasted if the app doesn't accept it. **Paste**: ⌘V, then your clipboard is put back. | Accessibility; Paste for 7 terminals and 11 Electron and Chromium apps |
+| **Line breaks** | **Multi-line**: lists, letters and "new line" get line breaks, except in a field that takes one line. **Single-line**: everything stays on one line; lists and letters stay in the sentence, and "new line" types a space. | Multi-line; Single-line for the 7 terminals, where a line break could run a command |
+
+A field takes one line when it is a text field of the app's own window: an address bar, a
+search box, a form field, an email's subject line. A text box in a web page, in a browser or an
+Electron app such as Slack, always counts as taking several lines, because browsers report
+message boxes as text fields too. Delete your setting for an app to go back to the built-in one.
+
+In every app, whatever its settings:
+
+- **Password fields get nothing.** In a field macOS marks as secure, or while secure keyboard
+  entry is on, recording stops at once and nothing is typed or copied. This is checked when you
+  start, when you finish, and again just before a paste.
+- **Text goes where you dictated.** A paste goes ahead only if the same app still has focus;
+  otherwise the text waits on the clipboard. In a launcher panel such as Spotlight, the text goes
+  to the panel, not to the app behind it.
+- **Checked, never typed twice.** Text typed through Accessibility is read back and must match
+  exactly. If the app took only part of it, the text goes on the clipboard instead of being
+  pasted again.
+- **Spaces where they belong.** A space is added after a word, but not after an opening bracket
+  or before a full stop, in apps that let Accessibility read the text before the cursor.
+- **The panel sits at your cursor** where the app reports it, and near the bottom of the screen
+  otherwise.
+- **Undo AI Edit stays in its field.** It works only in the app, and the field, the dictation
+  went into.
+- **Apps that hide their fields** from Accessibility get paste only, no automatic space, and the
+  panel near the bottom of the screen.
 
 ### Dictation History
 
@@ -516,7 +558,7 @@ tab: dictation settings, shortcuts, cleanup level, history and microphone stay a
   Cancelled dictations are never saved. Turn history off, set how long it is kept, or clear it in
   Settings › History; **Dictation History** in the menu bar shows and searches it, and deletes
   single dictations.
-- Snippets, vocabulary and per-app insertion choices are JSON files in
+- Snippets, vocabulary and per-app settings are JSON files in
   `~/Library/Application Support/org.nerdstorm.LiveTranscribe/` (`snippets.json`,
   `vocabulary.json`, `insertion-overrides.json`), readable only by your account.
 - Every live transcript session is saved as an unencrypted JSONL file in
@@ -530,7 +572,7 @@ tab: dictation settings, shortcuts, cleanup level, history and microphone stay a
   clipboard for you to paste is an ordinary copy.
 - Deleting the app does not delete its data. To remove it, delete
   `~/Library/Application Support/org.nerdstorm.LiveTranscribe` (sessions, dictation history,
-  snippets, vocabulary and per-app insertion choices),
+  snippets, vocabulary and per-app settings),
   `~/Library/Preferences/org.nerdstorm.LiveTranscribe.plist` (settings) and the models in
   `~/.cache/huggingface/hub` (folders named `models--mlx-community--…`, and `mlx-audio`).
 - Earlier builds ran in the App Sandbox and kept their data in
@@ -586,7 +628,7 @@ Packages/LiveTranscribeKit/   all feature code, as vertical slices
     TranscriptUI/    live transcript view model and views
     Hotkey/          global shortcut monitor (event tap), hold/double-tap gestures, bindings
     Permissions/     Accessibility and microphone permission, System Settings links
-    Insertion/       typing at the cursor: Accessibility, paste with clipboard restore, per-app choice
+    Insertion/       typing at the cursor: Accessibility, paste with clipboard restore, per-app settings
     Styles/          rule-based filler removal and layout: lists and letters
     SpokenCommands/  emoji, punctuation, line breaks and addresses said aloud
     Snippets/        trigger phrases and the text they insert
@@ -766,9 +808,13 @@ results are in [Training/README.md](Packages/LiveTranscribeKit/Training/README.m
   the fused adapter resolved only 13% of self-corrections.
 - **Fillers and layout are rules, not model output.** A 1.7B model does neither reliably, and a
   rule can be tested exhaustively. Fillers are removed before the model runs; lists are laid out
-  after it, only for multi-line text areas. A letter's greeting and sign-off are found before the
-  model runs and only its body is cleaned: shown a whole letter, the model moved the name in the
-  sign-off into the greeting.
+  after it, only where line breaks are allowed. A letter's greeting and sign-off are found before
+  the model runs and only its body is cleaned: shown a whole letter, the model moved the name in
+  the sign-off into the greeting.
+- **Line breaks are a per-app setting, not a field's report.** Only fields that reported a text
+  area used to get lists and letters, which left out chat apps' message boxes, such as Slack's.
+  Now every app is multi-line unless set otherwise, and only a field that certainly takes one
+  line (a text field of the app's own window, never one in a web page) stays on one line.
 - **Snippets and spoken commands are hidden from the model.** Each trigger, emoji, address, line
   break and list marker becomes a placeholder (`⟦S1⟧`) that the model must copy unchanged.
   OutputGuard rejects any output that alters one, and what it stands for goes back in only after
@@ -835,8 +881,11 @@ More decisions, and the assumptions behind them, are in [docs/dictation.md](docs
   OutputGuard catches it and inserts the raw transcript instead of the cleaned text. In
   dictation such a fallback is silent: only **Dictation History** shows it, if history is on.
 - Spoken lists are laid out only when you say their markers ("first…", "number one…", "bullet
-  point…"), and lists and letters only in multi-line text areas. The model sometimes drops or
-  rewrites a list item; OutputGuard then inserts your words, still laid out.
+  point…"), and lists and letters only where line breaks are allowed. The model sometimes drops
+  or rewrites a list item; OutputGuard then inserts your words, still laid out.
+- A text box in a web page always counts as taking several lines, so a list dictated into a
+  web page's one-line field, such as a site's search box, gets line breaks the field then drops
+  ("items:1. Milk"). Set that browser to single-line if it happens often.
 - In a single-line field a letter is cleaned as a whole, and the model sometimes moves the name
   in the sign-off into the greeting ("hi John … cheers Sam" → "Hi Sam, … Cheers."). OutputGuard
   rejects that, so your words are inserted uncleaned.
