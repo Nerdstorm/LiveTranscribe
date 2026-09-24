@@ -133,20 +133,20 @@ you. These help, when you have them:
 
 ## Build and run
 
-From the repository root:
+From the repository root, build the app in Release and open it:
 
 ```bash
-xcodebuild build -project LiveTranscribe.xcodeproj -scheme LiveTranscribe -configuration Release -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/xcode-app -skipPackagePluginValidation
+make run
 ```
 
-```bash
-open .build/xcode-app/Build/Products/Release/LiveTranscribe.app
-```
+`make` on its own lists every target: the tests, the bench and the eval, releases, and upkeep such
+as the licence notices, the icons and the app's log. The [Makefile](Makefile) shows the command
+behind each one.
 
 Or open `LiveTranscribe.xcodeproj` in Xcode and choose Run. The shared scheme runs the
 **Release** configuration, because MLX inference in Debug is several times slower. On the first
 build Xcode asks you to trust mlx-swift's `CudaBuild` build-tool plugin, which only does work in
-CUDA builds; `-skipPackagePluginValidation` skips that prompt on the command line.
+CUDA builds; the Makefile skips that prompt with `-skipPackagePluginValidation`.
 
 Live Transcribe runs in the menu bar. On first launch, **Set Up Dictation** walks you through
 microphone access, Accessibility and the fn key while the models (about 3.5 GB) download; see
@@ -164,7 +164,7 @@ with your own certificate: copy `Config/Signing.local.xcconfig.example` to
 The package has more than 1,000 Swift Testing tests. Unit tests need no models:
 
 ```bash
-(cd Packages/LiveTranscribeKit && xcodebuild test -scheme LiveTranscribeKit-Package -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/xcode -skipPackagePluginValidation -skip-testing:IntegrationTests)
+make test
 ```
 
 The end-to-end tests, the bench and the dictation eval need generated audio clips and the
@@ -197,7 +197,8 @@ App/                          menu bar app: menu, windows, composition root, app
 LiveTranscribe.xcodeproj      app project (ad-hoc signed, hardened runtime, no App Sandbox)
 design/                       the app icon, drawn as SVG
 docs/                         the guides indexed above, design notes and dictation's design
-scripts/                      test audio (generate-*-audio.sh) and icons (render-icons.sh)
+Makefile                      building, tests, the bench, releases and upkeep (make lists them)
+scripts/                      releases, licence notices, test audio and icons
 site/                         the website, published to GitHub Pages
 Packages/LiveTranscribeKit/   all feature code, as vertical slices
   Sources/
