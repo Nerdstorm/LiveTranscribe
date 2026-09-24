@@ -1,6 +1,46 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="8" fill="#0a5fc4"/>
-  <rect x="8.5" y="12" width="3" height="8" rx="1.5" fill="#fff"/>
-  <rect x="14.5" y="7.5" width="3" height="17" rx="1.5" fill="#fff"/>
-  <rect x="20.5" y="10.5" width="3" height="11" rx="1.5" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="100 100 824 824">
+  <!-- The site's mark: the app icon's body and glyphs from design/AppIcon.svg, filling the
+       square, without the shadows, which only blur at favicon sizes. -->
+  <defs>
+    <path id="body" d="M 383.41 100.00
+             L 640.59 100.00 C 722.19 100.00 763.00 100.00 799.79 112.14 C 854.88 131.21 892.79 169.12 911.86 224.21 C 924.00 261.00 924.00 301.81 924.00 383.41
+             L 924.00 640.59 C 924.00 722.19 924.00 763.00 911.86 799.79 C 892.79 854.88 854.88 892.79 799.79 911.86 C 763.00 924.00 722.19 924.00 640.59 924.00
+             L 383.41 924.00 C 301.81 924.00 261.00 924.00 224.21 911.86 C 169.12 892.79 131.21 854.88 112.14 799.79 C 100.00 763.00 100.00 722.19 100.00 640.59
+             L 100.00 383.41 C 100.00 301.81 100.00 261.00 112.14 224.21 C 131.21 169.12 169.12 131.21 224.21 112.14 C 261.00 100.00 301.81 100.00 383.41 100.00 Z"/>
+    <clipPath id="inside">
+      <use href="#body"/>
+    </clipPath>
+    <linearGradient id="background" gradientUnits="userSpaceOnUse" x1="0" y1="100" x2="0" y2="924">
+      <stop offset="0" stop-color="#3d8bff"/>
+      <stop offset="1" stop-color="#0a4db8"/>
+    </linearGradient>
+    <radialGradient id="shine" gradientUnits="userSpaceOnUse" cx="347" cy="199" r="618">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rim" gradientUnits="userSpaceOnUse" x1="0" y1="100" x2="0" y2="420">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="wave" gradientUnits="userSpaceOnUse" x1="0" y1="220" x2="0" y2="830">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dbe8ff"/>
+    </linearGradient>
+    <linearGradient id="cursor" gradientUnits="userSpaceOnUse" x1="0" y1="260" x2="0" y2="770">
+      <stop offset="0" stop-color="#ffe066"/>
+      <stop offset="1" stop-color="#ffb703"/>
+    </linearGradient>
+  </defs>
+
+  <use href="#body" fill="url(#background)"/>
+  <use href="#body" fill="url(#shine)"/>
+  <use href="#body" fill="none" stroke="url(#rim)" stroke-width="6" clip-path="url(#inside)"/>
+
+  <rect x="222" y="422" width="66" height="180" rx="33" fill="url(#wave)"/>
+  <rect x="330" y="332" width="66" height="360" rx="33" fill="url(#wave)"/>
+  <rect x="438" y="387" width="66" height="250" rx="33" fill="url(#wave)"/>
+  <rect x="546" y="447" width="66" height="130" rx="33" fill="url(#wave)"/>
+  <rect x="702" y="272" width="44" height="480" rx="22" fill="url(#cursor)"/>
+  <rect x="646" y="272" width="156" height="44" rx="22" fill="url(#cursor)"/>
+  <rect x="646" y="708" width="156" height="44" rx="22" fill="url(#cursor)"/>
 </svg>
