@@ -29,8 +29,8 @@ public struct LineBreakCommand: PhraseMatcher {
 
     public func matches(in text: TokenizedText) -> [PhraseMatch] {
         var found: [PhraseMatch] = []
-        for position in text.words.indices where !CommandGrammar.followsDeterminer(position, in: text) {
-            for phrase in Self.phrases where CommandGrammar.matches(phrase.words, at: position, in: text) {
+        for position in text.words.indices where !PhraseGrammar.followsDeterminer(position, in: text) {
+            for phrase in Self.phrases where PhraseGrammar.matches(phrase.words, at: position, in: text) {
                 let end = position + phrase.words.count
                 if end < text.words.count, text.words[end].text == "of" { continue }
                 found.append(PhraseMatch(
@@ -40,7 +40,7 @@ public struct LineBreakCommand: PhraseMatcher {
                         expansion: multiline ? String(repeating: "\n", count: phrase.lines) : " ",
                         role: .lineBreak
                     ),
-                    keptTrailing: CommandGrammar.trailingAfterClausePunctuation(text.token(ofWord: end - 1))
+                    keptTrailing: PhraseGrammar.trailingAfterClausePunctuation(text.token(ofWord: end - 1))
                 ))
             }
         }

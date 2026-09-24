@@ -50,14 +50,14 @@ public struct EmojiCommand: PhraseMatcher {
     /// "emoji fireworks": the longest name right after the keyword.
     private func nameAfter(_ keyword: Int, in text: TokenizedText) -> PhraseMatch? {
         let keywordToken = text.token(ofWord: keyword)
-        guard !CommandGrammar.endsClause(keywordToken), !CommandGrammar.followsDeterminer(keyword, in: text) else {
+        guard !PhraseGrammar.endsClause(keywordToken), !PhraseGrammar.followsDeterminer(keyword, in: text) else {
             return nil
         }
         let longest = min(maxNameWords, text.words.count - keyword - 1)
         guard longest > 0 else { return nil }
         for count in stride(from: longest, through: 1, by: -1) {
             let name = (keyword + 1)..<(keyword + 1 + count)
-            guard text.coversWholeTokens(name), CommandGrammar.runsOn(name, in: text),
+            guard text.coversWholeTokens(name), PhraseGrammar.runsOn(name, in: text),
                   let emoji = names.emoji(for: text.words(in: name))
             else { continue }
             return PhraseMatch(
@@ -77,9 +77,9 @@ public struct EmojiCommand: PhraseMatcher {
         for count in stride(from: longest, through: 1, by: -1) {
             let name = (keyword - count)..<keyword
             guard text.coversWholeTokens(name),
-                  !CommandGrammar.endsClause(text.token(ofWord: keyword - 1)),
-                  CommandGrammar.runsOn(name, in: text),
-                  !CommandGrammar.followsDeterminer(name.lowerBound, in: text),
+                  !PhraseGrammar.endsClause(text.token(ofWord: keyword - 1)),
+                  PhraseGrammar.runsOn(name, in: text),
+                  !PhraseGrammar.followsDeterminer(name.lowerBound, in: text),
                   !Self.followsSubject(name.lowerBound, in: text),
                   let emoji = names.emoji(for: text.words(in: name))
             else { continue }
@@ -110,7 +110,7 @@ public struct EmojiCommand: PhraseMatcher {
     private static func followsSubject(_ position: Int, in text: TokenizedText) -> Bool {
         guard position > 0 else { return false }
         let previous = text.words[position - 1]
-        return previous.endsToken && !CommandGrammar.endsClause(text.token(previous.token)) && subjects.contains(previous.text)
+        return previous.endsToken && !PhraseGrammar.endsClause(text.token(previous.token)) && subjects.contains(previous.text)
     }
 }
 

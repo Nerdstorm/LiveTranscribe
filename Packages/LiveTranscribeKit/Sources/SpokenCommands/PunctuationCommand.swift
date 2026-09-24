@@ -84,7 +84,7 @@ public struct PunctuationCommand: PhraseMatcher {
 
     private func markMatches(in text: TokenizedText) -> [PhraseMatch] {
         var found: [PhraseMatch] = []
-        for position in text.words.indices.dropFirst() where !CommandGrammar.followsDeterminer(position, in: text) {
+        for position in text.words.indices.dropFirst() where !PhraseGrammar.followsDeterminer(position, in: text) {
             for mark in marks {
                 guard let name = Self.longestName(mark.names, at: position, in: text) else { continue }
                 let end = position + name.count
@@ -98,7 +98,7 @@ public struct PunctuationCommand: PhraseMatcher {
                         replacesPrecedingPunctuation: true,
                         capitalizesNext: mark.endsSentence
                     )),
-                    keptTrailing: CommandGrammar.trailingAfterClausePunctuation(text.token(ofWord: end - 1))
+                    keptTrailing: PhraseGrammar.trailingAfterClausePunctuation(text.token(ofWord: end - 1))
                 ))
             }
         }
@@ -112,7 +112,7 @@ public struct PunctuationCommand: PhraseMatcher {
         var found: [PhraseMatch] = []
         var position = 0
         while position < text.words.count {
-            guard !CommandGrammar.followsDeterminer(position, in: text) else {
+            guard !PhraseGrammar.followsDeterminer(position, in: text) else {
                 position += 1
                 continue
             }
@@ -143,7 +143,7 @@ public struct PunctuationCommand: PhraseMatcher {
 
     private static func longestName(_ names: [[String]], at position: Int, in text: TokenizedText) -> [String]? {
         names
-            .filter { CommandGrammar.matches($0, at: position, in: text) }
+            .filter { PhraseGrammar.matches($0, at: position, in: text) }
             .max { $0.count < $1.count }
     }
 

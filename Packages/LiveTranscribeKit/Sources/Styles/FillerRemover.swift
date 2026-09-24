@@ -1,4 +1,5 @@
 import Foundation
+import Shared
 
 /// Removes hesitation fillers ("um", "uh", "er") from a transcript, deterministically.
 ///
@@ -25,7 +26,7 @@ public struct FillerRemover: Sendable {
         for token in text.split(whereSeparator: \.isWhitespace).map(String.init) {
             let core = token.trimmingCharacters(in: .punctuationCharacters).lowercased()
             guard fillers.contains(core) else {
-                kept.append(capitalizeNext ? Self.capitalizingFirstLetter(token) : token)
+                kept.append(capitalizeNext ? SentenceCase.capitalizingFirstWord(token) : token)
                 capitalizeNext = false
                 continue
             }
@@ -52,10 +53,5 @@ public struct FillerRemover: Sendable {
             trimmed.removeLast()
         }
         return trimmed + String(ender)
-    }
-
-    private static func capitalizingFirstLetter(_ token: String) -> String {
-        guard let index = token.firstIndex(where: \.isLetter) else { return token }
-        return token.replacingCharacters(in: index...index, with: token[index].uppercased())
     }
 }

@@ -192,10 +192,8 @@ private struct SegmentBuilder {
             text = String(text.drop(while: \.isWhitespace))
             if !text.isEmpty { joinsNext = false }
         }
-        if capitalizesNext, let first = text.firstIndex(where: { !$0.isWhitespace }) {
-            if text[first].isLowercase {
-                text.replaceSubrange(first...first, with: text[first].uppercased())
-            }
+        if capitalizesNext, text.contains(where: { !$0.isWhitespace }) {
+            text = SentenceCase.capitalizingFirstWord(text)
             capitalizesNext = false
         }
         if text.contains(where: { !$0.isWhitespace }) { endsWithInline = false }

@@ -47,64 +47,12 @@ public enum SpokenCommands {
                     lines[previous] += moved
                 }
             }
-            if let first = line.first, first.isLowercase {
-                line = first.uppercased() + line.dropFirst()
-            }
-            lines[index] = line
+            lines[index] = SentenceCase.capitalizingFirstWord(line)
         }
         return lines
             .joined(separator: "\n")
             .replacingOccurrences(of: "\n{3,}", with: "\n\n", options: .regularExpression)
     }
 
-    static let clauseEnders: Set<Character> = [",", ";", ":", ".", "!", "?"]
-}
-
-/// Word checks the commands share.
-enum CommandGrammar {
-    /// Words after which a command's words are a noun phrase, as in "a question mark", "the new
-    /// line of laptops" or "our new line": the speaker is talking about the thing, not asking for
-    /// it.
-    static let determiners: Set<String> = [
-        "a", "an", "the", "this", "that", "these", "those", "each", "every", "any", "no", "one",
-        "my", "your", "his", "her", "its", "our", "their", "another", "which", "what", "whose", "same", "some",
-    ]
-
-    /// Whether the word before `position` is a determiner or a possessive ("Apple's") in the same
-    /// clause.
-    static func followsDeterminer(_ position: Int, in text: TokenizedText) -> Bool {
-        guard position > 0 else { return false }
-        let previous = text.words[position - 1]
-        guard previous.endsToken, !endsClause(text.token(previous.token)) else { return false }
-        return determiners.contains(previous.text) || previous.text.hasSuffix("'s")
-    }
-
-    /// Whether `token` ends with punctuation that ends a clause.
-    static func endsClause(_ token: Substring) -> Bool {
-        TokenEdges.trailing(of: token).contains { SpokenCommands.clauseEnders.contains($0) }
-    }
-
-    /// The token's trailing punctuation after any clause punctuation at its start: what stays in
-    /// the text when a command replaces the punctuation the transcript had ("mark.\"" keeps the
-    /// closing quote).
-    static func trailingAfterClausePunctuation(_ token: Substring) -> String {
-        String(TokenEdges.trailing(of: token).drop { SpokenCommands.clauseEnders.contains($0) })
-    }
-
-    /// Whether the words at `position` are `phrase` and cover whole tokens.
-    static func matches(_ phrase: [String], at position: Int, in text: TokenizedText) -> Bool {
-        let range = position..<(position + phrase.count)
-        guard range.upperBound <= text.words.count, text.coversWholeTokens(range) else { return false }
-        return text.words(in: range) == phrase
-    }
-
-    /// Whether no token inside `range` other than the last ends a clause, so the words run on in
-    /// one phrase.
-    static func runsOn(_ range: Range<Int>, in text: TokenizedText) -> Bool {
-        let lastToken = text.words[range.upperBound - 1].token
-        return range.allSatisfy { index in
-            let word = text.words[index]
-            return word.token == lastToken || !word.endsToken || !endsClause(text.token(word.token))
-        }
-    }
+    private static let clauseEnders = PhraseGrammar.clauseEnders
 }
