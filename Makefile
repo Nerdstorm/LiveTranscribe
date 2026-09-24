@@ -64,6 +64,7 @@ resolve: ## Resolve the Swift packages, which also fetches Sparkle's release too
 test: ## Unit tests, which need no models
 	cd $(PACKAGE) && $(PACKAGE_TESTS) -skip-testing:IntegrationTests
 	scripts/tests/write-changelog-tests.sh
+	scripts/tests/check-swift-runtime-tests.sh
 
 test-integration: audio ## End-to-end tests with the real models, which they download (about 3.5 GB)
 	cd $(PACKAGE) && TEST_RUNNER_LT_RUN_MODEL_TESTS=1 $(PACKAGE_TESTS) -only-testing:IntegrationTests
@@ -103,6 +104,8 @@ doctor: ## Check the tools and credentials that building and releasing need
 	@printf '%-26s' 'Xcode'; xcodebuild -version | head -n 1
 	@printf '%-26s' 'Metal Toolchain'; xcrun metal -v >/dev/null 2>&1 && echo 'installed' \
 	  || echo 'missing: xcodebuild -downloadComponent MetalToolchain'
+	@printf '%-26s' 'Earlier macOS SDK'; scripts/check-swift-runtime.sh --sdk 2>/dev/null \
+	  || echo 'missing, and make release checks the app against one (docs/releasing.md)'
 	@printf '%-26s' 'Signing your own builds'; [ -f Config/Signing.local.xcconfig ] && echo 'Config/Signing.local.xcconfig' \
 	  || echo 'ad-hoc, so macOS asks for permissions after every build (docs/signing.md)'
 	@printf '%-26s' 'Developer ID certificate'; security find-identity -v -p codesigning \

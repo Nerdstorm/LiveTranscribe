@@ -108,6 +108,9 @@ preflight() {
   fi
   # Sparkle refuses a feed over plain HTTP, and so does the app.
   [[ $feed_url == https://?* ]] || fail "LT_UPDATE_FEED_URL must be an https address"
+  # verify_app checks the app against the Swift runtime of an earlier macOS, from its SDK.
+  "$root/scripts/check-swift-runtime.sh" --sdk >/dev/null \
+    || fail "there's no earlier macOS SDK to check the app against (docs/releasing.md)"
 
   if ! $test_build; then
     team_id="${LT_TEAM_ID:-$(sed -n 's/^[[:space:]]*DEVELOPMENT_TEAM[[:space:]]*=[[:space:]]*\([^[:space:]/]*\).*/\1/p' \
@@ -197,11 +200,13 @@ export_app() {
   run export xcodebuild -exportArchive -archivePath "$archive" -exportPath "${app:h}" -exportOptionsPlist "$options"
 }
 
-# verify_app <app>: checks the signature, the version and the updates, and for a release
-# everything notarization requires of the signature.
+# verify_app <app>: checks the signature, the version, the updates and that an earlier macOS can
+# launch it, and for a release everything notarization requires of the signature.
 verify_app() {
   local app=$1
   run verify codesign --verify --strict --deep --verbose=2 "$app"
+  # dyld won't launch an app that needs a symbol the Swift runtime of the Mac's macOS lacks.
+  run verify "$root/scripts/check-swift-runtime.sh" "$app"
   local info="$app/Contents/Info.plist"
   [[ "$(plutil -extract CFBundleShortVersionString raw -o - "$info")" == "$version" ]] \
     || fail "${app:t} isn't version $version"
