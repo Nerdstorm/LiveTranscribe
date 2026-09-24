@@ -29,6 +29,12 @@
   if every item is a sentence of four words or more. No other words change. Lists and letters are
   laid out only where line breaks are allowed (see
   [How each app is handled](snippets-vocabulary-apps.md#how-each-app-is-handled)).
+- A letter needs a greeting at the start ("Dear…", "Hi…", "Hello…", "Good morning…") and a
+  sign-off at the end ("Kind regards", "Sincerely", "Best wishes", …). An everyday sign-off
+  ("Thanks", "Thank you", "Cheers", "Best", "Love") counts before a name, or with no name after
+  a body of two sentences or more or a spoken list, so a one-line chat message ("Hi John, can
+  you send it? Thanks") stays as it is. The greeting and the sign-off get lines of their own,
+  and only the body goes to the model.
 - OutputGuard checks every output of the model. The uncleaned text is used instead, with fillers
   still removed and lists and letters still laid out, if the output:
   - is empty or chatty;

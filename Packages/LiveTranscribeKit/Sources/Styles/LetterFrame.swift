@@ -15,7 +15,10 @@ import Shared
 /// Both ends are found in the words before cleanup, and only the body goes to the model: given a
 /// whole letter, the model moved the name in the sign-off into the greeting. A letter needs a
 /// greeting and a sign-off, so "Hi John, can you send the report?" stays as it is, as a chat
-/// message should. A sign-off that is only "Thanks", "Cheers" or "Best" needs a name after it.
+/// message should. An everyday sign-off such as "Thanks", "Cheers" or "Best" ends a letter
+/// before a name, or with no name when the body reads as a letter's: two sentences or more, or
+/// a spoken list. So "Hi John, can you send the report? Thanks" stays a chat message, while an
+/// email that lists a few points and ends "Thanks" is laid out.
 ///
 /// The addressee is what follows the greeting up to its comma, or, when speech-to-text wrote
 /// none, the capitalised names or a word such as "team" or "all" right after it. "Dear sir oh
@@ -53,21 +56,25 @@ public struct LetterFrame: FrameRule {
         ["many", "thanks"], ["with", "thanks"], ["thanks", "and", "regards"], ["thanks", "in", "advance"],
         ["respectfully"], ["cordially"], ["with", "gratitude"],
     ]
-    /// Sign-offs that are also everyday words, so they end a letter only before a name.
-    private static let signOffsBeforeAName: [[String]] = [
+    /// Sign-offs that are also everyday words, so they end a letter only before a name or after
+    /// a body that reads as a letter's (see ``readsAsALetter(_:from:to:listMarkers:)``).
+    private static let everydaySignOffs: [[String]] = [
         ["thanks"], ["thank", "you"], ["cheers"], ["best"], ["love"], ["take", "care"], ["talk", "soon"], ["speak", "soon"],
     ]
     /// Most words in a signature.
     private static let longestSignature = 4
+    /// Fewest sentences in a body that an everyday sign-off with no name after it ends.
+    private static let minimumLetterSentences = 2
+    private static let sentenceEnders: Set<Character> = [".", "!", "?"]
 
     public init() {}
 
-    public func frame(in text: String) -> TextFrame? {
+    public func frame(in text: String, listMarkers: Set<String>) -> TextFrame? {
         let tokenized = TokenizedText(text)
         guard let firstWord = tokenized.words.first, firstWord.token == 0,
               let greeting = Self.greetings.first(where: { PhraseGrammar.matches($0, at: 0, in: tokenized) }),
               let salutation = salutation(after: greeting, in: tokenized),
-              let signOff = signOff(after: salutation.bodyStart, in: tokenized),
+              let signOff = signOff(after: salutation.bodyStart, in: tokenized, listMarkers: listMarkers),
               salutation.bodyStart < signOff.start
         else { return nil }
 
@@ -138,16 +145,21 @@ public struct LetterFrame: FrameRule {
     // MARK: - Sign-off
 
     /// The sign-off and its signature, and the index of the sign-off's first token.
-    private func signOff(after bodyStart: Int, in text: TokenizedText) -> (text: String, start: Int)? {
+    private func signOff(
+        after bodyStart: Int,
+        in text: TokenizedText,
+        listMarkers: Set<String>
+    ) -> (text: String, start: Int)? {
         var best: (text: String, start: Int)?
-        for (phrases, needsName) in [(Self.signOffs, false), (Self.signOffsBeforeAName, true)] {
+        for (phrases, isEveryday) in [(Self.signOffs, false), (Self.everydaySignOffs, true)] {
             for phrase in phrases {
                 for position in text.words.indices where PhraseGrammar.matches(phrase, at: position, in: text) {
                     let start = text.words[position].token
                     let end = text.words[position + phrase.count - 1].token
                     guard start > bodyStart, PhraseGrammar.runsOn(position..<(position + phrase.count), in: text),
                           let signature = signature(from: end + 1, in: text),
-                          !(needsName && signature.isEmpty)
+                          !isEveryday || !signature.isEmpty
+                            || Self.readsAsALetter(text, from: bodyStart, to: start, listMarkers: listMarkers)
                     else { continue }
                     if let current = best, current.start <= start { continue }
                     let closing = SentenceCase.capitalizingFirstWord(phrase.joined(separator: " ")) + ","
@@ -175,6 +187,23 @@ public struct LetterFrame: FrameRule {
             parts.append(isLast && !isPlaceholder ? String(token.dropLast(trailing.count)) : String(token))
         }
         return parts.joined(separator: " ")
+    }
+
+    /// Whether the body's tokens from `start` up to `end` read as a letter's rather than a chat
+    /// message's: at least ``minimumLetterSentences`` sentences, or a spoken list, numbered in
+    /// words ("first, …", "one is …") or with markers (two of `listMarkers`).
+    private static func readsAsALetter(
+        _ text: TokenizedText,
+        from start: Int,
+        to end: Int,
+        listMarkers: Set<String>
+    ) -> Bool {
+        guard start < end else { return false }
+        let tokens = (start..<end).map { String(text.token($0)) }
+        let markers = tokens.filter { token in listMarkers.contains { token.contains($0) } }.count
+        let sentences = tokens.filter { $0.last.map(sentenceEnders.contains) ?? false }.count
+        return markers >= 2 || sentences >= minimumLetterSentences
+            || ListFormatter().lines(for: tokens.joined(separator: " ")) != nil
     }
 
     /// "J." in "Sam J. Lee".

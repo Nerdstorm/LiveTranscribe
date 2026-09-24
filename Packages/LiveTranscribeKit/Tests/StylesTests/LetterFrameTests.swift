@@ -46,9 +46,36 @@ struct LetterFrameTests {
         #expect(frame?.closing == closing)
     }
 
+    /// An everyday sign-off with no name after it ends a letter when the body reads as one: two
+    /// sentences or more, or a spoken list.
+    @Test("Ends a letter with an everyday sign-off and no name", arguments: [
+        (
+            "Hi team, there are a few things I need to talk to you about. One is the launch. Two, the marketing. Thanks.",
+            "there are a few things I need to talk to you about. One is the launch. Two, the marketing.",
+            "\n\nThanks,"
+        ),
+        ("Hi Sam, the build is green. I'll tag the release tonight. Cheers", "the build is green. I'll tag the release tonight.", "\n\nCheers,"),
+        ("Hello all, we need three things: first, milk; second, eggs; third, bread. Thank you", "we need three things: first, milk; second, eggs; third, bread.", "\n\nThank you,"),
+    ])
+    func endsALetterWithAnEverydaySignOff(text: String, body: String, closing: String) {
+        let frame = rule.frame(in: text)
+        #expect(frame?.body == body)
+        #expect(frame?.closing == closing)
+    }
+
+    /// "Number one …" said as list markers is a list too, even in a single sentence.
+    @Test func listMarkersMakeABodyReadAsALetter() {
+        let text = "Hi team ⟦S1⟧ the launch ⟦S2⟧ the marketing thanks"
+        #expect(rule.frame(in: text) == nil)
+        #expect(rule.frame(in: text, listMarkers: ["⟦S1⟧", "⟦S2⟧"])
+            == TextFrame(opening: "Hi team,\n\n", body: "⟦S1⟧ the launch ⟦S2⟧ the marketing", closing: "\n\nThanks,"))
+    }
+
     @Test("Leaves text that is not a letter", arguments: [
         "Hi John, can you send the report?",
         "Hi John, can you send the report? Thanks",
+        "Hey Sam, running ten minutes late. Cheers",
+        "Hi all, one is enough. Thanks",
         "Hi John thanks for the update cheers",
         "Dear diary, today was great.",
         "I said hi to John. Kind regards Sam",
