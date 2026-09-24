@@ -4,6 +4,15 @@ What changed in each release of Live Transcribe, newest first. Before a release,
 `make changelog VERSION=x.y.z` summarises what was merged since the last one
 ([Releasing](docs/releasing.md)).
 
+## 0.1.1 - 2026-09-25
+
+- Open on macOS 14 to 26. 0.1.0 didn't open on any macOS before 27, and a copy that doesn't open can't update itself, so download 0.1.1 from the website ([#17](https://github.com/Nerdstorm/LiveTranscribe/pull/17))
+- Number a list said with "one…, two…", as "first…, second…" already was ([#17](https://github.com/Nerdstorm/LiveTranscribe/pull/17))
+- Lay out a message that opens with a greeting and ends with just "Thanks" as a letter, with its list ([#17](https://github.com/Nerdstorm/LiveTranscribe/pull/17))
+- Start a new paragraph after a spoken list ([#17](https://github.com/Nerdstorm/LiveTranscribe/pull/17))
+
+[Every commit since v0.1.0](https://github.com/Nerdstorm/LiveTranscribe/compare/v0.1.0...v0.1.1)
+
 ## 0.1.0 - 2026-09-24
 
 - Live Transcribe: on-device realtime transcription for Apple silicon
