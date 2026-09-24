@@ -6,6 +6,7 @@ import Persistence
 import Shared
 import Snippets
 import TranscriptUI
+import Updates
 import Vocabulary
 
 /// The Settings tabs, in display order.
@@ -47,6 +48,8 @@ public protocol DictationWindowActions: AnyObject {
     func showHistory()
     func showSettings(tab: SettingsTab?)
     func showOnboarding()
+    /// The About panel, with the version and the licence notices.
+    func showAbout()
 }
 
 /// Everything the dictation windows and the menu read and change, built once by the app.
@@ -69,6 +72,8 @@ public final class DictationUIContext {
     /// these values until Live Transcribe restarts (dictation settings are read at each use), so
     /// Settings can tell what is in effect from a change still waiting for a restart.
     public let settingsAtLaunch: AppSettings
+    /// New releases, in a release build; `nil` in a build from source, which never updates.
+    public let updates: (any SoftwareUpdating)?
     public weak var windows: (any DictationWindowActions)?
 
     public init(
@@ -81,7 +86,8 @@ public final class DictationUIContext {
         history: any DictationHistory,
         microphonePermission: any MicrophonePermissionProviding,
         accessibility: any AccessibilityPermissionProviding,
-        settingsAtLaunch: AppSettings
+        settingsAtLaunch: AppSettings,
+        updates: (any SoftwareUpdating)? = nil
     ) {
         self.controller = controller
         self.transcript = transcript
@@ -93,5 +99,6 @@ public final class DictationUIContext {
         self.microphonePermission = microphonePermission
         self.accessibility = accessibility
         self.settingsAtLaunch = settingsAtLaunch
+        self.updates = updates
     }
 }

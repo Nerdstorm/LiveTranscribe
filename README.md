@@ -84,13 +84,14 @@ Every feature, in detail: [docs/features.md](docs/features.md).
 | Guide | What's in it |
 |---|---|
 | [Features](docs/features.md) | Everything Live Transcribe does, in detail, and what's coming next |
-| [Using Live Transcribe](docs/using.md) | First launch, dictating, Dictation History, the live transcript, microphones and every Settings tab |
+| [Using Live Transcribe](docs/using.md) | First launch, dictating, Dictation History, the live transcript, microphones, updates and every Settings tab |
 | [Cleanup and spoken commands](docs/cleanup.md) | The four cleanup levels, what OutputGuard rejects, and the phrases that become emoji, punctuation, line breaks and addresses |
 | [Snippets, vocabulary and apps](docs/snippets-vocabulary-apps.md) | Saved text, your names and jargon, and how each app gets its text and line breaks |
 | [Privacy](docs/privacy.md) | What is kept where, what goes over the network, and how to remove it all |
-| [Signing and Gatekeeper](docs/signing.md) | Ad-hoc signing, keeping permissions across rebuilds, and distributing a build |
+| [Signing and Gatekeeper](docs/signing.md) | Ad-hoc signing, and keeping permissions across rebuilds |
+| [Releasing](docs/releasing.md) | The Developer ID certificate, the notary credentials and the update signing key, and building, notarizing, publishing and offering a release as an update |
 | [Known limitations](docs/limitations.md) | What doesn't work well yet |
-| [Development](docs/development.md) | The tests and their audio clips, the bench and the dictation eval, training the adapter, and the icons |
+| [Development](docs/development.md) | The tests and their audio clips, the bench and the dictation eval, training the adapter, the licence notices, and the icons |
 | [Design notes](docs/design-notes.md) | Why it is built the way it is |
 | [Dictation design](docs/dictation.md) | Dictation's decisions, assumptions, architecture, settings and eval results |
 | [Training the adapter](Packages/LiveTranscribeKit/Training/README.md) | The self-correction adapter's dataset, training and evaluation |
@@ -99,13 +100,25 @@ Every feature, in detail: [docs/features.md](docs/features.md).
 
 A working proof of concept, free and open source under the [MIT License](LICENSE).
 
-- There are no prebuilt downloads: build it from source (below).
+- Download it from [GitHub Releases](https://github.com/Nerdstorm/LiveTranscribe/releases/latest):
+  a disk image signed with Developer ID and notarized by Apple, which keeps itself up to date. Or
+  build it from source (below).
 - Tested on an M4 Pro Mac with macOS 27 and Xcode 27. The app targets macOS 14 or later but has
   not been run on older systems.
 - Tested with English speech. Parakeet v3 also recognises other European languages, but the
   cleanup step has not been tested with them.
-- Issues and pull requests are welcome.
+- Issues and pull requests are welcome; see [Reporting a problem](#reporting-a-problem).
 - What doesn't work well yet is in [Known limitations](docs/limitations.md).
+
+## Reporting a problem
+
+[Open an issue](https://github.com/Nerdstorm/LiveTranscribe/issues/new), in whatever form suits
+you. These help, when you have them:
+
+- your Mac, the macOS version, and the app's version (**About Live Transcribe** in the menu bar);
+- the app you were dictating into;
+- what you said, what was typed, and what you expected;
+- for a crash, the report macOS offers to send, or the one in Console › Crash Reports.
 
 ## Requirements
 
@@ -159,8 +172,9 @@ models; see [Development](docs/development.md).
 
 ## Privacy
 
-Audio and transcripts never leave your Mac, and there is no telemetry. The only network traffic
-is to Hugging Face, to download the models. **Dictation history is on by default:** every
+Audio and transcripts never leave your Mac, and there is no telemetry. The app goes online only
+to download the models from Hugging Face and, in a downloaded release, to check GitHub for a new
+version about once a day if you allow it. **Dictation history is on by default:** every
 completed dictation (what you said, what was typed, the app and timings) is kept unencrypted on
 this Mac, never synced, until you turn history off, limit how long it is kept or clear it in
 **Settings › History**. Where each file lives, and how to remove everything:
@@ -252,7 +266,9 @@ Built with [mlx-swift](https://github.com/ml-explore/mlx-swift),
 [swift-transformers](https://github.com/huggingface/swift-transformers). Every package
 dependency, including indirect ones, is MIT or Apache-2.0 licensed. Some bundle third-party code
 under other permissive licences (MLX includes the BSD-licensed PocketFFT, for example), so a
-redistributed build must carry those notices too.
+redistributed build must carry those notices too. The app does: **About Live Transcribe** in the
+menu bar shows every package's licence, collected from `Package.resolved` by
+`scripts/generate-acknowledgements.sh`.
 
 ## License
 

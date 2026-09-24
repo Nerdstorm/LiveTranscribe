@@ -7,7 +7,8 @@ Hardened Runtime and only the microphone entitlement. That rules out the Mac App
 Builds from this repository are ad-hoc signed ("Sign to Run Locally") by default and not
 notarized, so they run on the Mac that built them. Gatekeeper blocks a copy downloaded onto
 another Mac; build it there instead, or allow it under System Settings › Privacy & Security. To
-distribute a build, sign it with your Developer ID and notarize it.
+distribute a build, make a release: [Releasing](releasing.md) signs it with Developer ID and has
+Apple notarize it.
 
 **The ad-hoc signature changes with every build.** After a rebuild, macOS asks for microphone
 access again, and the Accessibility permission must be granted again: remove the old Live

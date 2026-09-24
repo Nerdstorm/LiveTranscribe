@@ -23,6 +23,7 @@ public enum Log {
     public static let permissions = Logger(subsystem: subsystem, category: "Permissions")
     public static let snippets = Logger(subsystem: subsystem, category: "Snippets")
     public static let vocabulary = Logger(subsystem: subsystem, category: "Vocabulary")
+    public static let updates = Logger(subsystem: subsystem, category: "Updates")
 
     /// Signposts for Instruments: STT and LLM calls are wrapped in intervals.
     public static let transcriptionSignposter = OSSignposter(logger: transcription)

@@ -183,6 +183,17 @@ struct GeneralSettingsTests {
         #expect(opened.value == 2)
         #expect(model.errorMessage == nil)
     }
+
+    // MARK: - Updates
+
+    @Test func theUpdatesSectionSaysWhenItLastChecked() {
+        #expect(GeneralSettingsUpdatesText.lastChecked(nil) == "Not checked yet")
+        let date = Date(timeIntervalSince1970: 1_790_000_000)
+        #expect(
+            GeneralSettingsUpdatesText.lastChecked(date)
+                == "Last checked \(date.formatted(date: .abbreviated, time: .shortened))"
+        )
+    }
 }
 
 /// A value the test changes after handing a closure that reads it to the model.

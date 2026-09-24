@@ -4,5 +4,9 @@
 <dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Live Transcribe turns your speech into text on this Mac. Audio never leaves your device.</string>
+	<key>SUFeedURL</key>
+	<string>$(LT_UPDATE_FEED_URL)</string>
+	<key>SUPublicEDKey</key>
+	<string>nCb03Znlvla/oZDimTr9DZdWMOT9+5HoLx/9tOG7GMk=</string>
 </dict>
 </plist>

@@ -189,6 +189,13 @@ struct MenuBarStatusTests {
             == "Undo AI Edit")
     }
 
+    // MARK: - Updates
+
+    @Test func theUpdatesItemNamesAReleaseWaitingForTheUser() {
+        #expect(MenuBarStatus.updatesTitle(pendingVersion: nil) == "Check for Updates…")
+        #expect(MenuBarStatus.updatesTitle(pendingVersion: "0.2.0") == "Update to 0.2.0…")
+    }
+
     // MARK: - Icon
 
     @Test func everyStateHasAnIconThatExists() {

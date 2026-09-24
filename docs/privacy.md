@@ -1,10 +1,16 @@
 # Privacy
 
 - Audio and transcripts never leave your Mac. There is no telemetry.
-- The only network traffic is to Hugging Face (huggingface.co and the download servers it
-  redirects to), to download the models on first launch, and on the next launch after you choose
-  a different model in Settings. Downloaded models are reused without contacting Hugging Face
-  again.
+- The app goes online for two things only:
+  - To download the models from Hugging Face (huggingface.co and the download servers it
+    redirects to), on first launch and on the next launch after you choose a different model in
+    Settings. Downloaded models are reused without contacting Hugging Face again.
+  - In a release downloaded from GitHub, to check for a new version: about once a day if you
+    allow it (the app asks on its second launch, and **Settings › General › Updates** changes
+    it), and whenever you choose **Check for Updates…**. The check reads a list of releases from
+    nerdstorm.github.io and sends nothing about you or your dictation, only what any web request
+    carries: your IP address, and the app's and Sparkle's versions. Updates download from
+    github.com. A build from source never checks.
 - **Dictation history is on by default.** Every completed dictation (what you said, the text
   inserted, the app, the cleanup level, whether and why cleanup fell back, how the text was
   delivered, and timings) is kept unencrypted in
