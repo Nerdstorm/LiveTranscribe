@@ -116,11 +116,18 @@ figure {
 }
 
 /* Window screenshots are 2x captures that include the macOS shadow on a transparent edge. */
-figure img {
+figure img,
+figure video {
   display: block;
   max-width: 100%;
   height: auto;
   margin: 0 auto;
+}
+
+/* A screen recording is cropped to part of a window, with no shadow, so it gets an edge. */
+figure video {
+  border: 1px solid var(--rule);
+  border-radius: 8px;
 }
 
 .lead {
