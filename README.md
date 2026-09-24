@@ -464,6 +464,9 @@ A field takes one line when it is a text field of the app's own window: an addre
 search box, a form field, an email's subject line. A text box in a web page, in a browser or an
 Electron app such as Slack, always counts as taking several lines, because browsers report
 message boxes as text fields too. Delete your setting for an app to go back to the built-in one.
+**Settings › Apps** lists built-in settings only for apps on your Mac; the rest are counted
+there and apply once the app is installed. Your own settings stay listed after their app is
+removed, so you can still delete them.
 
 In every app, whatever its settings:
 

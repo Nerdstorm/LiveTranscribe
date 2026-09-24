@@ -11,6 +11,10 @@ import Shared
 /// shows what applies: an entry from before line settings, with a method only, shows the app's
 /// built-in or default line setting, and saving it stores both.
 ///
+/// Built-in settings are listed only for apps on this Mac; the others are counted
+/// (``uninstalledBuiltInCount``) and apply once their app is installed. The user's settings are
+/// all listed, an uninstalled app's under its bundle identifier, so each can still be deleted.
+///
 /// Every change goes through ``AppOverridesStore/update(_:)``, which re-reads the file and
 /// changes only the one app in a single step on the store: writing the copy loaded when the tab
 /// opened would drop an entry added by hand since, and a separate read and write could lose one
@@ -23,8 +27,10 @@ final class AppOverridesModel {
 
     /// The user's settings, sorted by app name.
     private(set) var userRows: [AppOverrideRow] = []
-    /// The built-in settings, sorted by app name.
+    /// The built-in settings for apps on this Mac, sorted by app name.
     private(set) var builtInRows: [AppOverrideRow] = []
+    /// How many built-in settings are for apps that aren't on this Mac, which aren't listed.
+    private(set) var uninstalledBuiltInCount = 0
     /// Regular apps running now that don't have a setting of the user's, for the Add sheet.
     /// Refreshed by ``refreshRunningApps()``.
     private(set) var runningApps: [AppOverrideApp] = []
@@ -173,11 +179,13 @@ final class AppOverridesModel {
                 )
             }
             .sorted { Self.byName($0.app, $1.app) }
-        builtInRows = Self.apps(in: builtIn)
-            .map { key in
+        let builtInApps = Self.apps(in: builtIn).map { (key: $0, app: app(for: $0)) }
+        builtInRows = builtInApps
+            .filter(\.app.isInstalled)
+            .map { key, app in
                 AppOverrideRow(
                     bundleIdentifier: key,
-                    app: app(for: key),
+                    app: app,
                     method: builtIn.method(for: key) ?? .accessibility,
                     lineMode: builtIn.lineMode(for: key) ?? .multiLine,
                     source: .builtIn,
@@ -185,6 +193,7 @@ final class AppOverridesModel {
                 )
             }
             .sorted { Self.byName($0.app, $1.app) }
+        uninstalledBuiltInCount = builtInApps.count - builtInRows.count
     }
 
     /// Every bundle identifier with a setting of either kind in `overrides`.
@@ -193,7 +202,8 @@ final class AppOverridesModel {
     }
 
     /// How to show the app stored under `key`: its real name and icon when it is installed,
-    /// otherwise the identifier itself. The result always carries `key` as its identifier.
+    /// otherwise the identifier itself. The result always carries `key` as its identifier. Only
+    /// apps that were found are remembered, so one installed later is found on the next load.
     private func app(for key: String) -> AppOverrideApp {
         let found = appsByIdentifier[key] ?? catalog.app(bundleIdentifier: key)
         guard let found else { return .unresolved(key) }
