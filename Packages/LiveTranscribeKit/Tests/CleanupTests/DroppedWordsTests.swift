@@ -42,24 +42,18 @@ struct DroppedWordsTests {
         #expect(outputGuard.review(raw: raw, outcome: .completed(cleaned), options: medium) == .accepted(cleaned))
     }
 
-    @Test func highMayDeleteWordsWhenRewordingButNotANegation() {
-        let high = CleanupOptions(level: .high)
-        let cleaned = "We could meet at the cafe or the office."
-        #expect(outputGuard.review(raw: "we could meet at the cafe on the corner or at the office", outcome: .completed(cleaned), options: high)
-            == .accepted(cleaned))
-        #expect(outputGuard.review(raw: "i do not agree with that plan", outcome: .completed("I do agree with that plan."), options: high)
+    @Test func highMayDeleteARunOfFunctionWordsButNotANegation() {
+        let raw = "the demo of the new release for the sales team was really very good"
+        let cleaned = "The demo of the new release for the sales team was good."
+        #expect(outputGuard.review(raw: raw, outcome: .completed(cleaned), options: medium) == .rejected(.droppedWords(count: 2)))
+        #expect(outputGuard.review(raw: raw, outcome: .completed(cleaned), options: CleanupOptions(level: .high)) == .accepted(cleaned))
+        #expect(outputGuard.review(raw: "i do not agree with that plan", outcome: .completed("I do agree with that plan."), options: CleanupOptions(level: .high))
             == .rejected(.lostNegation))
     }
 
     @Test func aReplacementIsNotADeletion() {
-        #expect(droppedWords.droppedRun(raw: words("we need twenty five chairs"), cleaned: words("We need 25 chairs.")) == nil)
-        #expect(droppedWords.droppedRun(raw: words("email the nerd storm team"), cleaned: words("Email the Nerdstorm team.")) == nil)
-    }
-
-    @Test func gapsPairDeletionsWithWhatReplacedThem() {
-        let gaps = DroppedWords.gaps(raw: ["a", "b", "c", "d", "e"], cleaned: ["a", "x", "d", "e", "f"])
-        #expect(gaps.map(\.deleted) == [[1, 2], []])
-        #expect(gaps.map(\.inserted) == [1, 1])
+        #expect(droppedWords.droppedRun(in: WordAlignment(raw: words("we need twenty five chairs"), cleaned: words("We need 25 chairs."))) == nil)
+        #expect(droppedWords.droppedRun(in: WordAlignment(raw: words("email the nerd storm team"), cleaned: words("Email the Nerdstorm team."))) == nil)
     }
 
     @Test func fallbackReasonsDoNotRepeatWhatWasSaid() {

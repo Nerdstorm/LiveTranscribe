@@ -118,10 +118,13 @@ struct PromptProbeTests {
         correctionCues: [],
         fillers: [],
         negations: [],
+        functionWords: [],
         maxDroppedRun: .max,
+        maxDroppedContent: .max,
         maxRetractedWords: 0,
         minRespellingSimilarity: 1,
-        requiresIntactPlaceholders: false
+        requiresIntactPlaceholders: false,
+        requiresNamesInPlace: false
     ))
 
     @Test(.timeLimit(.minutes(10)))
@@ -219,6 +222,96 @@ struct PromptProbeTests {
             print("EMOJI \(intact.count)/\(emoji.count) \(punctuated.count) | \(raw) → \(cleaned)")
         }
         print("EMOJI SUMMARY kept \(kept)/\(total), punctuated \(repunctuated)")
+    }
+
+    /// Texts that invite High to reword: grammar slips, wordy phrasing, idioms and names.
+    static let rewordingCases = [
+        "me and him went to the store yesterday to get some milk",
+        "there is lots of reasons why we should of left earlier",
+        "i was wondering if you could maybe send me the report by friday",
+        "the thing is that we don't have enough time to finish the migration",
+        "in order to ship the release we need to fix the login bug first",
+        "the reason why the build failed is because the cache was stale",
+        "at the end of the day the customer just wants the app to work",
+        "each and every one of the tests needs to pass before we merge",
+        "we was going to call you but the meeting ran long",
+        "can you please kindly review the pull request when you get a chance",
+        "the team have decided that they are going to move the launch to March",
+        "i think that it would be good if we could have a meeting about the budget",
+        "so basically what happened was the server ran out of memory",
+        "she don't know about the new pricing yet",
+        "the data shows that less people are using the old dashboard",
+        "We need milk, eggs, and bread.",
+        "Tell Sam that the car is ready and that the keys are at the front desk.",
+        "our new office is bigger then the old one and it has more light",
+        "Hi John thanks for the update I will review it tomorrow cheers Sam.",
+        "please make sure that you remember to bring your laptop to the workshop",
+    ]
+
+    /// What the content and name checks turn away at High, the level that rewords. Cleans every
+    /// cleanup example in `Training/` and ``rewordingCases`` at High with nothing rejected (texts
+    /// without a correction cue, so each is one pass), then reviews each answer with the
+    /// production guard and with the guard as it was before those checks. Prints the answers
+    /// only the production guard rejects, to judge whether each one lost meaning.
+    @Test(.timeLimit(.minutes(60)))
+    func compareContentChecksAtHigh() async throws {
+        let cleaner = try await Self.loadCleaner(template: nil, outputGuard: Self.permissiveGuard)
+        let productionGuard = OutputGuard()
+        var before = OutputGuard.Policy.default
+        before.maxDroppedContent = .max
+        before.requiresNamesInPlace = false
+        let previousGuard = OutputGuard(policy: before)
+        let options = CleanupOptions(level: .high)
+
+        var rejectedOnlyNow = 0, rejectedOnlyBefore = 0, rejectedByBoth = 0, total = 0
+        for text in try Self.trainingCleanupTexts() + Self.rewordingCases.map({ (context: [String](), raw: $0) }) {
+            let input = CleanupExecutor.deterministicCleanup(of: text.raw, level: .high)
+            guard productionGuard.correctionCueCount(in: input) == 0 else { continue }
+            let segment = Segment(id: UUID(), sessionID: UUID(), startMs: 0, endMs: 1_000, rawText: text.raw)
+            let answer = await cleaner.clean(segment, context: text.context, options: options).cleanedText
+            let now = productionGuard.review(raw: input, outcome: .completed(answer), options: options)
+            let previously = previousGuard.review(raw: input, outcome: .completed(answer), options: options)
+            total += 1
+            switch (now, previously) {
+            case (.rejected, .accepted):
+                rejectedOnlyNow += 1
+                print("CONTENT \(Self.describe(now)) | \(input) → \(answer)")
+            case (.accepted, .rejected):
+                rejectedOnlyBefore += 1
+                print("CONTENT ACCEPTED NOW, \(Self.describe(previously)) BEFORE | \(input) → \(answer)")
+            case (.rejected, .rejected):
+                rejectedByBoth += 1
+            case (.accepted, .accepted):
+                break
+            }
+        }
+        print("CONTENT SUMMARY \(total) texts: \(rejectedOnlyNow) rejected only now, \(rejectedByBoth) by both, \(rejectedOnlyBefore) only before")
+    }
+
+    /// The raw text and context of every cleanup example in the package's `Training/` data:
+    /// the curated files, and the generated ones where they have been made.
+    private static func trainingCleanupTexts() throws -> [(context: [String], raw: String)] {
+        struct Example: Decodable {
+            let category: String
+            let context: [String]
+            let raw: String
+        }
+        let training = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "Training", directoryHint: .isDirectory)
+        let files = (FileManager.default.enumerator(at: training, includingPropertiesForKeys: nil)?.allObjects as? [URL] ?? [])
+            .filter { $0.pathExtension == "jsonl" && !$0.path.contains("/runs/") }
+            .sorted { $0.path < $1.path }
+        var seen = Set<String>()
+        var texts: [(context: [String], raw: String)] = []
+        for file in files {
+            for line in try String(contentsOf: file, encoding: .utf8).split(whereSeparator: \.isNewline) {
+                let example = try JSONDecoder().decode(Example.self, from: Data(line.utf8))
+                guard example.category == "cleanup", seen.insert(example.raw).inserted else { continue }
+                texts.append((example.context, example.raw))
+            }
+        }
+        return texts
     }
 
     /// The punctuation next to `token` in `text`, ignoring spaces: what the model put around it.

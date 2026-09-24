@@ -60,6 +60,17 @@ focus context, Command Mode, multilingual) is not started.
   and the guard accepted it. A letter needs a greeting at the start and a sign-off at the end;
   "Thanks", "Cheers", "Best" and "Love" count as sign-offs only before a name, so a chat message
   ("Hi John, can you send it? Thanks") is left alone.
+- **OutputGuard keeps names in place and content words in, at every level.** In a single-line
+  field there is no letter frame, and the model still moved the sign-off's name into the
+  greeting; at High, rewording was checked for length and similarity only, and dropped "milk"
+  from a shopping list. Now a name (a capitalised word that does not start a sentence) must stay
+  where it was said, or be respelled there, and a word that is not a function word ("the", "of",
+  "is", "really") may not be deleted with nothing in its place. Rewording may still replace,
+  reorder, respell and merge words, and write numbers as digits. Function words are a fixed list
+  rather than NLTagger's parts of speech: a list is deterministic and testable, and a tagger's
+  errors on unpunctuated speech would decide what counts as content. On 860 texts without a
+  correction cue, cleaned at High by the model, the two checks rejected only 2 answers the old
+  guard accepted, and both had changed the meaning.
 - **Spoken commands apply at every level, in dictation only**, like snippets: emoji by name,
   punctuation by name, "new line" and "new paragraph", and email and web addresses. They are
   words, not commands, after a determiner or possessive ("a question mark", "the fire emoji",
@@ -213,7 +224,9 @@ Changed slices:
 - **Cleanup**: `Prompt` becomes `PromptBuilder`: base rules + level rules + vocabulary +
   placeholder rule + prior context, each a separately tested function. `Cleaner.clean` takes
   `CleanupOptions` (level, vocabulary terms, placeholder tokens, multi-line). `OutputGuard`
-  takes the level's word-ratio bounds and rejects output that alters a placeholder.
+  takes the level's word-ratio bounds and rejects output that alters a placeholder, drops or
+  moves a name (`SpokenNames`) or leaves out a content word (`ContentWords`); those checks and
+  `DroppedWords` share one `WordAlignment` of the words said with the words returned.
   `PlaceholderAliases` shows the model a plain word for each token and swaps the tokens back
   before the guard. `CleanupExecutor` runs High in two passes when there is a correction cue
   (L3).
@@ -248,7 +261,8 @@ Hotkey up ───▶ discard if < 300 ms
              ─▶ LLM cleanup (level rules + vocabulary + placeholder rule + context), tokens
                 shown as words; High with a correction cue: Medium pass, then High pass;
                 skipped with OutputGuard when cleanup is off in Advanced (read at launch)
-             ─▶ OutputGuard (level bounds, placeholders intact) — else the pre-LLM text
+             ─▶ OutputGuard (level bounds, placeholders intact, names in place, no content
+                word left out) — else the pre-LLM text
              ─▶ line breaks and list markers put back and tidied; lists laid out
                 (Medium+, multi-line only); then snippets, emoji and addresses
              ─▶ insert at the cursor (AX, else paste, else clipboard + HUD)
@@ -367,30 +381,31 @@ microphone stay as they are.
   covered by unit tests rather than clips.
 - Prompt probe (`PromptProbeTests`, run with `TEST_RUNNER_LT_PROMPT_PROBE=1`): prints the
   model's answers for hard cases, and compares prompts, placeholder token formats and visible
-  emoji.
+  emoji. `compareContentChecksAtHigh` cleans every cleanup example in `Training/` at High and
+  prints the answers the name and content checks reject that the guard accepted before them.
 - Manual QA (needs a person): the F2 app list, full screen, multiple displays, light and dark,
   plugging in and removing microphones mid-dictation, a virtual default input.
 
 ### Eval results
 
 M4 Pro, macOS 27, synthetic speech (Samantha), latency = speech-to-text + cleanup
-(4231d63), 65 clips. Dictating into a multi-line field (`--multiline`):
+(9df55e4), 65 clips. Dictating into a multi-line field (`--multiline`):
 
 | Level | WER vs said | WER vs meant | Fallbacks | p50 | p95 | Laid out as meant |
 |---|---:|---:|---:|---:|---:|---:|
-| None | 10.9% | 20.1% | 0 | 33 ms | 64 ms | 57/65 |
-| Light | 11.3% | 19.6% | 1 | 163 ms | 329 ms | 57/65 |
-| Medium | 21.8% | 2.2% | 3 | 186 ms | 428 ms | 65/65 |
-| High | 21.8% | 2.2% | 3 | 212 ms | 431 ms | 65/65 |
+| None | 10.9% | 20.1% | 0 | 34 ms | 66 ms | 57/65 |
+| Light | 11.1% | 19.9% | 2 | 162 ms | 325 ms | 57/65 |
+| Medium | 21.8% | 2.2% | 3 | 185 ms | 423 ms | 65/65 |
+| High | 21.8% | 2.2% | 3 | 210 ms | 426 ms | 65/65 |
 
 Into a single-line field:
 
 | Level | WER vs said | WER vs meant | Fallbacks | p50 | p95 |
 |---|---:|---:|---:|---:|---:|
-| None | 10.9% | 20.1% | 0 | 34 ms | 63 ms |
-| Light | 11.3% | 19.6% | 1 | 164 ms | 328 ms |
-| Medium | 20.6% | 5.0% | 3 | 186 ms | 428 ms |
-| High | 21.2% | 3.8% | 2 | 214 ms | 430 ms |
+| None | 10.9% | 20.1% | 0 | 35 ms | 67 ms |
+| Light | 11.1% | 19.9% | 2 | 174 ms | 353 ms |
+| Medium | 20.2% | 5.0% | 5 | 199 ms | 457 ms |
+| High | 20.2% | 5.0% | 5 | 232 ms | 441 ms |
 
 Every level is well under the p95 target of 1.2 s. At Medium and High all 12 self-corrections
 and all 10 filler clips come out as meant, and in a multi-line field every list and letter is
@@ -401,16 +416,23 @@ what was meant, one fallback).
 The fallbacks:
 - "I've attached the invoice and the signed agreement." at Medium and High: the adapter
   mistakes a plain sentence for a correction.
-- Two lists at Medium and High, multi-line: the model rewrote the bulleted one (similarity
-  0.58) and dropped an item from the numbered one. The uncleaned text is still laid out.
-- In a single-line field, the bulleted list at Medium (the model dropped the words "bullet
-  point", which are not commands there) and the whole passport letter at Medium and High (the
-  model changed more than the self-correction).
+- Two lists at Medium and High, multi-line: the model rewrote the bulleted one, dropping three
+  of its words, and dropped an item from the numbered one. The uncleaned text is still laid out.
+- In a single-line field, where lists are not laid out, both lists at Medium and High: the model
+  dropped the words "bullet point" or "number", which are not commands there, to lay the list
+  out itself. At Light it did the same to the numbered list in both kinds of field.
+- In a single-line field, the passport letter at Medium and High (the model changed more than
+  the self-correction), and "hi John … cheers Sam" at Medium and High, which the model turned
+  into "Hi Sam, … Cheers."; in a multi-line field the letter frame keeps the names where they
+  were said.
 - The passport letter at Light, where resolving the correction is not allowed.
 
-In a single-line field the model also turned "hi John … cheers Sam" into "Hi Sam, … Cheers."
-and the guard accepted it (ledger LiveTranscribe-0103); in a multi-line field the letter frame
-keeps the names where they were said.
+The name and content checks (9df55e4) added the fallbacks for the numbered list, the bulleted
+list at High and the letter with the moved name; before them OutputGuard accepted those outputs
+(ledger LiveTranscribe-0103, LiveTranscribe-0104). In a single-line field that raises High's
+WER against what was meant from 3.8% to 5.0%, since the lists the model had numbered itself now
+come out as said. Every other output is unchanged, and so is latency: two passes in opposite
+orders put the difference within run-to-run variation.
 
 The time from releasing the key to the text appearing adds the recorder stop and insertion, a
 few milliseconds each, which the controller logs.

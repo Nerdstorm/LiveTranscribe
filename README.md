@@ -383,13 +383,19 @@ each build: grant them once more after switching, and they survive every rebuild
   with a colon, and items keep their full stops only if every item is a sentence of four words
   or more. No other words change. Lists and letters are laid out only in multi-line text areas
   (fields macOS reports as a text area).
-- OutputGuard checks every output of the model. If the output is empty or chatty, drops a
-  correction cue without a genuine self-correction, deletes a run of spoken words (below High),
-  drops a negation, alters a placeholder (for a snippet, emoji, address, line break or list
-  marker), changes the word count or the text too much, or takes longer than 3 s (**Timeout** in
-  **Settings › Advanced**), the uncleaned text is used instead, with fillers still removed and
-  lists and letters still laid out. In dictation this is silent:
-  **Dictation History** shows it and the reason, if history is on.
+- OutputGuard checks every output of the model. The uncleaned text is used instead, with fillers
+  still removed and lists and letters still laid out, if the output:
+  - is empty or chatty;
+  - drops a correction cue without a genuine self-correction;
+  - deletes a run of spoken words (below High);
+  - leaves out a word that carries meaning, at any level ("milk" from "milk, eggs and bread"):
+    rewording may replace, reorder or respell words, but not drop them;
+  - drops or moves a name ("hi John … cheers Sam" → "Hi Sam, … Cheers."), or drops a negation;
+  - alters a placeholder (for a snippet, emoji, address, line break or list marker);
+  - changes the word count or the text too much;
+  - or takes longer than 3 s (**Timeout** in **Settings › Advanced**).
+
+  In dictation this is silent: **Dictation History** shows it and the reason, if history is on.
 - With **Clean up transcripts with the LLM** off in **Settings › Advanced**, nothing is reworded.
   In dictation, Medium and High still remove fillers and lay out lists and letters, and
   snippets, vocabulary and spoken commands still apply; the live transcript shows the raw text.
@@ -704,10 +710,10 @@ Last run, on an M4 Pro with macOS 27 and synthetic speech, with `--multiline`:
 
 | Level | WER vs said | WER vs meant | Fallbacks | p50 (ms) | p95 (ms) | Laid out as meant |
 |---|---:|---:|---:|---:|---:|---:|
-| None | 10.9% | 20.1% | 0 | 33 | 64 | 57/65 |
-| Light | 11.3% | 19.6% | 1 | 163 | 329 | 57/65 |
-| Medium | 21.8% | 2.2% | 3 | 186 | 428 | 65/65 |
-| High | 21.8% | 2.2% | 3 | 212 | 431 | 65/65 |
+| None | 10.9% | 20.1% | 0 | 34 | 66 | 57/65 |
+| Light | 11.1% | 19.9% | 2 | 162 | 325 | 57/65 |
+| Medium | 21.8% | 2.2% | 3 | 185 | 423 | 65/65 |
+| High | 21.8% | 2.2% | 3 | 210 | 426 | 65/65 |
 
 Medium resolved all 12 self-corrections and removed the fillers from all 10 filler clips, and
 Medium and High laid out every list and letter. WER against what was said counts each spoken
@@ -720,14 +726,17 @@ inserted:
 - The same plain sentence at Medium and High ("I've attached the invoice and the signed
   agreement."): the self-correction adapter changed a sentence that had nothing to correct
   (three spoken words dropped at Medium; similarity 0.48, below the floor, at High).
-- Two spoken lists at Medium and High: the model rewrote a bulleted list and dropped an item
-  from a numbered one. The uncleaned text was still laid out as meant.
-- The long letter at Light, where the model resolved its self-correction although Light keeps
-  every word.
+- Two spoken lists at Medium and High: the model rewrote a bulleted list, dropping three of its
+  words, and dropped an item from a numbered one. The uncleaned text was still laid out as meant.
+- Two clips at Light, which keeps every word: the long letter, where the model resolved its
+  self-correction, and the numbered list, where it dropped the spoken word "number" to number the
+  items itself.
 
-Without `--multiline` (a single-line field), Medium falls back on 3 clips and High on 2, and a
-letter is cleaned as a whole. The longest clip is about 40 words, so these numbers say nothing
-about long dictations.
+Without `--multiline` (a single-line field), where lists are not laid out, Light falls back on 2
+clips and Medium and High on 5 each. The model drops "number" or "bullet point" to lay a list
+out itself, and it moves the name in a letter's sign-off into the greeting; a letter is cleaned
+as a whole there. The longest clip is about 40 words, so these numbers say nothing about long
+dictations.
 
 ## Training the adapter
 
@@ -820,20 +829,21 @@ More decisions, and the assumptions behind them, are in [docs/dictation.md](docs
   cleanup that drops a correction cue ("sorry", "I mean", "no", "wait", "actually", "scratch
   that", …) unless the only words it removed were up to six retracted words before that cue, the
   cue itself, fillers such as "um", and immediately repeated words; and cleanup that keeps every
-  cue may not delete a run of spoken words or a negation. A correction that moves a word rather
-  than deleting it ("Tell Yasmin, or rather, Victor" → "Tell Victor, or rather,") can still get
-  through.
+  cue may not delete a run of spoken words, a word that carries meaning or a negation, or move a
+  name.
 - The self-correction adapter occasionally rewrites a plain sentence (1 of 65 eval clips);
   OutputGuard catches it and inserts the raw transcript instead of the cleaned text. In
   dictation such a fallback is silent: only **Dictation History** shows it, if history is on.
 - Spoken lists are laid out only when you say their markers ("first…", "number one…", "bullet
   point…"), and lists and letters only in multi-line text areas. The model sometimes drops or
   rewrites a list item; OutputGuard then inserts your words, still laid out.
-- In a single-line field a letter is cleaned as a whole, and the model can move the name in the
-  sign-off into the greeting ("hi John … cheers Sam" → "Hi Sam, … Cheers."). OutputGuard does
-  not catch that yet.
-- At **High**, rewording is checked for length and similarity but not for dropped words, so it
-  can leave out a word you said.
+- In a single-line field a letter is cleaned as a whole, and the model sometimes moves the name
+  in the sign-off into the greeting ("hi John … cheers Sam" → "Hi Sam, … Cheers."). OutputGuard
+  rejects that, so your words are inserted uncleaned.
+- OutputGuard catches a word left out and a name moved, but not a word replaced by a different
+  one ("milk" → "cream", "three" → "4") unless it is a name. Words that only hold a sentence
+  together ("the", "of", "really") may still be dropped. Names are recognised by the capital
+  letter speech-to-text gives them.
 - The floating panel sits next to the cursor, and a leading space is added, only in apps that
   report their text through Accessibility. Elsewhere the panel appears near the bottom of the
   screen and no space is added.
