@@ -86,7 +86,6 @@ public struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480)
     }
 
     private func restoreDefaults() {

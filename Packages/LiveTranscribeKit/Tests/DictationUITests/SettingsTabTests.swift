@@ -1,3 +1,4 @@
+import AppKit
 @testable import DictationUI
 import Testing
 
@@ -8,5 +9,11 @@ struct SettingsTabTests {
             #expect(!tab.title.isEmpty)
             #expect(!tab.systemImage.isEmpty)
         }
+    }
+
+    @Test(arguments: SettingsTab.allCases)
+    func everyIconIsASymbol(_ tab: SettingsTab) {
+        // A misspelt symbol leaves the tab's toolbar button without an icon.
+        #expect(NSImage(systemSymbolName: tab.systemImage, accessibilityDescription: nil) != nil)
     }
 }

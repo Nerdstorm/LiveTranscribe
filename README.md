@@ -529,14 +529,14 @@ macOS's microphone indicator then stays on while the app runs.
 
 ### Settings
 
-**Settings** (⌘, or the menu bar) has seven tabs:
+**Settings** (⌘, or the menu bar) has seven tabs, along the top of its window:
 
 | Tab | What it holds |
 |---|---|
 | **General** | **Enable dictation**, the shortcuts, the cleanup level, the microphone, **Keep the microphone ready**, and **Timing**: 13 controls for gestures, recording limits, undo, messages, pasting, Accessibility and vocabulary |
 | **Snippets** | trigger phrases and the text they insert |
 | **Vocabulary** | names and jargon, with how they are spoken |
-| **Apps** | the insertion method per app |
+| **Apps** | per app, how text goes in (Accessibility or paste) and whether it takes line breaks |
 | **History** | dictation history on or off, retention, clearing |
 | **Permissions** | microphone and Accessibility status, with buttons that open the right System Settings pane, and **Reopen Live Transcribe** when macOS won't let it paste until it reopens |
 | **Advanced** | for dictation and the live transcript: the speech-to-text and cleanup models, **Clean up transcripts with the LLM**, **Resolve spoken self-corrections**, the cleanup **Timeout**, the GPU cache and capture restarts; for the live transcript only: the voice-activity model, silence, speech threshold, pre-roll and minimum speech, maximum segment length, live partials, context segments and queue capacity |

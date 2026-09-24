@@ -3,10 +3,11 @@ import Shared
 
 /// Which Settings tab is showing.
 ///
-/// The app keeps one for the Settings window, and the window's tab view is bound to it. Asking
-/// for a tab from elsewhere (History's *History Settings…*, setup's *Choose Another Shortcut…*,
-/// General's *Open Permissions*) changes only the selection. The window keeps its view, and with
-/// it every tab's state, including an editor sheet and its unsaved draft.
+/// The app keeps one for the Settings window, whose toolbar follows it (see
+/// ``SettingsTabViewController``). Asking for a tab from elsewhere (History's *History
+/// Settings…*, setup's *Choose Another Shortcut…*, General's *Open Permissions*) changes only the
+/// selection. The window keeps its panes, and with them every tab's state, including an editor
+/// sheet and its unsaved draft.
 @MainActor
 @Observable
 public final class SettingsNavigation {

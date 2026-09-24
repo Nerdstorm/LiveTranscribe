@@ -41,12 +41,13 @@ final class WindowPresenter: NSObject, DictationWindowActions, NSWindowDelegate 
         }
     }
 
-    /// Only the tab changes on a window that is already open. Its view is never replaced, so an
-    /// editor sheet and its unsaved draft survive.
+    /// Only the tab changes on a window that is already open. Its content is never replaced, so
+    /// an editor sheet and its unsaved draft survive. The window is titled with the pane showing
+    /// and sized to it by its content (see ``SettingsTabViewController``).
     func showSettings(tab: SettingsTab?) {
         settingsNavigation.show(tab, sheetIsOpen: windows[.settings]?.attachedSheet != nil)
-        present(.settings, title: "Settings", size: nil, resizable: false) {
-            SettingsRootView(context: context, navigation: settingsNavigation)
+        present(.settings, title: nil, size: nil, resizable: false) {
+            SettingsTabViewController(context: context, navigation: settingsNavigation)
         }
     }
 
@@ -60,7 +61,7 @@ final class WindowPresenter: NSObject, DictationWindowActions, NSWindowDelegate 
 
     // MARK: - Windows
 
-    /// Brings the window of this kind forward, creating it the first time.
+    /// Brings the window of this kind forward, creating it the first time around `content`.
     private func present<Content: View>(
         _ kind: Kind,
         title: String,
@@ -68,7 +69,20 @@ final class WindowPresenter: NSObject, DictationWindowActions, NSWindowDelegate 
         resizable: Bool,
         content: () -> Content
     ) {
-        let window = windows[kind] ?? makeWindow(kind, title: title, size: size, resizable: resizable, content: content())
+        present(kind, title: title, size: size, resizable: resizable) { NSHostingController(rootView: content()) }
+    }
+
+    /// Brings the window of this kind forward, creating it the first time around the view
+    /// controller `makeController` makes. With no `title`, the controller titles the window.
+    private func present(
+        _ kind: Kind,
+        title: String?,
+        size: NSSize?,
+        resizable: Bool,
+        makeController: () -> NSViewController
+    ) {
+        let window = windows[kind]
+            ?? makeWindow(kind, title: title, size: size, resizable: resizable, controller: makeController())
         windows[kind] = window
         if NSApp.activationPolicy() != .regular {
             NSApp.setActivationPolicy(.regular)
@@ -77,15 +91,17 @@ final class WindowPresenter: NSObject, DictationWindowActions, NSWindowDelegate 
         window.makeKeyAndOrderFront(nil)
     }
 
-    private func makeWindow<Content: View>(
+    private func makeWindow(
         _ kind: Kind,
-        title: String,
+        title: String?,
         size: NSSize?,
         resizable: Bool,
-        content: Content
+        controller: NSViewController
     ) -> NSWindow {
-        let window = NSWindow(contentViewController: NSHostingController(rootView: content))
-        window.title = title
+        let window = NSWindow(contentViewController: controller)
+        if let title {
+            window.title = title
+        }
         window.styleMask = resizable
             ? [.titled, .closable, .miniaturizable, .resizable]
             : [.titled, .closable]
