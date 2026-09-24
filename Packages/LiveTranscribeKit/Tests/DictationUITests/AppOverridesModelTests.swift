@@ -43,7 +43,7 @@ struct AppOverridesModelTests {
         return (AppOverridesModel(store: store, catalog: catalog, builtIn: Self.builtIn), store)
     }
 
-    @Test func builtInSettingsAreListedByNameWithUnknownAppsShownByIdentifier() async {
+    @Test func builtInSettingsAreListedByNameOnlyForAppsOnThisMac() async {
         let folder = EditableListTemporaryFolder()
         defer { folder.cleanUp() }
         let (model, _) = makeModel(in: folder)
@@ -52,21 +52,64 @@ struct AppOverridesModelTests {
 
         #expect(model.status.loadState == .loaded)
         #expect(model.userRows.isEmpty)
-        #expect(model.builtInRows.map(\.app.name) == ["Google Chrome", "io.alacritty", "Terminal"])
+        // io.alacritty isn't installed, so it is counted rather than listed by its identifier.
+        #expect(model.builtInRows.map(\.app.name) == ["Google Chrome", "Terminal"])
         #expect(model.builtInRows.allSatisfy { $0.method == .paste && $0.source == .builtIn && !$0.isReplacedByUser })
-        #expect(model.builtInRows.map(\.lineMode) == [.multiLine, .singleLine, .singleLine])
-        #expect(model.builtInRows.first { $0.bundleIdentifier == "io.alacritty" }?.app.isInstalled == false)
+        #expect(model.builtInRows.map(\.lineMode) == [.multiLine, .singleLine])
+        #expect(model.uninstalledBuiltInCount == 1)
     }
 
-    @Test func theRealBuiltInListIsShownByDefault() async {
+    @Test func theRealBuiltInListIsUsedByDefault() async {
         let folder = EditableListTemporaryFolder()
         defer { folder.cleanUp() }
-        let store = AppOverridesStore(fileURL: folder.file(Self.fileName))
-        let model = AppOverridesModel(store: store, catalog: FakeAppCatalog(installed: []))
+        let bundled = Set(AppOverrides.bundled.methods.keys).union(AppOverrides.bundled.lines.keys)
+        let everything = bundled.map { AppOverrideApp(bundleIdentifier: $0, name: $0, url: URL(fileURLWithPath: "/Applications/\($0).app")) }
 
+        let onAMacWithAll = AppOverridesModel(store: AppOverridesStore(fileURL: folder.file(Self.fileName)), catalog: FakeAppCatalog(installed: everything))
+        await onAMacWithAll.load()
+        #expect(Set(onAMacWithAll.builtInRows.map(\.bundleIdentifier)) == bundled)
+        #expect(onAMacWithAll.uninstalledBuiltInCount == 0)
+
+        let onAMacWithNone = AppOverridesModel(store: AppOverridesStore(fileURL: folder.file(Self.fileName)), catalog: FakeAppCatalog(installed: []))
+        await onAMacWithNone.load()
+        #expect(onAMacWithNone.builtInRows.isEmpty)
+        #expect(onAMacWithNone.uninstalledBuiltInCount == bundled.count)
+    }
+
+    @Test func aBuiltInAppInstalledLaterIsListedOnTheNextLoad() async {
+        let folder = EditableListTemporaryFolder()
+        defer { folder.cleanUp() }
+        let catalog = FakeAppCatalog(installed: [Self.terminal, Self.chrome])
+        let (model, _) = makeModel(in: folder, catalog: catalog)
+        await model.load()
+        #expect(model.uninstalledBuiltInCount == 1)
+
+        let alacritty = AppOverrideApp(bundleIdentifier: "io.alacritty", name: "Alacritty", url: URL(fileURLWithPath: "/Applications/Alacritty.app"))
+        catalog.installed[alacritty.bundleIdentifier] = alacritty
         await model.load()
 
-        #expect(Set(model.builtInRows.map(\.bundleIdentifier)) == Set(AppOverrides.bundled.methods.keys))
+        #expect(model.builtInRows.map(\.app.name) == ["Alacritty", "Google Chrome", "Terminal"])
+        #expect(model.uninstalledBuiltInCount == 0)
+    }
+
+    @Test func aSettingOfYoursStaysListedAfterItsAppIsGone() async throws {
+        // It still applies if the app comes back, and the user must be able to delete it.
+        let folder = EditableListTemporaryFolder()
+        defer { folder.cleanUp() }
+        let (model, store) = makeModel(in: folder)
+        try await store.save(AppOverrides(methods: ["io.alacritty": .accessibility], lines: ["io.alacritty": .multiLine]))
+        await model.load()
+
+        let row = try #require(model.userRows.first)
+        #expect(row.bundleIdentifier == "io.alacritty")
+        #expect(row.app.name == "io.alacritty")
+        #expect(!row.app.isInstalled)
+        #expect(!model.builtInRows.contains { $0.bundleIdentifier == "io.alacritty" })
+        #expect(model.uninstalledBuiltInCount == 1)
+
+        #expect(await model.delete(bundleIdentifier: row.bundleIdentifier))
+        #expect(model.userRows.isEmpty)
+        #expect(try await store.load() == .empty)
     }
 
     @Test func aUserSettingForABuiltInAppWinsAndTheBuiltInRowSaysSo() async throws {
@@ -339,5 +382,16 @@ struct AppOverridesModelTests {
         for mode in LineMode.allCases {
             #expect(!AppOverrideLineText.summary(mode).isEmpty)
         }
+    }
+
+    @Test func theNoteCountsTheBuiltInSettingsThatArentListed() {
+        #expect(AppOverrideBuiltInText.uninstalledNote(uninstalled: 0, listed: 3) == nil)
+        #expect(AppOverrideBuiltInText.uninstalledNote(uninstalled: 1, listed: 2)
+            == "1 more app has a built-in setting that applies once it\u{2019}s installed.")
+        #expect(AppOverrideBuiltInText.uninstalledNote(uninstalled: 15, listed: 3)
+            == "15 more apps have a built-in setting that applies once they\u{2019}re installed.")
+        // With none listed above it, there is nothing for "more" to add to.
+        #expect(AppOverrideBuiltInText.uninstalledNote(uninstalled: 18, listed: 0)
+            == "18 apps have a built-in setting that applies once they\u{2019}re installed.")
     }
 }

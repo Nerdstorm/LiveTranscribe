@@ -64,3 +64,16 @@ enum AppOverrideLineText {
         }
     }
 }
+
+/// What the Apps tab says about the built-in settings it doesn't list.
+enum AppOverrideBuiltInText {
+    /// The note under the built-in settings about the `uninstalled` ones for apps that aren't on
+    /// this Mac, or `nil` when there are none. `listed` is how many are shown above it.
+    static func uninstalledNote(uninstalled: Int, listed: Int) -> String? {
+        guard uninstalled > 0 else { return nil }
+        let more = listed > 0 ? " more" : ""
+        return uninstalled == 1
+            ? "1\(more) app has a built-in setting that applies once it\u{2019}s installed."
+            : "\(uninstalled)\(more) apps have a built-in setting that applies once they\u{2019}re installed."
+    }
+}

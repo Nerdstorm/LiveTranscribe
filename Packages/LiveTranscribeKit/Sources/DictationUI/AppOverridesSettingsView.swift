@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Settings › Apps: how dictated text gets into particular apps, and whether it may break
-/// across lines there. Shows the built-in settings read-only and edits the user's own in
-/// `insertion-overrides.json` through the context's ``AppOverridesStore``.
+/// across lines there. Shows the built-in settings for apps on this Mac read-only, and edits the
+/// user's own in `insertion-overrides.json` through the context's ``AppOverridesStore``.
 public struct AppOverridesSettingsView: View {
     private static let explanation = """
         Dictated text is typed in through Accessibility, or pasted where an app doesn\u{2019}t accept \
@@ -42,6 +42,14 @@ public struct AppOverridesSettingsView: View {
                     Section("Built in") {
                         ForEach(model.builtInRows) { row in
                             AppOverrideRowView(row: row)
+                        }
+                        if let note = AppOverrideBuiltInText.uninstalledNote(
+                            uninstalled: model.uninstalledBuiltInCount,
+                            listed: model.builtInRows.count
+                        ) {
+                            Text(note)
+                                .foregroundStyle(.secondary)
+                                .selectionDisabled()
                         }
                     }
                 }
