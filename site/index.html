@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live Transcribe: private dictation for your Mac</title>
+  <meta name="description" content="Hold fn, speak and let go. Live Transcribe types what you said at your cursor in almost any app, cleaned up, and runs entirely on your Mac. Free and open source.">
+  <meta name="color-scheme" content="light">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Live Transcribe">
+  <meta property="og:description" content="Private dictation for your Mac. Hold fn, speak and let go: the text appears at your cursor, cleaned up. Runs entirely on your Mac.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="wordmark" href="./">
+      <img src="favicon.svg" alt="" width="24" height="24">
+      Live Transcribe
+    </a>
+    <a href="https://github.com/Nerdstorm/LiveTranscribe">GitHub</a>
+  </header>
+
+  <main>
+    <section class="intro">
+      <h1>Private dictation for your Mac</h1>
+      <p class="lead">
+        Hold <kbd>fn</kbd>, speak and let go. Live Transcribe types what you said at your cursor,
+        in almost any app, with the “um”s removed and the punctuation fixed. Speech recognition
+        and cleanup run on your Mac, so what you say never leaves it.
+      </p>
+      <p>
+        <a class="download" href="https://github.com/Nerdstorm/LiveTranscribe/releases/latest">Download for Mac</a>
+      </p>
+      <p class="meta">Free and open source · Apple silicon · macOS 14 or later</p>
+    </section>
+
+    <section aria-labelledby="examples">
+      <h2 id="examples">What you say, and what it types</h2>
+      <table class="examples">
+        <thead>
+          <tr><th scope="col">You say</th><th scope="col">It types</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Um, I think we should, uh, push the launch by a week</td><td>I think we should push the launch by a week.</td></tr>
+          <tr><td>Let’s meet on Monday, no wait, Tuesday</td><td>Let’s meet on Tuesday.</td></tr>
+          <tr><td>The budget is fifty thousand, I mean sixty thousand</td><td>The budget is 60,000.</td></tr>
+          <tr><td>So, uh, what time does the, um, the train leave</td><td>So, what time does the train leave?</td></tr>
+        </tbody>
+      </table>
+      <p class="note">Outputs from the dictation test set (synthetic speech) at the default cleanup level.</p>
+    </section>
+
+    <section aria-labelledby="features">
+      <h2 id="features">What it does</h2>
+      <ul class="features">
+        <li>Works in almost any app: email, chat, documents, browsers, code editors and terminals.</li>
+        <li>Removes filler words and fixes punctuation and capitals.</li>
+        <li>Follows your corrections: “Monday, no wait, Tuesday” becomes “Tuesday”.</li>
+        <li>Inserts saved text when you say its phrase, such as “my calendar link”.</li>
+        <li>Spells your names and jargon correctly once you add them.</li>
+        <li>Puts back exactly what you said if you press <kbd>⌃</kbd><kbd>⌥</kbd><kbd>Z</kbd> within 30 seconds.</li>
+        <li>Listens hands-free when you double-tap the key, until you tap it once more.</li>
+        <li>Lets you choose how much it edits: None, Light, Medium or High.</li>
+        <li>Shows a live transcript as you speak, for longer sessions.</li>
+        <li>Recognises and cleans up a sentence in about 0.2 seconds on an M4 Pro.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="privacy">
+      <h2 id="privacy">Stays on your Mac</h2>
+      <p>
+        Speech recognition and cleanup run locally with Apple’s MLX. There is no account, no cloud
+        service and no telemetry. The app goes online only to download its models from Hugging Face
+        on first launch, and works offline after that. Your dictation history is kept on your Mac,
+        and you can turn it off.
+      </p>
+    </section>
+
+    <section aria-labelledby="install">
+      <h2 id="install">Install</h2>
+      <ol class="steps">
+        <li>Download the latest release from GitHub and move Live Transcribe to your Applications folder.</li>
+        <li>Open it. Setup walks you through microphone access, Accessibility and the fn key setting, while the speech models (about 3.5 GB) download.</li>
+        <li>When the menu bar icon shows it’s ready, hold <kbd>fn</kbd> in any app and speak.</li>
+      </ol>
+      <p class="note">
+        If macOS says it can’t verify the app, open System Settings › Privacy &amp; Security and
+        click Open Anyway. You can also
+        <a href="https://github.com/Nerdstorm/LiveTranscribe#build-and-run">build it from source</a>.
+      </p>
+    </section>
+
+    <section aria-labelledby="requirements">
+      <h2 id="requirements">Requirements</h2>
+      <ul>
+        <li>A Mac with Apple silicon</li>
+        <li>macOS 14 or later (tested on macOS 27)</li>
+        <li>About 3.5 GB of disk space for the models, and about 3 GB of memory while running</li>
+        <li>English speech</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      Live Transcribe is free and open source under the
+      <a href="https://github.com/Nerdstorm/LiveTranscribe/blob/main/LICENSE">MIT License</a>.
+      Source code, issues and releases are
+      <a href="https://github.com/Nerdstorm/LiveTranscribe">on GitHub</a>.
+    </p>
+    <p>
+      Speech recognition uses NVIDIA’s Parakeet and cleanup uses Qwen3, both run with MLX.
+      <a href="https://github.com/Nerdstorm/LiveTranscribe#models-and-credits">Models and credits</a>.
+    </p>
+    <p>© 2026 Nerdstorm</p>
+  </footer>
+</body>
+</html>
