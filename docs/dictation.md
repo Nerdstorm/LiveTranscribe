@@ -19,6 +19,9 @@ focus context, Command Mode, multilingual) is not started.
 | H1 | Default hotkey: Fn (🌐), changeable in Settings. Settings open from the menu bar. | Owner |
 | H2 | History is on by default and keeps everything until turned off or given a retention limit. It stays on this Mac and is never synced. | Owner |
 | M1 | With **System Default** selected, capture follows macOS's default input as it changes, including mid-session, so a newly connected microphone (which macOS usually makes the default) is picked up without a restart. Virtual and aggregate devices are never followed automatically. | Owner |
+| L1 | The structure of a dictation (a list, a letter) is found and laid out by deterministic rules; the D5 model only cleans the words. A new structure is one more rule in `Layout`. | Owner |
+| L2 | List items keep the speaker's words: layout moves and punctuates, never rewords. | Owner |
+| L3 | At High, a dictation with a correction cue is cleaned in two passes: Medium's prompt, which the adapter was trained on, resolves the correction, then High's rewords the result within the same deadline. A rejected rewording keeps the first pass, which is not a fallback. D5 stands. | Owner |
 
 ### Assumptions made without the owner (review these)
 
@@ -49,8 +52,25 @@ focus context, Command Mode, multilingual) is not started.
 - **A chosen microphone that disconnects** falls back to the system default with a notice
   (the handoff's F6), replacing the old behaviour of stopping capture.
 - **Fillers are removed deterministically** (um, uh, er, …) before the LLM at Medium and High,
-  and **spoken lists are formatted deterministically** after it, only for multi-line fields.
+  and **spoken lists are laid out deterministically** after it, only for multi-line fields.
   A 1.7B model does neither reliably, and a rule can be tested exhaustively.
+- **A letter's greeting and sign-off are laid out before the model runs**, and only the body is
+  cleaned. Layout was planned to run after cleanup (L1), but given a whole letter the model moved
+  the name in the sign-off into the greeting ("Hi John … cheers Sam" became "Hi Sam, … Cheers.")
+  and the guard accepted it. A letter needs a greeting at the start and a sign-off at the end;
+  "Thanks", "Cheers", "Best" and "Love" count as sign-offs only before a name, so a chat message
+  ("Hi John, can you send it? Thanks") is left alone.
+- **Spoken commands apply at every level, in dictation only**, like snippets: emoji by name,
+  punctuation by name, "new line" and "new paragraph", and email and web addresses. They are
+  words, not commands, after a determiner or possessive ("a question mark", "the fire emoji",
+  "Apple's new line"). "Period", "colon" and "dash" never are commands. The user's snippets are
+  matched first, so a snippet with the same words replaces a built-in command.
+- **"Fireworks" is 🎆** (Unicode FIREWORKS); 🎇 is FIREWORK SPARKLER, said "sparkler". A
+  snippet can remap either.
+- **The cleanup model sees each placeholder as a word** ("S1"), not the bracketed token. The
+  prompt probe showed it stripping or dropping `⟦S1⟧` in 17 of 23 sentences, so snippets had
+  mostly been falling back at Medium; as words, 21 of 23 survived. It punctuates the words like
+  names, so dictation drops commas next to an emoji that the speaker did not say.
 - **High** allows light rewording for grammar. On a 1.7B model it behaves close to Medium; real
   restructuring would need a larger model, which D5 rules out.
 - **The `Dictionary/` slice is named `Vocabulary`**, because a module called `Dictionary` would
@@ -71,9 +91,10 @@ focus context, Command Mode, multilingual) is not started.
 - **Undo AI edit** works only between dictations, never during one.
 - **Undo AI edit puts back the uncleaned text, not the literal transcript.** F3 says undo
   "swaps to the raw transcript"; it is read as "the text before cleanup". Everything cleanup
-  changed is taken back (fillers, punctuation, casing, rewording, list formatting), but snippet
-  expansions and vocabulary spellings stay: the user set those up, and turning a snippet back
-  into its spoken trigger would not help anyone. History keeps the literal transcript.
+  changed is taken back (fillers, punctuation, casing, rewording, layout, and spoken list
+  markers go back to the words said), but snippet expansions, spoken commands and vocabulary
+  spellings stay: the user set those up or asked for them, and turning a snippet back into its
+  spoken trigger would not help anyone. History keeps the literal transcript.
 - **Undo after a paste checks the field, not what it holds.** A paste records no range, and
   reading a field's whole value after every paste would block on large fields (a terminal's
   scrollback) and misfire where the app changes the value by itself (live terminal output,
@@ -144,8 +165,8 @@ focus context, Command Mode, multilingual) is not started.
   it loads.
   The interval is not shown in Settings.
 - **Cleanup turned off in Advanced is a choice, not a failure.** Like the model, the switch is
-  read at launch. Without the model, Medium and High still remove fillers and format spoken
-  lists, nothing is reworded, and dictations are not marked *Cleanup didn't apply*; the live
+  read at launch. Without the model, Medium and High still remove fillers and lay out spoken
+  lists and letters, nothing is reworded, and dictations are not marked *Cleanup didn't apply*; the live
   transcript shows the raw text. General's cleanup note describes the switches in effect since
   launch and says when a change in Advanced waits for a restart.
 - **The Accessibility prompt is remembered for the launch** by setup and Settings alike: macOS
@@ -170,24 +191,32 @@ New package targets (vertical slices), each with its own test target:
 
 | Target | Owns | Depends on |
 |---|---|---|
-| `Styles` | `FillerRemover`, `ListFormatter`: the deterministic rules the levels turn on | Shared |
+| `Styles` | `FillerRemover`, and `Layout` with its rules: `LetterFrame` (before cleanup), `MarkedListLayout` and `OrdinalListLayout` (after), `ListMarkerCommand`, `ListStyle`, `ListFormatter` | Shared |
+| `SpokenCommands` | `EmojiCommand` (with `EmojiNames`), `PunctuationCommand`, `LineBreakCommand`, `AddressCommand`: phrase matchers for commands said aloud | Shared |
 | `Snippets` | `Snippet`, `SnippetStore`, `SnippetExpander` | Shared |
 | `Vocabulary` | `VocabularyEntry`, `VocabularyStore`, `VocabularyReplacer`, `VocabularySelector` | Shared |
 | `Hotkey` | `HotkeyBinding`, `HotkeyGesture` (pure state machine), `HotkeyMonitor`, `CGEventTapHotkeyMonitor` | Shared |
 | `Insertion` | `TextInserter`, `AXTextInserter`, `PasteboardTextInserter`, `InsertionRouter`, `InserterOverrides`, `FocusedElement` | Shared |
 | `Permissions` | Microphone and Accessibility status, prompts, System Settings links | Shared |
-| `Dictation` | `DictationController` (the flow, including Undo AI edit), `DictationRecorder`, `DictationProcessor`, `TextDelivery` | all of the above, Capture, Transcription, Cleanup, Persistence |
+| `Dictation` | `DictationController` (the flow, including Undo AI edit), `DictationRecorder`, `DictationProcessor` with `PreparedDictation` (phrases, placeholders and layout around cleanup), `TextDelivery` | all of the above, Capture, Transcription, Cleanup, Persistence |
 | `DictationUI` | menu bar content and icon, HUD panel, history window, onboarding, Settings tabs, readiness from the session, reopening the app | Dictation, TranscriptUI, Session, … |
 
 Changed slices:
 
 - **Shared**: `CleanupLevel`, because `AppSettings` carries it and four slices read it; the
-  snippet placeholder token format (`⟦S1⟧`), which Snippets writes and Cleanup checks;
+  placeholder token format (`⟦S1⟧`), which the phrase protector writes and Cleanup checks;
+  `PhraseProtector`, which runs every `PhraseMatcher` (snippets, spoken commands, list markers)
+  over a transcript and keeps what each placeholder stands for, with its role (content, line
+  break, structure) deciding when it is put back; `PhraseGrammar` and `SentenceCase`, the word
+  rules the matchers and layout share;
   `SyntheticEventMarker`, the tag Insertion puts on the keys it posts and Hotkey's tap reads.
 - **Cleanup**: `Prompt` becomes `PromptBuilder`: base rules + level rules + vocabulary +
   placeholder rule + prior context, each a separately tested function. `Cleaner.clean` takes
   `CleanupOptions` (level, vocabulary terms, placeholder tokens, multi-line). `OutputGuard`
   takes the level's word-ratio bounds and rejects output that alters a placeholder.
+  `PlaceholderAliases` shows the model a plain word for each token and swaps the tokens back
+  before the guard. `CleanupExecutor` runs High in two passes when there is a correction cue
+  (L3).
 - **Capture**: devices report whether they are virtual; capture follows the default input (M1).
   `MicrophonePickerList` is the one rule for what the three microphone pickers (the menu bar,
   Settings › General, the live transcript window) list: virtual devices only with
@@ -209,13 +238,19 @@ Changed slices:
 Hotkey down ─▶ record (pre-roll if the mic is kept ready)
 Hotkey up ───▶ discard if < 300 ms
              ─▶ transcribe the whole buffer (Parakeet)
-             ─▶ snippets: triggers → ⟦S1⟧ placeholders
+             ─▶ phrases → ⟦S1⟧ placeholders: snippets first, then emoji, addresses and
+                line breaks; list markers too (Medium+, multi-line only); punctuation said
+                by name is written in directly
              ─▶ vocabulary: known spoken variants → canonical spelling
-             ─▶ level None: done; else remove fillers (Medium, High)
-             ─▶ LLM cleanup (level rules + vocabulary + placeholder rule + context),
+             ─▶ level None: breaks and commands put back; done
+             ─▶ remove fillers (Medium, High); a letter's greeting and sign-off laid out
+                (Medium+, multi-line only), only its body goes on
+             ─▶ LLM cleanup (level rules + vocabulary + placeholder rule + context), tokens
+                shown as words; High with a correction cue: Medium pass, then High pass;
                 skipped with OutputGuard when cleanup is off in Advanced (read at launch)
              ─▶ OutputGuard (level bounds, placeholders intact) — else the pre-LLM text
-             ─▶ placeholders → expansions; lists → numbered lines (Medium+, multi-line only)
+             ─▶ line breaks and list markers put back and tidied; lists laid out
+                (Medium+, multi-line only); then snippets, emoji and addresses
              ─▶ insert at the cursor (AX, else paste, else clipboard + HUD)
              ─▶ history (raw + cleaned), undo buffer
 ```
@@ -271,8 +306,8 @@ main actor with `kAXSelectedTextRangeAttribute` and `kAXStringForRangeParameteri
 
 ⌃⌥Z within 30 s of an insertion, in the same app and field: select the inserted range via AX
 and replace it with the uncleaned text; otherwise send ⌘Z and insert the uncleaned text. The
-uncleaned text is the dictation before cleanup, with snippets and vocabulary still applied (see
-*Assumptions*).
+uncleaned text is the dictation before cleanup, with snippets, spoken commands and vocabulary
+still applied, list markers as they were said and nothing laid out (see *Assumptions*).
 
 Undo refuses, changing nothing, when another app is in front, when another field of the same
 app has focus (checked for pasted text too, whenever Accessibility sees the field when it is
@@ -317,32 +352,65 @@ microphone stay as they are.
 
 - Unit tests with fakes for every slice: gesture state machine, prompt composition per level,
   snippet matching and placeholder round trips (including a property test with random
-  snippets), vocabulary replacement, level guard bounds, filler removal, list formatting,
+  snippets), spoken commands, vocabulary replacement, level guard bounds, filler removal, list
+  and letter layout, placeholder aliases, two-pass High,
   inserter ordering with a fake AX layer, pasteboard snapshot and restore, device policy and
   fallback, history pruning, the dictation controller with fake audio, transcriber, cleaner and
   inserter, and the Settings, menu and editor models.
-- Eval set: `Tests/IntegrationTests/Fixtures/Dictation/clips.tsv`, 44 clips (plain,
-  fillers, self-corrections, long, questions), each with what is said and what is meant.
-  `scripts/generate-dictation-audio.sh` synthesises them; `Bench --dictation` runs each through
-  the dictation processor at every level and reports WER against both references, fallbacks and
-  latency. Snippets, vocabulary and lists are covered by unit tests rather than clips.
+- Eval set: `Tests/IntegrationTests/Fixtures/Dictation/clips.tsv`, 65 clips (plain,
+  fillers, self-corrections, long, questions, emoji, dictated punctuation, addresses, line
+  breaks, lists and letters), each with what is said and what is meant, laid out as in a
+  multi-line field. `scripts/generate-dictation-audio.sh` synthesises them; `Bench --dictation`
+  runs each through the dictation processor at every level and reports WER against both
+  references, fallbacks and latency; with `--multiline` it dictates into a multi-line field and
+  also counts the clips that come out with the intended lines. Snippets and vocabulary are
+  covered by unit tests rather than clips.
+- Prompt probe (`PromptProbeTests`, run with `TEST_RUNNER_LT_PROMPT_PROBE=1`): prints the
+  model's answers for hard cases, and compares prompts, placeholder token formats and visible
+  emoji.
 - Manual QA (needs a person): the F2 app list, full screen, multiple displays, light and dark,
   plugging in and removing microphones mid-dictation, a virtual default input.
 
 ### Eval results
 
 M4 Pro, macOS 27, synthetic speech (Samantha), latency = speech-to-text + cleanup
-(be4d502):
+(4231d63), 65 clips. Dictating into a multi-line field (`--multiline`):
+
+| Level | WER vs said | WER vs meant | Fallbacks | p50 | p95 | Laid out as meant |
+|---|---:|---:|---:|---:|---:|---:|
+| None | 10.9% | 20.1% | 0 | 33 ms | 64 ms | 57/65 |
+| Light | 11.3% | 19.6% | 1 | 163 ms | 329 ms | 57/65 |
+| Medium | 21.8% | 2.2% | 3 | 186 ms | 428 ms | 65/65 |
+| High | 21.8% | 2.2% | 3 | 212 ms | 431 ms | 65/65 |
+
+Into a single-line field:
 
 | Level | WER vs said | WER vs meant | Fallbacks | p50 | p95 |
 |---|---:|---:|---:|---:|---:|
-| None | 1.9% | 24.2% | 0 | 32 ms | 59 ms |
-| Light | 2.1% | 23.9% | 0 | 159 ms | 308 ms |
-| Medium | 15.5% | 1.8% | 1 | 184 ms | 386 ms |
-| High | 15.5% | 1.8% | 1 | 199 ms | 388 ms |
+| None | 10.9% | 20.1% | 0 | 34 ms | 63 ms |
+| Light | 11.3% | 19.6% | 1 | 164 ms | 328 ms |
+| Medium | 20.6% | 5.0% | 3 | 186 ms | 428 ms |
+| High | 21.2% | 3.8% | 2 | 214 ms | 430 ms |
 
 Every level is well under the p95 target of 1.2 s. At Medium and High all 12 self-corrections
-and all 10 filler clips come out as meant. The one fallback ("I've attached the invoice and the
-signed agreement.") is the adapter mistaking a plain sentence for a correction; OutputGuard
-rejects it and the transcript is used. The time from releasing the key to the text appearing
-adds the recorder stop and insertion, a few milliseconds each, which the controller logs.
+and all 10 filler clips come out as meant, and in a multi-line field every list and letter is
+laid out. WER against what was said counts spoken commands as wrong, since they are replaced by
+what they name; the 44 clips from before the commands score as they did (Medium: 1.8% against
+what was meant, one fallback).
+
+The fallbacks:
+- "I've attached the invoice and the signed agreement." at Medium and High: the adapter
+  mistakes a plain sentence for a correction.
+- Two lists at Medium and High, multi-line: the model rewrote the bulleted one (similarity
+  0.58) and dropped an item from the numbered one. The uncleaned text is still laid out.
+- In a single-line field, the bulleted list at Medium (the model dropped the words "bullet
+  point", which are not commands there) and the whole passport letter at Medium and High (the
+  model changed more than the self-correction).
+- The passport letter at Light, where resolving the correction is not allowed.
+
+In a single-line field the model also turned "hi John … cheers Sam" into "Hi Sam, … Cheers."
+and the guard accepted it (ledger LiveTranscribe-0103); in a multi-line field the letter frame
+keeps the names where they were said.
+
+The time from releasing the key to the text appearing adds the recorder stop and insertion, a
+few milliseconds each, which the controller logs.

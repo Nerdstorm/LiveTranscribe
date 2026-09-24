@@ -29,15 +29,25 @@ Real outputs from the dictation eval, at the default **Medium** cleanup level:
 | Tell Daniel, sorry, tell Maria the draft is ready | Tell Maria the draft is ready. |
 | So, uh, what time does the, um, the train leave | So, what time does the train leave? |
 | I'll be about ten minutes late, the train is running slow today | I'll be about 10 minutes late. The train is running slow today. |
+| hi emoji fireworks | Hi 🎆. |
+| email me at john dot smith at example dot com | Email me at john.smith@example.com. |
 
-**12 of 12 self-corrections resolved. 10 of 10 filler clips cleaned. 386 ms at p95.** In the
-44-clip dictation eval at Medium, speech-to-text plus cleanup of sentence-length dictations took
-184 ms at p50 and 386 ms at p95, well inside the 1.2 s target.
+And in a multi-line text area, such as a document or the body of an email:
+
+| You say | Live Transcribe types |
+|---|---|
+| Things to do today. First, call the bank. Second, book the flights. Third, send the invoice. | Things to do today:<br>1. Call the bank<br>2. Book the flights<br>3. Send the invoice |
+| hi John thanks for the update I will review it tomorrow cheers Sam | Hi John,<br><br>Thanks for the update, I will review it tomorrow.<br><br>Cheers,<br>Sam |
+
+**12 of 12 self-corrections resolved. 10 of 10 filler clips cleaned. 65 of 65 clips laid out as
+meant. 428 ms at p95.** In the 65-clip dictation eval at Medium, dictating into a multi-line
+field, speech-to-text plus cleanup of sentence-length dictations took 186 ms at p50 and 428 ms at
+p95, well inside the 1.2 s target.
 
 Measured on an M4 Pro with synthetic speech: the left column is the script a macOS text-to-speech
 voice read aloud. Stopping the recorder and inserting the text are not included in those times.
-One of the 44 clips, a plain sentence, fell back to the uncleaned transcript
-([details](#dictation-eval)).
+Three of the 65 clips fell back to the uncleaned transcript: a plain sentence and two spoken
+lists, which were still laid out ([details](#dictation-eval)).
 
 ## What you get
 
@@ -55,17 +65,26 @@ One of the 44 clips, a plain sentence, fell back to the uncleaned transcript
   sentences, such as "sorry I'm late", as spoken.
 - **Punctuation and capitals, done.** From **Light** up, the local model fixes punctuation,
   casing and misheard words.
-- **Spoken lists become numbered lists.** In a multi-line text area (a field macOS reports as a
-  text area, such as a TextEdit document), at Medium or High, say "first… second… and third…"
-  and each item gets its own numbered line.
+- **Spoken lists become lists.** In a multi-line text area (a field macOS reports as a text
+  area, such as a TextEdit document), at Medium or High, say "first… second… and third…",
+  "number one… number two…" or "bullet point… bullet point…" and each item gets its own
+  numbered or bulleted line, under a lead-in ending in a colon. The items keep your words.
+- **Letters and emails laid out.** Start with a greeting ("Dear sir or madam", "Hi John") and
+  end with a sign-off ("Kind regards Jordan Lee", "Cheers Sam"), and in a multi-line text area,
+  at Medium or High, the greeting and the sign-off each get their own lines. The model cleans
+  only the body, so it cannot move the names around.
+- **Emoji, punctuation and line breaks by voice.** At every level, say "hi emoji fireworks" for
+  "hi 🎆", "thanks heart emoji" for "thanks ❤️", "is it ready question mark" for "is it ready?",
+  "new line" or "new paragraph" for a line break, and "john dot smith at example dot com" for
+  john.smith@example.com. See [Spoken commands](#spoken-commands).
 - **You choose how much it edits.** Pick **None**, **Light**, **Medium** or **High** from the
   menu bar in two clicks, and your next dictation uses it.
 - **Undo the AI, keep your words.** Press ⌃⌥Z within 30 seconds, in the field you dictated
-  into, and what you actually said replaces the cleaned text, with your snippets and vocabulary
-  still applied.
+  into, and what you actually said replaces the cleaned text, with your snippets, vocabulary and
+  spoken commands still applied.
 - **A safety net against rewrites.** Every edit is checked. If the model drops a "not", deletes
   words you said (below High) or rewrites too much, your own words are typed instead, with
-  fillers still removed and lists still formatted at Medium and High.
+  fillers still removed and lists and letters still laid out at Medium and High.
 
 ### Dictate from any app
 
@@ -181,18 +200,17 @@ One of the 44 clips, a plain sentence, fell back to the uncleaned transcript
   self-correction adapter on your Mac, in Swift (the bundled one took 30 minutes).
 - **Bring your own models.** Point **Settings › Advanced** at another Hugging Face
   speech-to-text, cleanup or voice-activity model that the MLX libraries can load. Or turn the
-  language model off, and dictation still removes fillers and formats spoken lists at Medium and
-  High.
+  language model off, and dictation still removes fillers and lays out spoken lists and letters
+  at Medium and High.
 
 ## Coming next
 
 Ideas for a later phase. None of this is started, and **none of it is in the app yet**:
 
-- Built-in **"new line"** and **"new paragraph"** commands. Today you can add them yourself as
-  snippets whose text is a line break.
-- Bullet lists without spoken numbers. Today a list needs "first… second…".
-- Paragraph breaks in long dictations.
-- Per-app formatting, such as a greeting and sign-off in email.
+- Bullet lists without spoken markers. Today a list needs "first… second…", "number one…" or
+  "bullet point…".
+- Paragraph breaks in long dictations, without saying "new paragraph".
+- Per-app formatting. Letters are laid out in any multi-line text area today, whatever the app.
 - Per-app tone.
 - Awareness of the focused app's context.
 - **Command Mode**: select text and say how to change it.
@@ -313,7 +331,8 @@ each build: grant them once more after switching, and they survive every rebuild
   ready to paste, the text goes on the clipboard instead, and the panel says another app took
   focus.
 - **Undo AI Edit** (⌃⌥Z, within 30 seconds, in the field you dictated into) swaps the cleaned
-  text for what you said before cleanup. Snippets and vocabulary stay applied. It changes nothing
+  text for what you said before cleanup. Snippets, vocabulary and spoken commands stay applied;
+  lists and letters go back to how you said them. It changes nothing
   if another app or field has focus (click back into the field and try again within the
   30 seconds) or if the text was edited since. It works between dictations, and at **None** there
   is nothing to undo.
@@ -344,32 +363,58 @@ each build: grant them once more after switching, and they survive every rebuild
 
 | Level | What cleanup changes |
 |---|---|
-| **None** | Nothing. The transcript is inserted as heard, with your snippets and vocabulary applied. |
+| **None** | Nothing. The transcript is inserted as heard, with your snippets, vocabulary and spoken commands applied. |
 | **Light** | Punctuation, casing and misheard words. Fillers and self-corrections are kept as spoken; the model is told not to add or remove words (it may drop a repeated word such as "the the"). |
-| **Medium** (default) | Light, plus: fillers such as "um" are removed, spoken self-corrections are resolved ("Monday, no wait, Tuesday" → "Tuesday"), and spoken lists become numbered lines in multi-line text areas. |
-| **High** | Medium, plus light rewording for grammar and clarity. On a 1.7B model it behaves close to Medium. |
+| **Medium** (default) | Light, plus: fillers such as "um" are removed, spoken self-corrections are resolved ("Monday, no wait, Tuesday" → "Tuesday"), and spoken lists and letters are laid out in multi-line text areas. |
+| **High** | Medium, plus light rewording for grammar and clarity. On a 1.7B model it behaves close to Medium. A dictation with a self-correction is cleaned twice: Medium's pass resolves the correction, then High's rewords the result, and if that rewording is rejected, Medium's result is used. |
 
 - Choose the level from **Cleanup** in the menu bar or in **Settings › General › Cleanup**. It
-  applies to dictation and the live transcript. Snippets, vocabulary and list formatting apply to
-  dictation only.
+  applies to dictation and the live transcript. Snippets, vocabulary, spoken commands and layout
+  apply to dictation only.
 - Self-correction cues are "sorry", "I mean", "I meant", "no", "wait", "rather", "actually",
   "make that", "scratch that" and "correction". The bundled adapter resolves them at Medium and
   High only (**Resolve spoken self-corrections** in **Settings › Advanced**, on by default).
-- A list needs spoken ordinals in order, starting with "first" ("first", "second", … or
-  "firstly", …), at least two, each starting a clause; "finally" or "lastly" may end it. The
-  ordinals become numbers, each item starts with a capital, and the joining "and"/"then" and the
-  punctuation between items go; no other words change. Lists are formatted only in multi-line
-  text areas (fields macOS reports as a text area).
+- A list needs at least two items, marked by spoken ordinals in order from "first" ("first",
+  "second", … or "firstly", …, each starting a clause; "finally" or "lastly" may end it), by
+  "number", "item" or "step" with the numbers one, two, … in order, or by "bullet point". The
+  markers become "1." or "-", each item starts with a capital, the line before the list ends
+  with a colon, and items keep their full stops only if every item is a sentence of four words
+  or more. No other words change. Lists and letters are laid out only in multi-line text areas
+  (fields macOS reports as a text area).
 - OutputGuard checks every output of the model. If the output is empty or chatty, drops a
   correction cue without a genuine self-correction, deletes a run of spoken words (below High),
-  drops a negation, alters a snippet placeholder, changes the word count or the text too much, or
-  takes longer than 3 s (**Timeout** in **Settings › Advanced**), the uncleaned text is used
-  instead, with fillers still removed and lists still formatted. In dictation this is silent:
+  drops a negation, alters a placeholder (for a snippet, emoji, address, line break or list
+  marker), changes the word count or the text too much, or takes longer than 3 s (**Timeout** in
+  **Settings › Advanced**), the uncleaned text is used instead, with fillers still removed and
+  lists and letters still laid out. In dictation this is silent:
   **Dictation History** shows it and the reason, if history is on.
 - With **Clean up transcripts with the LLM** off in **Settings › Advanced**, nothing is reworded.
-  In dictation, Medium and High still remove fillers and format lists, and snippets and
-  vocabulary still apply; the live transcript shows the raw text. The switch applies at the next
-  launch.
+  In dictation, Medium and High still remove fillers and lay out lists and letters, and
+  snippets, vocabulary and spoken commands still apply; the live transcript shows the raw text.
+  The switch applies at the next launch.
+
+### Spoken commands
+
+Dictation turns these phrases into what they name, at every cleanup level. The language model
+never sees an emoji, an address or a line break, only a placeholder it must copy.
+
+| Say | Get |
+|---|---|
+| "emoji fireworks", "heart emoji", "emoji party popper" | 🎆, ❤️, 🎉: about 350 common names, then any Unicode emoji name |
+| "question mark", "exclamation mark", "full stop", "comma", "semicolon" | ? ! . , ; |
+| "open quote … close quote", "quote … unquote", "open bracket … close bracket" | "…" and (…) |
+| "new line", "new paragraph" | a line break or a blank line; a space in single-line fields |
+| "john dot smith at example dot com", "example dot com slash pricing", "w w w dot example dot org" | john.smith@example.com, example.com/pricing, www.example.org |
+
+- A command is a command only when it is not talked about: "a question mark", "the fire emoji",
+  "Apple's new line" and "new line of code" stay as said. "Period", "colon" and "dash" always
+  stay words, because they are common nouns ("the trial period").
+- A comma or semicolon needs a word after it. Quotes and brackets work only in pairs, so a lone
+  "end quote" or the idiom "quote unquote" stays as said.
+- An address needs a known ending (.com, .org, .io, .co.uk, …). An email address needs a dot,
+  underscore or digit in its name, or a word such as "email", "to" or "at" before it.
+- "Fireworks" is 🎆 (Unicode's FIREWORKS); 🎇 is "sparkler". A snippet with the same words wins
+  over a command, so you can map any phrase to the emoji you prefer.
 
 ### Snippets, vocabulary and apps
 
@@ -534,7 +579,8 @@ Packages/LiveTranscribeKit/   all feature code, as vertical slices
     Hotkey/          global shortcut monitor (event tap), hold/double-tap gestures, bindings
     Permissions/     Accessibility and microphone permission, System Settings links
     Insertion/       typing at the cursor: Accessibility, paste with clipboard restore, per-app choice
-    Styles/          rule-based filler removal and list formatting
+    Styles/          rule-based filler removal and layout: lists and letters
+    SpokenCommands/  emoji, punctuation, line breaks and addresses said aloud
     Snippets/        trigger phrases and the text they insert
     Vocabulary/      names and jargon, with how they are spoken
     Dictation/       DictationController: hotkey → record → transcribe → clean up → insert
@@ -639,31 +685,47 @@ signpost intervals ("STT", "LLM") for Instruments.
 (cd Packages/LiveTranscribeKit && .build/xcode/Build/Products/Release/Bench --dictation)
 ```
 
-Runs the 44 dictation clips (plain sentences, fillers, self-corrections, questions and longer
-passages) through dictation's speech-to-text and cleanup at every cleanup level, and reports per
-level and category the WER against what was *said* and against what was *meant* (fillers dropped,
-self-corrections resolved), the fallbacks, and p50/p95 latency against the target of p95 under
-1.2 s. Latency here is speech-to-text plus cleanup; stopping the recorder and inserting the text
-are not included. `--level <none|light|medium|high>` (repeatable) limits the levels,
+Runs the 65 dictation clips (plain sentences, fillers, self-corrections, questions, longer
+passages, emoji, dictated punctuation, addresses, line breaks, spoken lists and letters) through
+dictation's speech-to-text and cleanup at every cleanup level, and reports per level and
+category the WER against what was *said* and against what was *meant* (fillers dropped,
+self-corrections resolved, commands turned into what they name), the fallbacks, and p50/p95
+latency against the target of p95 under 1.2 s. Latency here is speech-to-text plus cleanup;
+stopping the recorder and inserting the text are not included. `--multiline` dictates into a
+multi-line field, where line breaks, lists and letters are laid out, and adds how many clips came
+out with the intended lines. `--level <none|light|medium|high>` (repeatable) limits the levels,
 `--clips <dir>` reads other clips, `--p95-target-ms <n>` changes the target, `--no-adapter`
 cleans up without the adapter and `--verbose` prints every output, with the reason for each
 fallback.
 
-Last run, on an M4 Pro with macOS 27 and synthetic speech:
+Last run, on an M4 Pro with macOS 27 and synthetic speech, with `--multiline`:
 
-| Level | WER vs said | WER vs meant | Fallbacks | p50 (ms) | p95 (ms) |
-|---|---:|---:|---:|---:|---:|
-| None | 1.9% | 24.2% | 0 | 32 | 59 |
-| Light | 2.1% | 23.9% | 0 | 159 | 308 |
-| Medium | 15.5% | 1.8% | 1 | 184 | 386 |
-| High | 15.5% | 1.8% | 1 | 199 | 388 |
+| Level | WER vs said | WER vs meant | Fallbacks | p50 (ms) | p95 (ms) | Laid out as meant |
+|---|---:|---:|---:|---:|---:|---:|
+| None | 10.9% | 20.1% | 0 | 33 | 64 | 57/65 |
+| Light | 11.3% | 19.6% | 1 | 163 | 329 | 57/65 |
+| Medium | 21.8% | 2.2% | 3 | 186 | 428 | 65/65 |
+| High | 21.8% | 2.2% | 3 | 212 | 431 | 65/65 |
 
-Medium resolved all 12 self-corrections and removed the fillers from all 10 filler clips. Every
-level met the latency target. The one fallback (the same plain sentence at Medium and High, "I've
-attached the invoice and the signed agreement.") is the self-correction adapter changing a
-sentence that had nothing to correct. OutputGuard caught it (three spoken words dropped at
-Medium; similarity 0.48, below the floor, at High) and the uncleaned transcript was inserted.
-The longest clip is about 30 words, so these numbers say nothing about long dictations.
+Medium resolved all 12 self-corrections and removed the fillers from all 10 filler clips, and
+Medium and High laid out every list and letter. WER against what was said counts each spoken
+command as wrong, because it is replaced by what it names. None and Light lay out only line
+breaks, by design. Every level met the latency target; High takes longer on self-corrections
+because it cleans them in two passes.
+
+The fallbacks, where OutputGuard rejected the model's output and the uncleaned transcript was
+inserted:
+- The same plain sentence at Medium and High ("I've attached the invoice and the signed
+  agreement."): the self-correction adapter changed a sentence that had nothing to correct
+  (three spoken words dropped at Medium; similarity 0.48, below the floor, at High).
+- Two spoken lists at Medium and High: the model rewrote a bulleted list and dropped an item
+  from a numbered one. The uncleaned text was still laid out as meant.
+- The long letter at Light, where the model resolved its self-correction although Light keeps
+  every word.
+
+Without `--multiline` (a single-line field), Medium falls back on 3 clips and High on 2, and a
+letter is cleaned as a whole. The longest clip is about 40 words, so these numbers say nothing
+about long dictations.
 
 ## Training the adapter
 
@@ -679,9 +741,10 @@ results are in [Training/README.md](Packages/LiveTranscribeKit/Training/README.m
 
 - **Two pipelines, one set of models.** The live transcript runs microphone → Silero voice
   activity detection → Parakeet speech-to-text → Qwen3-1.7B cleanup at the chosen level → window
-  and JSONL file. Dictation runs shortcut → recording → Parakeet → snippet placeholders and
-  vocabulary → filler rule and Qwen3-1.7B cleanup, checked by OutputGuard → list formatting →
-  snippets restored → text at the cursor. One Parakeet and one Qwen3-1.7B instance serve both.
+  and JSONL file. Dictation runs shortcut → recording → Parakeet → placeholders for snippets,
+  spoken commands and list markers, and vocabulary → filler rule, letter frame and Qwen3-1.7B
+  cleanup, checked by OutputGuard → line breaks and layout → snippets, emoji and addresses
+  restored → text at the cursor. One Parakeet and one Qwen3-1.7B instance serve both.
 - **A menu bar app.** Dictation has to be available in every app, so Live Transcribe lives in
   the menu bar (`LSUIElement`) and becomes a regular app with a Dock icon only while one of its
   windows (transcript, history, Settings, setup) is open.
@@ -690,12 +753,16 @@ results are in [Training/README.md](Packages/LiveTranscribeKit/Training/README.m
 - **The adapter is loaded as separate LoRA layers**, at the exact base-model commit it was
   trained on, not fused into the weights. Fusing re-quantizes the adapted weights to 4 bits, and
   the fused adapter resolved only 13% of self-corrections.
-- **Fillers and lists are rules, not model output.** A 1.7B model does neither reliably, and a
-  rule can be tested exhaustively. Fillers are removed before the model runs; lists are formatted
-  after it, only for multi-line text areas.
-- **Snippets are hidden from the model.** Each trigger becomes a placeholder (`⟦S1⟧`) that the
-  model must copy unchanged. OutputGuard rejects any output that alters one, and the saved text
-  goes back in only after cleanup.
+- **Fillers and layout are rules, not model output.** A 1.7B model does neither reliably, and a
+  rule can be tested exhaustively. Fillers are removed before the model runs; lists are laid out
+  after it, only for multi-line text areas. A letter's greeting and sign-off are found before the
+  model runs and only its body is cleaned: shown a whole letter, the model moved the name in the
+  sign-off into the greeting.
+- **Snippets and spoken commands are hidden from the model.** Each trigger, emoji, address, line
+  break and list marker becomes a placeholder (`⟦S1⟧`) that the model must copy unchanged.
+  OutputGuard rejects any output that alters one, and what it stands for goes back in only after
+  cleanup. The model itself sees a plain word ("S1"): it stripped or dropped the bracketed tokens
+  in 17 of 23 probe sentences, and kept 21 of 23 as words.
 - **The shortcut is read with a `CGEventTap`**, which needs Accessibility. That is also the
   permission typing into other apps needs, so dictation asks for only two permissions. The tap
   runs on its own thread, and is re-enabled at once if macOS disables it.
@@ -754,11 +821,17 @@ More decisions, and the assumptions behind them, are in [docs/dictation.md](docs
   cue may not delete a run of spoken words or a negation. A correction that moves a word rather
   than deleting it ("Tell Yasmin, or rather, Victor" → "Tell Victor, or rather,") can still get
   through.
-- The self-correction adapter occasionally rewrites a plain sentence (1 of 44 eval clips);
+- The self-correction adapter occasionally rewrites a plain sentence (1 of 65 eval clips);
   OutputGuard catches it and inserts the raw transcript instead of the cleaned text. In
   dictation such a fallback is silent: only **Dictation History** shows it, if history is on.
-- Spoken lists are formatted only when you say the ordinals ("first", "second", …), and only in
-  multi-line text areas.
+- Spoken lists are laid out only when you say their markers ("first…", "number one…", "bullet
+  point…"), and lists and letters only in multi-line text areas. The model sometimes drops or
+  rewrites a list item; OutputGuard then inserts your words, still laid out.
+- In a single-line field a letter is cleaned as a whole, and the model can move the name in the
+  sign-off into the greeting ("hi John … cheers Sam" → "Hi Sam, … Cheers."). OutputGuard does
+  not catch that yet.
+- At **High**, rewording is checked for length and similarity but not for dropped words, so it
+  can leave out a word you said.
 - The floating panel sits next to the cursor, and a leading space is added, only in apps that
   report their text through Accessibility. Elsewhere the panel appears near the bottom of the
   screen and no space is added.
