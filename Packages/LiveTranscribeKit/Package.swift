@@ -179,7 +179,7 @@ let package = Package(
         // MARK: - Tests
 
         .testTarget(name: "SharedTests", dependencies: ["Shared"], swiftSettings: strictSwift),
-        .testTarget(name: "StylesTests", dependencies: ["Styles"], swiftSettings: strictSwift),
+        .testTarget(name: "StylesTests", dependencies: ["Styles", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "SnippetsTests", dependencies: ["Snippets", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "SpokenCommandsTests", dependencies: ["SpokenCommands", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "VocabularyTests", dependencies: ["Vocabulary", "Shared"], swiftSettings: strictSwift),
