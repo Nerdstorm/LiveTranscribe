@@ -1,6 +1,8 @@
 # Dictation eval clips: id, category, what the voice says, what the writer meant.
 # scripts/generate-dictation-audio.sh synthesises <id>.wav from the spoken column; Bench --dictation
 # scores every cleanup level against both columns. Tabs separate columns; lines starting with # are skipped.
+# The intended column is laid out as in a field that takes several lines (Bench --dictation --multiline),
+# with \n for a line break.
 plain01	plain	Can you send me the slides from this morning's meeting	Can you send me the slides from this morning's meeting?
 plain02	plain	I'll be about ten minutes late, the train is running slow today	I'll be about ten minutes late, the train is running slow today.
 plain03	plain	Thanks for the quick turnaround on the contract	Thanks for the quick turnaround on the contract.
@@ -45,3 +47,24 @@ question01	question	Do you want to grab lunch after the stand up	Do you want to 
 question02	question	Have you had a chance to look at the proposal	Have you had a chance to look at the proposal?
 question03	question	What time should we leave for the airport	What time should we leave for the airport?
 question04	question	Is the conference room free at two	Is the conference room free at two?
+emoji01	emoji	hi emoji fireworks	Hi 🎆
+emoji02	emoji	thanks so much heart emoji	Thanks so much ❤️
+emoji03	emoji	great job emoji party popper see you tomorrow	Great job 🎉 see you tomorrow.
+emoji04	emoji	see you soon smiley face emoji	See you soon 🙂
+punct01	punct	is it ready question mark	Is it ready?
+punct02	punct	that is amazing exclamation mark	That is amazing!
+punct03	punct	he said open quote I will be late close quote and left	He said "I will be late" and left.
+punct04	punct	we need milk comma eggs comma and bread full stop	We need milk, eggs, and bread.
+punct05	punct	what time is the meeting question mark I need to know	What time is the meeting? I need to know.
+address01	address	email me at john dot smith at example dot com	Email me at john.smith@example.com.
+address02	address	the pricing is on example dot com slash pricing	The pricing is on example.com/pricing.
+address03	address	send it to support at example dot com please	Send it to support@example.com, please.
+layout01	layout	first line new line second line	First line\nSecond line
+layout02	layout	hi team new paragraph the build is green new paragraph thanks Sam	Hi team,\n\nThe build is green.\n\nThanks,\nSam
+list01	list	shopping list bullet point milk bullet point eggs bullet point bread	Shopping list:\n- Milk\n- Eggs\n- Bread
+list02	list	my goals for this week number one ship the release number two fix the login bug number three write the docs	My goals for this week:\n1. Ship the release\n2. Fix the login bug\n3. Write the docs
+list03	list	List of to do tasks for Acme Limited. Number one, we have to work on the launch of the new website. Number two, need to fix the Android app build.	List of to-do tasks for Acme Limited:\n1. We have to work on the launch of the new website.\n2. Need to fix the Android app build.
+list04	list	Things to do today. First, call the bank. Second, book the flights. Third, send the invoice.	Things to do today:\n1. Call the bank\n2. Book the flights\n3. Send the invoice
+letter01	letter	Dear sir or madam, I'm writing to you and mention about my passport is expiring and we need to renew. It's expiring in January, no, in February, and need to be reapplied as soon as possible. Kind regards, Jordan Lee.	Dear Sir or Madam,\n\nI am writing regarding my passport renewal. It expires in February and needs to be reapplied for as soon as possible.\n\nKind regards,\nJordan Lee
+letter02	letter	hi John thanks for the update I will review it tomorrow cheers Sam	Hi John,\n\nThanks for the update. I will review it tomorrow.\n\nCheers,\nSam
+letter03	letter	Hi Sam, thanks for sending the report. I'll review it tomorrow morning and get back to you with comments. Cheers, Alex.	Hi Sam,\n\nThanks for sending the report. I'll review it tomorrow morning and get back to you with comments.\n\nCheers,\nAlex
