@@ -21,9 +21,9 @@ struct ListFormatterTests {
         #expect(formatter.formatted("for the launch first we update the docs second we tag the release") == nil)
     }
 
-    @Test func keepsTextAfterTheListOnItsOwnLine() {
+    @Test func startsANewParagraphAfterTheList() {
         #expect(formatter.formatted("First, we fix the login bug. Second, we ship the release. Then we celebrate.")
-            == "1. We fix the login bug.\n2. We ship the release.\nThen we celebrate.")
+            == "1. We fix the login bug.\n2. We ship the release.\n\nThen we celebrate.")
     }
 
     @Test func finallyClosesTheList() {
@@ -64,6 +64,40 @@ struct ListFormatterTests {
     ])
     func leavesOtherText(text: String) {
         #expect(formatter.formatted(text) == nil)
+    }
+
+    @Test("Cardinals number a list when \"is\", a comma, a colon or a full stop follows them", arguments: [
+        ("one is XYZ, two is kyt", "1. XYZ\n2. Kyt"),
+        (
+            "There are a few things I need to talk to you about. One is the launch of the app. Two, the marketing plan.",
+            "There are a few things I need to talk to you about:\n1. The launch of the app\n2. The marketing plan"
+        ),
+        ("Two options: one, fly on Monday; two, drive on Sunday.", "Two options:\n1. Fly on Monday\n2. Drive on Sunday"),
+        ("One: the venue. Two: the invites. Three: the catering.", "1. The venue\n2. The invites\n3. The catering"),
+        ("One. Book the venue. Two. Send the invites.", "1. Book the venue\n2. Send the invites"),
+        ("1 is the budget, 2 is the timeline, and finally the team.", "1. The budget\n2. The timeline\n3. The team"),
+    ])
+    func cardinalsNumberAList(text: String, list: String) {
+        #expect(formatter.formatted(text) == list)
+    }
+
+    @Test("Leaves cardinals that don't introduce items", arguments: [
+        "One of them left early. Two stayed behind.",
+        "Two people came and one left.",
+        "One, two, three, go!",
+        "We need one, two or three volunteers.",
+        "I only need one.",
+        "One is enough.",
+        "One is the budget. Second, the timeline.",
+    ])
+    func leavesOtherCardinals(text: String) {
+        #expect(formatter.formatted(text) == nil)
+    }
+
+    /// A one that isn't followed by two leaves the list to a later one.
+    @Test func aOneBeforeTheSecondItemStartsTheListAgain() {
+        #expect(formatter.formatted("One is enough, I thought. Then there were two issues. One is the build. Two, the docs.")
+            == "One is enough, I thought. Then there were two issues:\n1. The build\n2. The docs")
     }
 
     @Test func keepsQuestionMarks() {

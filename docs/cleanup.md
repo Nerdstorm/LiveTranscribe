@@ -16,16 +16,19 @@
   "make that", "scratch that" and "correction". The bundled adapter resolves them at Medium and
   High only (**Resolve spoken self-corrections** in **Settings › Advanced**, on by default).
 - A list needs at least two items, marked by spoken ordinals in order from "first" ("first",
-  "second", … or "firstly", …, each starting a clause; "finally" or "lastly" may end it), by
-  "number", "item" or "step" with the numbers one, two, … in order, or by "bullet point". A
+  "second", … or "firstly", …, each starting a clause; "finally" or "lastly" may end it), by the
+  numbers one, two, … in order, each starting a clause and followed by "is", a comma, a colon or
+  a full stop ("one is the launch, two, the marketing"), by "number", "item" or "step" with the
+  numbers one, two, … in order, or by "bullet point". A
   marker that is talked about stays as said: after "the" or "a", after "is" or "are" ("cost is
   number two"), or for bullets after "first", "second", … ("the second bullet point is wrong").
   An "is" that only introduces the item goes with its marker ("first is call the bank", "second
   thing is…", "number one is…"), but not after a comma or in a question ("first, is it ready?").
   The markers become "1." or "-", each item starts with a capital, the line before the list ends
-  with a colon, and items keep their full stops only if every item is a sentence of four words
-  or more. No other words change. Lists and letters are laid out only where line breaks are
-  allowed (see [How each app is handled](snippets-vocabulary-apps.md#how-each-app-is-handled)).
+  with a colon, text after the list starts a new paragraph, and items keep their full stops only
+  if every item is a sentence of four words or more. No other words change. Lists and letters are
+  laid out only where line breaks are allowed (see
+  [How each app is handled](snippets-vocabulary-apps.md#how-each-app-is-handled)).
 - OutputGuard checks every output of the model. The uncleaned text is used instead, with fillers
   still removed and lists and letters still laid out, if the output:
   - is empty or chatty;

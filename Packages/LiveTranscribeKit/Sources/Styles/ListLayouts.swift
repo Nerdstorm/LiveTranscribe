@@ -3,7 +3,7 @@ import Foundation
 /// Lists spoken with markers ("number one …, number two …", "bullet point … bullet point …"),
 /// whose markers ``ListMarkerCommand`` has already turned into "1. " and "- " at the start of
 /// lines: the line before gets its colon, the items their capitals and full stops (see
-/// ``ListStyle``), and any sentence after the last item moves to a line of its own.
+/// ``ListStyle``), and any sentence after the last item starts a new paragraph.
 public struct MarkedListLayout: LayoutRule {
     private let style: ListStyle
 
@@ -37,15 +37,16 @@ public struct MarkedListLayout: LayoutRule {
                 after = split.rest
             }
             result += zip(prefixes, style.items(texts)).map { $0 + $1 }
-            if let after { result.append(after) }
+            // What follows the list starts a paragraph, unless it is the next item said inline.
+            if let after { result += ListStyle.marker(of: after) == nil ? ["", after] : [after] }
             changed = true
         }
         return changed ? result : nil
     }
 }
 
-/// Lists spoken with ordinals ("first, …; second, …"), found in each line of prose by
-/// ``ListFormatter``. Lines that are already list items are left alone.
+/// Lists spoken with ordinals ("first, …; second, …") or cardinals ("one is …, two is …"), found
+/// in each line of prose by ``ListFormatter``. Lines that are already list items are left alone.
 public struct OrdinalListLayout: LayoutRule {
     private let formatter: ListFormatter
 

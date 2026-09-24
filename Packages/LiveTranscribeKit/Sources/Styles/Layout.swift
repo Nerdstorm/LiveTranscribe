@@ -51,7 +51,8 @@ public struct Layout: Sendable {
 
 /// Rearranges one paragraph of cleaned text.
 public protocol LayoutRule: Sendable {
-    /// `lines`, one paragraph without blank lines, laid out; `nil` to leave them as they are.
+    /// `lines`, one paragraph without blank lines, laid out; `nil` to leave them as they are. A
+    /// blank line in the result starts a new paragraph, as after a list.
     func arrange(_ lines: [String]) -> [String]?
 }
 
