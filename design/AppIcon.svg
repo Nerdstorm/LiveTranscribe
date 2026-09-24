@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Live Transcribe's app icon: a waveform running into a text cursor, for "speak, and it
+       types at your cursor". Drawn on the macOS icon grid: an 824-point body with continuous
+       corners, centred on a 1024-point canvas, with the standard drop shadow. The master for
+       every size from 32 pixels up; 16 pixels uses AppIcon-16.svg. After editing, run
+       scripts/render-icons.sh. -->
+  <defs>
+    <path id="body" d="M 383.41 100.00
+             L 640.59 100.00 C 722.19 100.00 763.00 100.00 799.79 112.14 C 854.88 131.21 892.79 169.12 911.86 224.21 C 924.00 261.00 924.00 301.81 924.00 383.41
+             L 924.00 640.59 C 924.00 722.19 924.00 763.00 911.86 799.79 C 892.79 854.88 854.88 892.79 799.79 911.86 C 763.00 924.00 722.19 924.00 640.59 924.00
+             L 383.41 924.00 C 301.81 924.00 261.00 924.00 224.21 911.86 C 169.12 892.79 131.21 854.88 112.14 799.79 C 100.00 763.00 100.00 722.19 100.00 640.59
+             L 100.00 383.41 C 100.00 301.81 100.00 261.00 112.14 224.21 C 131.21 169.12 169.12 131.21 224.21 112.14 C 261.00 100.00 301.81 100.00 383.41 100.00 Z"/>
+    <clipPath id="inside">
+      <use href="#body"/>
+    </clipPath>
+    <linearGradient id="background" gradientUnits="userSpaceOnUse" x1="0" y1="100" x2="0" y2="924">
+      <stop offset="0" stop-color="#3d8bff"/>
+      <stop offset="1" stop-color="#0a4db8"/>
+    </linearGradient>
+    <radialGradient id="shine" gradientUnits="userSpaceOnUse" cx="347" cy="199" r="618">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rim" gradientUnits="userSpaceOnUse" x1="0" y1="100" x2="0" y2="420">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="wave" gradientUnits="userSpaceOnUse" x1="0" y1="220" x2="0" y2="830">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dbe8ff"/>
+    </linearGradient>
+    <linearGradient id="cursor" gradientUnits="userSpaceOnUse" x1="0" y1="260" x2="0" y2="770">
+      <stop offset="0" stop-color="#ffe066"/>
+      <stop offset="1" stop-color="#ffb703"/>
+    </linearGradient>
+    <filter id="icon-shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#000000" flood-opacity="0.32"/>
+    </filter>
+    <filter id="glyph-shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#062a66" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <use href="#body" fill="url(#background)" filter="url(#icon-shadow)"/>
+  <use href="#body" fill="url(#shine)"/>
+  <!-- A light edge along the top, drawn inside the body. -->
+  <use href="#body" fill="none" stroke="url(#rim)" stroke-width="6" clip-path="url(#inside)"/>
+
+  <g filter="url(#glyph-shadow)">
+    <!-- The waveform: four bars, centred on the body's middle. -->
+    <rect x="222" y="422" width="66" height="180" rx="33" fill="url(#wave)"/>
+    <rect x="330" y="332" width="66" height="360" rx="33" fill="url(#wave)"/>
+    <rect x="438" y="387" width="66" height="250" rx="33" fill="url(#wave)"/>
+    <rect x="546" y="447" width="66" height="130" rx="33" fill="url(#wave)"/>
+    <!-- The text cursor: an I-beam, taller than the waveform. -->
+    <rect x="702" y="272" width="44" height="480" rx="22" fill="url(#cursor)"/>
+    <rect x="646" y="272" width="156" height="44" rx="22" fill="url(#cursor)"/>
+    <rect x="646" y="708" width="156" height="44" rx="22" fill="url(#cursor)"/>
+  </g>
+</svg>
