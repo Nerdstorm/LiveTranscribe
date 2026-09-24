@@ -61,13 +61,23 @@ keychain may ask before the key is read.
 ## Making a release
 
 1. Merge what goes into the release into main, and pick its version, x.y.z.
-2. On main, up to date with origin, tag the release and push the tag:
+2. Write the release's changelog:
+
+   ```bash
+   make changelog VERSION=0.1.0
+   ```
+
+   This adds the release to `CHANGELOG.md`: a line for each pull request merged since the last
+   release, with the title it was merged with, and one for each commit made on main directly.
+   Reword the lines for the people who use the app and drop what doesn't concern them, then merge
+   it into main, so that the tag includes it.
+3. On main, up to date with origin, tag the release and push the tag:
 
    ```bash
    make tag VERSION=0.1.0
    ```
 
-3. Build the release and upload it to a draft:
+4. Build the release and upload it to a draft:
 
    ```bash
    make release VERSION=0.1.0
@@ -75,11 +85,11 @@ keychain may ask before the key is read.
 
    This takes about ten minutes, mostly waiting for Apple's notary service, which sometimes takes
    much longer. It also writes the new appcast, `build/release/0.1.0/appcast.xml`.
-4. Download the draft's disk image on a Mac that has never run a build of Live Transcribe, or in
+5. Download the draft's disk image on a Mac that has never run a build of Live Transcribe, or in
    another user account. Open it, drag the app to Applications and open it. macOS should only
    say that it was downloaded from the internet.
-5. Publish the draft on GitHub. The website's Download button goes to the latest release.
-6. Offer it as an update: put the new appcast in `site/` and merge it into main through a pull
+6. Publish the draft on GitHub. The website's Download button goes to the latest release.
+7. Offer it as an update: put the new appcast in `site/` and merge it into main through a pull
    request. The website workflow publishes it, and installed copies find the update at their
    next daily check or at **Check for Updates…**.
 
@@ -91,7 +101,7 @@ keychain may ask before the key is read.
    GitHub serves only once the release is public, so an earlier appcast offers an update that
    fails to download. `make appcast` checks that the download works before it copies
    `build/release/0.1.0/appcast.xml` to `site/appcast.xml`.
-7. Keep `build/release/<version>/LiveTranscribe.xcarchive`. Its debug symbols turn crash reports
+8. Keep `build/release/<version>/LiveTranscribe.xcarchive`. Its debug symbols turn crash reports
    from that version into readable stack traces.
 
 ## What the script does

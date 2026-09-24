@@ -89,7 +89,7 @@ Every feature, in detail: [docs/features.md](docs/features.md).
 | [Snippets, vocabulary and apps](docs/snippets-vocabulary-apps.md) | Saved text, your names and jargon, and how each app gets its text and line breaks |
 | [Privacy](docs/privacy.md) | What is kept where, what goes over the network, and how to remove it all |
 | [Signing and Gatekeeper](docs/signing.md) | Ad-hoc signing, and keeping permissions across rebuilds |
-| [Releasing](docs/releasing.md) | The Developer ID certificate, the notary credentials and the update signing key, and building, notarizing, publishing and offering a release as an update |
+| [Releasing](docs/releasing.md) | The Developer ID certificate, the notary credentials and the update signing key, and writing the changelog, building, notarizing, publishing and offering a release as an update |
 | [Known limitations](docs/limitations.md) | What doesn't work well yet |
 | [Development](docs/development.md) | The tests and their audio clips, the bench and the dictation eval, training the adapter, the licence notices, and the icons |
 | [Design notes](docs/design-notes.md) | Why it is built the way it is |
@@ -103,6 +103,7 @@ A working proof of concept, free and open source under the [MIT License](LICENSE
 - Download it from [GitHub Releases](https://github.com/Nerdstorm/LiveTranscribe/releases/latest):
   a disk image signed with Developer ID and notarized by Apple, which keeps itself up to date. Or
   build it from source (below).
+- What changed in each release is in the [changelog](CHANGELOG.md).
 - Tested on an M4 Pro Mac with macOS 27 and Xcode 27. The app targets macOS 14 or later but has
   not been run on older systems.
 - Tested with English speech. Parakeet v3 also recognises other European languages, but the
@@ -195,10 +196,11 @@ this Mac, never synced, until you turn history off, limit how long it is kept or
 ```
 App/                          menu bar app: menu, windows, composition root, app icon
 LiveTranscribe.xcodeproj      app project (ad-hoc signed, hardened runtime, no App Sandbox)
+CHANGELOG.md                  what changed in each release, written by make changelog
 design/                       the app icon, drawn as SVG
 docs/                         the guides indexed above, design notes and dictation's design
 Makefile                      building, tests, the bench, releases and upkeep (make lists them)
-scripts/                      releases, licence notices, test audio and icons
+scripts/                      releases, the changelog, licence notices, test audio and icons
 site/                         the website, published to GitHub Pages
 Packages/LiveTranscribeKit/   all feature code, as vertical slices
   Sources/

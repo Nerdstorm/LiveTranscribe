@@ -34,7 +34,7 @@ check-version = @echo '$(VERSION)' | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$$' \
 	|| { echo 'Set VERSION to the release, for example: make $@ VERSION=0.1.0' >&2; exit 2; }
 
 .PHONY: help build run resolve test test-integration prompt-probe audio dictation-audio bench eval \
-	train doctor release-test tag release appcast acknowledgements icons logs site clean
+	train doctor release-test changelog tag release appcast acknowledgements icons logs site clean
 
 help: ## List the targets
 	@echo 'Usage: make <target> [VERSION=x.y.z] [ARGS="..."]'
@@ -63,6 +63,7 @@ resolve: ## Resolve the Swift packages, which also fetches Sparkle's release too
 
 test: ## Unit tests, which need no models
 	cd $(PACKAGE) && $(PACKAGE_TESTS) -skip-testing:IntegrationTests
+	scripts/tests/write-changelog-tests.sh
 
 test-integration: audio ## End-to-end tests with the real models, which they download (about 3.5 GB)
 	cd $(PACKAGE) && TEST_RUNNER_LT_RUN_MODEL_TESTS=1 $(PACKAGE_TESTS) -only-testing:IntegrationTests
@@ -115,6 +116,10 @@ doctor: ## Check the tools and credentials that building and releasing need
 release-test: ## Build HEAD like a release, but ad-hoc signed and not notarized (VERSION=x.y.z)
 	$(check-version)
 	scripts/release.sh $(VERSION) --test
+
+changelog: ## Summarise the pull requests since the last release into CHANGELOG.md (VERSION=x.y.z)
+	$(check-version)
+	scripts/write-changelog.sh $(VERSION)
 
 tag: ## Tag main as vVERSION and push the tag, which starts a release (VERSION=x.y.z)
 	$(check-version)
