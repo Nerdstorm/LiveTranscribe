@@ -39,6 +39,10 @@ let package = Package(
         // transitive dependencies of mlx-audio-swift; declared so Cleanup can adapt them).
         .package(url: "https://github.com/huggingface/swift-huggingface.git", exact: "0.11.0"),
         .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "1.3.4"),
+        // Not used directly: holds back the version swift-transformers and swift-jinja get. Built
+        // with Swift 6.4, 1.7.0 links swift_initBorrow, which only macOS 27 has, so the app
+        // wouldn't launch on an earlier macOS (https://github.com/apple/swift-collections/issues/733).
+        .package(url: "https://github.com/apple/swift-collections.git", exact: "1.6.0"),
         // Updates for releases downloaded from GitHub (see docs/releasing.md).
         .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0"),
     ],
