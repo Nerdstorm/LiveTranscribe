@@ -35,8 +35,8 @@ struct SettingsNavigationTests {
         #expect(navigation.selectedTab == .history)
     }
 
-    @Test func aSwitchIsSeenByTheTabView() {
-        // The tab view reads the selection through Observation, so a change must be observed.
+    @Test func aSwitchIsSeenByTheToolbar() {
+        // The Settings toolbar follows the selection through Observation, so a change must be observed.
         let navigation = SettingsNavigation()
         let changed = OSAllocatedUnfairLock(initialState: false)
         withObservationTracking { _ = navigation.selectedTab } onChange: { changed.withLock { $0 = true } }

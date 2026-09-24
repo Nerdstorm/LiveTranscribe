@@ -42,12 +42,22 @@ focus context, Command Mode, multilingual) is not started.
   session and never starts one. A Start still opening the microphone when the window closes is
   stopped as soon as it reports listening. Keeping it running in the background, with a prompt on
   close, was the alternative.
-- **Settings keeps one view per window.** `SettingsNavigation` holds the selected tab, so asking
-  for a tab (History's *History Settings…*, setup's *Choose Another Shortcut…*) switches the open
-  window instead of rebuilding it, which threw away an editor sheet and its unsaved draft. While a
-  sheet is open the tab stays as it is and the window only comes forward, because switching away
-  from the tab that opened the sheet can close it, and at best leaves it over the wrong tab.
-  Settings reopens on the tab it last showed.
+- **Settings keeps its panes.** `SettingsNavigation` holds the selected tab, so asking for a tab
+  (History's *History Settings…*, setup's *Choose Another Shortcut…*) switches the open window
+  instead of rebuilding it, which threw away an editor sheet and its unsaved draft. While a sheet
+  is open the tab stays as it is and the window only comes forward, because switching away from
+  the tab that opened the sheet can close it, and at best leaves it over the wrong tab. Settings
+  reopens on the tab it last showed.
+- **Settings uses AppKit's toolbar tabs.** `SettingsTabViewController` is an `NSTabViewController`
+  in toolbar style, like the Settings windows of Apple's apps: icons over names in the toolbar, and
+  the window titled after the pane showing and sized to it, its top-left corner fixed. A SwiftUI
+  `TabView` looks like that only in a SwiftUI `Settings` scene, and Settings is an AppKit window
+  like the app's others, so `WindowPresenter` can bring it forward from the menu bar and see
+  whether a sheet is open. In an ordinary window the `TabView` drew a segmented control over a
+  bordered box, which looked dated and took room from every pane. Each pane is an
+  `NSHostingController` that reports its SwiftUI size, set by `SettingsPaneFrame`: 680 points
+  wide, as tall as its content up to 640 and scrolling beyond that, and 540 tall for the lists,
+  which have no natural height.
 - **The cleanup level applies to both modes.** Medium removes fillers in the live transcript too.
   Snippets and vocabulary apply only to dictation.
 - **A chosen microphone that disconnects** falls back to the system default with a notice

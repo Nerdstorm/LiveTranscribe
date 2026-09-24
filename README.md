@@ -529,7 +529,7 @@ macOS's microphone indicator then stays on while the app runs.
 
 ### Settings
 
-**Settings** (⌘, or the menu bar) has seven tabs:
+**Settings** (⌘, or the menu bar) has seven tabs, along the top of its window:
 
 | Tab | What it holds |
 |---|---|
