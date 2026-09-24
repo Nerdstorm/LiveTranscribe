@@ -15,13 +15,15 @@
 - **Punctuation and capitals, done.** From **Light** up, the local model fixes punctuation,
   casing and misheard words.
 - **Spoken lists become lists.** At Medium or High, in any app that takes several lines, say
-  "first… second… and third…", "number one… number two…" or "bullet point… bullet point…" and
+  "first… second… and third…", "one is… two is…", "number one… number two…" or "bullet point…
+  bullet point…" and
   each item gets its own numbered or bulleted line, under a lead-in ending in a colon. The items
   keep your words.
 - **Letters and emails laid out.** Start with a greeting ("Dear sir or madam", "Hi John") and
-  end with a sign-off ("Kind regards Jordan Lee", "Cheers Sam"), and at Medium or High, in any
-  app that takes several lines, the greeting and the sign-off each get their own lines. The
-  model cleans only the body, so it cannot move the names around.
+  end with a sign-off ("Kind regards Jordan Lee", "Cheers Sam", or just "Thanks" after a few
+  sentences or a list), and at Medium or High, in any app that takes several lines, the greeting
+  and the sign-off each get their own lines, with any list in between laid out. The model cleans
+  only the body, so it cannot move the names around.
 - **Emoji, punctuation and line breaks by voice.** At every level, say "hi emoji fireworks" for
   "hi 🎆", "thanks heart emoji" for "thanks ❤️", "is it ready question mark" for "is it ready?",
   "new line" or "new paragraph" for a line break, and "john dot smith at example dot com" for
@@ -164,8 +166,8 @@
 
 Ideas for a later phase. None of this is started, and **none of it is in the app yet**:
 
-- Bullet lists without spoken markers. Today a list needs "first… second…", "number one…" or
-  "bullet point…".
+- Bullet lists without spoken markers. Today a list needs "first… second…", "one is… two is…",
+  "number one…" or "bullet point…".
 - Paragraph breaks in long dictations, without saying "new paragraph".
 - Per-app cleanup level and tone. Apps can be set single-line today, but every app gets the
   same cleanup.

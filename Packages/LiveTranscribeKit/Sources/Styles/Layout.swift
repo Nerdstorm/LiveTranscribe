@@ -29,9 +29,10 @@ public struct Layout: Sendable {
     }
 
     /// The first frame that fits `text`, the transcript before cleanup; `nil` when none does.
-    public func frame(in text: String) -> TextFrame? {
+    /// `listMarkers` are the placeholders in `text` that start list items.
+    public func frame(in text: String, listMarkers: Set<String> = []) -> TextFrame? {
         for rule in frames {
-            if let frame = rule.frame(in: text) { return frame }
+            if let frame = rule.frame(in: text, listMarkers: listMarkers) { return frame }
         }
         return nil
     }
@@ -51,14 +52,23 @@ public struct Layout: Sendable {
 
 /// Rearranges one paragraph of cleaned text.
 public protocol LayoutRule: Sendable {
-    /// `lines`, one paragraph without blank lines, laid out; `nil` to leave them as they are.
+    /// `lines`, one paragraph without blank lines, laid out; `nil` to leave them as they are. A
+    /// blank line in the result starts a new paragraph, as after a list.
     func arrange(_ lines: [String]) -> [String]?
 }
 
 /// Finds a structure in the words before cleanup.
 public protocol FrameRule: Sendable {
-    /// The frame around `text`, or `nil` when the structure is not there.
-    func frame(in text: String) -> TextFrame?
+    /// The frame around `text`, or `nil` when the structure is not there. `listMarkers` are the
+    /// placeholders in `text` that start list items, such as a spoken "number one".
+    func frame(in text: String, listMarkers: Set<String>) -> TextFrame?
+}
+
+extension FrameRule {
+    /// The frame around `text`, which has no list markers.
+    public func frame(in text: String) -> TextFrame? {
+        frame(in: text, listMarkers: [])
+    }
 }
 
 /// Text split into a body the language model cleans and the laid-out text around it.

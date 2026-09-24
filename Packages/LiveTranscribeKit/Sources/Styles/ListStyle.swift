@@ -61,7 +61,7 @@ public struct ListStyle: Sendable, Equatable {
     }
 
     /// `text` split after its first sentence, or `nil` when it is one sentence. The text after
-    /// a list's last item follows the list on a line of its own.
+    /// a list's last item starts a new paragraph after the list.
     static func splitAfterFirstSentence(_ text: String) -> (sentence: String, rest: String)? {
         let tokens = text.split(whereSeparator: \.isWhitespace)
         guard let end = tokens.firstIndex(where: { $0.last.map(sentenceEnders.contains) ?? false }),

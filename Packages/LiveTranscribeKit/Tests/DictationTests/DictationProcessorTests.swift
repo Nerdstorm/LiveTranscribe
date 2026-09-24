@@ -186,6 +186,29 @@ struct DictationProcessorTests {
         #expect(!output.fellBack)
     }
 
+    /// An email with a greeting, a list said as "one is …, two, …", and "Thanks" with no name:
+    /// laid out as a letter, with the list in its body and the text after it in a paragraph.
+    @Test func anEmailWithASpokenListIsLaidOut() async {
+        let transcript = "Hi team, there are a few things I need to talk with you about. One is the launch of the "
+            + "application and how to go through the QA process. Two, the marketing part of it. Talk back to me "
+            + "when you get five minutes. Thanks."
+        let output = await finish(transcript, configuration(.high, multiline: true), cleaner: ScriptedCleaner { $0 })
+        #expect(output.text == "Hi team,\n\nThere are a few things I need to talk with you about:\n"
+            + "1. The launch of the application and how to go through the QA process.\n2. The marketing part of it.\n\n"
+            + "Talk back to me when you get five minutes.\n\nThanks,")
+        #expect(output.uncleanedText == transcript)
+    }
+
+    /// "Number one …" markers make a one-sentence body a letter's.
+    @Test func anEmailWithListMarkersIsLaidOut() async {
+        let output = await finish(
+            "Hi team, number one the launch, number two the marketing. Thanks",
+            configuration(.medium, multiline: true),
+            cleaner: ScriptedCleaner { $0 }
+        )
+        #expect(output.text == "Hi team,\n\n1. The launch\n2. The marketing\n\nThanks,")
+    }
+
     @Test func anUnpunctuatedNoteIsFramed() async {
         let output = await finish(
             "Hi John thanks for the update I will review it tomorrow cheers Sam.",

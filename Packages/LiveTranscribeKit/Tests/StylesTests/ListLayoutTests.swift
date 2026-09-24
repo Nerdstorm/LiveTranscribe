@@ -23,9 +23,9 @@ struct MarkedListLayoutTests {
         #expect(layout.arrange(["Groceries.", "- milk,", "- eggs."]) == ["Groceries:", "- Milk", "- Eggs"])
     }
 
-    @Test func movesTextAfterTheLastItemToItsOwnLine() {
+    @Test func startsANewParagraphAfterTheLastItem() {
         #expect(layout.arrange(["My goals:", "1. ship the release.", "2. fix the login bug. Then we celebrate."])
-            == ["My goals:", "1. Ship the release", "2. Fix the login bug", "Then we celebrate."])
+            == ["My goals:", "1. Ship the release", "2. Fix the login bug", "", "Then we celebrate."])
     }
 
     @Test func aListRightAfterAnotherHasNoLeadIn() {
@@ -44,6 +44,11 @@ struct OrdinalListLayoutTests {
     @Test func laysOutAnEnumerationWithinALine() {
         #expect(layout.arrange(["Hello.", "We need three things: first, milk; second, eggs; and third, bread."])
             == ["Hello.", "We need three things:", "1. Milk", "2. Eggs", "3. Bread"])
+    }
+
+    @Test func laysOutAListNumberedWithCardinals() {
+        #expect(layout.arrange(["Two things. One is the build, two is the docs. Thanks for checking."])
+            == ["Two things:", "1. The build", "2. The docs", "", "Thanks for checking."])
     }
 
     @Test func leavesListLinesAlone() {

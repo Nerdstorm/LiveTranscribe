@@ -118,7 +118,7 @@
         }
       ],
       "url" : "https://github.com/apple/swift-collections",
-      "version" : "1.7.0"
+      "version" : "1.6.0"
     },
     {
       "name" : "swift-crypto",

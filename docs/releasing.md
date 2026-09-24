@@ -53,6 +53,10 @@ Sparkle's tools first reads the key; allow it.
 **The team ID.** The script takes `DEVELOPMENT_TEAM` from `Config/Signing.local.xcconfig` (see
 [Signing and Gatekeeper](signing.md)), or `LT_TEAM_ID` from the environment.
 
+**An earlier macOS SDK.** Every build is checked against the Swift runtime of an earlier macOS,
+which the oldest macOS SDK on your Mac that is older than Xcode's describes. Command Line Tools
+(`xcode-select --install`) keeps the previous macOS's SDK. `LT_BASELINE_SDK` names another.
+
 **For `make release`,** the GitHub CLI, signed in with `gh auth login`.
 
 `make doctor` checks all of these but the update signing key, which `make release` checks, as the
@@ -108,8 +112,8 @@ keychain may ask before the key is read.
 
 It stops at the first problem, and shows the end of that step's log.
 
-1. Checks the tag, the certificate and the notary credentials, and for `--draft` that origin has
-   the same tag.
+1. Checks the tag, the certificate, the notary credentials and the earlier macOS SDK, and for
+   `--draft` that origin has the same tag.
 2. Exports the tagged commit into `build/release/<version>/source`, so uncommitted changes in
    your checkout can't reach a release, and fetches the Swift packages.
 3. Checks that the keychain's update signing key is the one `App/Info.plist` trusts. Steps 1 to 3
@@ -120,7 +124,9 @@ It stops at the first problem, and shows the end of that step's log.
    come from `Package.resolved` alone.
 5. Exports the app through Xcode's Developer ID distribution, and checks its signature: your
    team's Developer ID, the Hardened Runtime, a secure timestamp, and no debugging entitlement.
-   It also checks that the app has Sparkle, the appcast's address and the update key.
+   It also checks that the app has Sparkle, the appcast's address and the update key, and that it
+   needs nothing from the Swift runtime that the earlier macOS lacks: macOS wouldn't launch it
+   there at all (`scripts/check-swift-runtime.sh`).
 6. Notarizes the app and staples its ticket, so a copy dragged out of the disk image opens
    offline.
 7. Makes the disk image, with an Applications shortcut next to the app, then signs, notarizes and
@@ -145,6 +151,7 @@ rejects a submission, its reasons are in `logs/notary-app-findings.json` or
 | `LT_SPARKLE_ACCOUNT` | `LiveTranscribe` | The keychain account of the update signing key |
 | `LT_UPDATE_FEED_URL` | `https://nerdstorm.github.io/LiveTranscribe/appcast.xml` | The appcast the app checks |
 | `LT_RELEASES_URL` | `https://github.com/Nerdstorm/LiveTranscribe/releases` | Where the appcast's downloads are |
+| `LT_BASELINE_SDK` | The oldest macOS SDK older than Xcode's | The SDK whose Swift runtime the app is checked against |
 
 ## Test builds
 

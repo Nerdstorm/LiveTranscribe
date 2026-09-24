@@ -70,8 +70,10 @@ focus context, Command Mode, multilingual) is not started.
   cleaned. Layout was planned to run after cleanup (L1), but given a whole letter the model moved
   the name in the sign-off into the greeting ("Hi John … cheers Sam" became "Hi Sam, … Cheers.")
   and the guard accepted it. A letter needs a greeting at the start and a sign-off at the end;
-  "Thanks", "Cheers", "Best" and "Love" count as sign-offs only before a name, so a chat message
-  ("Hi John, can you send it? Thanks") is left alone.
+  "Thanks", "Cheers", "Best" and "Love" count as sign-offs before a name, or with no name after a
+  body of two sentences or more or a spoken list, so a one-line chat message ("Hi John, can you
+  send it? Thanks") is left alone while an email that lists a few points and ends "Thanks" is
+  laid out.
 - **OutputGuard keeps names in place and content words in, at every level.** In a single-line
   field there is no letter frame, and the model still moved the sign-off's name into the
   greeting; at High, rewording was checked for length and similarity only, and dropped "milk"

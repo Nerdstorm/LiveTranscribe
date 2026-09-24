@@ -34,8 +34,8 @@
 - The self-correction adapter occasionally rewrites a plain sentence (1 of 65 eval clips);
   OutputGuard catches it and inserts the raw transcript instead of the cleaned text. In
   dictation such a fallback is silent: only **Dictation History** shows it, if history is on.
-- Spoken lists are laid out only when you say their markers ("first…", "number one…", "bullet
-  point…"), and lists and letters only where line breaks are allowed. The model sometimes drops
+- Spoken lists are laid out only when you say their markers ("first…", "one is…", "number
+  one…", "bullet point…"), and lists and letters only where line breaks are allowed. The model sometimes drops
   or rewrites a list item; OutputGuard then inserts your words, still laid out.
 - A text box in a web page always counts as taking several lines, so a list dictated into a
   web page's one-line field, such as a site's search box, gets line breaks the field then drops

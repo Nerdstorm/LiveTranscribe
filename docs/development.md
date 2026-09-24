@@ -11,7 +11,8 @@ The package has more than 1,000 Swift Testing tests. Unit tests need no models:
 make test
 ```
 
-It also runs `scripts/tests/`, which tests `scripts/write-changelog.sh` in a scratch repository.
+It also runs `scripts/tests/`, which tests `scripts/write-changelog.sh` in a scratch repository and
+`scripts/check-swift-runtime.sh` with small programs.
 
 The end-to-end tests and the bench use short spoken clips. The clips are not in the repository,
 because Apple's licence does not allow publishing recordings of its system voices. `make audio`

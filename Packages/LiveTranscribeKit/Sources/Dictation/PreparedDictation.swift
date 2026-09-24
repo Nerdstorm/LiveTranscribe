@@ -57,7 +57,8 @@ struct PreparedDictation {
     /// level's filler removal, so "Um, dear Sam" still starts with its greeting.
     func frame(level: CleanupLevel) -> TextFrame? {
         guard laysOut else { return nil }
-        return layout.frame(in: CleanupExecutor.deterministicCleanup(of: text, level: level))
+        let listMarkers = Set(protected.placeholders.filter { $0.role == .structure }.map(\.token))
+        return layout.frame(in: CleanupExecutor.deterministicCleanup(of: text, level: level), listMarkers: listMarkers)
     }
 
     /// `cleaned`, cleanup's output with every placeholder in it, as the text to insert; `nil` when

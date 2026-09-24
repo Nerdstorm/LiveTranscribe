@@ -24,6 +24,12 @@ Free and open source (MIT) · Apple silicon · macOS 14 or later (tested on macO
 
 ## See the difference
 
+A reply dictated into Slack: hold the shortcut, speak, let go.
+
+<p align="center">
+  <img src="site/images/slack-demo-clip.gif" width="732" alt="Dictating a reply in Slack. A pill by the message box shows Listening, then Transcribing, and the reply appears laid out: “Thanks for the feedback, Rost. I have a couple of things for you:”, a numbered list, “1. Can you check the application on your iOS device?” and “2. Once done, tag it and push it to GitHub.”, then “Thanks, I'll talk to you later.” in a paragraph of its own.">
+</p>
+
 Real outputs from the dictation eval, at the default **Medium** cleanup level:
 
 | You say | Live Transcribe types |
