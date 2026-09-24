@@ -4,9 +4,9 @@ import Shared
 /// Finds spoken snippet triggers in a raw transcript and swaps them for placeholder tokens, so the
 /// language model never sees (and never "fixes") a URL, an address or a signature.
 ///
-/// The dictation flow calls ``protect(_:)`` before cleanup, asks the model to keep the tokens
-/// verbatim, and calls ``ProtectedText/restore(in:)`` on the model's output. A model that drops
-/// or mangles a token is caught there instead of inserting half an expansion.
+/// Dictation passes it to ``PhraseProtector`` with the spoken commands, asks the model to keep
+/// the tokens verbatim, and calls ``ProtectedText/restore(in:)`` on the model's output. A model
+/// that drops or mangles a token is caught there instead of inserting half an expansion.
 ///
 /// Matching:
 /// - whole words only, after ``EditDistance/normalize(_:)``, so casing and punctuation do not
@@ -18,7 +18,7 @@ import Shared
 ///   "Here's ⟦S1⟧.";
 /// - a snippet that ``Snippet/validate(_:)`` would reject for its own content (a trigger with no
 ///   words, an empty expansion) or for repeating an earlier snippet's trigger is ignored.
-public struct SnippetExpander: Sendable {
+public struct SnippetExpander: PhraseMatcher {
     /// Patterns keyed by their first word, longest first, so the first one that matches at a
     /// position is the longest.
     private let patternsByFirstWord: [String: [TriggerPattern]]
@@ -51,38 +51,34 @@ public struct SnippetExpander: Sendable {
         }
     }
 
+    /// The longest trigger starting at each word, each a placeholder for its snippet's expansion.
+    /// Overlapping matches are left for ``PhraseProtector`` to choose among.
+    public func matches(in text: TokenizedText) -> [PhraseMatch] {
+        guard !patternsByFirstWord.isEmpty else { return [] }
+        var found: [PhraseMatch] = []
+        for (position, word) in text.words.enumerated() where word.startsToken {
+            guard let candidates = patternsByFirstWord[word.text],
+                  let pattern = candidates.first(where: { Self.words(text.words, at: position, match: $0.words) })
+            else { continue }
+            let end = position + pattern.words.count
+            found.append(PhraseMatch(
+                words: position..<end,
+                replacement: .placeholder(
+                    trigger: pattern.snippet.trigger,
+                    expansion: pattern.snippet.expansion,
+                    role: .content
+                ),
+                keptLeading: String(pattern.keptLeading(of: text.token(ofWord: position))),
+                keptTrailing: String(pattern.keptTrailing(of: text.token(ofWord: end - 1)))
+            ))
+        }
+        return found
+    }
+
     /// `text` with every trigger replaced by a placeholder token, numbered in order of
     /// appearance. Text without triggers comes back unchanged.
     public func protect(_ text: String) -> ProtectedText {
-        guard !patternsByFirstWord.isEmpty else { return ProtectedText(unchanged: text) }
-        let tokenized = TokenizedText(text)
-        let matches = findMatches(in: tokenized)
-        guard !matches.isEmpty else { return ProtectedText(unchanged: text) }
-
-        var segments: [ProtectedText.Segment] = []
-        var placeholders: [Placeholder] = []
-        var cursor = text.startIndex
-        for match in matches {
-            let firstToken = tokenized.tokens[match.firstToken]
-            let lastToken = tokenized.tokens[match.lastToken]
-            let before = text[cursor..<firstToken.lowerBound] + match.pattern.keptLeading(of: text[firstToken])
-            let after = match.pattern.keptTrailing(of: text[lastToken])
-
-            let placeholder = Placeholder(
-                token: Placeholder.token(number: placeholders.count + 1),
-                trigger: match.pattern.snippet.trigger,
-                expansion: match.pattern.snippet.expansion
-            )
-            segments.append(.literal(String(before)))
-            segments.append(.placeholder(placeholders.count))
-            segments.append(.literal(String(after)))
-            placeholders.append(placeholder)
-            cursor = lastToken.upperBound
-        }
-        segments.append(.literal(String(text[cursor...])))
-
-        Log.snippets.debug("Protected \(placeholders.count, privacy: .public) snippet occurrences")
-        return ProtectedText(segments: segments.filter { $0 != .literal("") }, placeholders: placeholders)
+        PhraseProtector(matchers: [self]).protect(text)
     }
 
     /// `text` with every trigger replaced by its expansion directly, for text that does not go
@@ -92,33 +88,6 @@ public struct SnippetExpander: Sendable {
     }
 
     // MARK: - Private
-
-    private struct Match {
-        let firstToken: Int
-        let lastToken: Int
-        let pattern: TriggerPattern
-    }
-
-    /// Leftmost, then longest, non-overlapping matches that cover whole tokens.
-    private func findMatches(in text: TokenizedText) -> [Match] {
-        let words = text.words
-        var found: [Match] = []
-        var position = 0
-        while position < words.count {
-            let word = words[position]
-            guard word.startsToken,
-                  let candidates = patternsByFirstWord[word.text],
-                  let pattern = candidates.first(where: { Self.words(words, at: position, match: $0.words) })
-            else {
-                position += 1
-                continue
-            }
-            let lastWord = words[position + pattern.words.count - 1]
-            found.append(Match(firstToken: word.token, lastToken: lastWord.token, pattern: pattern))
-            position += pattern.words.count
-        }
-        return found
-    }
 
     /// Whether `pattern` matches the words starting at `position` and ends at the end of a token.
     private static func words(_ words: [TokenizedText.Word], at position: Int, match pattern: [String]) -> Bool {

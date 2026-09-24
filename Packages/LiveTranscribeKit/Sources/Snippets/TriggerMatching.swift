@@ -1,61 +1,6 @@
 import Foundation
 import Shared
 
-/// Text split the way trigger matching sees it: whitespace-delimited tokens, and the normalised
-/// words each token contributes.
-///
-/// A token usually contributes one word, but a hyphenated token ("calendar-link") contributes
-/// several and a lone dash or ellipsis none, because ``EditDistance/normalize(_:)`` splits on
-/// hyphens and drops punctuation. Matches must start at a token's first word and end at a
-/// token's last word, so only whole tokens are ever replaced.
-struct TokenizedText {
-    struct Word {
-        let text: String
-        let token: Int
-        let startsToken: Bool
-        let endsToken: Bool
-    }
-
-    /// Character ranges of the whitespace-delimited tokens, in order.
-    let tokens: [Range<String.Index>]
-    let words: [Word]
-
-    init(_ text: String) {
-        var tokens: [Range<String.Index>] = []
-        var tokenStart: String.Index?
-        var index = text.startIndex
-        while index < text.endIndex {
-            if text[index].isWhitespace {
-                if let start = tokenStart {
-                    tokens.append(start..<index)
-                    tokenStart = nil
-                }
-            } else if tokenStart == nil {
-                tokenStart = index
-            }
-            index = text.index(after: index)
-        }
-        if let start = tokenStart {
-            tokens.append(start..<text.endIndex)
-        }
-
-        var words: [Word] = []
-        for (tokenIndex, range) in tokens.enumerated() {
-            let tokenWords = EditDistance.words(in: EditDistance.normalize(String(text[range])))
-            for (position, word) in tokenWords.enumerated() {
-                words.append(Word(
-                    text: word,
-                    token: tokenIndex,
-                    startsToken: position == 0,
-                    endsToken: position == tokenWords.count - 1
-                ))
-            }
-        }
-        self.tokens = tokens
-        self.words = words
-    }
-}
-
 /// A snippet's trigger prepared for matching.
 struct TriggerPattern: Sendable {
     let words: [String]
@@ -92,25 +37,5 @@ struct TriggerPattern: Sendable {
         let trailing = TokenEdges.trailing(of: token)
         guard !trailingPunctuation.isEmpty, trailing.hasPrefix(trailingPunctuation) else { return trailing }
         return trailing.dropFirst(trailingPunctuation.count)
-    }
-}
-
-/// The punctuation around a token's letters and digits.
-enum TokenEdges {
-    /// Characters before the first letter or digit. Empty for a token with no letters or digits,
-    /// so its characters are never counted twice as both leading and trailing.
-    static func leading(of token: Substring) -> Substring {
-        guard let first = token.firstIndex(where: isWordCharacter) else { return token.prefix(0) }
-        return token[..<first]
-    }
-
-    /// Characters after the last letter or digit; empty for a token with no letters or digits.
-    static func trailing(of token: Substring) -> Substring {
-        guard let last = token.lastIndex(where: isWordCharacter) else { return token.suffix(0) }
-        return token[token.index(after: last)...]
-    }
-
-    private static func isWordCharacter(_ character: Character) -> Bool {
-        character.isLetter || character.isNumber
     }
 }
