@@ -28,6 +28,9 @@ public enum FallbackReason: Sendable, Equatable, CustomStringConvertible {
     case droppedWords(count: Int)
     /// A negation ("not", "never", "can't") was removed.
     case lostNegation
+    /// Words that carry what was said ("milk", "Tuesday", "cancel") were deleted with nothing in
+    /// their place.
+    case droppedContent(count: Int)
     case timedOut(seconds: Double)
     case cancelled
     case generationFailed(String)
@@ -44,6 +47,7 @@ public enum FallbackReason: Sendable, Equatable, CustomStringConvertible {
         case .placeholderChanged: "changed a placeholder"
         case .droppedWords(let count): "dropped \(count) spoken words"
         case .lostNegation: "dropped a negation"
+        case .droppedContent(let count): count == 1 ? "dropped a word that carries meaning" : "dropped \(count) words that carry meaning"
         case .timedOut(let seconds): String(format: "timed out after %.1fs", seconds)
         case .cancelled: "cancelled"
         case .generationFailed(let message): "generation failed: \(message)"
@@ -70,8 +74,10 @@ public enum GuardVerdict: Sendable, Equatable {
 /// to pass the length and similarity limits. At a level that keeps every word (Light), dropping
 /// a cue is always rejected.
 ///
-/// Output that keeps every cue is checked by ``DroppedWords``: it may not remove a negation and,
-/// unless the level allows rewording (High), may not delete a run of spoken words outright.
+/// Output that keeps every cue may not remove a negation and, unless the level allows rewording
+/// (High), may not delete a run of spoken words outright (``DroppedWords``). At every level, it
+/// may not delete a word that carries meaning with nothing in its place (``ContentWords``):
+/// rewording replaces words, it does not leave them out.
 public struct OutputGuard: Sendable {
     public struct Policy: Sendable, Equatable {
         /// Allowed ratio of the output's word count to the input's, per level. A level missing
@@ -87,8 +93,13 @@ public struct OutputGuard: Sendable {
         public var fillers: [String]
         /// Words that negate what follows; removing one reverses the meaning.
         public var negations: [String]
+        /// Words that hold a sentence together rather than carry what was said ("the", "of",
+        /// "is"), which cleanup may drop or replace. Every other word is content.
+        public var functionWords: [String]
         /// Longest run of spoken words that output keeping every cue may delete outright.
         public var maxDroppedRun: Int
+        /// Most content words that output keeping every cue may delete with nothing in their place.
+        public var maxDroppedContent: Int
         /// Most words a self-correction may retract before its cue.
         public var maxRetractedWords: Int
         /// Minimum similarity for a word that was not spoken to count as a respelling of one
@@ -106,7 +117,9 @@ public struct OutputGuard: Sendable {
             correctionCues: [String],
             fillers: [String],
             negations: [String],
+            functionWords: [String],
             maxDroppedRun: Int,
+            maxDroppedContent: Int,
             maxRetractedWords: Int,
             minRespellingSimilarity: Double,
             requiresIntactPlaceholders: Bool = true
@@ -117,7 +130,9 @@ public struct OutputGuard: Sendable {
             self.correctionCues = correctionCues
             self.fillers = fillers
             self.negations = negations
+            self.functionWords = functionWords
             self.maxDroppedRun = maxDroppedRun
+            self.maxDroppedContent = maxDroppedContent
             self.maxRetractedWords = maxRetractedWords
             self.minRespellingSimilarity = minRespellingSimilarity
             self.requiresIntactPlaceholders = requiresIntactPlaceholders
@@ -142,7 +157,9 @@ public struct OutputGuard: Sendable {
             ],
             fillers: FillerRemover.standardFillers,
             negations: ["not", "never", "no", "nothing", "nobody", "none", "neither", "nor", "nowhere", "cannot", "without"],
+            functionWords: ContentWords.standardFunctionWords,
             maxDroppedRun: 1,
+            maxDroppedContent: 0,
             maxRetractedWords: 6,
             minRespellingSimilarity: 0.6
         )
@@ -151,11 +168,13 @@ public struct OutputGuard: Sendable {
     public let policy: Policy
     private let selfCorrection: SelfCorrection
     private let droppedWords: DroppedWords
+    private let contentWords: ContentWords
 
     public init(policy: Policy = .default) {
         self.policy = policy
         self.selfCorrection = SelfCorrection(policy: policy)
         self.droppedWords = DroppedWords(policy: policy)
+        self.contentWords = ContentWords(policy: policy)
     }
 
     /// Whether `cleaned` has fewer correction cues than `raw`, so that ``review(raw:outcome:)``
@@ -212,6 +231,11 @@ public struct OutputGuard: Sendable {
         }
         if droppedWords.losesNegation(raw: rawWords, cleaned: cleanedWords) {
             return .rejected(.lostNegation)
+        }
+        let placeholderWords = Set(options.placeholders.map(EditDistance.normalize))
+        let droppedContent = contentWords.droppedCount(in: alignment, ignoring: placeholderWords)
+        if droppedContent > policy.maxDroppedContent {
+            return .rejected(.droppedContent(count: droppedContent))
         }
 
         let rawWordCount = EditDistance.words(in: raw).count
