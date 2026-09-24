@@ -2,7 +2,7 @@ import Foundation
 import Shared
 
 /// A letter or email: a greeting at the start ("Dear Sir or Madam", "Hi John") and a sign-off
-/// at the end ("Kind regards Purinda Gunasekara"), laid out on lines of their own around the
+/// at the end ("Kind regards Jordan Lee"), laid out on lines of their own around the
 /// body:
 ///
 ///     Dear Sir or Madam,
@@ -10,7 +10,7 @@ import Shared
 ///     I am writing about my passport renewal.
 ///
 ///     Kind regards,
-///     Purinda Gunasekara
+///     Jordan Lee
 ///
 /// Both ends are found in the words before cleanup, and only the body goes to the model: given a
 /// whole letter, the model moved the name in the sign-off into the greeting. A letter needs a
