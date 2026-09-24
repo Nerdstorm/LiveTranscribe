@@ -7,7 +7,10 @@ import Shared
 ///
 /// Numbered markers count only in a run that starts at one and goes up by one, with the same
 /// word, at least two of them, so "we're number one" stays as said. Bullets need two markers
-/// too. A marker after a determiner is a noun ("the number one priority", "a bullet point").
+/// too. Every marker needs words after it. A marker is talked about, not said, after a
+/// determiner ("the number one priority", "a bullet point"), after a form of "be" ("speed is
+/// number one and cost is number two"), and, for bullets, after an ordinal ("the second bullet
+/// point is wrong").
 ///
 /// Used only where lists are laid out: Medium and High, in fields that take several lines.
 /// Elsewhere the model sees the words, and text that is not laid out gets them back.
@@ -19,6 +22,14 @@ public struct ListMarkerCommand: PhraseMatcher {
         "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20,
     ]
     static let bullet = ["bullet", "point"]
+    /// Words after which "number one" is a predicate, not a list marker.
+    static let copulas: Set<String> = ["is", "was", "are", "were", "be", "been", "being", "am", "isn't", "wasn't", "aren't", "weren't"]
+    /// Endings of contracted copulas: "we're", "I'm".
+    static let copulaContractions = ["'re", "'m"]
+    /// Words after which "bullet point" names a bullet on a slide or page.
+    static let ordinals: Set<String> = [
+        "first", "second", "third", "fourth", "fifth", "sixth", "last", "next", "previous", "final", "other",
+    ]
 
     public init() {}
 
@@ -39,8 +50,10 @@ public struct ListMarkerCommand: PhraseMatcher {
         for position in text.words.indices.dropLast() where Self.numberedKeywords.contains(text.words[position].text) {
             let words = position..<(position + 2)
             guard text.coversWholeTokens(words),
+                  words.upperBound < text.words.count,
                   !PhraseGrammar.endsClause(text.token(ofWord: position)),
                   !PhraseGrammar.followsDeterminer(position, in: text),
+                  !Self.follows(position, in: text, oneOf: Self.copulas, orEndingIn: Self.copulaContractions),
                   let number = Self.number(text.words[position + 1].text)
             else { continue }
             candidates.append(Candidate(words: words, keyword: text.words[position].text, number: number))
@@ -66,7 +79,10 @@ public struct ListMarkerCommand: PhraseMatcher {
 
     private func bulletMarkers(in text: TokenizedText) -> [PhraseMatch] {
         let positions = text.words.indices.filter { position in
-            PhraseGrammar.matches(Self.bullet, at: position, in: text) && !PhraseGrammar.followsDeterminer(position, in: text)
+            PhraseGrammar.matches(Self.bullet, at: position, in: text)
+                && position + Self.bullet.count < text.words.count
+                && !PhraseGrammar.followsDeterminer(position, in: text)
+                && !Self.follows(position, in: text, oneOf: Self.ordinals)
         }
         guard positions.count >= 2 else { return [] }
         return positions.map { marker(at: $0..<($0 + 2), text: "- ", trigger: "bullet point", in: text) }
@@ -83,6 +99,20 @@ public struct ListMarkerCommand: PhraseMatcher {
             ),
             keptTrailing: PhraseGrammar.trailingAfterClausePunctuation(text.token(ofWord: words.upperBound - 1))
         )
+    }
+
+    /// Whether the word before `position`, in the same clause, is one of `words` or ends with
+    /// one of `endings`.
+    private static func follows(
+        _ position: Int,
+        in text: TokenizedText,
+        oneOf words: Set<String>,
+        orEndingIn endings: [String] = []
+    ) -> Bool {
+        guard position > 0 else { return false }
+        let previous = text.words[position - 1]
+        guard previous.endsToken, !PhraseGrammar.endsClause(text.token(previous.token)) else { return false }
+        return words.contains(previous.text) || endings.contains { previous.text.hasSuffix($0) }
     }
 
     private static func number(_ word: String) -> Int? {

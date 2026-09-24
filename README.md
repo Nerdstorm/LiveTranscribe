@@ -376,8 +376,10 @@ each build: grant them once more after switching, and they survive every rebuild
   High only (**Resolve spoken self-corrections** in **Settings › Advanced**, on by default).
 - A list needs at least two items, marked by spoken ordinals in order from "first" ("first",
   "second", … or "firstly", …, each starting a clause; "finally" or "lastly" may end it), by
-  "number", "item" or "step" with the numbers one, two, … in order, or by "bullet point". The
-  markers become "1." or "-", each item starts with a capital, the line before the list ends
+  "number", "item" or "step" with the numbers one, two, … in order, or by "bullet point". A
+  marker that is talked about stays as said: after "the" or "a", after "is" or "are" ("cost is
+  number two"), or for bullets after "first", "second", … ("the second bullet point is wrong").
+  The markers become "1." or "-", each item starts with a capital, the line before the list ends
   with a colon, and items keep their full stops only if every item is a sentence of four words
   or more. No other words change. Lists and letters are laid out only in multi-line text areas
   (fields macOS reports as a text area).

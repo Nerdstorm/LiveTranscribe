@@ -29,6 +29,11 @@ struct ListMarkerCommandTests {
         #expect(protected.placeholders.map(\.expansion) == ["\n- ", "\n- "])
     }
 
+    @Test func aListAfterAColonIsStillAList() {
+        let protected = protector.protect("My goals are: number one ship it, number two test it.")
+        #expect(protected.placeholders.map(\.expansion) == ["\n1. ", "\n2. "])
+    }
+
     @Test func aNewRunStartsAtOne() {
         let protected = protector.protect("step 1 mix step 2 bake then step one wash step two dry")
         #expect(protected.placeholders.map(\.expansion) == ["1. ", "\n2. ", "\n1. ", "\n2. "])
@@ -42,6 +47,11 @@ struct ListMarkerCommandTests {
         "a bullet point is enough",
         "one bullet point here",
         "we need number 1, and a bullet point",
+        "speed is number one and cost is number two for us",
+        "we're number one and they're number two in sales",
+        "speed number one, cost number two",
+        "the first bullet point is wrong and the second bullet point is fine",
+        "list bullet point milk bullet point",
     ])
     func leavesOtherText(text: String) {
         #expect(protector.protect(text).placeholders.isEmpty)
