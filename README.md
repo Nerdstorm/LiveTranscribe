@@ -84,7 +84,7 @@ Every feature, in detail: [docs/features.md](docs/features.md).
 | Guide | What's in it |
 |---|---|
 | [Features](docs/features.md) | Everything Live Transcribe does, in detail, and what's coming next |
-| [Using Live Transcribe](docs/using.md) | First launch, dictating, Dictation History, the live transcript, microphones and every Settings tab |
+| [Using Live Transcribe](docs/using.md) | First launch, dictating, Dictation History, the live transcript, microphones, updates and every Settings tab |
 | [Cleanup and spoken commands](docs/cleanup.md) | The four cleanup levels, what OutputGuard rejects, and the phrases that become emoji, punctuation, line breaks and addresses |
 | [Snippets, vocabulary and apps](docs/snippets-vocabulary-apps.md) | Saved text, your names and jargon, and how each app gets its text and line breaks |
 | [Privacy](docs/privacy.md) | What is kept where, what goes over the network, and how to remove it all |
@@ -159,8 +159,9 @@ models; see [Development](docs/development.md).
 
 ## Privacy
 
-Audio and transcripts never leave your Mac, and there is no telemetry. The only network traffic
-is to Hugging Face, to download the models. **Dictation history is on by default:** every
+Audio and transcripts never leave your Mac, and there is no telemetry. The app goes online only
+to download the models from Hugging Face and, in a downloaded release, to check GitHub for a new
+version about once a day if you allow it. **Dictation history is on by default:** every
 completed dictation (what you said, what was typed, the app and timings) is kept unencrypted on
 this Mac, never synced, until you turn history off, limit how long it is kept or clear it in
 **Settings › History**. Where each file lives, and how to remove everything:

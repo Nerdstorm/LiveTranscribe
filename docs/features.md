@@ -152,6 +152,9 @@
 - **Open all the way down.** MIT licensed, with more than 1,000 tests, a **Bench** tool that
   measures accuracy and speed on your own recordings, and a **Train** tool that rebuilds the
   self-correction adapter on your Mac, in Swift (the bundled one took 30 minutes).
+- **Keeps itself up to date.** A downloaded release checks GitHub for a new version about once
+  a day, if you let it, without interrupting what you're doing. Updates are signed and checked
+  before they install.
 - **Bring your own models.** Point **Settings › Advanced** at another Hugging Face
   speech-to-text, cleanup or voice-activity model that the MLX libraries can load. Or turn the
   language model off, and dictation still removes fillers and lays out spoken lists and letters

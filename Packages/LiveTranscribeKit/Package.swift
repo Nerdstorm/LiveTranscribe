@@ -23,7 +23,7 @@ let package = Package(
                 "Shared", "Capture", "Segmentation", "Transcription", "Cleanup",
                 "Persistence", "Session", "TranscriptUI", "MLXSupport", "Styles",
                 "Snippets", "SpokenCommands", "Vocabulary", "Insertion", "Hotkey", "Permissions", "Dictation", "DictationUI",
-                "About",
+                "Updates", "About",
             ]
         ),
         .executable(name: "Bench", targets: ["Bench"]),
@@ -39,6 +39,8 @@ let package = Package(
         // transitive dependencies of mlx-audio-swift; declared so Cleanup can adapt them).
         .package(url: "https://github.com/huggingface/swift-huggingface.git", exact: "0.11.0"),
         .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "1.3.4"),
+        // Updates for releases downloaded from GitHub (see docs/releasing.md).
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0"),
     ],
     targets: [
         // MARK: - Slices
@@ -134,8 +136,16 @@ let package = Package(
             name: "DictationUI",
             dependencies: [
                 "Shared", "Capture", "Dictation", "Hotkey", "Insertion", "Permissions", "Persistence",
-                "Snippets", "Vocabulary", "Styles", "Session", "TranscriptUI",
+                "Snippets", "Vocabulary", "Styles", "Session", "TranscriptUI", "Updates",
             ],
+            swiftSettings: strictSwift
+        ),
+
+        // Checking for and installing new releases, with Sparkle. Only this slice touches
+        // Sparkle's types; the UI sees SoftwareUpdating.
+        .target(
+            name: "Updates",
+            dependencies: ["Shared", .product(name: "Sparkle", package: "Sparkle")],
             swiftSettings: strictSwift
         ),
 
@@ -229,10 +239,11 @@ let package = Package(
             name: "DictationUITests",
             dependencies: [
                 "DictationUI", "Dictation", "Shared", "Capture", "Hotkey", "Insertion", "Permissions",
-                "Persistence", "Snippets", "Vocabulary", "Styles", "Session",
+                "Persistence", "Snippets", "Vocabulary", "Styles", "Session", "Updates",
             ],
             swiftSettings: strictSwift
         ),
+        .testTarget(name: "UpdatesTests", dependencies: ["Updates", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "AboutTests", dependencies: ["About", "Shared"], swiftSettings: strictSwift),
         .testTarget(
             name: "TranscriptUITests",

@@ -14,6 +14,7 @@ import Shared
 import Snippets
 import Transcription
 import TranscriptUI
+import Updates
 import Vocabulary
 
 /// The only place concrete implementations are constructed. Everything else depends on protocols.
@@ -143,7 +144,8 @@ final class AppComposition {
             history: history,
             microphonePermission: microphonePermission,
             accessibility: accessibility,
-            settingsAtLaunch: settings
+            settingsAtLaunch: settings,
+            updates: Self.makeUpdater()
         )
         hud = DictationHUD(controller: dictation)
         relay.deliver = { [weak self] notice, destination in self?.show(notice, in: destination) }
@@ -167,6 +169,28 @@ final class AppComposition {
         deviceTask = Task { [weak self] in
             for await _ in changes {
                 self?.captureNotices.devicesChanged()
+            }
+        }
+    }
+
+    /// Sparkle, in a release. A build from source names no update feed, so it never checks and is
+    /// never replaced by a release.
+    private static func makeUpdater() -> (any SoftwareUpdating)? {
+        switch UpdateFeed.status(in: Bundle.main.infoDictionary) {
+        case .notConfigured:
+            Log.updates.info("No update feed in this build, so it doesn't check for updates")
+            return nil
+        case .invalid(let reason):
+            Log.updates.error("Updates are off: \(reason, privacy: .public)")
+            return nil
+        case .configured(let feed):
+            do {
+                return try SparkleUpdater()
+            } catch {
+                Log.updates.error(
+                    "Updates are off: Sparkle didn't start with \(feed.url.absoluteString, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                )
+                return nil
             }
         }
     }

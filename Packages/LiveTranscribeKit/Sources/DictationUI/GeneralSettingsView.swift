@@ -4,8 +4,8 @@ import Hotkey
 import Shared
 import SwiftUI
 
-/// Settings › General: turning dictation on, its shortcuts, the cleanup level, the microphone
-/// and the timing group.
+/// Settings › General: turning dictation on, its shortcuts, the cleanup level, the microphone,
+/// the timing group and, in a release, updates.
 ///
 /// Every value is read and written through `@AppStorage`; the app watches UserDefaults and
 /// applies changes to the dictation controller, so they take effect on the next dictation.
@@ -38,6 +38,9 @@ struct GeneralSettingsView: View {
             GeneralSettingsMicrophoneSection(transcript: context.transcript)
             Section {
                 GeneralSettingsTimingSection()
+            }
+            if let updates = context.updates {
+                GeneralSettingsUpdatesSection(updates: updates)
             }
         }
         .formStyle(.grouped)

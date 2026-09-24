@@ -216,4 +216,11 @@ struct MenuBarStatus: Equatable, Sendable {
         guard let effective = HotkeyMatcher.effectiveUndoBinding(undo, dictation: dictation) else { return title }
         return "\(title) (\(effective.displayName))"
     }
+
+    /// "Check for Updates…", or "Update to 0.2.0…" while a release that a scheduled check found
+    /// waits behind other apps for the user to look at it.
+    static func updatesTitle(pendingVersion: String?) -> String {
+        guard let pendingVersion else { return "Check for Updates…" }
+        return "Update to \(pendingVersion)…"
+    }
 }

@@ -124,13 +124,29 @@ the system default, tells you, and switches back when it reconnects.
 between dictations, so dictation starts faster and keeps the 300 ms before you pressed the key.
 macOS's microphone indicator then stays on while the app runs.
 
+## Updates
+
+A release downloaded from GitHub updates itself with [Sparkle](https://sparkle-project.org). On
+its second launch it asks whether to check for updates automatically, about once a day; change
+that in **Settings › General › Updates**, which also has **Check Now** and when it last checked.
+**Check for Updates…** in the menu bar checks at once. A new version found by a daily check
+doesn't interrupt you: its window waits behind your other apps, and the menu bar offers **Update
+to** the new version until you look at it. Updates are signed, and Sparkle checks the signature
+before installing one.
+
+A build from source never checks for updates, and has neither the menu item nor the Settings
+section.
+
+**About Live Transcribe** in the menu bar shows the version, the models' credits and the licences
+of the open-source packages the app is built with.
+
 ## Settings
 
 **Settings** (⌘, or the menu bar) has seven tabs, along the top of its window:
 
 | Tab | What it holds |
 |---|---|
-| **General** | **Enable dictation**, the shortcuts, the cleanup level, the microphone, **Keep the microphone ready**, and **Timing**: 13 controls for gestures, recording limits, undo, messages, pasting, Accessibility and vocabulary |
+| **General** | **Enable dictation**, the shortcuts, the cleanup level, the microphone, **Keep the microphone ready**, **Timing**: 13 controls for gestures, recording limits, undo, messages, pasting, Accessibility and vocabulary, and in a downloaded release, **Updates** |
 | **Snippets** | trigger phrases and the text they insert |
 | **Vocabulary** | names and jargon, with how they are spoken |
 | **Apps** | per app, how text goes in (Accessibility or paste) and whether it takes line breaks |

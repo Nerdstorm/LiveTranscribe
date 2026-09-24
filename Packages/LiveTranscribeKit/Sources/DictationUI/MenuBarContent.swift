@@ -4,9 +4,10 @@ import Permissions
 import Shared
 import SwiftUI
 import TranscriptUI
+import Updates
 
 /// The menu bar menu: dictation status and controls, stopping the live transcript, the cleanup
-/// level, the microphone, the app's windows and About.
+/// level, the microphone, the app's windows, About and, in a release, updates.
 ///
 /// Made for `MenuBarExtra { MenuBarContent(context:) } label: { MenuBarLabel(context:) }` with
 /// `.menuBarExtraStyle(.menu)`, so it uses only views a menu can show. What it says and allows
@@ -92,8 +93,20 @@ public struct MenuBarContent: View {
         Divider()
 
         Button("About Live Transcribe") { showWindow("About") { $0.showAbout() } }
+        if let updates = context.updates {
+            updatesItem(updates)
+        }
         Button("Quit Live Transcribe") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
+    }
+
+    /// *Check for Updates…*, which a running check disables, or the release a scheduled check
+    /// found, which can always be brought forward.
+    private func updatesItem(_ updates: any SoftwareUpdating) -> some View {
+        Button(MenuBarStatus.updatesTitle(pendingVersion: updates.pendingUpdateVersion)) {
+            updates.checkForUpdates()
+        }
+        .disabled(updates.pendingUpdateVersion == nil && !updates.canCheckForUpdates)
     }
 
     /// Copies the last dictation, for when it landed somewhere unexpected.
