@@ -3,13 +3,15 @@ import Insertion
 import Observation
 import Shared
 
-/// Settings › Apps: the built-in per-app insertion settings (read-only) and the user's own
-/// (editable), saved through ``InserterOverridesStore``.
+/// Settings › Apps: the built-in per-app settings (read-only) and the user's own (editable),
+/// saved through ``AppOverridesStore``. Each setting is an insertion method and a line setting.
 ///
 /// The store keeps only the user's entries; the built-in ones live in code. For an app in both,
-/// the user's entry wins (``InserterOverrides/merged(with:)``), and the built-in row says so.
+/// the user's entry wins (``AppOverrides/merged(with:)``), and the built-in row says so. A row
+/// shows what applies: an entry from before line settings, with a method only, shows the app's
+/// built-in or default line setting, and saving it stores both.
 ///
-/// Every change goes through ``InserterOverridesStore/update(_:)``, which re-reads the file and
+/// Every change goes through ``AppOverridesStore/update(_:)``, which re-reads the file and
 /// changes only the one app in a single step on the store: writing the copy loaded when the tab
 /// opened would drop an entry added by hand since, and a separate read and write could lose one
 /// saved in between.
@@ -28,10 +30,10 @@ final class AppOverridesModel {
     private(set) var runningApps: [AppOverrideApp] = []
     let status: EditableListStatus
 
-    private let store: InserterOverridesStore
+    private let store: AppOverridesStore
     private let catalog: any AppOverrideAppCatalog
-    private let builtIn: InserterOverrides
-    private var user: InserterOverrides = .empty
+    private let builtIn: AppOverrides
+    private var user: AppOverrides = .empty
     /// Apps already looked up, so Launch Services is asked once per bundle identifier.
     @ObservationIgnored private var appsByIdentifier: [String: AppOverrideApp] = [:]
 
@@ -39,11 +41,11 @@ final class AppOverridesModel {
     ///   - store: Where the user's settings live.
     ///   - catalog: Finds app names, icons and running apps.
     ///   - builtIn: The settings shipped with the app; tests pass a short list.
-    init(store: InserterOverridesStore, catalog: any AppOverrideAppCatalog, builtIn: InserterOverrides = .bundled) {
+    init(store: AppOverridesStore, catalog: any AppOverrideAppCatalog, builtIn: AppOverrides = .bundled) {
         self.store = store
         self.catalog = catalog
         self.builtIn = builtIn
-        status = EditableListStatus(fileURL: store.fileURL, subject: "per-app insertion settings")
+        status = EditableListStatus(fileURL: store.fileURL, subject: "per-app settings")
     }
 
     /// Reads the user's settings. A damaged file is set aside by the store and noted in
@@ -64,7 +66,7 @@ final class AppOverridesModel {
     func refreshRunningApps() {
         var seen: Set<String> = []
         runningApps = catalog.runningApps()
-            .filter { user.method(for: $0.bundleIdentifier) == nil && seen.insert($0.bundleIdentifier.lowercased()).inserted }
+            .filter { !user.hasOverride(for: $0.bundleIdentifier) && seen.insert($0.bundleIdentifier.lowercased()).inserted }
             .sorted(by: Self.byName)
         for app in runningApps { appsByIdentifier[app.bundleIdentifier] = app }
     }
@@ -80,17 +82,16 @@ final class AppOverridesModel {
         return app
     }
 
-    /// The method a new setting for this app starts with: the one it doesn't use now. An app
-    /// with no setting tries Accessibility first, so a setting for it is most likely Paste; a
-    /// built-in Paste app gets a setting to undo that.
-    func suggestedMethod(for bundleIdentifier: String) -> InsertionMethod {
-        let current = builtIn.merged(with: user).method(for: bundleIdentifier) ?? .accessibility
-        return current == .paste ? .accessibility : .paste
+    /// What applies to this app now, from the user's setting, the built-in one or the defaults
+    /// (Accessibility, multi-line). A new setting starts from it.
+    func currentSettings(for bundleIdentifier: String) -> (method: InsertionMethod, lineMode: LineMode) {
+        let current = builtIn.merged(with: user)
+        return (current.method(for: bundleIdentifier) ?? .accessibility, current.lineMode(for: bundleIdentifier) ?? .multiLine)
     }
 
-    /// A draft for a new setting; the app is chosen in the sheet.
+    /// A draft for a new setting, starting from the defaults; the app is chosen in the sheet.
     func newDraft() -> AppOverrideDraft {
-        AppOverrideDraft(app: nil, method: .paste, isNew: true)
+        AppOverrideDraft(app: nil, method: .accessibility, lineMode: .multiLine, isNew: true)
     }
 
     /// A draft that edits `row`. A built-in row can't be changed itself: its draft adds a setting
@@ -99,18 +100,20 @@ final class AppOverridesModel {
         if row.source == .builtIn, let own = userRows.first(where: { $0.bundleIdentifier.caseInsensitiveCompare(row.bundleIdentifier) == .orderedSame }) {
             return draft(for: own)
         }
-        switch row.source {
-        case .user: return AppOverrideDraft(app: row.app, method: row.method, isNew: false)
-        case .builtIn: return AppOverrideDraft(app: row.app, method: suggestedMethod(for: row.bundleIdentifier), isNew: true)
-        }
+        return AppOverrideDraft(app: row.app, method: row.method, lineMode: row.lineMode, isNew: row.source == .builtIn)
     }
 
-    /// Whether `draft` can be saved: an app has been chosen, and a new setting isn't for an app
-    /// that already has one.
+    /// Whether `draft` can be saved: an app has been chosen, a new setting isn't for an app that
+    /// already has one, and it changes something about the app.
     func validation(of draft: AppOverrideDraft) -> EditableListValidation {
         guard let app = draft.app else { return .incomplete("Choose an app.") }
-        if draft.isNew, user.method(for: app.bundleIdentifier) != nil {
+        guard draft.isNew else { return .valid }
+        if user.hasOverride(for: app.bundleIdentifier) {
             return .invalid("You already have a setting for \(app.name). Edit it instead.")
+        }
+        let current = currentSettings(for: app.bundleIdentifier)
+        if draft.method == current.method, draft.lineMode == current.lineMode {
+            return .incomplete("Choose a setting \(app.name) doesn\u{2019}t already use.")
         }
         return .valid
     }
@@ -125,12 +128,14 @@ final class AppOverridesModel {
         guard validation(of: draft).canSave, let app = draft.app else { return false }
         let bundleIdentifier = app.bundleIdentifier
         let method = draft.method
+        let lineMode = draft.lineMode
         return await status.perform(draft.isNew ? "add a per-app setting" : "save a per-app setting") {
             let overrides = try await store.update { overrides in
-                overrides.methods = overrides.methods.filter {
-                    $0.key.caseInsensitiveCompare(bundleIdentifier) != .orderedSame
-                }
+                let otherApps: (String) -> Bool = { $0.caseInsensitiveCompare(bundleIdentifier) != .orderedSame }
+                overrides.methods = overrides.methods.filter { otherApps($0.key) }
+                overrides.lines = overrides.lines.filter { otherApps($0.key) }
                 overrides.methods[bundleIdentifier] = method
+                overrides.lines[bundleIdentifier] = lineMode
             }
             apply(overrides)
         }
@@ -143,29 +148,48 @@ final class AppOverridesModel {
     @discardableResult
     func delete(bundleIdentifier: String) async -> Bool {
         await status.perform("remove a per-app setting") {
-            let overrides = try await store.update { $0.methods[bundleIdentifier] = nil }
+            let overrides = try await store.update { overrides in
+                overrides.methods[bundleIdentifier] = nil
+                overrides.lines[bundleIdentifier] = nil
+            }
             apply(overrides)
         }
     }
 
     // MARK: - Private
 
-    private func apply(_ overrides: InserterOverrides) {
+    private func apply(_ overrides: AppOverrides) {
         user = overrides
-        userRows = overrides.methods
-            .map { AppOverrideRow(bundleIdentifier: $0.key, app: app(for: $0.key), method: $0.value, source: .user, isReplacedByUser: false) }
-            .sorted { Self.byName($0.app, $1.app) }
-        builtInRows = builtIn.methods
-            .map { key, method in
-                AppOverrideRow(
+        userRows = Self.apps(in: overrides)
+            .map { key in
+                let current = currentSettings(for: key)
+                return AppOverrideRow(
                     bundleIdentifier: key,
                     app: app(for: key),
-                    method: method,
-                    source: .builtIn,
-                    isReplacedByUser: overrides.method(for: key) != nil
+                    method: current.method,
+                    lineMode: current.lineMode,
+                    source: .user,
+                    isReplacedByUser: false
                 )
             }
             .sorted { Self.byName($0.app, $1.app) }
+        builtInRows = Self.apps(in: builtIn)
+            .map { key in
+                AppOverrideRow(
+                    bundleIdentifier: key,
+                    app: app(for: key),
+                    method: builtIn.method(for: key) ?? .accessibility,
+                    lineMode: builtIn.lineMode(for: key) ?? .multiLine,
+                    source: .builtIn,
+                    isReplacedByUser: overrides.hasOverride(for: key)
+                )
+            }
+            .sorted { Self.byName($0.app, $1.app) }
+    }
+
+    /// Every bundle identifier with a setting of either kind in `overrides`.
+    private static func apps(in overrides: AppOverrides) -> Set<String> {
+        Set(overrides.methods.keys).union(overrides.lines.keys)
     }
 
     /// How to show the app stored under `key`: its real name and icon when it is installed,

@@ -2,7 +2,7 @@ import Insertion
 import SwiftUI
 
 /// The sheet that adds a per-app setting (choosing the app from those running, or any app on
-/// disk) or changes an existing setting's method.
+/// disk) or changes an existing one: how the app gets its text, and whether it takes line breaks.
 struct AppOverrideEditorSheet: View {
     /// Tall enough for about six running apps.
     private static var runningListHeight: CGFloat { 170 }
@@ -10,7 +10,7 @@ struct AppOverrideEditorSheet: View {
     private let model: AppOverridesModel
     private let close: () -> Void
     /// The draft started without an app, so the sheet lists apps to choose from; otherwise the
-    /// app is fixed and only its method can change.
+    /// app is fixed and only its settings can change.
     private let choosesApp: Bool
     private let title: String
     @State private var draft: AppOverrideDraft
@@ -46,14 +46,24 @@ struct AppOverrideEditorSheet: View {
             } else if let app = draft.app {
                 AppOverrideAppLabel(app: app)
             }
-            VStack(alignment: .leading, spacing: 6) {
-                Picker("Insert text with", selection: $draft.method) {
-                    ForEach(InsertionMethod.allCases, id: \.self) { method in
-                        Text(method.displayName).tag(method)
+            // One grid, so both choices line up beside their labels.
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 16) {
+                GridRow {
+                    Text("Insert text with")
+                    VStack(alignment: .leading, spacing: 6) {
+                        choice(InsertionMethod.allCases, selection: $draft.method, label: "Insert text with", name: \.displayName)
+                        EditableListFieldNote(AppOverrideMethodText.summary(draft.method))
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .pickerStyle(.radioGroup)
-                EditableListFieldNote(AppOverrideMethodText.summary(draft.method))
+                GridRow {
+                    Text("Line breaks")
+                    VStack(alignment: .leading, spacing: 6) {
+                        choice(LineMode.allCases, selection: $draft.lineMode, label: "Line breaks", name: \.displayName)
+                        EditableListFieldNote(AppOverrideLineText.summary(draft.lineMode))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         }
         .onAppear {
@@ -67,6 +77,23 @@ struct AppOverrideEditorSheet: View {
             guard let id, let app = model.runningApps.first(where: { $0.id == id }) else { return }
             use(app)
         }
+    }
+
+    /// Radio buttons for `options`; the grid shows the label, so the picker only names itself to
+    /// VoiceOver.
+    private func choice<Option: Hashable>(
+        _ options: [Option],
+        selection: Binding<Option>,
+        label: String,
+        name: KeyPath<Option, String>
+    ) -> some View {
+        Picker(label, selection: selection) {
+            ForEach(options, id: \.self) { option in
+                Text(option[keyPath: name]).tag(option)
+            }
+        }
+        .pickerStyle(.radioGroup)
+        .labelsHidden()
     }
 
     /// The running apps to pick from, a button for any other app, and the app chosen that way.
@@ -104,12 +131,12 @@ struct AppOverrideEditorSheet: View {
         use(app)
     }
 
-    /// Makes `app` the draft's app, starting with the method it doesn't use now.
+    /// Makes `app` the draft's app, starting from the settings that apply to it now.
     private func use(_ app: AppOverrideApp) {
         choiceError = nil
         guard draft.app != app else { return }
         draft.app = app
-        draft.method = model.suggestedMethod(for: app.bundleIdentifier)
+        (draft.method, draft.lineMode) = model.currentSettings(for: app.bundleIdentifier)
     }
 
     private func save() {

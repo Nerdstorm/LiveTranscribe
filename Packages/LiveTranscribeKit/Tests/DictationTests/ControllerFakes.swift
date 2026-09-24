@@ -84,6 +84,7 @@ struct FakeElement: AccessibilityElement {
         return text.substring(with: range)
     }
     var processIdentifier: pid_t? { 42 }
+    var parent: (any AccessibilityElement)? { nil }
     func isSameElement(as other: any AccessibilityElement) -> Bool { true }
 }
 
@@ -141,7 +142,7 @@ final class FakeFocus: FocusedTargetProvider, @unchecked Sendable {
 
     /// A focused field whose caret is drawn at `caret`.
     static func field(caret: CGRect) -> InsertionTarget {
-        InsertionTarget(app: app, element: nil, isSecure: false, isMultiline: false, caretRect: caret)
+        InsertionTarget(app: app, element: nil, isSecure: false, caretRect: caret)
     }
 
     func set(_ target: InsertionTarget) { self.target.withLock { $0 = target } }
@@ -166,11 +167,20 @@ final class FakeFocus: FocusedTargetProvider, @unchecked Sendable {
 actor FakeDelivery: TextDelivery {
     private(set) var inserted: [String] = []
     private(set) var undone: [String] = []
+    /// The targets asked about line breaks.
+    private(set) var lineBreakQuestions: [InsertionTarget] = []
     var result: InsertionResult = .inserted(.accessibility, range: NSRange(location: 0, length: 0))
     var undoResult: UndoResult = .replacedInPlace(range: NSRange(location: 0, length: 0))
+    var lineBreaks = false
 
     func set(result: InsertionResult) { self.result = result }
     func set(undoResult: UndoResult) { self.undoResult = undoResult }
+    func set(lineBreaks: Bool) { self.lineBreaks = lineBreaks }
+
+    func allowsLineBreaks(in target: InsertionTarget) async -> Bool {
+        lineBreakQuestions.append(target)
+        return lineBreaks
+    }
 
     func insert(_ text: String, into target: InsertionTarget) async -> InsertionResult {
         inserted.append(text)

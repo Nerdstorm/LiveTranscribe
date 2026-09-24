@@ -29,8 +29,9 @@ public struct DictationProcessor: Sendable {
         public var vocabularyPromptLimit: Int
         /// How close a spoken word must be to a term for the term to be listed in the prompt.
         public var vocabularySimilarityThreshold: Double
-        /// The target field takes several lines, so spoken line breaks are newlines and spoken
-        /// lists and letters can be laid out on lines.
+        /// The text may break across lines, so spoken line breaks are newlines and spoken lists
+        /// and letters can be laid out on lines: the app is multi-line and the field isn't
+        /// certainly single-line (`AppOverrides.allowsLineBreaks(in:)`).
         public var multiline: Bool
 
         public init(

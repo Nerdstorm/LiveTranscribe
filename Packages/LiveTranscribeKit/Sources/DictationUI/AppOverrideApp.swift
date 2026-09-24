@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-/// An app a per-app insertion setting can name: its bundle identifier, and how to show it.
+/// An app a per-app setting can name: its bundle identifier, and how to show it.
 struct AppOverrideApp: Identifiable, Equatable, Sendable {
     /// The identifier the setting is stored under.
     let bundleIdentifier: String

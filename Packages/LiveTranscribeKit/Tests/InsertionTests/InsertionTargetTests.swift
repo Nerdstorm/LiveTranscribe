@@ -5,10 +5,9 @@ import Testing
 
 @Suite("InsertionTarget")
 struct InsertionTargetTests {
-    @Test func aPlainTextFieldIsNeitherSecureNorMultiline() {
+    @Test func aPlainTextFieldIsNotSecure() {
         let target = InsertionTarget(app: Fixtures.textEdit, element: FakeElement(value: ""), secureEventInputEnabled: false)
         #expect(!target.isSecure)
-        #expect(!target.isMultiline)
         #expect(target.app == Fixtures.textEdit)
     }
 
@@ -23,13 +22,6 @@ struct InsertionTargetTests {
     @Test func secureEventInputMakesAnyTargetSecure() {
         #expect(InsertionTarget(app: nil, element: FakeElement(value: ""), secureEventInputEnabled: true).isSecure)
         #expect(InsertionTarget(app: nil, element: nil, secureEventInputEnabled: true).isSecure)
-    }
-
-    @Test func aTextAreaIsMultiline() {
-        let target = InsertionTarget(
-            app: nil, element: FakeElement(value: "", role: kAXTextAreaRole), secureEventInputEnabled: false
-        )
-        #expect(target.isMultiline)
     }
 
     @Test("The caret rectangle comes from the selection's bounds", arguments: [
@@ -53,7 +45,7 @@ struct InsertionTargetTests {
     @Test func noElementMeansNoFlagsAndNoCaret() {
         let target = InsertionTarget(app: Fixtures.textEdit, element: nil, secureEventInputEnabled: false)
         #expect(target.element == nil)
-        #expect(!target.isSecure && !target.isMultiline)
+        #expect(!target.isSecure)
         #expect(target.caretRect == nil)
     }
 }

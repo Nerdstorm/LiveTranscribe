@@ -1,13 +1,14 @@
 import Foundation
 import Insertion
 
-/// One row of the Apps list: an app, and the insertion method its setting picks first.
+/// One row of the Apps list: an app, the insertion method its setting picks first, and whether
+/// its text may break across lines.
 struct AppOverrideRow: Identifiable, Equatable {
     /// Where the setting comes from.
     enum Source: String {
         /// The user's own setting, stored in `insertion-overrides.json`; editable.
         case user
-        /// Shipped with the app (``InserterOverrides/bundled``); read-only.
+        /// Shipped with the app (``AppOverrides/bundled``); read-only.
         case builtIn
     }
 
@@ -17,6 +18,7 @@ struct AppOverrideRow: Identifiable, Equatable {
     /// How to show the app; its ``AppOverrideApp/bundleIdentifier`` is ``bundleIdentifier``.
     let app: AppOverrideApp
     let method: InsertionMethod
+    let lineMode: LineMode
     let source: Source
     /// For a built-in row: the user has a setting of their own for this app, which wins.
     let isReplacedByUser: Bool
@@ -32,6 +34,7 @@ struct AppOverrideDraft: Identifiable, Equatable {
     /// The app, once one has been chosen.
     var app: AppOverrideApp?
     var method: InsertionMethod
+    var lineMode: LineMode
     /// Whether saving adds a setting rather than changing the one for ``app``.
     let isNew: Bool
 }
@@ -45,6 +48,19 @@ enum AppOverrideMethodText {
             "Types into the field directly and leaves the clipboard alone. If the app doesn\u{2019}t accept it, the text is pasted instead."
         case .paste:
             "Pastes with \u{2318}V. Works in almost every app, but briefly uses the clipboard."
+        }
+    }
+}
+
+/// What each line setting means, in the words of the Apps tab.
+enum AppOverrideLineText {
+    /// A sentence about `mode` for the picker in the editor sheet.
+    static func summary(_ mode: LineMode) -> String {
+        switch mode {
+        case .multiLine:
+            "Lists, letters and \u{201C}new line\u{201D} get line breaks, except in fields that take one line, such as search boxes."
+        case .singleLine:
+            "Everything stays on one line: lists and letters stay in the sentence, and \u{201C}new line\u{201D} types a space. For apps where a line break sends or runs something."
         }
     }
 }

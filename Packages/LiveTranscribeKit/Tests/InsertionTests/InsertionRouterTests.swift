@@ -20,7 +20,7 @@ struct InsertionRouterTests {
             clipboard: [PasteboardSnapshot.Item] = [],
             keystrokesSucceed: Bool = true,
             keystrokesPermitted: Bool = true,
-            overrides: InserterOverrides = .bundled
+            overrides: AppOverrides = .bundled
         ) {
             let pasteboard = FakePasteboard(items: clipboard)
             let keystrokes = keystrokesSucceed && keystrokesPermitted
@@ -104,14 +104,14 @@ struct InsertionRouterTests {
     }
 
     @Test("Chooses the methods for each app", arguments: [
-        (Fixtures.textEdit, InserterOverrides.empty, [InsertionMethod.accessibility, .paste]),
+        (Fixtures.textEdit, AppOverrides.empty, [InsertionMethod.accessibility, .paste]),
         (Fixtures.terminal, .bundled, [.paste]),
-        (Fixtures.terminal, .bundled.merged(with: InserterOverrides(methods: ["com.apple.Terminal": .accessibility])),
+        (Fixtures.terminal, .bundled.merged(with: AppOverrides(methods: ["com.apple.Terminal": .accessibility])),
          [.accessibility, .paste]),
-        (Fixtures.notes, InserterOverrides(methods: ["COM.APPLE.NOTES": .paste]), [.paste]),
+        (Fixtures.notes, AppOverrides(methods: ["COM.APPLE.NOTES": .paste]), [.paste]),
         (AppInfo(bundleIdentifier: nil, name: "tool", processIdentifier: 7), .bundled, [.accessibility, .paste]),
     ])
-    func methodOrder(app: AppInfo, overrides: InserterOverrides, expected: [InsertionMethod]) {
+    func methodOrder(app: AppInfo, overrides: AppOverrides, expected: [InsertionMethod]) {
         let router = InsertionRouter(
             accessibility: FakeInserter(.success(nil)),
             paste: FakeInserter(.success(nil)),

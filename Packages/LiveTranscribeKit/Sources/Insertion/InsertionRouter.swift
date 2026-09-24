@@ -24,15 +24,15 @@ public struct InsertionRouter: Sendable {
     private let accessibility: any TextInserter
     private let paste: any TextInserter
     private let pasteboard: any PasteboardAccess
-    private let overrides: InserterOverrides
+    private let overrides: AppOverrides
 
     /// - Parameter overrides: The effective overrides, normally
-    ///   `InserterOverrides.bundled.merged(with: userOverrides)`.
+    ///   `AppOverrides.bundled.merged(with: userOverrides)`.
     public init(
         accessibility: any TextInserter,
         paste: any TextInserter,
         pasteboard: any PasteboardAccess,
-        overrides: InserterOverrides
+        overrides: AppOverrides
     ) {
         self.accessibility = accessibility
         self.paste = paste

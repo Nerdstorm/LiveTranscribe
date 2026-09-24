@@ -111,13 +111,14 @@ extension DictationController {
 
         async let snippets = dependencies.snippets()
         async let vocabulary = dependencies.vocabulary()
+        async let allowsLineBreaks = dependencies.delivery.allowsLineBreaks(in: target)
         let configuration = DictationProcessor.Configuration(
             level: settings.cleanupLevel,
             snippets: await snippets,
             vocabulary: await vocabulary,
             vocabularyPromptLimit: settings.dictation.vocabularyPromptLimit,
             vocabularySimilarityThreshold: settings.dictation.vocabularySimilarityThreshold,
-            multiline: target.isMultiline
+            multiline: await allowsLineBreaks
         )
         let processor = dependencies.processor
         let samples = recording.samples

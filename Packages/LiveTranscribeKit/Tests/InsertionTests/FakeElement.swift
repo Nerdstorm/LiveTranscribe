@@ -42,6 +42,7 @@ final class FakeElement: AccessibilityElement {
     let role: String?
     let subrole: String?
     let processIdentifier: pid_t?
+    let parent: (any AccessibilityElement)?
     private let caretBounds: CGRect?
     private let providesStringForRange: Bool
     private let state: OSAllocatedUnfairLock<State>
@@ -60,11 +61,13 @@ final class FakeElement: AccessibilityElement {
         caretBounds: CGRect? = nil,
         behaviour: Behaviour = .normal,
         ignoresSelectionWrites: Bool = false,
-        providesStringForRange: Bool = true
+        providesStringForRange: Bool = true,
+        parent: (any AccessibilityElement)? = nil
     ) {
         self.role = role
         self.subrole = subrole
         self.processIdentifier = processIdentifier
+        self.parent = parent
         self.caretBounds = caretBounds
         self.providesStringForRange = providesStringForRange
         let initialSelection = selection ?? value.map { NSRange(location: $0.utf16.count, length: 0) }

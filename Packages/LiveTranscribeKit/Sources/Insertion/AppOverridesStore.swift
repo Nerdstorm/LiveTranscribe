@@ -1,8 +1,8 @@
 import Foundation
 import Shared
 
-/// Why the user's per-app insertion overrides could not be read or saved.
-public enum InserterOverridesStoreError: LocalizedError, Equatable, Sendable {
+/// Why the user's per-app settings could not be read or saved.
+public enum AppOverridesStoreError: LocalizedError, Equatable, Sendable {
     /// Application Support could not be located or created.
     case directoryUnavailable(String)
     /// The file exists but could not be read (permissions, I/O), or it is corrupt and could not
@@ -16,21 +16,21 @@ public enum InserterOverridesStoreError: LocalizedError, Equatable, Sendable {
         case .directoryUnavailable(let detail):
             "The Application Support folder is unavailable: \(detail)"
         case .readFailed(let detail):
-            "The per-app insertion settings could not be read: \(detail)"
+            "The per-app settings could not be read: \(detail)"
         case .writeFailed(let detail):
-            "The per-app insertion settings could not be saved: \(detail)"
+            "The per-app settings could not be saved: \(detail)"
         }
     }
 }
 
-/// Loads and saves the user's per-app insertion overrides as JSON.
+/// Loads and saves the user's per-app settings as JSON.
 ///
 /// The file holds only the user's entries; the bundled defaults live in code, so an update can
-/// change them without a migration. Combine with ``InserterOverrides/merged(with:)``.
+/// change them without a migration. Combine with ``AppOverrides/merged(with:)``.
 ///
 /// An actor so a save from Settings and a load at launch never interleave on the file. A change
 /// to some entries goes through ``update(_:)``, which reads, changes and writes in one step.
-public actor InserterOverridesStore {
+public actor AppOverridesStore {
     public static let fileName = "insertion-overrides.json"
     /// Owner read and write only, like the other files the user edits in Settings.
     static let filePermissions: mode_t = 0o600
@@ -47,7 +47,7 @@ public actor InserterOverridesStore {
     }
 
     /// `~/Library/Application Support/<bundle id>/insertion-overrides.json`.
-    public static func defaultFileURL(bundleIdentifier: String) throws(InserterOverridesStoreError) -> URL {
+    public static func defaultFileURL(bundleIdentifier: String) throws(AppOverridesStoreError) -> URL {
         do {
             let applicationSupport = try FileManager.default.url(
                 for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
@@ -65,8 +65,8 @@ public actor InserterOverridesStore {
     /// A file that is not valid overrides JSON is renamed to
     /// `insertion-overrides.json.corrupt-<ISO 8601 time>` and treated as empty, so one bad edit
     /// neither blocks dictation nor is silently overwritten by the next save. If it cannot be
-    /// renamed, this throws ``InserterOverridesStoreError/readFailed(_:)`` instead.
-    public func load() throws(InserterOverridesStoreError) -> InserterOverrides {
+    /// renamed, this throws ``AppOverridesStoreError/readFailed(_:)`` instead.
+    public func load() throws(AppOverridesStoreError) -> AppOverrides {
         let data: Data
         do {
             data = try Data(contentsOf: fileURL)
@@ -80,24 +80,27 @@ public actor InserterOverridesStore {
             throw .readFailed(error.localizedDescription)
         }
 
-        let overrides: InserterOverrides
+        let overrides: AppOverrides
         do {
-            overrides = try JSONDecoder().decode(InserterOverrides.self, from: data)
+            overrides = try JSONDecoder().decode(AppOverrides.self, from: data)
         } catch {
             let backup = try setAsideCorruptFile()
             Log.insertion.error("""
-                Per-app insertion overrides were corrupt; set aside as \(backup.lastPathComponent, privacy: .public) \
+                Per-app settings were corrupt; set aside as \(backup.lastPathComponent, privacy: .public) \
                 and started empty: \(String(describing: error), privacy: .private)
                 """)
             return .empty
         }
-        Log.insertion.info("Loaded \(overrides.methods.count, privacy: .public) per-app insertion overrides")
+        Log.insertion.info("""
+            Loaded per-app settings: \(overrides.methods.count, privacy: .public) insertion methods, \
+            \(overrides.lines.count, privacy: .public) line settings
+            """)
         return overrides
     }
 
     /// Replaces the file with `overrides` (the user's entries only), atomically, so a crash
     /// mid-write leaves the previous file.
-    public func save(_ overrides: InserterOverrides) throws(InserterOverridesStoreError) {
+    public func save(_ overrides: AppOverrides) throws(AppOverridesStoreError) {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         do {
@@ -106,7 +109,10 @@ public actor InserterOverridesStore {
                 at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true
             )
             try AtomicFileWriter.write(data, to: fileURL, permissions: Self.filePermissions)
-            Log.insertion.info("Saved \(overrides.methods.count, privacy: .public) per-app insertion overrides")
+            Log.insertion.info("""
+                Saved per-app settings: \(overrides.methods.count, privacy: .public) insertion methods, \
+                \(overrides.lines.count, privacy: .public) line settings
+                """)
         } catch {
             Log.insertion.error("""
                 Overrides not saved to \(self.fileURL.path, privacy: .private): \
@@ -124,18 +130,18 @@ public actor InserterOverridesStore {
     /// aside first. When `change` leaves the overrides as they were, nothing is written.
     ///
     /// - Returns: The overrides as they now are.
-    /// - Throws: ``InserterOverridesStoreError/readFailed(_:)`` from the read, in which case
+    /// - Throws: ``AppOverridesStoreError/readFailed(_:)`` from the read, in which case
     ///   `change` is not called and the file is untouched, or
-    ///   ``InserterOverridesStoreError/writeFailed(_:)``.
+    ///   ``AppOverridesStoreError/writeFailed(_:)``.
     @discardableResult
     public func update(
-        _ change: @Sendable (inout InserterOverrides) -> Void
-    ) throws(InserterOverridesStoreError) -> InserterOverrides {
+        _ change: @Sendable (inout AppOverrides) -> Void
+    ) throws(AppOverridesStoreError) -> AppOverrides {
         let current = try load()
         var updated = current
         change(&updated)
         guard updated != current else {
-            Log.insertion.debug("Per-app insertion overrides unchanged; nothing written")
+            Log.insertion.debug("Per-app settings unchanged; nothing written")
             return current
         }
         try save(updated)
@@ -148,7 +154,7 @@ public actor InserterOverridesStore {
     /// The timestamp is ISO 8601 in its basic format (`20260921T141320Z`): colons would show up as
     /// slashes in Finder. A second damaged file within the same second gets a numeric suffix, so an
     /// earlier backup is never replaced.
-    private func setAsideCorruptFile() throws(InserterOverridesStoreError) -> URL {
+    private func setAsideCorruptFile() throws(AppOverridesStoreError) -> URL {
         let stamp = now().formatted(
             Date.ISO8601FormatStyle(dateSeparator: .omitted, timeSeparator: .omitted, timeZone: .gmt)
         )
@@ -166,7 +172,7 @@ public actor InserterOverridesStore {
             return backup
         } catch {
             Log.insertion.error("""
-                Per-app insertion overrides are corrupt and could not be set aside: \
+                Per-app settings are corrupt and could not be set aside: \
                 \(error.localizedDescription, privacy: .private)
                 """)
             throw .readFailed("the file is damaged and could not be set aside (\(error.localizedDescription))")

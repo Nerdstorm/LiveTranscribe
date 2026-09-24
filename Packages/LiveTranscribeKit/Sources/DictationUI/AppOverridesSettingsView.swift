@@ -1,13 +1,14 @@
 import SwiftUI
 
-/// Settings › Apps: how dictated text gets into particular apps. Shows the built-in settings
-/// read-only and edits the user's own in `insertion-overrides.json` through the context's
-/// ``InserterOverridesStore``.
+/// Settings › Apps: how dictated text gets into particular apps, and whether it may break
+/// across lines there. Shows the built-in settings read-only and edits the user's own in
+/// `insertion-overrides.json` through the context's ``AppOverridesStore``.
 public struct AppOverridesSettingsView: View {
     private static let explanation = """
-        Dictated text is typed in through Accessibility, and pasted when an app doesn\u{2019}t accept \
-        that. Apps that ignore Accessibility, such as terminals and Electron apps, paste first. \
-        Your setting for an app wins over the built-in one.
+        Dictated text is typed in through Accessibility, or pasted where an app doesn\u{2019}t accept \
+        that, as in terminals and Electron apps. Lists, letters and \u{201C}new line\u{201D} get line \
+        breaks, except in fields that take one line, such as search boxes. Terminals are single-line, \
+        so a line break never runs a command. Your setting for an app wins over the built-in one.
         """
 
     @State private var model: AppOverridesModel
@@ -30,7 +31,7 @@ public struct AppOverridesSettingsView: View {
                 List(selection: $selection) {
                     Section("Your settings") {
                         if model.userRows.isEmpty {
-                            Text("None yet. Click + to choose how an app gets its text.")
+                            Text("None yet. Click + to choose how an app gets its text and line breaks.")
                                 .foregroundStyle(.secondary)
                                 .selectionDisabled()
                         }
@@ -96,8 +97,8 @@ public struct AppOverridesSettingsView: View {
     }
 }
 
-/// One app in the list with the method its setting picks; a built-in row the user has replaced
-/// says so.
+/// One app in the list with its setting's method and line setting; a built-in row the user has
+/// replaced says so.
 private struct AppOverrideRowView: View {
     let row: AppOverrideRow
 
@@ -110,7 +111,7 @@ private struct AppOverrideRowView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Text(row.method.displayName)
+            Text(settings)
                 .foregroundStyle(row.isReplacedByUser ? .tertiary : .secondary)
                 .strikethrough(row.isReplacedByUser)
         }
@@ -118,8 +119,12 @@ private struct AppOverrideRowView: View {
         .accessibilityLabel(accessibilityText)
     }
 
+    private var settings: String {
+        "\(row.method.displayName) \u{00B7} \(row.lineMode.displayName)"
+    }
+
     private var accessibilityText: String {
-        let method = "\(row.app.name), \(row.method.displayName)"
-        return row.isReplacedByUser ? "\(method), replaced by your setting" : method
+        let setting = "\(row.app.name), \(row.method.displayName), \(row.lineMode.displayName)"
+        return row.isReplacedByUser ? "\(setting), replaced by your setting" : setting
     }
 }
