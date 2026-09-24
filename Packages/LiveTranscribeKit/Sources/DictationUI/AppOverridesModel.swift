@@ -3,7 +3,7 @@ import Insertion
 import Observation
 import Shared
 
-/// Settings › Apps: the built-in per-app insertion settings (read-only) and the user's own
+/// Settings › Apps: the built-in per-app settings (read-only) and the user's own
 /// (editable), saved through ``AppOverridesStore``.
 ///
 /// The store keeps only the user's entries; the built-in ones live in code. For an app in both,
@@ -43,7 +43,7 @@ final class AppOverridesModel {
         self.store = store
         self.catalog = catalog
         self.builtIn = builtIn
-        status = EditableListStatus(fileURL: store.fileURL, subject: "per-app insertion settings")
+        status = EditableListStatus(fileURL: store.fileURL, subject: "per-app settings")
     }
 
     /// Reads the user's settings. A damaged file is set aside by the store and noted in

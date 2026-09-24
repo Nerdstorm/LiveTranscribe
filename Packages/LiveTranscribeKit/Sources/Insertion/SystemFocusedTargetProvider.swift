@@ -27,8 +27,8 @@ public struct SystemFocusedTargetProvider: FocusedTargetProvider {
         )
         Log.insertion.debug("""
             Focused target: \(target.app?.bundleIdentifier ?? "unknown", privacy: .public), \
-            element \(element == nil ? "none" : "found", privacy: .public), \
-            secure \(target.isSecure, privacy: .public), multi-line \(target.isMultiline, privacy: .public)
+            element \(element.map { $0.role ?? "without a role" } ?? "none", privacy: .public), \
+            secure \(target.isSecure, privacy: .public)
             """)
         return target
     }

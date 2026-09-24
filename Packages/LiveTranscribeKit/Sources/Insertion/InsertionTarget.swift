@@ -21,16 +21,14 @@ public struct AppInfo: Sendable, Equatable, Hashable {
 
 /// Where dictated text would go, captured when dictation finishes.
 ///
-/// Captured once and passed along, so the processing steps (list formatting needs
-/// ``isMultiline``) and the insertion agree on the same field.
+/// Captured once and passed along, so the processing steps (whether the text may break across
+/// lines, see ``AppOverrides/allowsLineBreaks(in:)``) and the insertion agree on the same field.
 public struct InsertionTarget: Sendable {
     public let app: AppInfo?
     /// The focused element, or `nil` when nothing is focused or it is out of Accessibility's reach.
     public let element: (any AccessibilityElement)?
     /// A password field, or secure event input is on (a password prompt somewhere has the keyboard).
     public let isSecure: Bool
-    /// The field takes several lines (`AXTextArea`), so spoken lists may become numbered lines.
-    public let isMultiline: Bool
     /// Screen rectangle of the caret or selection, for placing the HUD near it; `nil` if unknown.
     ///
     /// In Accessibility (Quartz) global coordinates: the origin is the top-left corner of the
@@ -42,13 +40,11 @@ public struct InsertionTarget: Sendable {
         app: AppInfo?,
         element: (any AccessibilityElement)?,
         isSecure: Bool,
-        isMultiline: Bool,
         caretRect: CGRect?
     ) {
         self.app = app
         self.element = element
         self.isSecure = isSecure
-        self.isMultiline = isMultiline
         self.caretRect = caretRect
     }
 
@@ -67,7 +63,6 @@ public struct InsertionTarget: Sendable {
             app: app,
             element: element,
             isSecure: isSecure,
-            isMultiline: element?.role == kAXTextAreaRole,
             caretRect: caretRect
         )
     }

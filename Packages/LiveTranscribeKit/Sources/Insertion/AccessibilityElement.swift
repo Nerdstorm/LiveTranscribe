@@ -14,6 +14,9 @@ public protocol AccessibilityElement: Sendable {
     var subrole: String? { get }
     /// The process that owns the element.
     var processIdentifier: pid_t? { get }
+    /// The element that contains this one (`kAXParentAttribute`); `nil` at the top, or when the
+    /// app doesn't say.
+    var parent: (any AccessibilityElement)? { get }
 
     /// A string attribute, or `nil` if the app does not provide it as a string.
     func string(_ attribute: String) -> String?
@@ -51,6 +54,11 @@ public struct AXElement: AccessibilityElement, @unchecked Sendable {
     public var role: String? { string(kAXRoleAttribute) }
 
     public var subrole: String? { string(kAXSubroleAttribute) }
+
+    public var parent: (any AccessibilityElement)? {
+        guard let value = copyValue(kAXParentAttribute), CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
+        return AXElement(unsafeDowncast(value, to: AXUIElement.self))
+    }
 
     public var processIdentifier: pid_t? {
         var pid: pid_t = 0

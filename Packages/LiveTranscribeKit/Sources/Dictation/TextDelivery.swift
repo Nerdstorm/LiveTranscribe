@@ -5,14 +5,18 @@ import Shared
 
 /// Puts text at the cursor and undoes it: the Insertion slice, as the dictation flow uses it.
 public protocol TextDelivery: Sendable {
+    /// Whether text for `target` may contain line breaks, from its app's setting and its field
+    /// (see ``AppOverrides/allowsLineBreaks(in:)``).
+    func allowsLineBreaks(in target: InsertionTarget) async -> Bool
     func insert(_ text: String, into target: InsertionTarget) async -> InsertionResult
     func undo(_ record: InsertionRecord, replacingWith text: String, in target: InsertionTarget) async -> UndoResult
 }
 
 /// The system's text delivery: Accessibility, then paste, then the clipboard.
 ///
-/// The router is built for each call from the current settings and per-app overrides, so a
-/// change in Settings applies to the next dictation. The paste inserter is kept between calls:
+/// The router is built for each call from the current settings and per-app overrides, and line
+/// breaks are decided from the current overrides, so a change in Settings applies to the next
+/// dictation. The paste inserter is kept between calls:
 /// pastes through one inserter never overlap, which keeps the user's clipboard safe when an undo
 /// pastes while a dictation is still restoring it.
 public final class SystemTextDelivery: TextDelivery {
@@ -38,6 +42,10 @@ public final class SystemTextDelivery: TextDelivery {
         self.focus = focus
     }
 
+    public func allowsLineBreaks(in target: InsertionTarget) async -> Bool {
+        await currentOverrides().allowsLineBreaks(in: target)
+    }
+
     public func insert(_ text: String, into target: InsertionTarget) async -> InsertionResult {
         await router(settings().dictation).insert(text, into: target)
     }
@@ -53,19 +61,23 @@ public final class SystemTextDelivery: TextDelivery {
     }
 
     private func router(_ settings: DictationSettings) async -> InsertionRouter {
-        let user: AppOverrides
-        do {
-            user = try await overrides.load()
-        } catch {
-            Log.insertion.error("Per-app insertion overrides unreadable: \(error.localizedDescription, privacy: .public)")
-            user = .empty
-        }
-        return InsertionRouter(
+        InsertionRouter(
             accessibility: AXTextInserter(verificationDelayMs: settings.accessibilityVerificationDelayMs),
             paste: paste(restoreDelayMs: settings.pasteRestoreDelayMs),
             pasteboard: pasteboard,
-            overrides: .bundled.merged(with: user)
+            overrides: await currentOverrides()
         )
+    }
+
+    /// The built-in overrides with the user's on top; the built-in ones alone when the user's
+    /// can't be read.
+    private func currentOverrides() async -> AppOverrides {
+        do {
+            return .bundled.merged(with: try await overrides.load())
+        } catch {
+            Log.insertion.error("Per-app settings unreadable: \(error.localizedDescription, privacy: .public)")
+            return .bundled
+        }
     }
 
     private func paste(restoreDelayMs: Int) -> PasteboardTextInserter {

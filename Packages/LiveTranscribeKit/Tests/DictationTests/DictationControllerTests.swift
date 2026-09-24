@@ -37,6 +37,20 @@ struct DictationControllerTests {
         #expect(saved.first?.cleanupLevel == "medium")
     }
 
+    /// Whether the text may break across lines is the delivery's answer for the field dictated
+    /// into, asked once the recording ends.
+    @Test(arguments: [(true, "Thanks\nSee you soon."), (false, "Thanks see you soon.")])
+    func aSpokenLineBreakFollowsTheDeliverysAnswer(allowed: Bool, inserted: String) async {
+        let h = Harness(transcript: "thanks new line see you soon")
+        await h.delivery.set(lineBreaks: allowed)
+        h.controller.start()
+        await h.hold(milliseconds: 500)
+        await h.release()
+
+        #expect(await h.delivery.inserted == [inserted])
+        #expect(await h.delivery.lineBreakQuestions.map { $0.app } == [FakeFocus.app])
+    }
+
     @Test func aSpaceSeparatesDictationFromTheWordBeforeTheCaret() async {
         let h = Harness()
         h.focus.set(FakeFocus.field(value: "Hello", secure: false))

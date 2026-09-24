@@ -4,7 +4,7 @@ import Shared
 
 /// Where an editable Settings list's file stands, and the last thing that went wrong with it.
 ///
-/// The snippets, vocabulary and per-app insertion lists each own one. Their models run every
+/// The snippets, vocabulary and per-app settings lists each own one. Their models run every
 /// store call through ``load(_:)`` or ``perform(_:_:)``, so all three report an unreadable file,
 /// a failed save and a damaged file the same way, and ``EditableListPane`` shows them the same way.
 @MainActor

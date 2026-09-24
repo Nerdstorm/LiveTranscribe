@@ -219,6 +219,6 @@ enum Fixtures {
         app: AppInfo? = textEdit,
         isSecure: Bool = false
     ) -> InsertionTarget {
-        InsertionTarget(app: app, element: element, isSecure: isSecure, isMultiline: false, caretRect: nil)
+        InsertionTarget(app: app, element: element, isSecure: isSecure, caretRect: nil)
     }
 }

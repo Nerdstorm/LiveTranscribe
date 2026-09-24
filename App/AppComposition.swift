@@ -226,7 +226,7 @@ final class AppComposition {
         do {
             return try AppOverridesStore.defaultFileURL(bundleIdentifier: Log.subsystem)
         } catch {
-            Log.app.error("Insertion overrides folder unavailable: \(error.localizedDescription, privacy: .public)")
+            Log.app.error("Per-app settings folder unavailable: \(error.localizedDescription, privacy: .public)")
             return applicationSupport.appending(path: Log.subsystem).appending(path: AppOverridesStore.fileName)
         }
     }

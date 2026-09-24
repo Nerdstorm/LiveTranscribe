@@ -44,6 +44,57 @@ struct AppOverridesTests {
         #expect(String(decoding: data, as: UTF8.self) == #"{"methods":{"com.apple.Notes":"paste"}}"#)
         #expect(try JSONDecoder().decode(AppOverrides.self, from: data).methods == ["com.apple.Notes": .paste])
     }
+
+    @Test(arguments: [
+        "com.apple.Terminal", "com.googlecode.iterm2", "dev.warp.Warp-Stable", "com.mitchellh.ghostty",
+        "io.alacritty", "net.kovidgoyal.kitty", "com.github.wez.wezterm",
+    ])
+    func terminalsAreSingleLineByDefault(bundleIdentifier: String) {
+        #expect(AppOverrides.bundled.lineMode(for: bundleIdentifier) == .singleLine)
+    }
+
+    @Test func onlyTerminalsHaveABuiltInLineSetting() {
+        #expect(AppOverrides.bundled.lines.count == 7)
+        #expect(AppOverrides.bundled.lineMode(for: "com.tinyspeck.slackmacgap") == nil)
+    }
+
+    @Test func theUserWinsEachSettingSeparately() {
+        let user = AppOverrides(methods: ["com.apple.Terminal": .accessibility], lines: ["com.tinyspeck.slackmacgap": .singleLine])
+        let merged = AppOverrides.bundled.merged(with: user)
+        #expect(merged.method(for: "com.apple.Terminal") == .accessibility)
+        #expect(merged.lineMode(for: "com.apple.Terminal") == .singleLine, "the built-in line setting still applies")
+        #expect(merged.method(for: "com.tinyspeck.slackmacgap") == .paste)
+        #expect(merged.lineMode(for: "com.tinyspeck.slackmacgap") == .singleLine)
+    }
+
+    @Test func eitherSettingCountsAsAnOverride() {
+        let overrides = AppOverrides(methods: ["com.apple.Notes": .paste], lines: ["com.apple.Mail": .singleLine])
+        #expect(overrides.hasOverride(for: "com.apple.Notes"))
+        #expect(overrides.hasOverride(for: "COM.APPLE.MAIL"))
+        #expect(!overrides.hasOverride(for: "com.apple.TextEdit"))
+        #expect(!overrides.hasOverride(for: nil))
+    }
+
+    /// Versions before line settings require `methods`, so it is always written.
+    @Test func encodesLineSettingsBesideTheMethods() throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        let overrides = AppOverrides(lines: ["com.apple.Mail": .singleLine, "com.apple.Terminal": .multiLine])
+        let data = try encoder.encode(overrides)
+        #expect(String(decoding: data, as: UTF8.self)
+            == #"{"lines":{"com.apple.Mail":"single-line","com.apple.Terminal":"multi-line"},"methods":{}}"#)
+        #expect(try JSONDecoder().decode(AppOverrides.self, from: data) == overrides)
+    }
+
+    @Test func aFileFromBeforeLineSettingsHasNone() throws {
+        let overrides = try JSONDecoder().decode(AppOverrides.self, from: Data(#"{"methods":{"com.apple.Notes":"paste"}}"#.utf8))
+        #expect(overrides == AppOverrides(methods: ["com.apple.Notes": .paste]))
+    }
+
+    @Test func aFileWithOnlyLineSettingsIsValid() throws {
+        let overrides = try JSONDecoder().decode(AppOverrides.self, from: Data(#"{"lines":{"com.apple.Mail":"Single-Line"}}"#.utf8))
+        #expect(overrides == AppOverrides(lines: ["com.apple.Mail": .singleLine]))
+    }
 }
 
 @Suite("AppOverridesStore")
@@ -150,6 +201,30 @@ struct AppOverridesStoreTests {
             methods: ["com.apple.Terminal": .accessibility, "com.google.Chrome": .paste]
         ))
         #expect(try folder.contents() == [AppOverridesStore.fileName])
+    }
+
+    @Test func anUnknownLineSettingSkipsOnlyThatEntry() async throws {
+        let folder = TemporaryFolder()
+        try FileManager.default.createDirectory(at: folder.url, withIntermediateDirectories: true)
+        try Data(#"""
+            {"methods":{"com.apple.Notes":"paste"},"lines":{"com.apple.Mail":"two-line","com.apple.Terminal":"Multi-Line"}}
+            """#.utf8).write(to: folder.fileURL)
+        let store = AppOverridesStore(fileURL: folder.fileURL)
+
+        #expect(try await store.load() == AppOverrides(
+            methods: ["com.apple.Notes": .paste], lines: ["com.apple.Terminal": .multiLine]
+        ))
+        #expect(try folder.contents() == [AppOverridesStore.fileName])
+    }
+
+    @Test func savesAndLoadsLineSettings() async throws {
+        let folder = TemporaryFolder()
+        let store = AppOverridesStore(fileURL: folder.fileURL)
+        let user = AppOverrides(methods: ["com.apple.Notes": .paste], lines: ["com.apple.Terminal": .multiLine])
+
+        try await store.save(user)
+
+        #expect(try await store.load() == user)
     }
 
     @Test func anUnreadableFileIsAnErrorAndIsLeftAlone() async throws {

@@ -262,7 +262,7 @@ struct AppOverridesModelTests {
             Issue.record("Expected the load to fail, got \(model.status.loadState)")
             return
         }
-        #expect(message.hasPrefix("The per-app insertion settings could not be read"))
+        #expect(message.hasPrefix("The per-app settings could not be read"))
         #expect(!(await model.save(AppOverrideDraft(app: Self.notes, method: .paste, isNew: true))))
         #expect(!(await model.delete(bundleIdentifier: "com.apple.Notes")))
         var isDirectory: ObjCBool = false

@@ -1,7 +1,7 @@
 import Foundation
 import Shared
 
-/// Why the user's per-app insertion overrides could not be read or saved.
+/// Why the user's per-app settings could not be read or saved.
 public enum AppOverridesStoreError: LocalizedError, Equatable, Sendable {
     /// Application Support could not be located or created.
     case directoryUnavailable(String)
@@ -16,14 +16,14 @@ public enum AppOverridesStoreError: LocalizedError, Equatable, Sendable {
         case .directoryUnavailable(let detail):
             "The Application Support folder is unavailable: \(detail)"
         case .readFailed(let detail):
-            "The per-app insertion settings could not be read: \(detail)"
+            "The per-app settings could not be read: \(detail)"
         case .writeFailed(let detail):
-            "The per-app insertion settings could not be saved: \(detail)"
+            "The per-app settings could not be saved: \(detail)"
         }
     }
 }
 
-/// Loads and saves the user's per-app insertion overrides as JSON.
+/// Loads and saves the user's per-app settings as JSON.
 ///
 /// The file holds only the user's entries; the bundled defaults live in code, so an update can
 /// change them without a migration. Combine with ``AppOverrides/merged(with:)``.
@@ -86,12 +86,15 @@ public actor AppOverridesStore {
         } catch {
             let backup = try setAsideCorruptFile()
             Log.insertion.error("""
-                Per-app insertion overrides were corrupt; set aside as \(backup.lastPathComponent, privacy: .public) \
+                Per-app settings were corrupt; set aside as \(backup.lastPathComponent, privacy: .public) \
                 and started empty: \(String(describing: error), privacy: .private)
                 """)
             return .empty
         }
-        Log.insertion.info("Loaded \(overrides.methods.count, privacy: .public) per-app insertion overrides")
+        Log.insertion.info("""
+            Loaded per-app settings: \(overrides.methods.count, privacy: .public) insertion methods, \
+            \(overrides.lines.count, privacy: .public) line settings
+            """)
         return overrides
     }
 
@@ -106,7 +109,10 @@ public actor AppOverridesStore {
                 at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true
             )
             try AtomicFileWriter.write(data, to: fileURL, permissions: Self.filePermissions)
-            Log.insertion.info("Saved \(overrides.methods.count, privacy: .public) per-app insertion overrides")
+            Log.insertion.info("""
+                Saved per-app settings: \(overrides.methods.count, privacy: .public) insertion methods, \
+                \(overrides.lines.count, privacy: .public) line settings
+                """)
         } catch {
             Log.insertion.error("""
                 Overrides not saved to \(self.fileURL.path, privacy: .private): \
@@ -135,7 +141,7 @@ public actor AppOverridesStore {
         var updated = current
         change(&updated)
         guard updated != current else {
-            Log.insertion.debug("Per-app insertion overrides unchanged; nothing written")
+            Log.insertion.debug("Per-app settings unchanged; nothing written")
             return current
         }
         try save(updated)
@@ -166,7 +172,7 @@ public actor AppOverridesStore {
             return backup
         } catch {
             Log.insertion.error("""
-                Per-app insertion overrides are corrupt and could not be set aside: \
+                Per-app settings are corrupt and could not be set aside: \
                 \(error.localizedDescription, privacy: .private)
                 """)
             throw .readFailed("the file is damaged and could not be set aside (\(error.localizedDescription))")

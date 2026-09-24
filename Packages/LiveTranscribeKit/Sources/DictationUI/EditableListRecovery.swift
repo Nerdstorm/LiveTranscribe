@@ -2,7 +2,7 @@ import Foundation
 
 /// Finds the copy of a damaged file that a store set aside.
 ///
-/// The snippets, vocabulary and per-app insertion stores all rename a file they cannot decode to
+/// The snippets, vocabulary and per-app settings stores all rename a file they cannot decode to
 /// `<file name>.corrupt-<timestamp>` (with `-2`, `-3`, … for more in the same second) and then
 /// read as empty, without telling the caller. Comparing the folder's backups before and after a
 /// store call is how Settings learns that it happened and can say where the user's text went.
