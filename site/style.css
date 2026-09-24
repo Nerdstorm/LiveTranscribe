@@ -89,8 +89,29 @@ h2 {
   letter-spacing: -0.01em;
 }
 
+h3 {
+  margin: 2rem 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+h2 + h3 {
+  margin-top: 0;
+}
+
 section {
   padding: 2.25rem 0 0.25rem;
+}
+
+figure {
+  margin: 1.25rem 0 0.5rem;
+}
+
+/* Window screenshots are 2x captures that include the macOS shadow on a transparent edge. */
+figure img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
 }
 
 .lead {
