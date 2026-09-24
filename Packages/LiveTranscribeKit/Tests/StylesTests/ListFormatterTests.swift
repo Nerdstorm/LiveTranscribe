@@ -36,6 +36,25 @@ struct ListFormatterTests {
             == "1. Thanks for coming\n2. The agenda")
     }
 
+    @Test("Words that introduce an item belong to its ordinal", arguments: [
+        ("I have a few to-do items. First is work on getting the weed killer. Second is go to the hardware store and buy the weed killer.",
+         "I have a few to-do items:\n1. Work on getting the weed killer.\n2. Go to the hardware store and buy the weed killer."),
+        ("First thing is milk. Second thing is eggs.", "1. Milk\n2. Eggs"),
+        ("First one's milk, second one\u{2019}s eggs.", "1. Milk\n2. Eggs"),
+        ("Firstly was the budget. Secondly was the timeline.", "1. The budget\n2. The timeline"),
+    ])
+    func introducingWordsBelongToTheOrdinal(text: String, list: String) {
+        #expect(formatter.formatted(text) == list)
+    }
+
+    @Test("An \"is\" that asks stays in its item", arguments: [
+        "First, is it ready? Second, is it tested?",
+        "First is it ready? Second is it tested?",
+    ])
+    func anIsThatAsksStays(text: String) {
+        #expect(formatter.formatted(text) == "1. Is it ready?\n2. Is it tested?")
+    }
+
     @Test("Leaves text that is not an enumeration", arguments: [
         "The first and second floors are closed.",
         "First, let me say thanks.",

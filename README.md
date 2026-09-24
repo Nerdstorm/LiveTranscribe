@@ -384,6 +384,8 @@ each build: grant them once more after switching, and they survive every rebuild
   "number", "item" or "step" with the numbers one, two, … in order, or by "bullet point". A
   marker that is talked about stays as said: after "the" or "a", after "is" or "are" ("cost is
   number two"), or for bullets after "first", "second", … ("the second bullet point is wrong").
+  An "is" that only introduces the item goes with its marker ("first is call the bank", "second
+  thing is…", "number one is…"), but not after a comma or in a question ("first, is it ready?").
   The markers become "1." or "-", each item starts with a capital, the line before the list ends
   with a colon, and items keep their full stops only if every item is a sentence of four words
   or more. No other words change. Lists and letters are laid out only where line breaks are
