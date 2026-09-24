@@ -6,9 +6,10 @@ import Shared
 /// form.
 ///
 /// The words stay words after a determiner or a possessive ("a new line of laptops", "Apple's
-/// new line") or before "of" ("new line of code"). The break goes behind a placeholder, so the
+/// new line") or before "of" ("new line of code"). A break goes behind a placeholder, so the
 /// model cannot drop it; ``SpokenCommands/tidyLineBreaks(_:)`` tidies the text around it once it
-/// is put back.
+/// is put back. A space is written straight into the text: there is nothing for the model to
+/// drop, and a placeholder it might drop would only cost the cleanup.
 public struct LineBreakCommand: PhraseMatcher {
     private struct Phrase {
         let words: [String]
@@ -33,13 +34,16 @@ public struct LineBreakCommand: PhraseMatcher {
             for phrase in Self.phrases where PhraseGrammar.matches(phrase.words, at: position, in: text) {
                 let end = position + phrase.words.count
                 if end < text.words.count, text.words[end].text == "of" { continue }
+                let replacement: PhraseMatch.Replacement = multiline
+                    ? .placeholder(
+                        trigger: phrase.words.joined(separator: " "),
+                        expansion: String(repeating: "\n", count: phrase.lines),
+                        role: .lineBreak
+                    )
+                    : .inline(InlineText(" ", joinsPrevious: true, joinsNext: true))
                 found.append(PhraseMatch(
                     words: position..<end,
-                    replacement: .placeholder(
-                        trigger: phrase.words.joined(separator: " "),
-                        expansion: multiline ? String(repeating: "\n", count: phrase.lines) : " ",
-                        role: .lineBreak
-                    ),
+                    replacement: replacement,
                     keptTrailing: PhraseGrammar.trailingAfterClausePunctuation(text.token(ofWord: end - 1))
                 ))
             }

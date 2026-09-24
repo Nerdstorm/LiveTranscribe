@@ -59,9 +59,11 @@ struct LineBreakCommandTests {
         #expect(rendered(spoken) == expected)
     }
 
-    @Test func singleLineFieldsGetASpace() {
-        #expect(rendered("first line new line second line new paragraph third", multiline: false)
-            == "first line second line third")
+    @Test func singleLineFieldsGetASpaceWithNothingHidden() {
+        let protected = PhraseProtector(matchers: [LineBreakCommand(multiline: false)])
+            .protect("first line new line second line, new paragraph third")
+        #expect(protected.text == "first line second line, third")
+        #expect(protected.placeholders.isEmpty)
     }
 
     @Test("Leaves the words when they are a noun", arguments: [
