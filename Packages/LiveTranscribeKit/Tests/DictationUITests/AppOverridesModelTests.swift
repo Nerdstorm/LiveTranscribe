@@ -20,25 +20,25 @@ private final class FakeAppCatalog: AppOverrideAppCatalog {
     func runningApps() -> [AppOverrideApp] { running }
 }
 
-/// Settings › Apps against a real ``InserterOverridesStore`` on a temporary file.
+/// Settings › Apps against a real ``AppOverridesStore`` on a temporary file.
 @Suite("AppOverridesModel")
 @MainActor
 struct AppOverridesModelTests {
-    private static let fileName = InserterOverridesStore.fileName
+    private static let fileName = AppOverridesStore.fileName
     private static let terminal = AppOverrideApp(bundleIdentifier: "com.apple.Terminal", name: "Terminal", url: URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
     private static let chrome = AppOverrideApp(bundleIdentifier: "com.google.Chrome", name: "Google Chrome", url: URL(fileURLWithPath: "/Applications/Google Chrome.app"))
     private static let notes = AppOverrideApp(bundleIdentifier: "com.apple.Notes", name: "Notes", url: URL(fileURLWithPath: "/System/Applications/Notes.app"))
     private static let bbedit = AppOverrideApp(bundleIdentifier: "com.barebones.bbedit", name: "BBEdit", url: URL(fileURLWithPath: "/Applications/BBEdit.app"))
     /// Built in like the real list, but short. `io.alacritty` is not installed in the fake.
-    private static let builtIn = InserterOverrides(methods: [
+    private static let builtIn = AppOverrides(methods: [
         "com.apple.Terminal": .paste, "com.google.Chrome": .paste, "io.alacritty": .paste,
     ])
 
     private func makeModel(
         in folder: EditableListTemporaryFolder,
         catalog: FakeAppCatalog = FakeAppCatalog(installed: [terminal, chrome, notes, bbedit])
-    ) -> (AppOverridesModel, InserterOverridesStore) {
-        let store = InserterOverridesStore(fileURL: folder.file(Self.fileName), now: { EditableListTemporaryFolder.fixedDate })
+    ) -> (AppOverridesModel, AppOverridesStore) {
+        let store = AppOverridesStore(fileURL: folder.file(Self.fileName), now: { EditableListTemporaryFolder.fixedDate })
         return (AppOverridesModel(store: store, catalog: catalog, builtIn: Self.builtIn), store)
     }
 
@@ -59,12 +59,12 @@ struct AppOverridesModelTests {
     @Test func theRealBuiltInListIsShownByDefault() async {
         let folder = EditableListTemporaryFolder()
         defer { folder.cleanUp() }
-        let store = InserterOverridesStore(fileURL: folder.file(Self.fileName))
+        let store = AppOverridesStore(fileURL: folder.file(Self.fileName))
         let model = AppOverridesModel(store: store, catalog: FakeAppCatalog(installed: []))
 
         await model.load()
 
-        #expect(Set(model.builtInRows.map(\.bundleIdentifier)) == Set(InserterOverrides.bundled.methods.keys))
+        #expect(Set(model.builtInRows.map(\.bundleIdentifier)) == Set(AppOverrides.bundled.methods.keys))
     }
 
     @Test func aUserSettingForABuiltInAppWinsAndTheBuiltInRowSaysSo() async throws {
@@ -79,7 +79,7 @@ struct AppOverridesModelTests {
         #expect(draft.method == .accessibility)
         #expect(await model.save(draft))
 
-        #expect(try await store.load() == InserterOverrides(methods: ["com.apple.Terminal": .accessibility]))
+        #expect(try await store.load() == AppOverrides(methods: ["com.apple.Terminal": .accessibility]))
         #expect(model.userRows.map(\.app) == [Self.terminal])
         #expect(model.builtInRows.first { $0.bundleIdentifier == Self.terminal.bundleIdentifier }?.isReplacedByUser == true)
         // Changing the built-in row again edits the user's setting instead of adding another.
@@ -92,7 +92,7 @@ struct AppOverridesModelTests {
         let folder = EditableListTemporaryFolder()
         defer { folder.cleanUp() }
         let (model, store) = makeModel(in: folder)
-        try await store.save(InserterOverrides(methods: ["com.google.Chrome": .accessibility]))
+        try await store.save(AppOverrides(methods: ["com.google.Chrome": .accessibility]))
         await model.load()
 
         #expect(model.suggestedMethod(for: Self.notes.bundleIdentifier) == .paste)
@@ -106,7 +106,7 @@ struct AppOverridesModelTests {
         defer { folder.cleanUp() }
         let catalog = FakeAppCatalog(installed: [Self.terminal, Self.notes], running: [Self.notes, Self.terminal, Self.bbedit, Self.notes])
         let (model, store) = makeModel(in: folder, catalog: catalog)
-        try await store.save(InserterOverrides(methods: ["com.apple.terminal": .accessibility]))
+        try await store.save(AppOverrides(methods: ["com.apple.terminal": .accessibility]))
         await model.load()
 
         model.refreshRunningApps()
@@ -126,7 +126,7 @@ struct AppOverridesModelTests {
         draft.method = .paste
         #expect(await model.save(draft))
 
-        #expect(try await store.load() == InserterOverrides(methods: ["com.barebones.bbedit": .paste]))
+        #expect(try await store.load() == AppOverrides(methods: ["com.barebones.bbedit": .paste]))
         #expect(model.userRows.map(\.bundleIdentifier) == ["com.barebones.bbedit"])
     }
 
@@ -134,7 +134,7 @@ struct AppOverridesModelTests {
         let folder = EditableListTemporaryFolder()
         defer { folder.cleanUp() }
         let (model, store) = makeModel(in: folder)
-        try await store.save(InserterOverrides(methods: ["com.barebones.bbedit": .paste]))
+        try await store.save(AppOverrides(methods: ["com.barebones.bbedit": .paste]))
         await model.load()
         let before = folder.contents(of: Self.fileName)
 
@@ -150,7 +150,7 @@ struct AppOverridesModelTests {
         defer { folder.cleanUp() }
         let (model, store) = makeModel(in: folder)
         await model.load()
-        try await store.save(InserterOverrides(methods: ["org.example.HandEdited": .paste]))
+        try await store.save(AppOverrides(methods: ["org.example.HandEdited": .paste]))
 
         #expect(await model.save(AppOverrideDraft(app: Self.notes, method: .paste, isNew: true)))
 
@@ -162,7 +162,7 @@ struct AppOverridesModelTests {
         defer { folder.cleanUp() }
         let (model, store) = makeModel(in: folder)
         // A hand-edited file can name one app twice; Launch Services ignores the case.
-        try await store.save(InserterOverrides(methods: ["com.apple.Notes": .accessibility, "COM.APPLE.NOTES": .accessibility]))
+        try await store.save(AppOverrides(methods: ["com.apple.Notes": .accessibility, "COM.APPLE.NOTES": .accessibility]))
         await model.load()
         let row = try #require(model.userRows.first { $0.bundleIdentifier == "com.apple.Notes" })
         #expect(row.app.name == "Notes")
@@ -183,7 +183,7 @@ struct AppOverridesModelTests {
         // Launch Services finds the app whatever the case, and reports its own spelling.
         catalog.installed["com.barebones.BBEdit"] = Self.bbedit
         let (model, store) = makeModel(in: folder, catalog: catalog)
-        try await store.save(InserterOverrides(methods: ["com.barebones.BBEdit": .paste]))
+        try await store.save(AppOverrides(methods: ["com.barebones.BBEdit": .paste]))
         await model.load()
 
         let row = try #require(model.userRows.first)
@@ -197,7 +197,7 @@ struct AppOverridesModelTests {
         let folder = EditableListTemporaryFolder()
         defer { folder.cleanUp() }
         let (model, store) = makeModel(in: folder)
-        try await store.save(InserterOverrides(methods: ["com.apple.Terminal": .accessibility, "com.apple.Notes": .paste]))
+        try await store.save(AppOverrides(methods: ["com.apple.Terminal": .accessibility, "com.apple.Notes": .paste]))
         await model.load()
 
         #expect(await model.delete(bundleIdentifier: "com.apple.Terminal"))

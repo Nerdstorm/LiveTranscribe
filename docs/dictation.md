@@ -207,7 +207,7 @@ New package targets (vertical slices), each with its own test target:
 | `Snippets` | `Snippet`, `SnippetStore`, `SnippetExpander` | Shared |
 | `Vocabulary` | `VocabularyEntry`, `VocabularyStore`, `VocabularyReplacer`, `VocabularySelector` | Shared |
 | `Hotkey` | `HotkeyBinding`, `HotkeyGesture` (pure state machine), `HotkeyMonitor`, `CGEventTapHotkeyMonitor` | Shared |
-| `Insertion` | `TextInserter`, `AXTextInserter`, `PasteboardTextInserter`, `InsertionRouter`, `InserterOverrides`, `FocusedElement` | Shared |
+| `Insertion` | `TextInserter`, `AXTextInserter`, `PasteboardTextInserter`, `InsertionRouter`, `AppOverrides`, `FocusedElement` | Shared |
 | `Permissions` | Microphone and Accessibility status, prompts, System Settings links | Shared |
 | `Dictation` | `DictationController` (the flow, including Undo AI edit), `DictationRecorder`, `DictationProcessor` with `PreparedDictation` (phrases, placeholders and layout around cleanup), `TextDelivery` | all of the above, Capture, Transcription, Cleanup, Persistence |
 | `DictationUI` | menu bar content and icon, HUD panel, history window, onboarding, Settings tabs, readiness from the session, reopening the app | Dictation, TranscriptUI, Session, … |

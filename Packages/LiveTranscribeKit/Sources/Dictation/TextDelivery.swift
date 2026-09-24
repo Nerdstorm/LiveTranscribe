@@ -17,7 +17,7 @@ public protocol TextDelivery: Sendable {
 /// pastes while a dictation is still restoring it.
 public final class SystemTextDelivery: TextDelivery {
     private let settings: @Sendable () -> AppSettings
-    private let overrides: InserterOverridesStore
+    private let overrides: AppOverridesStore
     private let focus: any FocusedTargetProvider
     private let pasteboard = SystemPasteboard()
     private let keystrokes = CGEventKeystrokeSender()
@@ -30,7 +30,7 @@ public final class SystemTextDelivery: TextDelivery {
     ///   provider the dictation flow reads the target with.
     public init(
         settings: @escaping @Sendable () -> AppSettings,
-        overrides: InserterOverridesStore,
+        overrides: AppOverridesStore,
         focus: any FocusedTargetProvider
     ) {
         self.settings = settings
@@ -53,7 +53,7 @@ public final class SystemTextDelivery: TextDelivery {
     }
 
     private func router(_ settings: DictationSettings) async -> InsertionRouter {
-        let user: InserterOverrides
+        let user: AppOverrides
         do {
             user = try await overrides.load()
         } catch {

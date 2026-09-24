@@ -17,7 +17,7 @@ struct InsertionUndoerTests {
         let undoer: InsertionUndoer
         let router: InsertionRouter
 
-        init(field: FakeElement, keystrokesSucceed: Bool = true, overrides: InserterOverrides = .bundled) {
+        init(field: FakeElement, keystrokesSucceed: Bool = true, overrides: AppOverrides = .bundled) {
             self.field = field
             keystrokes = keystrokesSucceed
                 ? FakeKeystrokes.typing(into: field, from: pasteboard)

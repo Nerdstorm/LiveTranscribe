@@ -93,7 +93,7 @@ final class AppComposition {
         let snippets = SnippetStore(fileURL: SnippetStore.defaultURL(applicationSupport: applicationSupport, bundleIdentifier: Log.subsystem))
         let vocabulary = VocabularyStore(fileURL: VocabularyStore.defaultURL(applicationSupport: applicationSupport, bundleIdentifier: Log.subsystem))
         let history = JSONLDictationHistory(fileURL: JSONLDictationHistory.defaultURL(applicationSupport: applicationSupport, bundleIdentifier: Log.subsystem))
-        let overrides = InserterOverridesStore(fileURL: Self.overridesURL(applicationSupport: applicationSupport))
+        let overrides = AppOverridesStore(fileURL: Self.overridesURL(applicationSupport: applicationSupport))
         accessibility = SystemAccessibilityPermission(pollInterval: .milliseconds(settings.dictation.permissionPollMs))
 
         let currentSettings: @Sendable () -> AppSettings = { store.load() }
@@ -224,10 +224,10 @@ final class AppComposition {
 
     private static func overridesURL(applicationSupport: URL) -> URL {
         do {
-            return try InserterOverridesStore.defaultFileURL(bundleIdentifier: Log.subsystem)
+            return try AppOverridesStore.defaultFileURL(bundleIdentifier: Log.subsystem)
         } catch {
             Log.app.error("Insertion overrides folder unavailable: \(error.localizedDescription, privacy: .public)")
-            return applicationSupport.appending(path: Log.subsystem).appending(path: InserterOverridesStore.fileName)
+            return applicationSupport.appending(path: Log.subsystem).appending(path: AppOverridesStore.fileName)
         }
     }
 

@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Settings › Apps: how dictated text gets into particular apps. Shows the built-in settings
 /// read-only and edits the user's own in `insertion-overrides.json` through the context's
-/// ``InserterOverridesStore``.
+/// ``AppOverridesStore``.
 public struct AppOverridesSettingsView: View {
     private static let explanation = """
         Dictated text is typed in through Accessibility, and pasted when an app doesn\u{2019}t accept \

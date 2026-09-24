@@ -7,7 +7,7 @@ struct AppOverrideRow: Identifiable, Equatable {
     enum Source: String {
         /// The user's own setting, stored in `insertion-overrides.json`; editable.
         case user
-        /// Shipped with the app (``InserterOverrides/bundled``); read-only.
+        /// Shipped with the app (``AppOverrides/bundled``); read-only.
         case builtIn
     }
 

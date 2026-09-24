@@ -7,7 +7,7 @@ import Shared
 /// ``InsertionMethod/paste`` goes straight to paste; one mapped to
 /// ``InsertionMethod/accessibility`` gets the default order, which lets a user entry undo a
 /// bundled one.
-public struct InserterOverrides: Codable, Sendable, Equatable {
+public struct AppOverrides: Codable, Sendable, Equatable {
     /// Bundle identifier to the first method to try.
     public var methods: [String: InsertionMethod]
 
@@ -43,13 +43,13 @@ public struct InserterOverrides: Codable, Sendable, Equatable {
     }
 
     /// No overrides.
-    public static let empty = InserterOverrides(methods: [:])
+    public static let empty = AppOverrides(methods: [:])
 
     /// Apps known to mishandle Accessibility writes, which go straight to paste.
     ///
     /// Terminals have no Accessibility-writable text; Electron and Chromium apps often accept the
     /// write and ignore it, or apply it after reporting the old value, which risks the text twice.
-    public static let bundled = InserterOverrides(methods: Dictionary(
+    public static let bundled = AppOverrides(methods: Dictionary(
         uniqueKeysWithValues: (terminals + chromiumBased).map { ($0, InsertionMethod.paste) }
     ))
 
@@ -78,8 +78,8 @@ public struct InserterOverrides: Codable, Sendable, Equatable {
     ]
 
     /// These overrides with `user`'s entries on top: for an app in both, the user's choice wins.
-    public func merged(with user: InserterOverrides) -> InserterOverrides {
-        InserterOverrides(methods: methods.merging(user.methods) { _, userChoice in userChoice })
+    public func merged(with user: AppOverrides) -> AppOverrides {
+        AppOverrides(methods: methods.merging(user.methods) { _, userChoice in userChoice })
     }
 
     /// The first method to try for the app, if it has an override.

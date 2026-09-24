@@ -61,7 +61,7 @@ public final class DictationUIContext {
     public let settingsStore: AppSettingsStore
     public let snippets: SnippetStore
     public let vocabulary: VocabularyStore
-    public let overrides: InserterOverridesStore
+    public let overrides: AppOverridesStore
     public let history: any DictationHistory
     public let microphonePermission: any MicrophonePermissionProviding
     public let accessibility: any AccessibilityPermissionProviding
@@ -77,7 +77,7 @@ public final class DictationUIContext {
         settingsStore: AppSettingsStore,
         snippets: SnippetStore,
         vocabulary: VocabularyStore,
-        overrides: InserterOverridesStore,
+        overrides: AppOverridesStore,
         history: any DictationHistory,
         microphonePermission: any MicrophonePermissionProviding,
         accessibility: any AccessibilityPermissionProviding,

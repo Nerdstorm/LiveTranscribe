@@ -4,12 +4,12 @@ import Observation
 import Shared
 
 /// Settings › Apps: the built-in per-app insertion settings (read-only) and the user's own
-/// (editable), saved through ``InserterOverridesStore``.
+/// (editable), saved through ``AppOverridesStore``.
 ///
 /// The store keeps only the user's entries; the built-in ones live in code. For an app in both,
-/// the user's entry wins (``InserterOverrides/merged(with:)``), and the built-in row says so.
+/// the user's entry wins (``AppOverrides/merged(with:)``), and the built-in row says so.
 ///
-/// Every change goes through ``InserterOverridesStore/update(_:)``, which re-reads the file and
+/// Every change goes through ``AppOverridesStore/update(_:)``, which re-reads the file and
 /// changes only the one app in a single step on the store: writing the copy loaded when the tab
 /// opened would drop an entry added by hand since, and a separate read and write could lose one
 /// saved in between.
@@ -28,10 +28,10 @@ final class AppOverridesModel {
     private(set) var runningApps: [AppOverrideApp] = []
     let status: EditableListStatus
 
-    private let store: InserterOverridesStore
+    private let store: AppOverridesStore
     private let catalog: any AppOverrideAppCatalog
-    private let builtIn: InserterOverrides
-    private var user: InserterOverrides = .empty
+    private let builtIn: AppOverrides
+    private var user: AppOverrides = .empty
     /// Apps already looked up, so Launch Services is asked once per bundle identifier.
     @ObservationIgnored private var appsByIdentifier: [String: AppOverrideApp] = [:]
 
@@ -39,7 +39,7 @@ final class AppOverridesModel {
     ///   - store: Where the user's settings live.
     ///   - catalog: Finds app names, icons and running apps.
     ///   - builtIn: The settings shipped with the app; tests pass a short list.
-    init(store: InserterOverridesStore, catalog: any AppOverrideAppCatalog, builtIn: InserterOverrides = .bundled) {
+    init(store: AppOverridesStore, catalog: any AppOverrideAppCatalog, builtIn: AppOverrides = .bundled) {
         self.store = store
         self.catalog = catalog
         self.builtIn = builtIn
@@ -150,7 +150,7 @@ final class AppOverridesModel {
 
     // MARK: - Private
 
-    private func apply(_ overrides: InserterOverrides) {
+    private func apply(_ overrides: AppOverrides) {
         user = overrides
         userRows = overrides.methods
             .map { AppOverrideRow(bundleIdentifier: $0.key, app: app(for: $0.key), method: $0.value, source: .user, isReplacedByUser: false) }
