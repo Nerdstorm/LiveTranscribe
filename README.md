@@ -88,7 +88,8 @@ Every feature, in detail: [docs/features.md](docs/features.md).
 | [Cleanup and spoken commands](docs/cleanup.md) | The four cleanup levels, what OutputGuard rejects, and the phrases that become emoji, punctuation, line breaks and addresses |
 | [Snippets, vocabulary and apps](docs/snippets-vocabulary-apps.md) | Saved text, your names and jargon, and how each app gets its text and line breaks |
 | [Privacy](docs/privacy.md) | What is kept where, what goes over the network, and how to remove it all |
-| [Signing and Gatekeeper](docs/signing.md) | Ad-hoc signing, keeping permissions across rebuilds, and distributing a build |
+| [Signing and Gatekeeper](docs/signing.md) | Ad-hoc signing, and keeping permissions across rebuilds |
+| [Releasing](docs/releasing.md) | The Developer ID certificate, the notary credentials and the update signing key, and building, notarizing, publishing and offering a release as an update |
 | [Known limitations](docs/limitations.md) | What doesn't work well yet |
 | [Development](docs/development.md) | The tests and their audio clips, the bench and the dictation eval, training the adapter, the licence notices, and the icons |
 | [Design notes](docs/design-notes.md) | Why it is built the way it is |
