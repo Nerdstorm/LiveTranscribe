@@ -100,13 +100,25 @@ Every feature, in detail: [docs/features.md](docs/features.md).
 
 A working proof of concept, free and open source under the [MIT License](LICENSE).
 
-- There are no prebuilt downloads: build it from source (below).
+- Download it from [GitHub Releases](https://github.com/Nerdstorm/LiveTranscribe/releases/latest):
+  a disk image signed with Developer ID and notarized by Apple, which keeps itself up to date. Or
+  build it from source (below).
 - Tested on an M4 Pro Mac with macOS 27 and Xcode 27. The app targets macOS 14 or later but has
   not been run on older systems.
 - Tested with English speech. Parakeet v3 also recognises other European languages, but the
   cleanup step has not been tested with them.
-- Issues and pull requests are welcome.
+- Issues and pull requests are welcome; see [Reporting a problem](#reporting-a-problem).
 - What doesn't work well yet is in [Known limitations](docs/limitations.md).
+
+## Reporting a problem
+
+[Open an issue](https://github.com/Nerdstorm/LiveTranscribe/issues/new), in whatever form suits
+you. These help, when you have them:
+
+- your Mac, the macOS version, and the app's version (**About Live Transcribe** in the menu bar);
+- the app you were dictating into;
+- what you said, what was typed, and what you expected;
+- for a crash, the report macOS offers to send, or the one in Console › Crash Reports.
 
 ## Requirements
 
