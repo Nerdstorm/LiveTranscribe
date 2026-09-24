@@ -1,5 +1,5 @@
 // Bench: runs fixture clips through the real pipeline and reports WER (raw vs cleaned) and
-// per-stage latency. Build with xcodebuild (MLX needs its Metal library); see README.md.
+// per-stage latency. Build with xcodebuild (MLX needs its Metal library); see docs/development.md.
 //
 //   Bench [--fixtures <dir>] [--level none|light|medium|high] [--no-cleanup] [--no-adapter] [--fast]
 //   Bench --dictation [--clips <dir>] [--level <level>]... [--multiline] [--p95-target-ms <ms>] [--verbose] [--no-adapter]
