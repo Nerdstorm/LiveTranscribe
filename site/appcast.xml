@@ -3,6 +3,17 @@
     <channel>
         <title>LiveTranscribe</title>
         <item>
+            <title>0.2.0</title>
+            <pubDate>Fri, 25 Sep 2026 22:48:11 +1000</pubDate>
+            <link>https://github.com/Nerdstorm/LiveTranscribe/releases/tag/v0.2.0</link>
+            <sparkle:fullReleaseNotesLink>https://github.com/Nerdstorm/LiveTranscribe/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>137</sparkle:version>
+            <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/Nerdstorm/LiveTranscribe/releases/download/v0.2.0/LiveTranscribe.dmg" length="20648637" type="application/octet-stream" sparkle:edSignature="+5czpCAQFVjrDKqScKIV2RwnyZmg+9ZZLANsjNjg2NA6eJSic2hjelUCy3zM9utuWbPkXWc2xBfbWfWlrrr4DQ=="/>
+        </item>
+        <item>
             <title>0.1.1</title>
             <pubDate>Fri, 25 Sep 2026 00:05:55 +1000</pubDate>
             <link>https://github.com/Nerdstorm/LiveTranscribe/releases/tag/v0.1.1</link>
