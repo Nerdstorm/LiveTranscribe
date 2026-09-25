@@ -44,7 +44,7 @@ struct PreparedDictation {
     /// in place, but list markers as they were said and nothing laid out.
     var uncleaned: String {
         let asSaid: (Placeholder) -> String = { $0.role == .structure ? $0.spoken : $0.expansion }
-        if let restored = protected.restore(in: text, resolving: asSaid) {
+        if let restored = protected.restore(in: withoutFullStopsAfterEmoji(text), resolving: asSaid) {
             return tidied(restored)
         }
         // Vocabulary replacement skips placeholders, so this means a bug there.
@@ -65,7 +65,8 @@ struct PreparedDictation {
     /// a placeholder did not survive.
     func finished(_ cleaned: String) -> String? {
         let breaks: (Placeholder) -> String? = { $0.role == .content ? nil : $0.expansion }
-        guard let lines = protected.restore(in: withoutAddedCommasAroundEmoji(cleaned), resolving: breaks) else {
+        let punctuated = withoutFullStopsAfterEmoji(withoutAddedCommasAroundEmoji(cleaned))
+        guard let lines = protected.restore(in: punctuated, resolving: breaks) else {
             return nil
         }
         let tidy = tidied(lines)
@@ -95,6 +96,25 @@ struct PreparedDictation {
         }
         return result
     }
+
+    /// `text` without the full stop after an emoji that stands as a sentence of its own.
+    /// Speech-to-text can write an emoji's name that way ("See you soon. Smiley face emoji."), and
+    /// the model can keep it, but an emoji ends no sentence: "See you soon. 🙂".
+    private func withoutFullStopsAfterEmoji(_ text: String) -> String {
+        var result = text
+        for placeholder in protected.placeholders where placeholder.role == .content && Self.isEmoji(placeholder.expansion) {
+            guard let token = result.range(of: placeholder.token) else { continue }
+            let before = result[..<token.lowerBound].last { !$0.isWhitespace }
+            let after = result[token.upperBound...]
+            guard before.map(Self.sentenceEnders.contains) ?? true, after.hasPrefix("."), !after.hasPrefix("..") else {
+                continue
+            }
+            result.remove(at: token.upperBound)
+        }
+        return result
+    }
+
+    private static let sentenceEnders: Set<Character> = [".", "!", "?"]
 
     /// Whether `text` is emoji and spaces only, such as an emoji command's expansion.
     private static func isEmoji(_ text: String) -> Bool {

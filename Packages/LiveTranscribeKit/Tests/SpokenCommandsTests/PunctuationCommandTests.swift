@@ -19,6 +19,9 @@ struct PunctuationCommandTests {
         ("See the appendix open bracket page 4 close bracket for details.", "See the appendix (page 4) for details."),
         ("she called it quote finished unquote yesterday", "she called it \"finished\" yesterday"),
         ("He said open quote wait, close quote.", "He said \"wait,\"."),
+        ("He said, \"Open quote I will be late.\" Close quote and left.", "He said, \"I will be late.\" and left."),
+        ("He said open quote \"I will be late\" close quote and left.", "He said \"I will be late\" and left."),
+        ("See the appendix open bracket (page 4) close bracket.", "See the appendix (page 4)."),
     ])
     func writesPunctuation(spoken: String, expected: String) {
         let protected = protector.protect(spoken)
