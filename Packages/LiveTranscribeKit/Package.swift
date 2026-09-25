@@ -30,9 +30,12 @@ let package = Package(
         .executable(name: "Train", targets: ["Train"]),
     ],
     dependencies: [
-        // Pinned exactly. mlx-audio-swift must be pinned by revision (tag v0.1.3) because its
-        // manifest uses unsafeFlags, which SwiftPM only accepts from revision-pinned packages.
-        .package(url: "https://github.com/Blaizzy/mlx-audio-swift.git", revision: "d302a5c6080d2bb97bae38c7418f82abb76013b6"),
+        // Pinned exactly. mlx-audio-swift must be pinned by revision because its manifest uses
+        // unsafeFlags, which SwiftPM only accepts from revision-pinned packages. This is main as
+        // of 2026-09-18, past the latest tag (v0.1.3), for its fix to Qwen3-ASR's audio features
+        // (Blaizzy/mlx-audio-swift#247): the Slaney mel scale and a periodic Hann window, as
+        // Qwen's own feature extractor computes them.
+        .package(url: "https://github.com/Blaizzy/mlx-audio-swift.git", revision: "01dec7c9bdce3088a6b6b7ab9f2e403458195efb"),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm.git", exact: "3.31.4"),
         .package(url: "https://github.com/ml-explore/mlx-swift.git", exact: "0.31.6"),
         // Downloader + tokenizer implementations required by mlx-swift-lm 3.x (already
