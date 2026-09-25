@@ -1,8 +1,8 @@
 // Bench: runs fixture clips through the real pipeline and reports WER (raw vs cleaned) and
 // per-stage latency. Build with xcodebuild (MLX needs its Metal library); see docs/development.md.
 //
-//   Bench [--fixtures <dir>] [--level none|light|medium|high] [--no-cleanup] [--no-adapter] [--fast]
-//   Bench --dictation [--clips <dir>] [--level <level>]... [--multiline] [--p95-target-ms <ms>] [--verbose] [--no-adapter]
+//   Bench [--fixtures <dir>] [--level none|light|medium|high] [--no-cleanup] [--no-adapter] [--fast] [--stt-model <repo>]
+//   Bench --dictation [--clips <dir>] [--level <level>]... [--multiline] [--p95-target-ms <ms>] [--verbose] [--no-adapter] [--stt-model <repo>]
 
 import Capture
 import Cleanup
@@ -31,6 +31,8 @@ struct BenchOptions {
     /// The dictation latency target from docs/dictation.md: p95 of release-to-text under 1.2 s.
     var p95TargetMs = 1_200
     var verbose = false
+    /// A speech-to-text model to measure instead of the default, to compare models on the same clips.
+    var sttModel: String?
 
     static func parse(_ arguments: [String]) throws -> BenchOptions {
         var options = BenchOptions()
@@ -66,6 +68,9 @@ struct BenchOptions {
                 options.p95TargetMs = value
             case "--verbose":
                 options.verbose = true
+            case "--stt-model":
+                guard let repo = iterator.next(), !repo.isEmpty else { throw BenchError.usage("--stt-model needs a model repository") }
+                options.sttModel = repo
             default:
                 throw BenchError.usage("unknown argument \(argument)")
             }
@@ -84,8 +89,8 @@ enum BenchError: LocalizedError {
         case .usage(let detail):
             """
             \(detail)
-            usage: Bench [--fixtures <dir>] [--level none|light|medium|high] [--no-cleanup] [--no-adapter] [--fast]
-                   Bench --dictation [--clips <dir>] [--level <level>]... [--multiline] [--p95-target-ms <ms>] [--verbose] [--no-adapter]
+            usage: Bench [--fixtures <dir>] [--level none|light|medium|high] [--no-cleanup] [--no-adapter] [--fast] [--stt-model <repo>]
+                   Bench --dictation [--clips <dir>] [--level <level>]... [--multiline] [--p95-target-ms <ms>] [--verbose] [--no-adapter] [--stt-model <repo>]
             """
         case .noFixtures(let path):
             "No .wav files with matching .txt references in \(path). Run scripts/generate-test-audio.sh first."
@@ -118,6 +123,7 @@ struct Fixture {
 
 let options = try BenchOptions.parse(Array(CommandLine.arguments.dropFirst()))
 var settings = AppSettings.defaults
+settings.sttModel = options.sttModel ?? settings.sttModel
 settings.cleanupEnabled = options.cleanupEnabled
 settings.cleanupAdapterEnabled = options.adapterEnabled
 settings.cleanupLevel = options.level

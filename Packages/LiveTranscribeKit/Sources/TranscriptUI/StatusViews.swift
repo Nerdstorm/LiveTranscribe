@@ -14,7 +14,7 @@ struct LoadingView: View {
                 .foregroundStyle(.secondary)
             Text(isLoading ? "Preparing on-device models" : "Models are not loaded")
                 .font(.headline)
-            Text("The first launch downloads the models (about 3.5 GB with the defaults). Everything runs locally after that.")
+            Text("The first launch downloads the models (about 2 GB with the defaults). Everything runs locally after that.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

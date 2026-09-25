@@ -7,7 +7,7 @@ public struct ModelLoadProgress: Sendable, Equatable {
         case ready
     }
 
-    /// Hugging Face repository id, e.g. `mlx-community/parakeet-tdt-0.6b-v3`.
+    /// Hugging Face repository id, e.g. `mlx-community/Qwen3-ASR-0.6B-8bit`.
     public let modelID: String
     public let stage: Stage
     /// Fraction in 0...1, or `nil` when the stage has no measurable progress.

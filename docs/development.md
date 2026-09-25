@@ -47,6 +47,8 @@ It builds the `Bench` tool and runs it. Give it options with `ARGS`, for example
 - `--no-adapter`: clean up without the fine-tuned self-correction adapter.
 - `--fast`: feed audio as fast as possible instead of in real time. Latency numbers are then
   meaningless.
+- `--stt-model <repo>`: measure another speech-to-text model instead of the default, such as
+  `mlx-community/parakeet-tdt-0.6b-v3`, to compare models on the same clips.
 
 The bench prints the word error rate (WER) of the raw and cleaned text, p50 and p95 latency per
 stage, and four checks:
@@ -56,18 +58,21 @@ stage, and four checks:
 - no clip's WER gets more than 2 points worse after cleanup;
 - cleanup falls back to the raw text for fewer than 5% of segments.
 
-Last run, on an M4 Pro with the four generated clips played in real time. **These numbers are
-from Parakeet v2, the previous default; v3 has not been benchmarked yet.**
+Last run, on an M4 Pro with the four generated clips played in real time, with Qwen3-ASR and,
+for comparison, Parakeet TDT 0.6B v3 (the default until 2026-09-25) on the same clips:
 
-| Stage | p50 (ms) | p95 (ms) |
-|---|---:|---:|
-| Silence that ends a segment | 608 | 608 |
-| Speech-to-text | 68 | 113 |
-| Cleanup | 157 | 403 |
-| End of speech → text | 837 | 1126 |
+| Stage | Qwen3-ASR p50 (ms) | p95 (ms) | Parakeet v3 p50 (ms) | p95 (ms) |
+|---|---:|---:|---:|---:|
+| Silence that ends a segment | 608 | 608 | 608 | 608 |
+| Speech-to-text | 195 | 465 | 68 | 148 |
+| Cleanup | 225 | 549 | 219 | 557 |
+| End of speech → text | 1032 | 1623 | 900 | 1290 |
 
-WER was 1.0% raw and 1.0% cleaned, with no fallbacks, and all four checks passed. The first row
-is the configured 600 ms of silence that closes a segment; lower `vadSilenceMs` to trade it for
+With Qwen3-ASR, WER was 1.0% raw and 1.0% cleaned (Parakeet: 2.5% and 2.5%), with no fallbacks.
+**Qwen3-ASR fails the latency check: p95 from end of speech to text is 1,623 ms, against the
+1.5 s target that Parakeet meets.** Qwen3-ASR writes its text a token at a time, so a segment
+takes longer the more words it holds. The other three checks pass with both. The first row is
+the configured 600 ms of silence that closes a segment; lower `vadSilenceMs` to trade it for
 more segment splits. The clips are synthetic speech, so measure with real recordings on your own
 hardware before relying on these numbers. Speech-to-text and cleanup calls are also marked as
 signpost intervals ("STT", "LLM") for Instruments.
@@ -88,17 +93,18 @@ stopping the recorder and inserting the text are not included. `--multiline` dic
 multi-line field, where line breaks, lists and letters are laid out, and adds how many clips came
 out with the intended lines. `--level <none|light|medium|high>` (repeatable) limits the levels,
 `--clips <dir>` reads other clips, `--p95-target-ms <n>` changes the target, `--no-adapter`
-cleans up without the adapter and `--verbose` prints every output, with the reason for each
-fallback. Give them with `ARGS`, as for the bench: `make eval ARGS="--multiline --verbose"`.
+cleans up without the adapter, `--stt-model <repo>` measures another speech-to-text model and
+`--verbose` prints every output, with the reason for each fallback. Give them with `ARGS`, as for the bench: `make eval ARGS="--multiline --verbose"`.
 
-Last run, on an M4 Pro with macOS 27 and synthetic speech, with `--multiline`:
+Last run, on an M4 Pro with macOS 27 and synthetic speech, with Qwen3-ASR and `--multiline`
+([Eval results](dictation.md#eval-results) compares Parakeet v3 and the single-line field):
 
 | Level | WER vs said | WER vs meant | Fallbacks | p50 (ms) | p95 (ms) | Laid out as meant |
 |---|---:|---:|---:|---:|---:|---:|
-| None | 10.9% | 20.1% | 0 | 34 | 66 | 57/65 |
-| Light | 11.1% | 19.9% | 2 | 162 | 325 | 57/65 |
-| Medium | 21.8% | 2.2% | 3 | 185 | 423 | 65/65 |
-| High | 21.8% | 2.2% | 3 | 210 | 426 | 65/65 |
+| None | 10.8% | 20.3% | 0 | 128 | 262 | 57/65 |
+| Light | 11.0% | 19.7% | 1 | 254 | 536 | 57/65 |
+| Medium | 21.5% | 1.7% | 3 | 277 | 655 | 65/65 |
+| High | 21.5% | 1.7% | 3 | 310 | 642 | 65/65 |
 
 Medium resolved all 12 self-corrections and removed the fillers from all 10 filler clips, and
 Medium and High laid out every list and letter. WER against what was said counts each spoken
@@ -111,17 +117,17 @@ inserted:
 - The same plain sentence at Medium and High ("I've attached the invoice and the signed
   agreement."): the self-correction adapter changed a sentence that had nothing to correct
   (three spoken words dropped at Medium; similarity 0.48, below the floor, at High).
-- Two spoken lists at Medium and High: the model rewrote a bulleted list, dropping three of its
-  words, and dropped an item from a numbered one. The uncleaned text was still laid out as meant.
-- Two clips at Light, which keeps every word: the long letter, where the model resolved its
-  self-correction, and the numbered list, where it dropped the spoken word "number" to number the
-  items itself.
+- A filler clip at Medium and High: Qwen3-ASR ends a sentence at the hesitation ("tomorrow. Ah,
+  before noon"), and the model then drops a word that carries meaning. The filler rule has
+  already removed "ah".
+- An emoji clip at Medium and High: the model changed the placeholder of an emoji said between
+  two sentences ("Great job! 🎉 See you tomorrow.").
+- The long letter at Light, which keeps every word: the model resolved its self-correction.
 
-Without `--multiline` (a single-line field), where lists are not laid out, Light falls back on 2
-clips and Medium and High on 5 each. The model drops "number" or "bullet point" to lay a list
-out itself, and it moves the name in a letter's sign-off into the greeting; a letter is cleaned
-as a whole there. The longest clip is about 40 words, so these numbers say nothing about long
-dictations.
+Without `--multiline` (a single-line field), where lists are not laid out, Light falls back on 1
+clip and Medium and High on 4 each: the same clips, and the long letter at Medium and High too,
+where the model changed more than the self-correction. The longest clip is about 40 words, so
+these numbers say nothing about long dictations.
 
 ## Training the adapter
 
