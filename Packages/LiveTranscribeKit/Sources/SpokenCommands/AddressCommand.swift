@@ -10,7 +10,8 @@ import Shared
 /// a dot, underscore, hyphen or digit ("john.smith"), or follows a word such as "email", "to" or
 /// "is" ("email support at example.com"); "look at example.com" and "contact us at example.com"
 /// keep their "at". A domain speech-to-text already wrote as one word is left as it is unless it
-/// gains a name before it or a path after it.
+/// gains a name before it or a path after it; an email address it already wrote
+/// ("John.Smith@example.com") is taken whole.
 ///
 /// The address goes behind a placeholder, lowercased except for its path, so the model cannot
 /// capitalise or split it.
@@ -56,6 +57,16 @@ public struct AddressCommand: PhraseMatcher {
         var found: [PhraseMatch] = []
         var index = 0
         while index < tokens.count {
+            if let email = writtenEmail(tokens[index]), let words = wordsOfToken[index] {
+                found.append(PhraseMatch(
+                    words: words,
+                    replacement: .placeholder(trigger: email, expansion: email, role: .content),
+                    keptLeading: String(tokens[index].leading),
+                    keptTrailing: String(tokens[index].trailing)
+                ))
+                index += 1
+                continue
+            }
             guard let domain = domain(startingAt: index, in: tokens) else {
                 index += 1
                 continue
@@ -148,6 +159,18 @@ public struct AddressCommand: PhraseMatcher {
     }
 
     // MARK: - Email names
+
+    /// An email address speech-to-text already wrote as one word, lowercased: "John.Smith@example.com"
+    /// → "john.smith@example.com". The model would otherwise capitalise the name in it.
+    private func writtenEmail(_ token: AddressToken) -> String? {
+        let parts = token.core.split(separator: "@", omittingEmptySubsequences: false)
+        guard parts.count == 2, Self.isEmailName(String(parts[0])) else { return nil }
+        let labels = parts[1].split(separator: ".", omittingEmptySubsequences: false).map(String.init)
+        guard labels.count >= 2, labels.allSatisfy(Self.isLabel), let tld = labels.last, topLevelDomains.contains(tld) else {
+            return nil
+        }
+        return token.core
+    }
 
     /// The email name before "at" and the domain at `domainStart`, and the index of its first
     /// token.

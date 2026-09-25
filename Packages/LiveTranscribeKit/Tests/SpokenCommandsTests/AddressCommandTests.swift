@@ -42,6 +42,23 @@ struct AddressCommandTests {
         }
     }
 
+    @Test("Hides an email address speech-to-text wrote, lowercased", arguments: [
+        ("Email me at John.Smith@example.com.", "Email me at ⟦S1⟧.", "john.smith@example.com"),
+        ("(ops@Example.co.uk)", "(⟦S1⟧)", "ops@example.co.uk"),
+    ])
+    func hidesAWrittenEmailAddress(spoken: String, text: String, address: String) {
+        let protected = protector.protect(spoken)
+        #expect(protected.text == text)
+        #expect(protected.placeholders.first?.expansion == address)
+    }
+
+    @Test("Leaves what only looks like an email address", arguments: [
+        "ping me @sam", "user@localhost", "the@ sign", "a@b@example.com",
+    ])
+    func leavesNonAddresses(spoken: String) {
+        #expect(protector.protect(spoken).text == spoken)
+    }
+
     @Test func hidesTheAddressFromTheModel() {
         let protected = protector.protect("email support at example dot com.")
         #expect(protected.text == "email ⟦S1⟧.")

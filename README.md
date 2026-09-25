@@ -112,8 +112,8 @@ A working proof of concept, free and open source under the [MIT License](LICENSE
 - What changed in each release is in the [changelog](CHANGELOG.md).
 - Tested on an M4 Pro Mac with macOS 27 and Xcode 27. The app targets macOS 14 or later but has
   not been run on older systems.
-- Tested with English speech. Parakeet v3 also recognises other European languages, but the
-  cleanup step has not been tested with them.
+- Tested with English speech. Qwen3-ASR also recognises 29 other languages, among them Chinese,
+  Spanish, French and German, but the cleanup step has not been tested with them.
 - Issues and pull requests are welcome; see [Reporting a problem](#reporting-a-problem).
 - What doesn't work well yet is in [Known limitations](docs/limitations.md).
 
@@ -134,8 +134,8 @@ you. These help, when you have them:
 - To build: Xcode 26.4 or later (Swift 6.3 or later), with its Metal Toolchain component
   (`xcodebuild -downloadComponent MetalToolchain`). MLX compiles Metal shaders, so build with
   `xcodebuild` or Xcode; `swift build` produces binaries without the Metal library.
-- Disk space: about 3.5 GB for the models (Parakeet TDT 0.6B v3 is 2.5 GB, Qwen3-1.7B-4bit about
-  1 GB) and about 2 GB for the build. The tests and the bench need roughly 7 GB more: their own
+- Disk space: about 2 GB for the models (Qwen3-ASR 0.6B and Qwen3-1.7B-4bit are about 1 GB
+  each) and about 2 GB for the build. The tests and the bench need roughly 5.5 GB more: their own
   copy of the models and their own build.
 
 ## Build and run
@@ -156,7 +156,7 @@ build Xcode asks you to trust mlx-swift's `CudaBuild` build-tool plugin, which o
 CUDA builds; the Makefile skips that prompt with `-skipPackagePluginValidation`.
 
 Live Transcribe runs in the menu bar. On first launch, **Set Up Dictation** walks you through
-microphone access, Accessibility and the fn key while the models (about 3.5 GB) download; see
+microphone access, Accessibility and the fn key while the models (about 2 GB) download; see
 [First launch](docs/using.md#first-launch).
 
 **macOS treats every ad-hoc build as a new app.** After a rebuild it asks for microphone access
@@ -190,11 +190,11 @@ this Mac, never synced, until you turn history off, limit how long it is kept or
 ## Architecture
 
 - **Two pipelines, one set of models.** The live transcript runs microphone → Silero voice
-  activity detection → Parakeet speech-to-text → Qwen3-1.7B cleanup at the chosen level → window
-  and JSONL file. Dictation runs shortcut → recording → Parakeet → placeholders for snippets,
-  spoken commands and list markers, and vocabulary → filler rule, letter frame and Qwen3-1.7B
-  cleanup, checked by OutputGuard → line breaks and layout → snippets, emoji and addresses
-  restored → text at the cursor. One Parakeet and one Qwen3-1.7B instance serve both.
+  activity detection → Qwen3-ASR speech-to-text → Qwen3-1.7B cleanup at the chosen level →
+  window and JSONL file. Dictation runs shortcut → recording → Qwen3-ASR → placeholders for
+  snippets, spoken commands and list markers, and vocabulary → filler rule, letter frame and
+  Qwen3-1.7B cleanup, checked by OutputGuard → line breaks and layout → snippets, emoji and
+  addresses restored → text at the cursor. One Qwen3-ASR and one Qwen3-1.7B instance serve both.
 - **A menu bar app.** Dictation has to be available in every app, so Live Transcribe lives in
   the menu bar (`LSUIElement`) and becomes a regular app with a Dock icon only while one of its
   windows (transcript, history, Settings, setup) is open.
@@ -213,7 +213,7 @@ Packages/LiveTranscribeKit/   all feature code, as vertical slices
     Shared/          value types, AppSettings, logging, deadline, edit distance, atomic file writes
     Capture/         AVCaptureSession microphone capture → 16 kHz mono; microphone list and choice
     Segmentation/    Silero VAD + segmentation state machine (pre-roll, hysteresis, max length)
-    Transcription/   Parakeet via mlx-audio-swift
+    Transcription/   Qwen3-ASR via mlx-audio-swift
     Cleanup/         Qwen3 via mlx-swift-lm, prompt, OutputGuard fallbacks, fine-tuned adapter
     Persistence/     JSONL session files and dictation history
     Session/         SessionCoordinator (lifecycle) + SessionPipeline (3 concurrent stages)
@@ -256,13 +256,10 @@ this repository.
 
 | Role | Model used | Original model | Licence |
 |---|---|---|---|
-| Speech-to-text | [mlx-community/parakeet-tdt-0.6b-v3](https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v3) | [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) by NVIDIA | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| Speech-to-text | [mlx-community/Qwen3-ASR-0.6B-8bit](https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit) | [Qwen3-ASR-0.6B](https://huggingface.co/Qwen/Qwen3-ASR-0.6B) by the Qwen team, Alibaba Cloud | Apache-2.0 |
 | Cleanup | [mlx-community/Qwen3-1.7B-4bit](https://huggingface.co/mlx-community/Qwen3-1.7B-4bit) | [Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B) by the Qwen team, Alibaba Cloud | Apache-2.0 |
 | Self-correction adapter | bundled (`Sources/Cleanup/Adapter`) | trained on synthetic data in this repository ([`Training/`](Packages/LiveTranscribeKit/Training/README.md)) | MIT |
 | Voice activity detection | [mlx-community/silero-vad](https://huggingface.co/mlx-community/silero-vad) | [Silero VAD](https://github.com/snakers4/silero-vad) by the Silero team | MIT |
-
-If you redistribute the Parakeet weights, for example bundled with a build, CC BY 4.0 requires
-you to credit NVIDIA.
 
 Other models can be tried in **Settings › Advanced** (a Hugging Face repository ID for each role;
 it is downloaded on the next launch). They must be models mlx-audio-swift or mlx-swift-lm can

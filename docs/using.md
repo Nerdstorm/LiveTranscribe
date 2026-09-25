@@ -16,7 +16,7 @@ Every step can be skipped, and each is checked again when you come back from Sys
 won't let Live Transcribe paste after Accessibility is switched on, setup and **Settings ›
 Permissions** say so and offer **Reopen Live Transcribe**.
 
-At the same time the app downloads the models (about 3.5 GB) into the Hugging Face cache
+At the same time the app downloads the models (about 2 GB) into the Hugging Face cache
 (`~/.cache/huggingface`, shared with the tests, the bench and other Hugging Face tools). The menu
 bar and the transcript window show the progress. Dictation and **Start Transcribing** become
 available once the models have loaded. If the cleanup model fails to load, the app transcribes

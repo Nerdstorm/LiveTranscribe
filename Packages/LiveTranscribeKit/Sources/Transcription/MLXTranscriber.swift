@@ -5,13 +5,13 @@ import MLXAudioCore
 import MLXAudioSTT
 import Shared
 
-/// ``Transcriber`` backed by an mlx-audio-swift STT model (Parakeet by default).
+/// ``Transcriber`` backed by an mlx-audio-swift STT model (Qwen3-ASR by default).
 ///
 /// The model is loaded once and warmed up. It never leaves this actor, which runs on its own
 /// serial queue so the blocking MLX inference does not occupy the cooperative thread pool.
 public actor MLXTranscriber: Transcriber {
-    /// Shorter clips are returned as empty text rather than sent to the model: the conformer's
-    /// subsampling needs a minimum number of frames.
+    /// Shorter clips are returned as empty text rather than sent to the model: they hold no word,
+    /// and some models' subsampling (Parakeet's conformer, say) needs a minimum number of frames.
     private static let minimumSamples = AudioFormat.samples(forMilliseconds: 100)
 
     private let modelID: String

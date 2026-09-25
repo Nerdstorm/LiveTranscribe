@@ -66,7 +66,7 @@ test: ## Unit tests, which need no models
 	scripts/tests/write-changelog-tests.sh
 	scripts/tests/check-swift-runtime-tests.sh
 
-test-integration: audio ## End-to-end tests with the real models, which they download (about 3.5 GB)
+test-integration: audio ## End-to-end tests with the real models, which they download (about 2 GB)
 	cd $(PACKAGE) && TEST_RUNNER_LT_RUN_MODEL_TESTS=1 $(PACKAGE_TESTS) -only-testing:IntegrationTests
 
 prompt-probe: ## Print the cleanup model's output for hard prompt cases, when changing the prompt

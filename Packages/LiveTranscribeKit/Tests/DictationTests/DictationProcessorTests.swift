@@ -99,6 +99,25 @@ struct DictationProcessorTests {
         #expect(output.text == "Great job \u{1F389} see you tomorrow.")
     }
 
+    /// Speech-to-text can write an emoji's name as a sentence of its own; the emoji keeps the
+    /// sentence before it and takes no full stop of its own.
+    @Test func anEmojiSaidAsASentenceTakesNoFullStop() async {
+        let transcript = "Great job! Emoji party popper. See you soon. Smiley face emoji."
+        let expected = "Great job! \u{1F389} See you soon. \u{1F642}"
+        let none = await finish(transcript, configuration(.none), cleaner: nil)
+        #expect(none.text == expected)
+        let cleaner = ScriptedCleaner { $0 }
+        let medium = await finish(transcript, configuration(.medium), cleaner: cleaner)
+        #expect(await cleaner.requests.first?.text == "Great job! S1. See you soon. S2.", "the model sees the transcript's punctuation")
+        #expect(medium.text == expected)
+        #expect(medium.uncleanedText == expected)
+    }
+
+    @Test func aFullStopAfterAnEmojiInASentenceStays() async {
+        let output = await finish("Hi emoji fireworks.", configuration(.none), cleaner: nil)
+        #expect(output.text == "Hi \u{1F386}.")
+    }
+
     @Test func aDictatedCommaNextToAnEmojiStays() async {
         let cleaner = ScriptedCleaner { _ in "Great job, S1." }
         let output = await finish("great job comma emoji party popper", configuration(.medium), cleaner: cleaner)

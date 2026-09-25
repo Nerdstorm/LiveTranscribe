@@ -120,13 +120,17 @@ public struct PunctuationCommand: PhraseMatcher {
                let opening = open.last, opening.upperBound < position {
                 open.removeLast()
                 let closing = position..<(position + name.count)
+                // Speech-to-text may write the mark as well as its name ("Open quote I will be
+                // late." Close quote): the mark it wrote stands, so it is not written twice.
+                let openingWritten = TokenEdges.leading(of: text.token(ofWord: opening.upperBound)).hasPrefix(pair.opening)
+                let closingWritten = TokenEdges.trailing(of: text.token(ofWord: closing.lowerBound - 1)).hasSuffix(pair.closing)
                 found.append(PhraseMatch(
                     words: opening,
-                    replacement: .inline(InlineText(pair.opening, joinsNext: true))
+                    replacement: .inline(InlineText(openingWritten ? "" : pair.opening, joinsNext: true))
                 ))
                 found.append(PhraseMatch(
                     words: closing,
-                    replacement: .inline(InlineText(pair.closing, joinsPrevious: true)),
+                    replacement: .inline(InlineText(closingWritten ? "" : pair.closing, joinsPrevious: true)),
                     keptTrailing: String(TokenEdges.trailing(of: text.token(ofWord: closing.upperBound - 1)))
                 ))
                 position = closing.upperBound
