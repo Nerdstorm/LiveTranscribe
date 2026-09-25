@@ -37,6 +37,7 @@ final class AppComposition {
     init() {
         let store = AppSettingsStore()
         store.registerDefaults()
+        store.migrate()
         self.store = store
         let settings = store.load()
         MLXRuntime.configure(gpuCacheLimitMB: settings.gpuCacheLimitMB)

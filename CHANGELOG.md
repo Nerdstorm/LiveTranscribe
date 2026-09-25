@@ -7,7 +7,8 @@ What changed in each release of Live Transcribe, newest first. Before a release,
 ## 0.2.0 - 2026-09-25
 
 - Recognise speech with Qwen3-ASR instead of Parakeet. It made fewer mistakes in our dictation tests, downloads about 1 GB instead of 2.3 GB and uses less memory. It also recognises 29 languages besides English, but cleanup has only been tested with English ([#20](https://github.com/Nerdstorm/LiveTranscribe/pull/20))
-- After updating, the app downloads the new model once. The menu bar shows the progress, and dictation comes back when the model has loaded. The old model stays in `~/.cache/huggingface/hub/models--mlx-community--parakeet-tdt-0.6b-v3` (about 2.3 GB; in Finder, **Go › Go to Folder…** opens it): move it to the Trash unless you chose it in **Settings › Advanced** ([#20](https://github.com/Nerdstorm/LiveTranscribe/pull/20))
+- After updating, the app downloads the new model once. The menu bar shows the progress, and dictation comes back when the model has loaded. To keep using Parakeet instead, enter `mlx-community/parakeet-tdt-0.6b-v3` in **Settings › Advanced**. Otherwise the old model can go to the Trash: it's in `~/.cache/huggingface/hub/models--mlx-community--parakeet-tdt-0.6b-v3` (about 2.3 GB; in Finder, **Go › Go to Folder…** opens it) ([#20](https://github.com/Nerdstorm/LiveTranscribe/pull/20), [#22](https://github.com/Nerdstorm/LiveTranscribe/pull/22))
+- Stop **Settings › Advanced** from saving the models it shows just because you opened it, which kept Parakeet in place of the new default ([#22](https://github.com/Nerdstorm/LiveTranscribe/pull/22))
 - The live transcript shows each segment a little later than before, by about 0.1 to 0.3 s in our tests. A fix is planned ([#20](https://github.com/Nerdstorm/LiveTranscribe/pull/20))
 
 [Every commit since v0.1.1](https://github.com/Nerdstorm/LiveTranscribe/compare/v0.1.1...v0.2.0)

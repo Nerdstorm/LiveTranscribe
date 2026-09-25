@@ -231,4 +231,71 @@ struct AppSettingsTests {
     @Test func defaultsAreAlreadySanitized() {
         #expect(AppSettings.defaults.sanitized() == AppSettings.defaults)
     }
+
+    /// A text field writes its text back as soon as it gains focus. Stored, that would pin the
+    /// default of the time, which is how 0.1.x installs kept Parakeet.
+    @Test func aModelFieldGivenItsOwnTextStoresNothing() {
+        let (store, suite) = makeStore()
+        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        store.setText(AppSettings.defaults.sttModel, for: .sttModel)
+        #expect(UserDefaults(suiteName: suite)?.persistentDomain(forName: suite)?.isEmpty ?? true)
+
+        store.setText("mlx-community/whisper-large-v3-turbo", for: .sttModel)
+        store.setText("mlx-community/whisper-large-v3-turbo", for: .sttModel)
+        #expect(store.load().sttModel == "mlx-community/whisper-large-v3-turbo")
+    }
+
+    @Test func typingTheDefaultModelBackRemovesTheStoredOne() {
+        let (store, suite) = makeStore()
+        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        store.setText("mlx-community/whisper-large-v3-turbo", for: .sttModel)
+        store.setText(AppSettings.defaults.sttModel, for: .sttModel)
+        #expect(UserDefaults(suiteName: suite)?.persistentDomain(forName: suite)?[AppSettingsKey.sttModel.rawValue] == nil)
+        #expect(store.load().sttModel == AppSettings.defaults.sttModel)
+    }
+
+    @Test func migratingMovesTheOldDefaultSpeechModelToTheNewOne() {
+        let (store, suite) = makeStore()
+        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        let stored = UserDefaults(suiteName: suite)
+        stored?.set("mlx-community/parakeet-tdt-0.6b-v3", forKey: AppSettingsKey.sttModel.rawValue)
+        stored?.set(AppSettings.defaults.llmModel, forKey: AppSettingsKey.llmModel.rawValue)
+        stored?.set(AppSettings.defaults.vadModel, forKey: AppSettingsKey.vadModel.rawValue)
+
+        store.migrate()
+
+        #expect(store.load().sttModel == AppSettings.defaults.sttModel)
+        let remaining = stored?.persistentDomain(forName: suite) ?? [:]
+        for key in [AppSettingsKey.sttModel, .llmModel, .vadModel] {
+            #expect(remaining[key.rawValue] == nil, "\(key) no longer pins a default")
+        }
+    }
+
+    @Test func migratingKeepsChosenModelsAndOtherSettings() {
+        let (store, suite) = makeStore()
+        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        var settings = AppSettings.defaults
+        settings.sttModel = "mlx-community/parakeet-tdt-0.6b-v2"
+        settings.llmModel = "mlx-community/Qwen3-4B-4bit"
+        settings.vadSilenceMs = 900
+        store.save(settings)
+
+        store.migrate()
+
+        #expect(store.load() == settings)
+    }
+
+    /// Someone who wants Parakeet back after the migration sets it again, and it must stay.
+    @Test func migratingRunsOnce() {
+        let (store, suite) = makeStore()
+        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        let parakeet = "mlx-community/parakeet-tdt-0.6b-v3"
+        UserDefaults(suiteName: suite)?.set(parakeet, forKey: AppSettingsKey.sttModel.rawValue)
+        store.migrate()
+        #expect(store.load().sttModel == AppSettings.defaults.sttModel)
+
+        store.setText(parakeet, for: .sttModel)
+        store.migrate()
+        #expect(store.load().sttModel == parakeet)
+    }
 }

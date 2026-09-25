@@ -156,4 +156,5 @@ of the open-source packages the app is built with.
 
 Settings on every tab but **Advanced** apply immediately, to the next dictation. **Settings on
 the Advanced tab apply the next time the app starts.** Its **Restore Defaults** resets only that
-tab: dictation settings, shortcuts, cleanup level, history and microphone stay as they are.
+tab: dictation settings, shortcuts, cleanup level, history and microphone stay as they are. A
+model you haven't changed follows the default, including a new default in a later version.

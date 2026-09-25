@@ -33,9 +33,9 @@ public struct SettingsView: View {
     public var body: some View {
         Form {
             Section("Models (Hugging Face repositories)") {
-                TextField("Speech-to-text", text: $sttModel)
-                TextField("Cleanup LLM", text: $llmModel)
-                TextField("Voice activity", text: $vadModel)
+                TextField("Speech-to-text", text: modelField(.sttModel, $sttModel))
+                TextField("Cleanup LLM", text: modelField(.llmModel, $llmModel))
+                TextField("Voice activity", text: modelField(.vadModel, $vadModel))
                 Toggle("Clean up transcripts with the LLM", isOn: $cleanupEnabled)
             }
             Section("Segmentation") {
@@ -91,5 +91,13 @@ public struct SettingsView: View {
     private func restoreDefaults() {
         AppSettingsStore().resetToDefaults(AppSettingsKey.advancedTab)
         Log.ui.info("Restored the Advanced settings to their defaults")
+    }
+
+    /// A model field shows its setting through `@AppStorage`, which keeps it current after Restore
+    /// Defaults, but saves through ``AppSettingsStore/setText(_:for:)``. Bound to `@AppStorage`
+    /// directly, the field saved its text as soon as it gained focus, which pinned the default of
+    /// the time: 0.1.x installs kept Parakeet after the default changed.
+    private func modelField(_ key: AppSettingsKey, _ value: Binding<String>) -> Binding<String> {
+        Binding(get: { value.wrappedValue }, set: { AppSettingsStore().setText($0, for: key) })
     }
 }

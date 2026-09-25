@@ -82,6 +82,35 @@ public struct AppSettingsStore: Sendable {
         defaults.register(defaults: Self.dictionary(from: .defaults))
     }
 
+    /// Repairs settings that earlier versions stored without the user choosing them. Call it at
+    /// launch, before ``load()``. Each repair runs once per install.
+    ///
+    /// Before 0.2.0, Settings › Advanced saved a model field's text as soon as the field gained
+    /// focus, so opening the tab stored the models that were the defaults then. A stored model
+    /// equal to its current default only pins it against a later change, so it is removed. So is
+    /// the speech model that 0.1.x had as its default: an install that stored it would otherwise
+    /// never move to the new one. Anyone who sets it again after this keeps it.
+    public func migrate() {
+        let applied = defaults.integer(forKey: Self.migrationsKey)
+        if applied < 1 {
+            let current = Self.dictionary(from: .defaults)
+            let formerDefaults: [AppSettingsKey: String] = [.sttModel: "mlx-community/parakeet-tdt-0.6b-v3"]
+            for key in [AppSettingsKey.sttModel, .llmModel, .vadModel] {
+                let stored = defaults.string(forKey: key.rawValue)
+                if stored == current[key.rawValue] as? String || stored == formerDefaults[key] {
+                    defaults.removeObject(forKey: key.rawValue)
+                }
+            }
+        }
+        if applied < Self.migrationCount {
+            defaults.set(Self.migrationCount, forKey: Self.migrationsKey)
+        }
+    }
+
+    /// How many of ``migrate()``'s repairs this install has had. Not a setting.
+    private static let migrationsKey = "settingsMigrations"
+    private static let migrationCount = 1
+
     /// Reads the current settings, sanitised to runnable ranges. An unset key reads as its
     /// default.
     ///
@@ -174,6 +203,20 @@ public struct AppSettingsStore: Sendable {
     public func save(_ settings: AppSettings) {
         for (key, value) in Self.dictionary(from: settings) {
             defaults.set(value, forKey: key)
+        }
+    }
+
+    /// Stores the text of a Settings field, such as a model's repository. A text field writes its
+    /// text back as soon as it gains focus, so text equal to the current value is ignored, and
+    /// text equal to the default removes the stored value. Either way the setting keeps following
+    /// the default, including a later version's new one.
+    public func setText(_ text: String, for key: AppSettingsKey) {
+        let defaultText = Self.dictionary(from: .defaults)[key.rawValue] as? String
+        guard text != (defaults.string(forKey: key.rawValue) ?? defaultText) else { return }
+        if text == defaultText {
+            defaults.removeObject(forKey: key.rawValue)
+        } else {
+            defaults.set(text, forKey: key.rawValue)
         }
     }
 
