@@ -4,6 +4,15 @@ What changed in each release of Live Transcribe, newest first. Before a release,
 `make changelog VERSION=x.y.z` summarises what was merged since the last one
 ([Releasing](docs/releasing.md)).
 
+## 0.3.0 - 2026-09-26
+
+- Recognise Sinhala. The speech model is now Qwen3-ASR fine-tuned for Sinhala, which writes Sinhala in Sinhala script with English words in English letters ("meeting එක cancel කරන්න"). Cleanup is written for English, so Sinhala is typed as recognised ([#26](https://github.com/Nerdstorm/LiveTranscribe/pull/26))
+- After updating, the app downloads the new model once, about 1 GB. It recognises English almost as well as the previous model: in our dictation tests at Medium, 6.4% of words differed from what was meant, against 5.1%. To keep the previous model, enter `mlx-community/Qwen3-ASR-0.6B-8bit` in **Settings › Advanced**. Otherwise it can go to the Trash: it's in `~/.cache/huggingface/hub/models--mlx-community--Qwen3-ASR-0.6B-8bit` and `~/.cache/huggingface/hub/mlx-audio/mlx-community_Qwen3-ASR-0.6B-8bit` (about 1 GB; in Finder, **Go › Go to Folder…** opens them) ([#26](https://github.com/Nerdstorm/LiveTranscribe/pull/26))
+- Recognise speech better with noise in the background: the app now prepares the audio the way the speech model was trained. In our tests with background noise, 9.8% of English words came out wrong instead of 16.4% ([#24](https://github.com/Nerdstorm/LiveTranscribe/pull/24))
+- If the speech model gets stuck repeating a phrase, stop after a few seconds' worth of text instead of typing up to a minute of it ([#25](https://github.com/Nerdstorm/LiveTranscribe/pull/25))
+
+[Every commit since v0.2.0](https://github.com/Nerdstorm/LiveTranscribe/compare/v0.2.0...v0.3.0)
+
 ## 0.2.0 - 2026-09-25
 
 - Recognise speech with Qwen3-ASR instead of Parakeet. It made fewer mistakes in our dictation tests, downloads about 1 GB instead of 2.3 GB and uses less memory. It also recognises 29 languages besides English, but cleanup has only been tested with English ([#20](https://github.com/Nerdstorm/LiveTranscribe/pull/20))
