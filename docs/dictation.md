@@ -438,15 +438,14 @@ Qwen3-ASR 0.6B, the default in 0.2.0, on the same clips. Dictating into a multi-
 | Medium | 22.7% (22.1%) | 6.4% (5.1%) | 3 (3) | 280 ms (279) | 641 ms (644) | 65/65 |
 | High | 22.7% (22.1%) | 6.4% (5.1%) | 3 (3) | 319 ms (318) | 654 ms (650) | 65/65 |
 
-Into a single-line field, last measured before 0.3.0, with the base Qwen3-ASR at mlx-audio-swift
-d302a5c and, in brackets, Parakeet TDT 0.6B v3:
+Into a single-line field:
 
 | Level | WER vs said | WER vs meant | Fallbacks | p50 | p95 |
 |---|---:|---:|---:|---:|---:|
-| None | 10.8% (10.9%) | 20.3% (20.1%) | 0 (0) | 128 ms (33) | 261 ms (62) |
-| Light | 11.0% (11.1%) | 19.7% (19.9%) | 1 (2) | 253 ms (162) | 534 ms (337) |
-| Medium | 19.6% (20.2%) | 4.7% (5.0%) | 4 (5) | 286 ms (186) | 674 ms (428) |
-| High | 19.6% (20.2%) | 4.7% (5.0%) | 4 (5) | 330 ms (213) | 670 ms (427) |
+| None | 12.1% (11.4%) | 24.9% (23.7%) | 0 (0) | 134 ms (131) | 272 ms (277) |
+| Light | 11.7% (11.2%) | 23.9% (22.5%) | 1 (1) | 269 ms (268) | 564 ms (563) |
+| Medium | 20.8% (20.2%) | 9.4% (8.1%) | 4 (4) | 291 ms (288) | 671 ms (671) |
+| High | 20.8% (20.2%) | 9.4% (8.1%) | 4 (4) | 331 ms (330) | 671 ms (677) |
 
 Every level is well under the p95 target of 1.2 s, and the fine-tune is as fast as the base
 model. At Medium and High all 12 self-corrections are resolved and every filler is removed, and
@@ -481,6 +480,12 @@ The lists and the "hi John … cheers Sam" letter no longer fall back: Qwen3-ASR
 itself, so the model has less to change. "great job emoji party popper see you tomorrow", which
 fell back before, no longer does, but only because both models now hear its "emoji" as "M O G",
 so there is no emoji for the model to move.
+
+Sinhala has no eval clips in this repository. On 24 recordings of OpenSLR 52's held-out speakers,
+8 of them with English words, dictation's WER is 28.2% at None, Medium and High alike, with no
+fallbacks and a p95 of about 350 ms, and the English words stay in English letters: text with
+Sinhala in it skips the cleanup model (`CleanupScripts`). Before that skip, Medium garbled 4 of
+the 24 and fell back on the other 20, for 38.2% and a p95 of 656 ms.
 
 The time from releasing the key to the text appearing adds the recorder stop and insertion, a
 few milliseconds each, which the controller logs.
