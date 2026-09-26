@@ -36,12 +36,12 @@ Real outputs from the dictation eval, at the default **Medium** cleanup level:
 |---|---|
 | Um, I think we should, uh, push the launch by a week | I think we should push the launch by a week. |
 | Let's meet on Monday, no wait, Tuesday | Let's meet on Tuesday. |
-| The budget is fifty thousand, I mean sixty thousand | The budget is 60,000. |
-| We're flying into Boston, scratch that, into New York | We're flying into New York. |
+| The budget is fifty thousand, I mean sixty thousand | The budget is sixty thousand. |
+| We're flying into Boston, scratch that, into New York | We are flying into New York. |
 | Tell Daniel, sorry, tell Maria the draft is ready | Tell Maria the draft is ready. |
-| So, uh, what time does the, um, the train leave | So, what time does the train leave? |
+| So, uh, what time does the, um, the train leave | So what time does the train leave? |
 | I'll be about ten minutes late, the train is running slow today | I'll be about 10 minutes late. The train is running slow today. |
-| hi emoji fireworks | Hi 🎆. |
+| see you soon smiley face emoji | See you soon! 🙂 |
 | email me at john dot smith at example dot com | Email me at john.smith@example.com. |
 
 And in anything that takes several lines, such as a document, an email or a chat message:
@@ -49,17 +49,18 @@ And in anything that takes several lines, such as a document, an email or a chat
 | You say | Live Transcribe types |
 |---|---|
 | Things to do today. First, call the bank. Second, book the flights. Third, send the invoice. | Things to do today:<br>1. Call the bank<br>2. Book the flights<br>3. Send the invoice |
-| hi John thanks for the update I will review it tomorrow cheers Sam | Hi John,<br><br>Thanks for the update, I will review it tomorrow.<br><br>Cheers,<br>Sam |
+| hi John thanks for the update I will review it tomorrow cheers Sam | Hi John,<br><br>Thanks for the update. I will review it tomorrow.<br><br>Cheers,<br>Sam |
 
 **12 of 12 self-corrections resolved. 10 of 10 filler clips cleaned. 65 of 65 clips laid out as
-meant. 428 ms at p95.** In the 65-clip dictation eval at Medium, dictating into a multi-line
-field, speech-to-text plus cleanup of sentence-length dictations took 186 ms at p50 and 428 ms at
+meant. 641 ms at p95.** In the 65-clip dictation eval at Medium, dictating into a multi-line
+field, speech-to-text plus cleanup of sentence-length dictations took 280 ms at p50 and 641 ms at
 p95, well inside the 1.2 s target.
 
 Measured on an M4 Pro with synthetic speech: the left column is the script a macOS text-to-speech
 voice read aloud. Stopping the recorder and inserting the text are not included in those times.
-Three of the 65 clips fell back to the uncleaned transcript: a plain sentence and two spoken
-lists, which were still laid out ([details](docs/development.md#dictation-eval)).
+Three of the 65 clips fell back to the uncleaned transcript, with fillers still removed: a plain
+sentence, a sentence the speech model broke at a hesitation, and a spoken "comma" it heard as
+"common" ([details](docs/development.md#dictation-eval)).
 
 ## Features
 
@@ -84,6 +85,27 @@ lists, which were still laid out ([details](docs/development.md#dictation-eval))
   models if you prefer.
 
 Every feature, in detail: [docs/features.md](docs/features.md).
+
+## Languages
+
+Live Transcribe recognises 31 languages, and 22 Chinese dialects, and works out which one you are
+speaking. Sinhala comes out in Sinhala script with English words in English letters, as people
+type it: "meeting එක cancel කරන්න".
+
+| | | | |
+|---|---|---|---|
+| Arabic | Cantonese | Chinese (Mandarin) | Czech |
+| Danish | Dutch | English | Filipino |
+| Finnish | French | German | Greek |
+| Hindi | Hungarian | Indonesian | Italian |
+| Japanese | Korean | Macedonian | Malay |
+| Persian | Polish | Portuguese | Romanian |
+| Russian | **Sinhala** | Spanish | Swedish |
+| Thai | Turkish | Vietnamese | |
+
+Cleanup is written for English. Sinhala skips the cleanup model and is typed as recognised, and
+the other languages haven't been tested with cleanup. The speech model is Qwen3-ASR 0.6B,
+[fine-tuned for Sinhala](https://github.com/Nerdstorm/LiveTranscribe-Sinhala) by Nerdstorm.
 
 ## Documentation
 
@@ -112,8 +134,8 @@ A working proof of concept, free and open source under the [MIT License](LICENSE
 - What changed in each release is in the [changelog](CHANGELOG.md).
 - Tested on an M4 Pro Mac with macOS 27 and Xcode 27. The app targets macOS 14 or later but has
   not been run on older systems.
-- Tested with English speech. Qwen3-ASR also recognises 29 other languages, among them Chinese,
-  Spanish, French and German, but the cleanup step has not been tested with them.
+- Tested with English and Sinhala speech. It recognises 29 other languages too; see
+  [Languages](#languages).
 - Issues and pull requests are welcome; see [Reporting a problem](#reporting-a-problem).
 - What doesn't work well yet is in [Known limitations](docs/limitations.md).
 
@@ -256,7 +278,7 @@ this repository.
 
 | Role | Model used | Original model | Licence |
 |---|---|---|---|
-| Speech-to-text | [mlx-community/Qwen3-ASR-0.6B-8bit](https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit) | [Qwen3-ASR-0.6B](https://huggingface.co/Qwen/Qwen3-ASR-0.6B) by the Qwen team, Alibaba Cloud | Apache-2.0 |
+| Speech-to-text | [Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit](https://huggingface.co/Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit) | [Qwen3-ASR-0.6B](https://huggingface.co/Qwen/Qwen3-ASR-0.6B) by the Qwen team, Alibaba Cloud, [fine-tuned for Sinhala](https://github.com/Nerdstorm/LiveTranscribe-Sinhala) by Nerdstorm on [OpenSLR 52](https://www.openslr.org/52/) (Google, CC BY-SA 4.0) | CC-BY-SA-4.0 |
 | Cleanup | [mlx-community/Qwen3-1.7B-4bit](https://huggingface.co/mlx-community/Qwen3-1.7B-4bit) | [Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B) by the Qwen team, Alibaba Cloud | Apache-2.0 |
 | Self-correction adapter | bundled (`Sources/Cleanup/Adapter`) | trained on synthetic data in this repository ([`Training/`](Packages/LiveTranscribeKit/Training/README.md)) | MIT |
 | Voice activity detection | [mlx-community/silero-vad](https://huggingface.co/mlx-community/silero-vad) | [Silero VAD](https://github.com/snakers4/silero-vad) by the Silero team | MIT |

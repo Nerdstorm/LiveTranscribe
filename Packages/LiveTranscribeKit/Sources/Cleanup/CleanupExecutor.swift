@@ -49,6 +49,12 @@ public struct CleanupExecutor: Sendable {
         guard !EditDistance.words(in: input).isEmpty else {
             return CleanedSegment(segment: segment, cleanedText: input, fellBack: false, fallbackReason: nil, latencyMs: 0)
         }
+        // Text the model would damage gets the level's deterministic rules only, as when the
+        // model is off (``CleanupScripts``).
+        guard CleanupScripts.modelCanRewrite(input) else {
+            Log.cleanup.info("Cleanup skipped the model: the text is in a script it can't write")
+            return CleanedSegment(segment: segment, cleanedText: input, fellBack: false, fallbackReason: nil, latencyMs: 0)
+        }
 
         let verdict: GuardVerdict
         if options.level.allowsRewording, outputGuard.correctionCueCount(in: input) > 0 {

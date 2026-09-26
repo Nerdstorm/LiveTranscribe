@@ -13,8 +13,8 @@ focus context, Command Mode, multilingual) is not started.
 | D1 | Developer ID distribution without the App Sandbox (rules out the Mac App Store). Hardened Runtime stays; builds stay ad-hoc signed ("Sign to Run Locally") until someone signs a release with their Developer ID. | Owner |
 | D2 | Push-to-talk is the primary mode; the continuous transcript window stays. | Handoff |
 | D3 | Default cleanup level: Medium. | Handoff |
-| D4 | English only in v1. | Handoff |
-| D5 | Models: Qwen3-ASR 0.6B 8-bit + Qwen3-1.7B-4bit (+ Silero VAD). No 4B or larger model, now or for Command Mode. On 2026-09-25 Qwen3-ASR replaced Parakeet TDT 0.6B v3: it is one multilingual model that Sinhala can be added to by fine-tuning (ledger LiveTranscribe-0138). | Owner |
+| D4 | English only in v1. From 0.3.0 the speech model also writes Sinhala, in Sinhala script with English words in English letters; cleanup stays English, and text with Sinhala in it skips the cleanup model, which drops Sinhala's vowel signs (`CleanupScripts`, ledger LiveTranscribe-0153). | Handoff, Owner |
+| D5 | Models: Qwen3-ASR 0.6B 8-bit + Qwen3-1.7B-4bit (+ Silero VAD). No 4B or larger model, now or for Command Mode. On 2026-09-25 Qwen3-ASR replaced Parakeet TDT 0.6B v3: it is one multilingual model that Sinhala can be added to by fine-tuning (ledger LiveTranscribe-0138). From 0.3.0 the default is that fine-tune, [Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit](https://huggingface.co/Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit) (Nerdstorm/LiveTranscribe-Sinhala). | Owner |
 | D6 | Local builds can be signed with a developer's own certificate through a gitignored `Config/Signing.local.xcconfig`, so macOS keeps the Accessibility and microphone grants across rebuilds. An ad-hoc build's designated requirement is its code hash (`cdhash`), which every build changes; a certificate's names the certificate. The committed default stays ad-hoc, so the public repository holds no team ID and builds anywhere. | Owner |
 | H1 | Default hotkey: Fn (🌐), changeable in Settings. Settings open from the menu bar. | Owner |
 | H2 | History is on by default and keeps everything until turned off or given a retention limit. It stays on this Mac and is never synced. | Owner |
@@ -427,17 +427,19 @@ microphone stay as they are.
 ### Eval results
 
 M4 Pro, macOS 27, synthetic speech (Samantha), latency = speech-to-text + cleanup, 65 clips,
-with Qwen3-ASR. In brackets: Parakeet TDT 0.6B v3, the speech model until 2026-09-25, in the same
-run. Dictating into a multi-line field (`--multiline`):
+with the default speech model, Qwen3-ASR 0.6B fine-tuned for Sinhala. In brackets: the base
+Qwen3-ASR 0.6B, the default in 0.2.0, on the same clips. Dictating into a multi-line field
+(`--multiline`):
 
 | Level | WER vs said | WER vs meant | Fallbacks | p50 | p95 | Laid out as meant |
 |---|---:|---:|---:|---:|---:|---:|
-| None | 10.8% (10.9%) | 20.3% (20.1%) | 0 (0) | 128 ms (35) | 262 ms (64) | 57/65 |
-| Light | 11.0% (11.1%) | 19.7% (19.9%) | 1 (2) | 254 ms (170) | 536 ms (342) | 57/65 |
-| Medium | 21.5% (21.8%) | 1.7% (2.2%) | 3 (3) | 277 ms (201) | 655 ms (448) | 65/65 |
-| High | 21.5% (21.8%) | 1.7% (2.2%) | 3 (3) | 310 ms (222) | 642 ms (448) | 65/65 |
+| None | 12.1% (11.4%) | 24.9% (23.7%) | 0 (0) | 126 ms (125) | 266 ms (265) | 57/65 |
+| Light | 11.7% (11.2%) | 23.9% (22.5%) | 1 (1) | 258 ms (257) | 541 ms (544) | 57/65 |
+| Medium | 22.7% (22.1%) | 6.4% (5.1%) | 3 (3) | 280 ms (279) | 641 ms (644) | 65/65 |
+| High | 22.7% (22.1%) | 6.4% (5.1%) | 3 (3) | 319 ms (318) | 654 ms (650) | 65/65 |
 
-Into a single-line field:
+Into a single-line field, last measured before 0.3.0, with the base Qwen3-ASR at mlx-audio-swift
+d302a5c and, in brackets, Parakeet TDT 0.6B v3:
 
 | Level | WER vs said | WER vs meant | Fallbacks | p50 | p95 |
 |---|---:|---:|---:|---:|---:|
@@ -446,17 +448,22 @@ Into a single-line field:
 | Medium | 19.6% (20.2%) | 4.7% (5.0%) | 4 (5) | 286 ms (186) | 674 ms (428) |
 | High | 19.6% (20.2%) | 4.7% (5.0%) | 4 (5) | 330 ms (213) | 670 ms (427) |
 
-Every level is well under the p95 target of 1.2 s, but Qwen3-ASR adds about 90 ms at p50 and
-200 ms at p95: it writes its text a token at a time. At Medium and High all 12 self-corrections
-are resolved and every filler is removed, and in a multi-line field every list and letter is
-laid out. WER against what was said counts spoken commands as wrong, since they are replaced by
-what they name.
+Every level is well under the p95 target of 1.2 s, and the fine-tune is as fast as the base
+model. At Medium and High all 12 self-corrections are resolved and every filler is removed, and
+in a multi-line field every list and letter is laid out. WER against what was said counts spoken
+commands as wrong, since they are replaced by what they name.
 
-Qwen3-ASR punctuates as it goes: it writes "tomorrow. Ah, before noon", writes numbers as
-words ("ten minutes", "number one"), and punctuates the words of a spoken command ("Great job!
-Emoji party popper. See you tomorrow."). The rules take that in: an email address it writes
-itself goes behind a placeholder, a quote mark it writes beside "close quote" is not written
-twice, and an emoji said as a sentence of its own takes no full stop.
+The fine-tune costs English a little: 6.4% against what was meant at Medium, against 5.1%. The
+difference is a few words: it writes "10" for "ten" and "We are" for "We're", hears "the
+plumber" as "a plumber", and hears a spoken "comma" as "common" once more. Most of the 6.4% is
+words both models mishear in the synthetic voice: "emoji" as "M O G" or "high" ("hi emoji
+fireworks" comes out as "High 🎆."), "Acme" and "comma". On FLEURS English, WER is 5.24% against
+4.96% (Nerdstorm/LiveTranscribe-Sinhala).
+
+Qwen3-ASR punctuates as it goes: it ends a sentence at a hesitation ("tomorrow. Ah, before
+noon") and punctuates around the words of a spoken command. The rules take that in: an email
+address it writes itself goes behind a placeholder, a quote mark it writes beside "close quote"
+is not written twice, and an emoji said as a sentence of its own takes no full stop.
 
 The fallbacks:
 - "I've attached the invoice and the signed agreement." at Medium and High: the adapter
@@ -464,14 +471,16 @@ The fallbacks:
 - "Um, the package should arrive tomorrow, uh, before noon" at Medium and High: Qwen3-ASR ends
   a sentence at the hesitation, and the model then drops a word that carries meaning; the text
   comes out as "The package should arrive tomorrow. Before noon."
-- "great job emoji party popper see you tomorrow" at Medium and High: the model changes the
-  emoji's placeholder, which it sees between two sentences. The text comes out as "Great job! 🎉
-  See you tomorrow."
+- "we need milk comma eggs comma and bread full stop" at Medium and High: the speech model hears
+  "comma" as "common" ("We need milk, common eggs, common, and bread."), and the model drops
+  both, which OutputGuard counts as words that carry meaning.
 - The passport letter at Light, where resolving the correction is not allowed, and in a
   single-line field at Medium and High, where the model changed more than the self-correction.
 
 The lists and the "hi John … cheers Sam" letter no longer fall back: Qwen3-ASR punctuates them
-itself, so the model has less to change.
+itself, so the model has less to change. "great job emoji party popper see you tomorrow", which
+fell back before, no longer does, but only because both models now hear its "emoji" as "M O G",
+so there is no emoji for the model to move.
 
 The time from releasing the key to the text appearing adds the recorder stop and insertion, a
 few milliseconds each, which the controller logs.

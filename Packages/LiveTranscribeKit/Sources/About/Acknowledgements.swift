@@ -53,9 +53,9 @@ public struct ModelCredit: Equatable, Sendable {
     public static let defaults: [ModelCredit] = [
         ModelCredit(
             role: "Speech-to-text",
-            repository: "mlx-community/Qwen3-ASR-0.6B-8bit",
-            original: "Qwen3-ASR-0.6B by the Qwen team, Alibaba Cloud",
-            licence: "Apache-2.0"
+            repository: "Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit",
+            original: "Qwen3-ASR-0.6B by the Qwen team, Alibaba Cloud, fine-tuned for Sinhala by Nerdstorm on OpenSLR 52 (Google, CC BY-SA 4.0)",
+            licence: "CC-BY-SA-4.0"
         ),
         ModelCredit(
             role: "Cleanup",

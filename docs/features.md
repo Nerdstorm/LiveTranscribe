@@ -56,6 +56,10 @@
   screen in apps that don't report the cursor's position), on any display and over full-screen
   apps, shows a live microphone level, then **Transcribing…**, and never takes focus from your
   app. If something needs you, it says so in one plain sentence.
+- **Speak Sinhala, or 30 other languages.** The speech model works out which language you are
+  speaking. Sinhala comes out in Sinhala script with English words in English letters ("meeting
+  එක cancel කරන්න"). Cleanup is written for English: Sinhala is typed as recognised, and the
+  other languages haven't been tested with cleanup ([Languages](../README.md#languages)).
 
 ## Make it yours
 
@@ -173,4 +177,5 @@ Ideas for a later phase. None of this is started, and **none of it is in the app
   same cleanup.
 - Awareness of the focused app's context.
 - **Command Mode**: select text and say how to change it.
-- Multilingual cleanup. Today dictation and cleanup are English only.
+- Multilingual cleanup. Speech is recognised in 31 languages, but cleanup is written for English,
+  and text with Sinhala in it skips the cleanup model.
