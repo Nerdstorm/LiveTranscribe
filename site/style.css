@@ -183,6 +183,26 @@ figure video {
   color: var(--muted);
 }
 
+.languages {
+  width: 100%;
+  margin: 0 0 1rem;
+  border-collapse: collapse;
+}
+
+.languages td {
+  width: 25%;
+  padding: 0.5rem 0.75rem 0.5rem 0;
+  border-top: 1px solid var(--rule);
+}
+
+/* Four columns of names fit a phone only with less space between them. */
+@media (max-width: 30rem) {
+  .languages td {
+    padding-right: 0.35rem;
+    font-size: 0.9rem;
+  }
+}
+
 ul,
 ol {
   margin: 0 0 1rem;

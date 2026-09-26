@@ -53,8 +53,8 @@
         <tbody>
           <tr><td>Um, I think we should, uh, push the launch by a week</td><td>I think we should push the launch by a week.</td></tr>
           <tr><td>Let’s meet on Monday, no wait, Tuesday</td><td>Let’s meet on Tuesday.</td></tr>
-          <tr><td>The budget is fifty thousand, I mean sixty thousand</td><td>The budget is 60,000.</td></tr>
-          <tr><td>So, uh, what time does the, um, the train leave</td><td>So, what time does the train leave?</td></tr>
+          <tr><td>The budget is fifty thousand, I mean sixty thousand</td><td>The budget is sixty thousand.</td></tr>
+          <tr><td>So, uh, what time does the, um, the train leave</td><td>So what time does the train leave?</td></tr>
         </tbody>
       </table>
       <p class="note">Outputs from the dictation test set (synthetic speech) at the default cleanup level.</p>
@@ -83,6 +83,31 @@
         <li>Shows a live transcript as you speak, for longer sessions.</li>
         <li>Recognises and cleans up a sentence in about 0.2 seconds on an M4 Pro.</li>
       </ul>
+    </section>
+
+    <section aria-labelledby="languages">
+      <h2 id="languages">Languages</h2>
+      <p>
+        Live Transcribe recognises 31 languages, and 22 Chinese dialects, and works out which one
+        you’re speaking. Sinhala comes out in Sinhala script with English words in English letters,
+        as people type it: “meeting එක cancel කරන්න”.
+      </p>
+      <table class="languages">
+        <tbody>
+          <tr><td>Arabic</td><td>Cantonese</td><td>Chinese (Mandarin)</td><td>Czech</td></tr>
+          <tr><td>Danish</td><td>Dutch</td><td>English</td><td>Filipino</td></tr>
+          <tr><td>Finnish</td><td>French</td><td>German</td><td>Greek</td></tr>
+          <tr><td>Hindi</td><td>Hungarian</td><td>Indonesian</td><td>Italian</td></tr>
+          <tr><td>Japanese</td><td>Korean</td><td>Macedonian</td><td>Malay</td></tr>
+          <tr><td>Persian</td><td>Polish</td><td>Portuguese</td><td>Romanian</td></tr>
+          <tr><td>Russian</td><td><strong>Sinhala</strong></td><td>Spanish</td><td>Swedish</td></tr>
+          <tr><td>Thai</td><td>Turkish</td><td>Vietnamese</td><td></td></tr>
+        </tbody>
+      </table>
+      <p class="note">
+        Cleanup is written for English. Sinhala skips the cleanup model and is typed as recognised,
+        and the other languages haven’t been tested with cleanup.
+      </p>
     </section>
 
     <section aria-labelledby="settings">
@@ -163,7 +188,7 @@
         <li>A Mac with Apple silicon</li>
         <li>macOS 14 or later (tested on macOS 27)</li>
         <li>About 2 GB of disk space for the models, and about 3 GB of memory while running</li>
-        <li>English speech</li>
+        <li>Speech in one of the <a href="#languages">31 languages</a></li>
       </ul>
     </section>
   </main>
@@ -176,7 +201,8 @@
       <a href="https://github.com/Nerdstorm/LiveTranscribe">on GitHub</a>.
     </p>
     <p>
-      Speech recognition uses Qwen3-ASR and cleanup uses Qwen3, both run with MLX.
+      Speech recognition uses Qwen3-ASR, fine-tuned by Nerdstorm to add Sinhala, and cleanup uses
+      Qwen3, both run with MLX.
       <a href="https://github.com/Nerdstorm/LiveTranscribe#models-and-credits">Models and credits</a>.
     </p>
     <p><a href="https://nerdstorm.com.au">© 2026 Nerdstorm</a></p>
