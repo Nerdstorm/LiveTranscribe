@@ -62,5 +62,9 @@
   transcribed but not yet cleaned are lost: their raw text was on screen but not yet saved.
 - The models come from each repository's `main` branch at first launch and are then reused, so
   Macs that install at different times can end up with different model versions.
+- A transcript stops at 64 tokens plus 30 for each second of its audio. Speech needs far fewer,
+  but a speech-to-text model that falls into repeating a phrase would otherwise write on to its
+  own limit (8,192 tokens for Qwen3-ASR, about a minute), so at most a clip's worth of the
+  repetition is typed.
 - mlx-audio-swift copies the speech-to-text weights into a second folder of the Hugging Face
   cache; on APFS the copy is a clone, so `du` counts it twice but it takes no extra space.
