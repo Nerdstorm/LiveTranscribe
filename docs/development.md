@@ -58,19 +58,21 @@ stage, and four checks:
 - no clip's WER gets more than 2 points worse after cleanup;
 - cleanup falls back to the raw text for fewer than 5% of segments.
 
-Last run, on an M4 Pro with the four generated clips played in real time, with Qwen3-ASR and,
-for comparison, Parakeet TDT 0.6B v3 (the default until 2026-09-25) on the same clips:
+Last run, on an M4 Pro with the four generated clips played in real time, with the default
+speech model (Qwen3-ASR 0.6B fine-tuned for Sinhala) and, for comparison, Parakeet TDT 0.6B v3
+(the default until 2026-09-25) on the same clips:
 
 | Stage | Qwen3-ASR p50 (ms) | p95 (ms) | Parakeet v3 p50 (ms) | p95 (ms) |
 |---|---:|---:|---:|---:|
 | Silence that ends a segment | 608 | 608 | 608 | 608 |
-| Speech-to-text | 195 | 465 | 68 | 148 |
-| Cleanup | 225 | 549 | 219 | 557 |
-| End of speech → text | 1032 | 1623 | 900 | 1290 |
+| Speech-to-text | 204 | 481 | 68 | 148 |
+| Cleanup | 227 | 556 | 219 | 557 |
+| End of speech → text | 1038 | 1645 | 900 | 1290 |
 
 With Qwen3-ASR, WER was 1.0% raw and 1.0% cleaned (Parakeet: 2.5% and 2.5%), with no fallbacks.
-**Qwen3-ASR fails the latency check: p95 from end of speech to text is 1,623 ms, against the
-1.5 s target that Parakeet meets.** Qwen3-ASR writes its text a token at a time, so a segment
+The base Qwen3-ASR 0.6B, the default in 0.2.0, took 195 and 465 ms for speech-to-text on the
+same clips. **Qwen3-ASR fails the latency check: p95 from end of speech to text is 1,645 ms,
+against the 1.5 s target that Parakeet meets.** Qwen3-ASR writes its text a token at a time, so a segment
 takes longer the more words it holds. The other three checks pass with both. The first row is
 the configured 600 ms of silence that closes a segment; lower `vadSilenceMs` to trade it for
 more segment splits. The clips are synthetic speech, so measure with real recordings on your own
@@ -96,21 +98,25 @@ out with the intended lines. `--level <none|light|medium|high>` (repeatable) lim
 cleans up without the adapter, `--stt-model <repo>` measures another speech-to-text model and
 `--verbose` prints every output, with the reason for each fallback. Give them with `ARGS`, as for the bench: `make eval ARGS="--multiline --verbose"`.
 
-Last run, on an M4 Pro with macOS 27 and synthetic speech, with Qwen3-ASR and `--multiline`
-([Eval results](dictation.md#eval-results) compares Parakeet v3 and the single-line field):
+Last run, on an M4 Pro with macOS 27 and synthetic speech, with the default speech model and
+`--multiline` ([Eval results](dictation.md#eval-results) compares the base Qwen3-ASR and the
+single-line field):
 
 | Level | WER vs said | WER vs meant | Fallbacks | p50 (ms) | p95 (ms) | Laid out as meant |
 |---|---:|---:|---:|---:|---:|---:|
-| None | 10.8% | 20.3% | 0 | 128 | 262 | 57/65 |
-| Light | 11.0% | 19.7% | 1 | 254 | 536 | 57/65 |
-| Medium | 21.5% | 1.7% | 3 | 277 | 655 | 65/65 |
-| High | 21.5% | 1.7% | 3 | 310 | 642 | 65/65 |
+| None | 12.1% | 24.9% | 0 | 126 | 266 | 57/65 |
+| Light | 11.7% | 23.9% | 1 | 258 | 541 | 57/65 |
+| Medium | 22.7% | 6.4% | 3 | 280 | 641 | 65/65 |
+| High | 22.7% | 6.4% | 3 | 319 | 654 | 65/65 |
 
 Medium resolved all 12 self-corrections and removed the fillers from all 10 filler clips, and
 Medium and High laid out every list and letter. WER against what was said counts each spoken
 command as wrong, because it is replaced by what it names. None and Light lay out only line
 breaks, by design. Every level met the latency target; High takes longer on self-corrections
-because it cleans them in two passes.
+because it cleans them in two passes. Most of the 6.4% against what was meant is words both
+Qwen3-ASR models mishear in the synthetic voice ("emoji" as "M O G", "hi" as "high", "Acme" and
+"comma"); the rest is how the fine-tune writes some words, such as "10" for "ten" and "We are"
+for "We're". The base model scores 5.1% on the same run.
 
 The fallbacks, where OutputGuard rejected the model's output and the uncleaned transcript was
 inserted:
@@ -120,14 +126,14 @@ inserted:
 - A filler clip at Medium and High: Qwen3-ASR ends a sentence at the hesitation ("tomorrow. Ah,
   before noon"), and the model then drops a word that carries meaning. The filler rule has
   already removed "ah".
-- An emoji clip at Medium and High: the model changed the placeholder of an emoji said between
-  two sentences ("Great job! 🎉 See you tomorrow.").
+- A punctuation clip at Medium and High: Qwen3-ASR hears the spoken "comma" as "common"
+  ("We need milk, common eggs, common, and bread."), and the model drops both.
 - The long letter at Light, which keeps every word: the model resolved its self-correction.
 
-Without `--multiline` (a single-line field), where lists are not laid out, Light falls back on 1
-clip and Medium and High on 4 each: the same clips, and the long letter at Medium and High too,
-where the model changed more than the self-correction. The longest clip is about 40 words, so
-these numbers say nothing about long dictations.
+Without `--multiline` (a single-line field), where lists are not laid out, the base model last
+fell back on 1 clip at Light and 4 at Medium and High, the long letter among them, where the
+model changed more than the self-correction ([Eval results](dictation.md#eval-results)). The
+longest clip is about 40 words, so these numbers say nothing about long dictations.
 
 ## Training the adapter
 

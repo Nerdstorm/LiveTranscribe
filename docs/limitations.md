@@ -66,5 +66,13 @@
   but a speech-to-text model that falls into repeating a phrase would otherwise write on to its
   own limit (8,192 tokens for Qwen3-ASR, about a minute), so at most a clip's worth of the
   repetition is typed.
+- **Cleanup is written for English.** Text with Sinhala in it skips the cleanup model, which drops
+  Sinhala's vowel signs when it copies them. It gets only the steps that need no model, as when
+  cleanup is turned off: snippets, spoken commands and vocabulary, and at Medium and High filler
+  removal and layout, all of which listen for English words. The other languages go through the
+  English cleanup, which hasn't been tested with them.
+- The speech model learnt Sinhala from read sentences (OpenSLR 52). Conversation, strong accents
+  and noise are untested, and Sinhala sentences that mix in a lot of English may not always come
+  out in English letters.
 - mlx-audio-swift copies the speech-to-text weights into a second folder of the Hugging Face
   cache; on APFS the copy is a clone, so `du` counts it twice but it takes no extra space.

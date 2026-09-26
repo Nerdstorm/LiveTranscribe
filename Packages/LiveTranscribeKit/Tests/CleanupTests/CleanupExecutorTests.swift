@@ -88,6 +88,40 @@ struct CleanupExecutorTests {
         #expect(cleaned == CleanedSegment(segment: raw, cleanedText: raw.rawText, fellBack: false, fallbackReason: nil, latencyMs: 0))
     }
 
+    @Test(arguments: ["ඒකෙ තියෙන magic වැඩ um", "um ඔන්න මගේ film එකතුවට"])
+    func sinhalaSkipsTheModelButKeepsTheLevelsRules(_ text: String) async {
+        let raw = makeSegment(text)
+        for level in [CleanupLevel.light, .medium, .high] {
+            let cleaned = await executor().run(raw, context: [], options: CleanupOptions(level: level)) { _ in
+                Issue.record("the model drops Sinhala's vowel signs, so it must not see Sinhala")
+                return ""
+            }
+            #expect(cleaned == CleanedSegment(
+                segment: raw,
+                cleanedText: CleanupExecutor.deterministicCleanup(of: text, level: level),
+                fellBack: false,
+                fallbackReason: nil,
+                latencyMs: 0
+            ))
+        }
+    }
+
+    @Test func englishStillGoesToTheModel() async {
+        let captured = RequestRecorder()
+        _ = await executor().run(makeSegment("the build is broken"), context: [], options: medium) { request in
+            await captured.record(request)
+            return "The build is broken."
+        }
+        #expect(await captured.all.count == 1)
+    }
+
+    @Test func onlySinhalaIsKeptFromTheModel() {
+        #expect(!CleanupScripts.modelCanRewrite("මේ film එක බලන්න"))
+        #expect(!CleanupScripts.modelCanRewrite("ශ්‍රී"))
+        #expect(CleanupScripts.modelCanRewrite("Let's meet on Tuesday."))
+        #expect(CleanupScripts.modelCanRewrite("Café, naïve, 東京, नमस्ते"))
+    }
+
     @Test func mediumRemovesFillersBeforeTheModelSeesTheText() async {
         let captured = RequestRecorder()
         let raw = makeSegment("so um the build is uh broken")

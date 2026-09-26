@@ -95,7 +95,7 @@ public struct AppSettings: Sendable, Equatable {
     }
 
     public static let defaults = AppSettings(
-        sttModel: "mlx-community/Qwen3-ASR-0.6B-8bit",
+        sttModel: "Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit",
         llmModel: "mlx-community/Qwen3-1.7B-4bit",
         vadModel: "mlx-community/silero-vad",
         cleanupEnabled: true,
