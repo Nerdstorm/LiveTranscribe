@@ -54,7 +54,10 @@ public actor MLXTranscriber: Transcriber {
         // The first call compiles Metal kernels; pay that now, not on the first utterance.
         progress(ModelLoadProgress(modelID: modelID, stage: .warmingUp))
         let started = ContinuousClock.now
-        _ = loaded.generate(audio: MLXArray.zeros([AudioFormat.sampleRate]))
+        _ = loaded.generate(
+            audio: MLXArray.zeros([AudioFormat.sampleRate]),
+            generationParameters: OutputLimit.capping(loaded.defaultGenerationParameters, sampleCount: AudioFormat.sampleRate)
+        )
         model = loaded
         progress(ModelLoadProgress(modelID: modelID, stage: .ready, fractionCompleted: 1))
         Log.transcription.info(
@@ -73,7 +76,13 @@ public actor MLXTranscriber: Transcriber {
         let interval = signposter.beginInterval("STT", id: signposter.makeSignpostID())
         defer { signposter.endInterval("STT", interval) }
 
-        let output = model.generate(audio: MLXArray(samples))
+        let parameters = OutputLimit.capping(model.defaultGenerationParameters, sampleCount: samples.count)
+        let output = model.generate(audio: MLXArray(samples), generationParameters: parameters)
+        if parameters.maxTokens > 0, output.generationTokens >= parameters.maxTokens {
+            Log.transcription.warning(
+                "STT stopped at its limit of \(parameters.maxTokens, privacy: .public) tokens for \(samples.count / (AudioFormat.sampleRate / 1000), privacy: .public) ms of audio; the model was probably repeating itself"
+            )
+        }
         return output.text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

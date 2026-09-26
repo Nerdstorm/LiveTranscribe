@@ -224,6 +224,11 @@ let package = Package(
         .testTarget(name: "CaptureTests", dependencies: ["Capture", "Shared"], swiftSettings: strictSwift),
         .testTarget(name: "SegmentationTests", dependencies: ["Segmentation", "Shared"], swiftSettings: strictSwift),
         .testTarget(
+            name: "TranscriptionTests",
+            dependencies: ["Transcription", "Shared", .product(name: "MLXAudioSTT", package: "mlx-audio-swift")],
+            swiftSettings: strictSwift
+        ),
+        .testTarget(
             name: "CleanupTests",
             dependencies: ["Cleanup", "Shared", .product(name: "HuggingFace", package: "swift-huggingface")],
             swiftSettings: strictSwift
