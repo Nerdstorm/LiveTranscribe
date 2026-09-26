@@ -130,10 +130,10 @@ inserted:
   ("We need milk, common eggs, common, and bread."), and the model drops both.
 - The long letter at Light, which keeps every word: the model resolved its self-correction.
 
-Without `--multiline` (a single-line field), where lists are not laid out, the base model last
-fell back on 1 clip at Light and 4 at Medium and High, the long letter among them, where the
-model changed more than the self-correction ([Eval results](dictation.md#eval-results)). The
-longest clip is about 40 words, so these numbers say nothing about long dictations.
+Without `--multiline` (a single-line field), where lists are not laid out, Light falls back on 1
+clip and Medium and High on 4 each: the same clips, and the long letter at Medium and High too,
+where the model changed more than the self-correction. The longest clip is about 40 words, so
+these numbers say nothing about long dictations.
 
 ## Training the adapter
 
