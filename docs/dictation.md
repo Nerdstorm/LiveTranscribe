@@ -481,9 +481,9 @@ itself, so the model has less to change. "great job emoji party popper see you t
 fell back before, no longer does, but only because both models now hear its "emoji" as "M O G",
 so there is no emoji for the model to move.
 
-Sinhala has no eval clips in this repository. On 24 recordings of OpenSLR 52's held-out
-speakers, 8 of them with English words, dictation's WER is 28.2% at None, Medium and High alike,
-with no fallbacks and a p95 of about 350 ms, and the English words stay in English letters: text with
+Sinhala has no eval clips in this repository. On 24 recordings of OpenSLR 52's held-out speakers,
+8 of them with English words, dictation's WER is 28.2% at None, Medium and High alike, with no
+fallbacks and a p95 of about 350 ms, and the English words stay in English letters: text with
 Sinhala in it skips the cleanup model (`CleanupScripts`). Before that skip, Medium garbled 4 of
 the 24 and fell back on the other 20, for 38.2% and a p95 of 656 ms.
 
