@@ -16,7 +16,7 @@ public struct SystemFocusedTargetProvider: FocusedTargetProvider {
         self.messagingTimeoutSeconds = Float(max(0, messagingTimeoutMs)) / 1_000
     }
 
-    /// Makes up to five Accessibility calls to the focused app, each bounded by the messaging
+    /// Makes up to three Accessibility calls to the focused app, each bounded by the messaging
     /// timeout; call it off the main actor so a slow app cannot stall the UI.
     public func currentTarget() -> InsertionTarget {
         let element = focusedElement()

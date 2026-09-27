@@ -43,7 +43,6 @@ final class FakeElement: AccessibilityElement {
     let subrole: String?
     let processIdentifier: pid_t?
     let parent: (any AccessibilityElement)?
-    private let caretBounds: CGRect?
     private let providesStringForRange: Bool
     private let state: OSAllocatedUnfairLock<State>
 
@@ -58,7 +57,6 @@ final class FakeElement: AccessibilityElement {
         role: String? = kAXTextFieldRole,
         subrole: String? = nil,
         processIdentifier: pid_t? = 42,
-        caretBounds: CGRect? = nil,
         behaviour: Behaviour = .normal,
         ignoresSelectionWrites: Bool = false,
         providesStringForRange: Bool = true,
@@ -68,7 +66,6 @@ final class FakeElement: AccessibilityElement {
         self.subrole = subrole
         self.processIdentifier = processIdentifier
         self.parent = parent
-        self.caretBounds = caretBounds
         self.providesStringForRange = providesStringForRange
         let initialSelection = selection ?? value.map { NSRange(location: $0.utf16.count, length: 0) }
         self.state = OSAllocatedUnfairLock(initialState: State(
@@ -173,10 +170,6 @@ final class FakeElement: AccessibilityElement {
             if !state.ignoresSelectionWrites { state.selection = range }
         }
         return true
-    }
-
-    func bounds(for range: NSRange) -> CGRect? {
-        caretBounds
     }
 
     func string(forRange range: NSRange) -> String? {

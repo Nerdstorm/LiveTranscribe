@@ -76,7 +76,6 @@ struct FakeElement: AccessibilityElement {
     }
     func setString(_ value: String, for attribute: String) -> Bool { false }
     func setRange(_ range: NSRange, for attribute: String) -> Bool { false }
-    func bounds(for range: NSRange) -> CGRect? { CGRect(x: 100, y: 200, width: 2, height: 16) }
     func string(forRange range: NSRange) -> String? {
         probe?.record(kAXStringForRangeParameterizedAttribute)
         let text = value as NSString
@@ -138,11 +137,6 @@ final class FakeFocus: FocusedTargetProvider, @unchecked Sendable {
             value: value, caret: (value as NSString).length, subrole: secure ? kAXSecureTextFieldSubrole : nil, probe: probe
         )
         return InsertionTarget(app: app, element: element, secureEventInputEnabled: false)
-    }
-
-    /// A focused field whose caret is drawn at `caret`.
-    static func field(caret: CGRect) -> InsertionTarget {
-        InsertionTarget(app: app, element: nil, isSecure: false, caretRect: caret)
     }
 
     func set(_ target: InsertionTarget) { self.target.withLock { $0 = target } }
