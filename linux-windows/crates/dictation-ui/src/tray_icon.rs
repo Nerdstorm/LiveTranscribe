@@ -1,7 +1,7 @@
 //! The tray's icon, drawn as the Mac's menu bar draws its symbols: in one colour, the panel's text
 //! colour for the desktop's light or dark mode, on a 24-point grid scaled to the size asked for.
 
-use tiny_skia::{Color, FillRule, LineCap, LineJoin, Paint, PathBuilder, Pixmap, Rect, Stroke, Transform};
+use tiny_skia::{BlendMode, Color, FillRule, LineCap, LineJoin, Paint, PathBuilder, Pixmap, Rect, Stroke, Transform};
 
 use crate::panel_view::rounded_rect;
 use crate::{MenuBarIcon, Theme};
@@ -56,6 +56,10 @@ fn draw_pixmap(icon: MenuBarIcon, theme: Theme, size: u32) -> Pixmap {
     match icon {
         MenuBarIcon::Waveform => glyph.waveform(),
         MenuBarIcon::Microphone => glyph.microphone(),
+        MenuBarIcon::MicrophoneOff => {
+            glyph.microphone();
+            glyph.slash();
+        }
         MenuBarIcon::Ellipsis => {
             glyph.ring();
             for x in [7.8, CENTER, 16.2] {
@@ -104,6 +108,17 @@ impl Glyph<'_> {
         }
         self.line(&[(CENTER, 17.6), (CENTER, 21.0)], LINE_WIDTH);
         self.line(&[(8.5, 21.2), (15.5, 21.2)], LINE_WIDTH);
+    }
+
+    /// A slash across what is drawn, with a gap cut on either side of it, as SF Symbols' slashed
+    /// symbols have.
+    fn slash(&mut self) {
+        const ENDS: [(f32, f32); 2] = [(4.2, 2.6), (19.8, 21.4)];
+        let color = self.paint.clone();
+        self.paint.blend_mode = BlendMode::Clear;
+        self.line(&ENDS, LINE_WIDTH * 2.6);
+        self.paint = color;
+        self.line(&ENDS, LINE_WIDTH);
     }
 
     /// A triangle with an exclamation mark.
