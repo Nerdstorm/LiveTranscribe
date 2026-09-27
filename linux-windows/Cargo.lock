@@ -536,6 +536,8 @@ name = "lt-dictation"
 version = "0.1.0"
 dependencies = [
  "lt-cleanup",
+ "lt-hotkey",
+ "lt-insertion",
  "lt-shared",
  "lt-snippets",
  "lt-spoken-commands",

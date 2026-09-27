@@ -1,6 +1,6 @@
 [package]
 name = "lt-dictation"
-description = "Turns a transcript into the text dictation types."
+description = "The dictation flow, and the text it types."
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
@@ -8,6 +8,8 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+lt-hotkey.workspace = true
+lt-insertion.workspace = true
 lt-shared.workspace = true
 lt-styles.workspace = true
 lt-spoken-commands.workspace = true
