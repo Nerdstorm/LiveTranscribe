@@ -8,6 +8,7 @@
 //!   shortcut. Modifiers and locks don't count, as on the Mac, where they are flag changes rather
 //!   than key presses; nor do mouse and gamepad buttons.
 //! - The hotkey's own autorepeat means nothing, and neither does Esc's.
+//! - While paused (Settings is recording a new shortcut), nothing means anything.
 //!
 //! Unlike the Mac app, nothing is swallowed: a program reading the keyboard can't hide a key
 //! from the focused app without grabbing the whole keyboard, so the app sees the hotkey and Esc
@@ -107,25 +108,43 @@ pub struct KeyTracker {
     hotkey: u16,
     /// The keyboards the hotkey is down on.
     held_on: BTreeSet<u64>,
+    paused: bool,
 }
 
 impl KeyTracker {
     /// A tracker for `hotkey`, an input event code (`codes::KEY_RIGHTCTRL`, say).
     pub fn new(hotkey: u16) -> Result<Self, UnusableHotkey> {
-        if hotkey == codes::KEY_ESC {
-            return Err(UnusableHotkey::Escape);
-        }
-        if is_button(hotkey) {
-            return Err(UnusableHotkey::Button);
-        }
+        check(hotkey)?;
         Ok(Self {
             hotkey,
             held_on: BTreeSet::new(),
+            paused: false,
         })
     }
 
     pub fn hotkey(&self) -> u16 {
         self.hotkey
+    }
+
+    /// Watches for `hotkey` from now on. Whatever the old one was doing is forgotten without a
+    /// word: whoever changes the hotkey deals with a dictation it started.
+    pub fn set_hotkey(&mut self, hotkey: u16) -> Result<(), UnusableHotkey> {
+        check(hotkey)?;
+        self.hotkey = hotkey;
+        self.held_on.clear();
+        Ok(())
+    }
+
+    /// While paused, keys mean nothing, so that Settings can record a new shortcut. A hotkey
+    /// held when the pause starts or ends is forgotten, as by [`Self::set_hotkey`]: its release
+    /// means nothing either, and the next press is a press.
+    pub fn set_paused(&mut self, paused: bool) {
+        self.paused = paused;
+        self.held_on.clear();
+    }
+
+    pub fn is_paused(&self) -> bool {
+        self.paused
     }
 
     /// Whether the hotkey is down on any keyboard.
@@ -135,6 +154,9 @@ impl KeyTracker {
 
     /// What `state` of key `code` on keyboard `device` means; `None` when nothing.
     pub fn key(&mut self, device: u64, code: u16, state: KeyState) -> Option<HotkeyEvent> {
+        if self.paused {
+            return None;
+        }
         if code == self.hotkey {
             return match state {
                 KeyState::Pressed => {
@@ -164,6 +186,17 @@ impl KeyTracker {
         let removed = self.held_on.remove(&device);
         (removed && !self.is_held()).then_some(HotkeyEvent::Released)
     }
+}
+
+/// Whether `hotkey` can be the dictation hotkey.
+fn check(hotkey: u16) -> Result<(), UnusableHotkey> {
+    if hotkey == codes::KEY_ESC {
+        return Err(UnusableHotkey::Escape);
+    }
+    if is_button(hotkey) {
+        return Err(UnusableHotkey::Button);
+    }
+    Ok(())
 }
 
 fn is_modifier(code: u16) -> bool {
@@ -290,6 +323,54 @@ mod tests {
     fn escape_and_buttons_cant_be_the_hotkey() {
         assert_eq!(KeyTracker::new(KEY_ESC).unwrap_err(), UnusableHotkey::Escape);
         assert_eq!(KeyTracker::new(BTN_LEFT).unwrap_err(), UnusableHotkey::Button);
+    }
+
+    #[test]
+    fn a_new_hotkey_replaces_the_old_one_and_forgets_it_was_held() {
+        let mut tracker = tracker();
+        tracker.key(LAPTOP, KEY_RIGHTCTRL, Down);
+        tracker.set_hotkey(KEY_RIGHTALT).unwrap();
+        assert_eq!(tracker.hotkey(), KEY_RIGHTALT);
+        assert!(!tracker.is_held());
+        assert_eq!(tracker.key(LAPTOP, KEY_RIGHTCTRL, Up), None, "the old hotkey's release");
+        assert_eq!(
+            tracker.key(LAPTOP, KEY_RIGHTCTRL, Down),
+            None,
+            "the old hotkey is an ordinary key"
+        );
+        assert_eq!(tracker.key(LAPTOP, KEY_RIGHTALT, Down), Some(Pressed));
+        assert_eq!(tracker.key(LAPTOP, KEY_RIGHTALT, Up), Some(Released));
+    }
+
+    #[test]
+    fn an_unusable_hotkey_leaves_the_old_one_in_place() {
+        let mut tracker = tracker();
+        tracker.key(LAPTOP, KEY_RIGHTCTRL, Down);
+        assert_eq!(tracker.set_hotkey(KEY_ESC), Err(UnusableHotkey::Escape));
+        assert_eq!(tracker.set_hotkey(BTN_LEFT), Err(UnusableHotkey::Button));
+        assert_eq!(tracker.hotkey(), KEY_RIGHTCTRL);
+        assert_eq!(tracker.key(LAPTOP, KEY_RIGHTCTRL, Up), Some(Released), "still held");
+    }
+
+    #[test]
+    fn nothing_means_anything_while_paused() {
+        let mut tracker = tracker();
+        tracker.key(LAPTOP, KEY_RIGHTCTRL, Down);
+        tracker.set_paused(true);
+        assert!(tracker.is_paused());
+        for (code, state) in [
+            (KEY_RIGHTCTRL, Up),
+            (KEY_RIGHTCTRL, Down),
+            (KEY_A, Down),
+            (KEY_ESC, Down),
+        ] {
+            assert_eq!(tracker.key(LAPTOP, code, state), None, "code {code}");
+        }
+        assert_eq!(tracker.device_removed(LAPTOP), None);
+        // Held through the end of the pause: its release means nothing, and the next press counts.
+        tracker.set_paused(false);
+        assert_eq!(tracker.key(LAPTOP, KEY_RIGHTCTRL, Up), None);
+        assert_eq!(tracker.key(LAPTOP, KEY_RIGHTCTRL, Down), Some(Pressed));
     }
 
     #[test]

@@ -101,9 +101,71 @@ pub fn watch_keyboards<F>(codes: Vec<u16>, on_event: F) -> Result<Vec<Keyboard>,
 where
     F: Fn(KeyboardEvent<'_>) + Send + Sync + 'static,
 {
+    start_watching(codes, Box::new(on_event)).map(|(_, keyboards)| keyboards)
+}
+
+/// Watches the keyboards for `hotkey`, an input event code, and Esc, delivering what their keys
+/// mean for dictation to `sink`, in the order they happened. Returns the keyboards found now, and
+/// a handle that changes the hotkey, or pauses it, while the watching goes on.
+pub fn watch_hotkey<F>(hotkey: u16, sink: F) -> Result<(HotkeyWatch, Vec<Keyboard>), MonitorError>
+where
+    F: Fn(HotkeyEvent) + Send + Sync + 'static,
+{
+    let tracker = Arc::new(Mutex::new(KeyTracker::new(hotkey).map_err(MonitorError::Hotkey)?));
+    let tracking = Arc::clone(&tracker);
+    // Every key matters (another key while the hotkey is held cancels), but only keyboards that
+    // have the hotkey or Esc are worth reading.
+    let (watcher, keyboards) = start_watching(
+        hotkey_codes(hotkey),
+        Box::new(move |event| {
+            // Events are delivered under the lock, so they arrive in the order they were tracked.
+            let mut tracker = lock(&tracking);
+            let meaning = match event {
+                KeyboardEvent::Key { keyboard, code, state } => tracker.key(keyboard.id, code, state),
+                KeyboardEvent::Removed { keyboard } => tracker.device_removed(keyboard.id),
+            };
+            if let Some(meaning) = meaning {
+                sink(meaning);
+            }
+        }),
+    )?;
+    Ok((HotkeyWatch { tracker, watcher }, keyboards))
+}
+
+/// Changes what [`watch_hotkey`] watches for. Clones control the same watch.
+#[derive(Clone)]
+pub struct HotkeyWatch {
+    tracker: Arc<Mutex<KeyTracker>>,
+    watcher: Arc<Watcher>,
+}
+
+impl HotkeyWatch {
+    /// Watches for `hotkey` from now on (see [`KeyTracker::set_hotkey`]). A keyboard that has the
+    /// new key but was left alone so far is read from the next scan, within two seconds.
+    pub fn set_hotkey(&self, hotkey: u16) -> Result<(), UnusableHotkey> {
+        lock(&self.tracker).set_hotkey(hotkey)?;
+        *lock(&self.watcher.codes) = hotkey_codes(hotkey);
+        Ok(())
+    }
+
+    /// Pauses the hotkey and Esc, or resumes them (see [`KeyTracker::set_paused`]).
+    pub fn set_paused(&self, paused: bool) {
+        lock(&self.tracker).set_paused(paused);
+    }
+
+    pub fn hotkey(&self) -> u16 {
+        lock(&self.tracker).hotkey()
+    }
+}
+
+fn hotkey_codes(hotkey: u16) -> Vec<u16> {
+    vec![hotkey, codes::KEY_ESC]
+}
+
+fn start_watching(codes: Vec<u16>, on_event: EventHandler) -> Result<(Arc<Watcher>, Vec<Keyboard>), MonitorError> {
     let watcher = Arc::new(Watcher {
-        codes,
-        on_event: Box::new(on_event),
+        codes: Mutex::new(codes),
+        on_event,
         watched: Mutex::new(HashSet::new()),
         reported: Mutex::new(HashSet::new()),
         next_id: AtomicU64::new(1),
@@ -133,29 +195,7 @@ where
             path: PathBuf::from(INPUT_FOLDER),
             source,
         })?;
-    Ok(found.opened)
-}
-
-/// Watches the keyboards for `hotkey`, an input event code, and Esc, delivering what their keys
-/// mean for dictation to `sink`, in the order they happened. Returns the keyboards found now.
-pub fn watch_hotkey<F>(hotkey: u16, sink: F) -> Result<Vec<Keyboard>, MonitorError>
-where
-    F: Fn(HotkeyEvent) + Send + Sync + 'static,
-{
-    let tracker = Mutex::new(KeyTracker::new(hotkey).map_err(MonitorError::Hotkey)?);
-    // Every key matters (another key while the hotkey is held cancels), but only keyboards that
-    // have the hotkey or Esc are worth reading.
-    watch_keyboards(vec![hotkey, codes::KEY_ESC], move |event| {
-        // Events are delivered under the lock, so they arrive in the order they were tracked.
-        let mut tracker = tracker.lock().unwrap_or_else(PoisonError::into_inner);
-        let meaning = match event {
-            KeyboardEvent::Key { keyboard, code, state } => tracker.key(keyboard.id, code, state),
-            KeyboardEvent::Removed { keyboard } => tracker.device_removed(keyboard.id),
-        };
-        if let Some(meaning) = meaning {
-            sink(meaning);
-        }
-    })
+    Ok((watcher, found.opened))
 }
 
 /// The input event code for a key name as linux/input-event-codes.h spells it, with or without
@@ -225,7 +265,7 @@ type EventHandler = Box<dyn Fn(KeyboardEvent<'_>) + Send + Sync>;
 
 struct Watcher {
     /// A device is read when it has at least one of these codes.
-    codes: Vec<u16>,
+    codes: Mutex<Vec<u16>>,
     on_event: EventHandler,
     /// The device nodes being read.
     watched: Mutex<HashSet<PathBuf>>,
@@ -302,7 +342,7 @@ impl Watcher {
         let (Some(events), Some(keys)) = (read("ev"), read("key")) else {
             return false;
         };
-        events.contains(EV_KEY) && self.codes.iter().any(|&code| keys.contains(usize::from(code)))
+        events.contains(EV_KEY) && lock(&self.codes).iter().any(|&code| keys.contains(usize::from(code)))
     }
 
     fn read_keys(&self, keyboard: &Keyboard, mut device: Device) {

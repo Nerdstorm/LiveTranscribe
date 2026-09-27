@@ -84,6 +84,8 @@ enum Phase {
 #[derive(Clone, Debug)]
 pub struct HotkeyGesture {
     configuration: HotkeyGestureConfiguration,
+    /// The configuration for the next gesture, set while one was in progress.
+    next: Option<HotkeyGestureConfiguration>,
     phase: Phase,
     /// Timers asked for and not yet fired. Timers are never cancelled, so one from an earlier
     /// tap can still be pending when a new tap waits for its second press.
@@ -94,13 +96,30 @@ impl HotkeyGesture {
     pub fn new(configuration: HotkeyGestureConfiguration) -> Self {
         Self {
             configuration,
+            next: None,
             phase: Phase::Idle,
             timers_pending: 0,
         }
     }
 
+    /// The configuration the gesture in progress uses, or the next one will.
     pub fn configuration(&self) -> HotkeyGestureConfiguration {
-        self.configuration
+        self.next.unwrap_or(self.configuration)
+    }
+
+    /// Uses `configuration` from the next gesture on: one in progress keeps the timing it
+    /// started with, so a change never cuts a tap's window short or turns a hold into a tap.
+    pub fn set_configuration(&mut self, configuration: HotkeyGestureConfiguration) {
+        self.next = Some(configuration);
+        self.take_next_if_idle();
+    }
+
+    fn take_next_if_idle(&mut self) {
+        if self.phase == Phase::Idle
+            && let Some(next) = self.next.take()
+        {
+            self.configuration = next;
+        }
     }
 
     /// Whether audio is being recorded: from `StartRecording` until `StopAndProcess` or `Cancel`.
@@ -121,6 +140,7 @@ impl HotkeyGesture {
     /// does not leave the gesture held.
     pub fn reset(&mut self) {
         self.phase = Phase::Idle;
+        self.take_next_if_idle();
     }
 
     /// Advances the machine and returns what to do, in order. Empty when the input is ignored.
@@ -131,6 +151,7 @@ impl HotkeyGesture {
         if input == Input::TimerFired {
             self.timers_pending = self.timers_pending.saturating_sub(1);
         }
+        self.take_next_if_idle();
         let window = self.configuration.double_tap_window_ms;
         match (self.phase, input) {
             (Phase::Idle, Input::Pressed) => {
@@ -256,6 +277,41 @@ mod tests {
         assert_eq!(gesture.handle(Pressed, 1_000), [StartRecording]);
         assert!(gesture.is_recording());
         assert!(!gesture.is_hands_free());
+    }
+
+    #[test]
+    fn new_timing_waits_for_the_gesture_in_progress_to_end() {
+        let mut gesture = gesture(true);
+        let slower = HotkeyGestureConfiguration {
+            tap_max_ms: 600,
+            double_tap_window_ms: 500,
+            hands_free_enabled: false,
+        };
+        gesture.handle(Pressed, 0);
+        gesture.set_configuration(slower);
+        assert_eq!(gesture.configuration(), slower, "what the next gesture uses");
+        // Still the old timing: a 400 ms hold is a hold, not a tap.
+        assert_eq!(gesture.handle(Released, 400), [StopAndProcess]);
+        // The next gesture has the new timing: 400 ms is a tap now, and without hands-free a tap
+        // is cancelled.
+        assert_eq!(
+            run(&mut gesture, &[(Pressed, 1_000), (Released, 1_400)]),
+            [vec![StartRecording], vec![Cancel]]
+        );
+    }
+
+    #[test]
+    fn new_timing_applies_at_once_between_gestures() {
+        let mut gesture = gesture(true);
+        gesture.set_configuration(HotkeyGestureConfiguration {
+            tap_max_ms: 100,
+            double_tap_window_ms: WINDOW_MS,
+            hands_free_enabled: true,
+        });
+        assert_eq!(
+            run(&mut gesture, &[(Pressed, 0), (Released, 150)]),
+            [vec![StartRecording], vec![StopAndProcess]]
+        );
     }
 
     // Taps

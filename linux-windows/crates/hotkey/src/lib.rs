@@ -11,5 +11,5 @@ pub use hotkey_gesture::{HotkeyAction, HotkeyGesture, HotkeyGestureConfiguration
 pub use key_tracker::{HotkeyEvent, KeyState, KeyTracker, UnusableHotkey, codes};
 #[cfg(target_os = "linux")]
 pub use keyboard_monitor::{
-    Keyboard, KeyboardEvent, MonitorError, display_name, key_code, key_name, watch_hotkey, watch_keyboards,
+    HotkeyWatch, Keyboard, KeyboardEvent, MonitorError, display_name, key_code, key_name, watch_hotkey, watch_keyboards,
 };
