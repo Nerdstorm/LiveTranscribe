@@ -33,6 +33,7 @@ same place in both apps:
 | `lt-dictation` | `Dictation` | A transcript to the text dictation types |
 | `lt-transcription` | `Transcription`, and mlx-audio-swift's Qwen3-ASR | Speech to text: the log-mel features, the encoder's chunks and windows, the prompt, greedy decoding and its limits. The model's forward passes are behind the `SpeechModel` trait; `OpenVinoModel` runs them on OpenVINO |
 | `lt-hotkey` | `Hotkey` | The hold, tap and double-tap gesture; what each key means for it; on Linux, reading the keyboards (evdev) |
+| `lt-capture` | `Capture` | Recording the default microphone (cpal) as 16 kHz mono, and its level for the meter |
 
 ## Matching the Mac app
 

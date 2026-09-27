@@ -21,10 +21,13 @@ lt-cleanup = { path = "crates/cleanup" }
 lt-dictation = { path = "crates/dictation" }
 lt-transcription = { path = "crates/transcription" }
 lt-hotkey = { path = "crates/hotkey" }
+lt-capture = { path = "crates/capture" }
 
+cpal = "0.18"
 evdev = "0.13"
 openvino = { version = "0.11", features = ["runtime-linking"] }
 realfft = "3"
+rubato = "5"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tracing = "0.1"
