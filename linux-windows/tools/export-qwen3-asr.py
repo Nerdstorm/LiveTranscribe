@@ -3,24 +3,34 @@
 
 The app computes the model's input features, its prompt and the decoding itself, as the Mac app's
 mlx-audio-swift does (crates/transcription), and asks a runtime only for the model's forward
-passes (its SpeechModel trait). This script writes those passes as three OpenVINO models:
+passes (its SpeechModel trait). This script writes those passes as four OpenVINO models:
 
-  audio-conv     the audio encoder's convolutions and positional embedding, over chunks of mel
-                 frames: chunks [n, 128, frames] -> rows [n, rows, d_model]
-  audio-encoder  its attention layers and output projection, over one window of rows:
-                 rows [1, r, d_model] -> embeddings [1, r, hidden]
-  text           the language model, with its KV cache kept as state: token ids, audio rows in
-                 place of the placeholders, to the logits of the next token [1, 1, vocab]
+  audio-conv       the audio encoder's convolutions and positional embedding, over chunks of mel
+                   frames: chunks [n, 128, frames] -> rows [n, rows, d_model]
+  audio-encoder    its attention layers and output projection, over one window of rows, of which
+                   mask marks the real ones: rows [1, r, d_model], mask [1, r] -> embeddings
+                   [1, r, hidden]
+  text-embeddings  the language model's token embeddings: input_ids [1, n] -> embeddings
+                   [1, n, hidden], into which the app puts the audio rows
+  text             the language model, with its KV cache kept as state, in the form OpenVINO's LLM
+                   pipelines take (inputs_embeds, attention_mask, position_ids, beam_idx), to the
+                   logits of the next token [1, 1, vocab]
+
+Every dimension but the widths is left open, which the CPU takes as it is. The NPU compiles only
+fixed shapes: the app fixes the audio models' (one chunk of 100 frames; a window padded to 104
+rows, the padding masked out), and the NPU's LLM mode (NPUW) fixes the language model's, padding
+the prompt on the left and keeping the cache in fixed slots that attention_mask marks.
 
 The passes are written here in PyTorch as mlx-audio-swift's Qwen3ASR.swift computes them, not
 taken from transformers, whose model chunks audio the reference way. The checkpoint's weights
-load into them strictly, and each converted model is checked against its PyTorch pass.
+load into them strictly, and each converted model is checked against its PyTorch pass, on the
+CPU and, when there is one, on the NPU.
 
 Run it with the model tools the setup kit installs, inside the live-transcribe toolbox:
 
     ~/.local/share/live-transcribe/model-tools/bin/python export-qwen3-asr.py \\
         --model <folder with config.json and model.safetensors> \\
-        --out ~/.local/share/live-transcribe/models/qwen3-asr-0.6b
+        --out ~/.local/share/live-transcribe/models/qwen3-asr-0.6b-v2
 """
 
 import argparse
@@ -41,9 +51,29 @@ from torch import nn
 LOG = logging.getLogger("export-qwen3-asr")
 
 # The manifest's format. The app refuses a folder written in any other.
-MANIFEST_FORMAT = 1
+MANIFEST_FORMAT = 2
 # What the app reads from the checkpoint besides the models: its languages and its tokenizer.
 COPIED_FILES = ["config.json", "vocab.json", "merges.txt", "tokenizer_config.json"]
+# What a masked attention score gets: far below any real score, so it weighs nothing, yet finite in
+# 16-bit floats (the NPU's), so a row with nothing to attend to, such as a padded prompt position,
+# averages its values rather than turning to NaN and spreading.
+MASKED = -10_000.0
+# Mel frames in a chunk, and the rows of a full window (8 chunks of 13 rows): the audio models'
+# fixed shapes on the NPU, where the app pads every window to WINDOW_ROWS.
+CHUNK_FRAMES = 100
+WINDOW_ROWS = 104
+# The NPU's LLM mode (NPUW) for the checks here: room for the check's prompt and its steps. The app
+# sets its own.
+# --text-weights: how NNCF compresses the language model's and its embeddings' weights, per channel.
+# int8 is symmetric: the NPU's LLM mode runs it at about 16 ms a token, and asymmetric int8 at about
+# 870 ms; the CPU runs both alike. fp16 is there for comparisons.
+TEXT_WEIGHTS = {"int8": "INT8_SYM", "fp16": None}
+NPUW_CHECK = {
+    "NPU_USE_NPUW": "YES",
+    "NPUW_LLM": "YES",
+    "NPUW_LLM_MAX_PROMPT_LEN": "128",
+    "NPUW_LLM_MIN_RESPONSE_LEN": "64",
+}
 
 
 # MARK: - Audio encoder
@@ -97,12 +127,12 @@ class AudioAttention(nn.Module):
         self.v_proj = nn.Linear(width, width)
         self.out_proj = nn.Linear(width, width)
 
-    def forward(self, x):
+    def forward(self, x, bias):
         q, k, v = (
             projection(x).unflatten(-1, (self.heads, -1)).transpose(1, 2)
             for projection in (self.q_proj, self.k_proj, self.v_proj)
         )
-        attended = F.scaled_dot_product_attention(q, k, v, scale=self.scale)
+        attended = F.scaled_dot_product_attention(q, k, v, attn_mask=bias, scale=self.scale)
         return self.out_proj(attended.transpose(1, 2).flatten(2))
 
 
@@ -116,14 +146,16 @@ class AudioEncoderLayer(nn.Module):
         self.fc2 = nn.Linear(config["encoder_ffn_dim"], width)
         self.final_layer_norm = nn.LayerNorm(width)
 
-    def forward(self, x):
-        x = x + self.self_attn(self.self_attn_layer_norm(x))
+    def forward(self, x, bias):
+        x = x + self.self_attn(self.self_attn_layer_norm(x), bias)
         return x + self.fc2(F.gelu(self.fc1(self.final_layer_norm(x))))
 
 
 class AudioEncoder(nn.Module):
     """The encoder's attention layers and output projection over one window of rows, which
-    attend to each other with no mask."""
+    attend to each other with no mask, as the Mac's do. On the NPU the window is padded to a fixed
+    length: mask is 1 for the real rows and 0 for the padding, which nothing attends to, so the
+    real rows come out as they would from a window of only them."""
 
     def __init__(self, config):
         super().__init__()
@@ -133,9 +165,10 @@ class AudioEncoder(nn.Module):
         self.proj1 = nn.Linear(width, width)
         self.proj2 = nn.Linear(width, config["output_dim"])
 
-    def forward(self, rows):
+    def forward(self, rows, mask):
+        bias = (1 - mask[:, None, None, :].to(rows.dtype)) * MASKED
         for layer in self.layers:
-            rows = layer(rows)
+            rows = layer(rows, bias)
         return self.proj2(F.gelu(self.proj1(self.ln_post(rows))))
 
 
@@ -185,7 +218,7 @@ class TextAttention(nn.Module):
         self.q_norm = RMSNorm(head, config["rms_norm_eps"])
         self.k_norm = RMSNorm(head, config["rms_norm_eps"])
 
-    def forward(self, x, cos, sin, mask, past_key, past_value):
+    def forward(self, x, cos, sin, bias, past_key, past_value):
         q = self.q_norm(self.q_proj(x).unflatten(-1, (self.heads, -1))).transpose(1, 2)
         k = self.k_norm(self.k_proj(x).unflatten(-1, (self.kv_heads, -1))).transpose(1, 2)
         v = self.v_proj(x).unflatten(-1, (self.kv_heads, -1)).transpose(1, 2)
@@ -193,7 +226,7 @@ class TextAttention(nn.Module):
         value = torch.cat([past_value, v], dim=2)
         times = self.heads // self.kv_heads
         attended = F.scaled_dot_product_attention(
-            rotate(q, cos, sin, self.half), repeat_heads(key, times), repeat_heads(value, times), attn_mask=mask, scale=self.scale
+            rotate(q, cos, sin, self.half), repeat_heads(key, times), repeat_heads(value, times), attn_mask=bias, scale=self.scale
         )
         return self.o_proj(attended.transpose(1, 2).flatten(2)), key, value
 
@@ -218,10 +251,23 @@ class TextDecoderLayer(nn.Module):
         self.input_layernorm = RMSNorm(config["hidden_size"], config["rms_norm_eps"])
         self.post_attention_layernorm = RMSNorm(config["hidden_size"], config["rms_norm_eps"])
 
-    def forward(self, x, cos, sin, mask, past_key, past_value):
-        attended, key, value = self.self_attn(self.input_layernorm(x), cos, sin, mask, past_key, past_value)
+    def forward(self, x, cos, sin, bias, past_key, past_value):
+        attended, key, value = self.self_attn(self.input_layernorm(x), cos, sin, bias, past_key, past_value)
         x = x + attended
         return x + self.mlp(self.post_attention_layernorm(x)), key, value
+
+
+class TextEmbeddings(nn.Module):
+    """The language model's token embeddings, on their own: the app puts the audio rows in place
+    of the placeholders' embeddings before the language model sees them. Shares the language
+    model's embedding table."""
+
+    def __init__(self, embed_tokens):
+        super().__init__()
+        self.embed_tokens = embed_tokens
+
+    def forward(self, input_ids):
+        return self.embed_tokens(input_ids)
 
 
 class TextModel(nn.Module):
@@ -229,10 +275,16 @@ class TextModel(nn.Module):
     multimodal RoPE turns every section by the same position when only audio and text are in the
     prompt, which is the same), a causal mask, and logits from the tied embeddings.
 
-    Inputs: input_ids [1, n]; audio_rows [1, n, hidden], used where audio_mask [1, n] is 1 in place
-    of the token's embedding; position_ids [1, n], continuing the cache; then each layer's cached
-    key and value. Outputs: the logits after the last position [1, 1, vocab], then each layer's
-    key and value with this call's positions appended."""
+    Inputs, as OpenVINO's LLM pipelines name them: inputs_embeds [1, n, hidden], the tokens'
+    embeddings with the audio rows in place of the placeholders'; attention_mask [1, past + n],
+    1 for each cache slot and new position to attend to; position_ids [1, n]; then each layer's
+    cached key and value. Outputs: the logits after the last position [1, 1, vocab], then each
+    layer's key and value with this call's appended.
+
+    A position attends to the cache slots and new positions up to its own, where attention_mask
+    is 1. On the CPU the mask is all ones and the slots are the positions. The NPU's LLM mode keeps
+    the cache in a fixed number of slots, the unused ones masked, and pads a prompt on the left,
+    the padding masked too."""
 
     def __init__(self, config):
         super().__init__()
@@ -248,17 +300,20 @@ class TextModel(nn.Module):
         frequencies = 1.0 / config["rope_theta"] ** (torch.arange(0, head, 2, dtype=torch.float32) / head)
         self.register_buffer("frequencies", frequencies, persistent=False)
 
-    def forward(self, input_ids, audio_rows, audio_mask, position_ids, *past):
-        x = torch.where(audio_mask.unsqueeze(-1) > 0, audio_rows, self.embed_tokens(input_ids))
+    def forward(self, inputs_embeds, attention_mask, position_ids, *past):
+        x = inputs_embeds
         angles = position_ids.unsqueeze(-1).to(torch.float32) * self.frequencies
         angles = torch.cat([angles, angles], dim=-1)
         cos, sin = angles.cos().unsqueeze(1), angles.sin().unsqueeze(1)
-        # Cached position j holds token j, so a token sees every key up to its own position.
-        keys = torch.arange(past[0].shape[2] + input_ids.shape[1])
-        mask = (keys <= position_ids.unsqueeze(-1)).unsqueeze(1)
+        # This call's positions take the slots after the cache's, in order.
+        cached = past[0].shape[2]
+        slots = torch.arange(cached + inputs_embeds.shape[1])
+        own = cached + torch.arange(inputs_embeds.shape[1])
+        allowed = (slots <= own.unsqueeze(-1)) & (attention_mask.unsqueeze(1) > 0)
+        bias = torch.where(allowed, 0.0, MASKED).unsqueeze(1)
         presents = []
         for index, layer in enumerate(self.layers):
-            x, key, value = layer(x, cos, sin, mask, past[2 * index], past[2 * index + 1])
+            x, key, value = layer(x, cos, sin, bias, past[2 * index], past[2 * index + 1])
             presents += [key, value]
         last = self.norm(x[:, -1:])
         logits = self.lm_head(last) if self.lm_head is not None else last @ self.embed_tokens.weight.T
@@ -314,16 +369,47 @@ def convert_audio(conv, encoder, audio_config):
 
     encoder_model = ov.convert_model(
         encoder,
-        example_input=torch.randn(1, 30, width),
-        input=[(ov.PartialShape([1, -1, width]), ov.Type.f32)],
+        example_input=(torch.randn(1, 30, width), torch.ones(1, 30, dtype=torch.int64)),
+        input=[(ov.PartialShape([1, -1, width]), ov.Type.f32), (ov.PartialShape([1, -1]), ov.Type.i64)],
     )
-    name_ports(encoder_model.inputs, ["rows"])
+    name_ports(encoder_model.inputs, ["rows", "mask"])
     name_ports(encoder_model.outputs, ["embeddings"])
     return conv_model, encoder_model
 
 
+def convert_embeddings(embeddings):
+    import openvino as ov
+
+    model = ov.convert_model(
+        embeddings,
+        example_input=torch.randint(0, 1000, (1, 5)),
+        input=[(ov.PartialShape([1, -1]), ov.Type.i64)],
+    )
+    name_ports(model.inputs, ["input_ids"])
+    name_ports(model.outputs, ["embeddings"])
+    return model
+
+
 def kv_names(layers, kind):
     return [f"{kind}.{index}.{part}" for index in range(layers) for part in ("key", "value")]
+
+
+def add_beam_idx(model, cache_inputs):
+    """OpenVINO's LLM pipelines, the NPU's included, choose each cache's rows through a beam_idx
+    input before a step, for beam search. The app decodes one sequence and passes [0]."""
+    import openvino as ov
+    import openvino.opset13 as ops
+
+    beam_idx = ops.parameter(ov.PartialShape([1]), ov.Type.i32, name="beam_idx")
+    beam_idx.output(0).get_tensor().set_names({"beam_idx"})
+    model.add_parameters([beam_idx])
+    for name in cache_inputs:
+        port = model.input(name)
+        consumers = port.get_target_inputs()
+        chosen = ops.gather(port, beam_idx, ops.constant(0))
+        for consumer in consumers:
+            consumer.replace_source_output(chosen.output(0))
+    model.validate_nodes_and_infer_types()
 
 
 def convert_text(text, text_config):
@@ -333,26 +419,46 @@ def convert_text(text, text_config):
     layers, width = text_config["num_hidden_layers"], text_config["hidden_size"]
     kv_shape = [1, text_config["num_key_value_heads"], -1, text_config["head_dim"]]
     example = (
-        torch.randint(0, 1000, (1, 5)),
         torch.randn(1, 5, width),
-        torch.tensor([[0, 1, 1, 0, 0]]),
+        torch.ones(1, 8, dtype=torch.int64),
         torch.arange(3, 8)[None],
         *(torch.randn(1, kv_shape[1], 3, kv_shape[3]) for _ in range(2 * layers)),
     )
     inputs = [
-        (ov.PartialShape([1, -1]), ov.Type.i64),
         (ov.PartialShape([1, -1, width]), ov.Type.f32),
         (ov.PartialShape([1, -1]), ov.Type.i64),
         (ov.PartialShape([1, -1]), ov.Type.i64),
     ] + [(ov.PartialShape(kv_shape), ov.Type.f32)] * (2 * layers)
     model = ov.convert_model(text, example_input=example, input=inputs)
-    name_ports(model.inputs, ["input_ids", "audio_rows", "audio_mask", "position_ids", *kv_names(layers, "past")])
-    name_ports(model.outputs, ["logits", *kv_names(layers, "present")])
-    # The cache becomes state inside the model: each request starts with an empty one.
-    apply_make_stateful_transformation(
-        model, dict(zip(kv_names(layers, "past"), kv_names(layers, "present"), strict=True))
-    )
+    past, present = kv_names(layers, "past_key_values"), kv_names(layers, "present")
+    name_ports(model.inputs, ["inputs_embeds", "attention_mask", "position_ids", *past])
+    name_ports(model.outputs, ["logits", *present])
+    add_beam_idx(model, past)
+    # The cache becomes state inside the model, named as OpenVINO's LLM pipelines expect: each
+    # request starts with an empty one.
+    apply_make_stateful_transformation(model, dict(zip(past, present, strict=True)))
+    add_state_initializers(model)
     return model
+
+
+def add_state_initializers(model):
+    """Gives each cache's state an initializer, an empty cache as wide as the batch, as
+    optimum-intel's exports have. OpenVINO's CPU plugin fails to compile the cache's beam_idx
+    reordering without one ("ReadValue contains less parent edges than 0")."""
+    import openvino.opset13 as ops
+
+    embeds = model.input("inputs_embeds")
+    batch = ops.gather(ops.shape_of(embeds, output_type="i64"), ops.constant([0]), ops.constant(0))
+    for op in model.get_ops():
+        if op.get_type_name() != "ReadValue":
+            continue
+        # An empty cache: the sequence's dimension, the only open one, starts at 0.
+        dims = [dim.min_length for dim in op.get_output_partial_shape(0)]
+        dims[0] = batch
+        dims = [ops.constant(np.array([dim], np.int64)) if isinstance(dim, int) else dim for dim in dims]
+        empty = ops.broadcast(ops.constant(0.0, dtype=op.get_output_element_type(0)), ops.concat(dims, axis=0))
+        op.set_arguments([empty])
+    model.validate_nodes_and_infer_types()
 
 
 # MARK: - Checks against PyTorch
@@ -369,72 +475,122 @@ def compare(label, expected, actual, tolerance):
         sys.exit(f"{label}: OpenVINO differs from PyTorch by {difference / scale:.3g}, over {tolerance}")
 
 
-def check_audio(core, out, conv, encoder, audio_config, device):
+def compile_for(core, out, name, device, audio_config):
+    """`name` compiled for `device` as the app compiles it: on the NPU the audio models get their
+    fixed shapes and the language model the NPU's LLM mode. The app runs text-embeddings on the
+    CPU."""
+    model = core.read_model(out / f"{name}.xml")
+    config = {}
+    if device == "NPU":
+        if name == "audio-conv":
+            model.reshape({"chunks": [1, audio_config["num_mel_bins"], CHUNK_FRAMES]})
+        elif name == "audio-encoder":
+            model.reshape({"rows": [1, WINDOW_ROWS, audio_config["d_model"]], "mask": [1, WINDOW_ROWS]})
+        elif name == "text":
+            config = NPUW_CHECK
+    return core.compile_model(model, device, config)
+
+
+def check_audio(core, out, conv, encoder, audio_config, device, tolerance):
     generator = torch.Generator().manual_seed(0)
-    conv_model = core.compile_model(out / "audio-conv.xml", device)
-    for chunks, frames in [(3, 100), (2, 37)]:
+    fixed = device == "NPU"
+    conv_model = compile_for(core, out, "audio-conv", device, audio_config)
+    for chunks, frames in [(1, CHUNK_FRAMES)] if fixed else [(3, CHUNK_FRAMES), (2, 37)]:
         mel = torch.randn(chunks, audio_config["num_mel_bins"], frames, generator=generator)
         with torch.no_grad():
             expected = conv(mel).numpy()
-        compare(f"audio-conv {chunks}x{frames}", expected, conv_model(mel.numpy())[0], 2e-2)
+        compare(f"audio-conv {chunks}x{frames} on {device}", expected, conv_model(mel.numpy())[0], tolerance)
 
-    encoder_model = core.compile_model(out / "audio-encoder.xml", device)
-    for length in [13, 104]:
+    # Whole windows, and a short one padded to a whole window, its padding noise that the mask
+    # must hide: the real rows must come out as PyTorch makes them from the short window alone.
+    encoder_model = compile_for(core, out, "audio-encoder", device, audio_config)
+    for length in [13, 50, WINDOW_ROWS]:
         rows = torch.randn(1, length, audio_config["d_model"], generator=generator)
         with torch.no_grad():
-            expected = encoder(rows).numpy()
-        compare(f"audio-encoder {length} rows", expected, encoder_model(rows.numpy())[0], 2e-2)
+            expected = encoder(rows, torch.ones(1, length, dtype=torch.int64)).numpy()
+        padded = WINDOW_ROWS if fixed or length == 50 else length
+        feeds = {
+            "rows": np.concatenate([rows.numpy(), np.random.default_rng(length).standard_normal(
+                (1, padded - length, audio_config["d_model"]), dtype=np.float32)], axis=1),
+            "mask": (np.arange(padded) < length).astype(np.int64)[None],
+        }
+        actual = encoder_model(feeds)[0][:, :length]
+        compare(f"audio-encoder {length} of {padded} rows on {device}", expected, actual, tolerance)
 
 
-def check_text(core, out, text, text_config, prompt_ids, audio_start, device):
+def check_text(core, out, text, embeddings, text_config, prompt_ids, audio_start, device, audio_config):
     """A prompt with rows in place of its first placeholders, then three greedy steps: PyTorch
     with the cache passed around, OpenVINO with the cache as state."""
     generator = torch.Generator().manual_seed(1)
-    layers, width = text_config["num_hidden_layers"], text_config["hidden_size"]
-    ids = torch.tensor([prompt_ids])
-    rows = torch.zeros(1, len(prompt_ids), width)
-    mask = torch.zeros(1, len(prompt_ids), dtype=torch.int64)
-    audio = slice(audio_start, audio_start + 6)
-    rows[0, audio] = torch.randn(6, width, generator=generator) * 0.05
-    mask[0, audio] = 1
-    positions = torch.arange(len(prompt_ids))[None]
+    layers = text_config["num_hidden_layers"]
+    length = len(prompt_ids)
+    audio = torch.randn(6, text_config["hidden_size"], generator=generator) * 0.05
+    with torch.no_grad():
+        embeds = embeddings(torch.tensor([prompt_ids]))
+    embeds[0, audio_start : audio_start + 6] = audio
     empty = [torch.zeros(1, text_config["num_key_value_heads"], 0, text_config["head_dim"]) for _ in range(2 * layers)]
 
-    request = core.compile_model(out / "text.xml", device).create_infer_request()
-    feeds = {"input_ids": ids, "audio_rows": rows, "audio_mask": mask, "position_ids": positions}
+    embed = compile_for(core, out, "text-embeddings", "CPU", audio_config)
+    compiled = compile_for(core, out, "text", device, audio_config)
+    request = compiled.create_infer_request()
+    beam = beam_feed(compiled)
+    ov_embeds = embed(np.array([prompt_ids], np.int64))[0].copy()
+    ov_embeds[0, audio_start : audio_start + 6] = audio.numpy()
+    feeds = {
+        "inputs_embeds": ov_embeds,
+        "attention_mask": np.ones((1, length), np.int64),
+        "position_ids": np.arange(length, dtype=np.int64)[None],
+        **beam,
+    }
     with torch.no_grad():
-        logits, *past = text(ids, rows, mask, positions, *empty)
+        logits, *past = text(embeds, torch.ones(1, length, dtype=torch.int64), torch.arange(length)[None], *empty)
     agreed = 0
     for step in range(4):
-        actual = request.infer({name: value.numpy() for name, value in feeds.items()})["logits"]
+        actual = request.infer(feeds)["logits"]
         expected = logits.numpy()
-        compare(f"text step {step}", expected, actual, 0.15)
+        compare(f"text step {step} on {device}", expected, actual, 0.15)
         token = int(expected[0, -1].argmax())
         agreed += int(actual[0, -1].argmax()) == token
-        position = torch.tensor([[len(prompt_ids) + step]])
+        seen = length + step + 1
         feeds = {
-            "input_ids": torch.tensor([[token]]),
-            "audio_rows": torch.zeros(1, 1, width),
-            "audio_mask": torch.zeros(1, 1, dtype=torch.int64),
-            "position_ids": position,
+            "inputs_embeds": embed(np.array([[token]], np.int64))[0].copy(),
+            "attention_mask": np.ones((1, seen), np.int64),
+            "position_ids": np.array([[length + step]], np.int64),
+            **beam,
         }
         with torch.no_grad():
-            logits, *past = text(feeds["input_ids"], feeds["audio_rows"], feeds["audio_mask"], position, *past)
-    LOG.info("text: OpenVINO chose PyTorch's next token in %d of 4 steps", agreed)
+            logits, *past = text(
+                embeddings(torch.tensor([[token]])), torch.ones(1, seen, dtype=torch.int64), torch.tensor([[length + step]]), *past
+            )
+    LOG.info("text on %s: OpenVINO chose PyTorch's next token in %d of 4 steps", device, agreed)
     if agreed < 3:
-        sys.exit("the converted language model picks different tokens from PyTorch")
+        sys.exit(f"the converted language model picks different tokens from PyTorch on {device}")
 
 
-def check_cache(out, audio_config, text_feeds, device):
+def check_cache(out, audio_config, text_config, prompt, device):
     """Compiles each model twice through one new model cache, as the app's first and later starts
     do, and checks the model imported from the cache computes what the freshly compiled one did."""
     import openvino as ov
 
     generator = np.random.default_rng(2)
+    fixed = device == "NPU"
+    rows = WINDOW_ROWS if fixed else 13
     cases = {
-        "audio-conv.xml": {"chunks": generator.standard_normal((2, audio_config["num_mel_bins"], 50), dtype=np.float32)},
-        "audio-encoder.xml": {"rows": generator.standard_normal((1, 13, audio_config["d_model"]), dtype=np.float32)},
-        "text.xml": text_feeds,
+        "audio-conv": {
+            "chunks": generator.standard_normal(
+                (1, audio_config["num_mel_bins"], CHUNK_FRAMES) if fixed else (2, audio_config["num_mel_bins"], 50),
+                dtype=np.float32,
+            )
+        },
+        "audio-encoder": {
+            "rows": generator.standard_normal((1, rows, audio_config["d_model"]), dtype=np.float32),
+            "mask": (np.arange(rows) < 13).astype(np.int64)[None],
+        },
+        "text": {
+            "inputs_embeds": generator.standard_normal((1, len(prompt), text_config["hidden_size"]), dtype=np.float32) * 0.05,
+            "attention_mask": np.ones((1, len(prompt)), np.int64),
+            "position_ids": np.arange(len(prompt), dtype=np.int64)[None],
+        },
     }
     with tempfile.TemporaryDirectory() as cache:
         for name, feeds in cases.items():
@@ -442,10 +598,20 @@ def check_cache(out, audio_config, text_feeds, device):
             for _ in range(2):
                 core = ov.Core()
                 core.set_property({"CACHE_DIR": cache})
-                outputs.append(core.compile_model(out / name, device).create_infer_request().infer(feeds)[0].copy())
+                compiled = compile_for(core, out, name, device, audio_config)
+                if name == "text":
+                    feeds = {**feeds, **beam_feed(compiled)}
+                outputs.append(compiled.create_infer_request().infer(feeds)[0].copy())
             if not np.isfinite(outputs[1]).all():
-                sys.exit(f"{name} gives NaN or infinity once imported from OpenVINO's model cache")
-            compare(f"{name} from the model cache", outputs[0], outputs[1], 1e-4)
+                sys.exit(f"{name} gives NaN or infinity on {device} once imported from OpenVINO's model cache")
+            compare(f"{name} on {device} from the model cache", outputs[0], outputs[1], 1e-4)
+
+
+def beam_feed(compiled):
+    """beam_idx for the language model, if it still takes it, as the app feeds it: the NPU's LLM
+    mode may take that input away, having one reply at a time."""
+    names = {name for port in compiled.inputs for name in port.get_names()}
+    return {"beam_idx": np.zeros(1, np.int32)} if "beam_idx" in names else {}
 
 
 def prompt_for_check(folder, audio_token, placeholders):
@@ -471,12 +637,11 @@ def main():
     parser.add_argument("--out", type=Path, required=True, help="folder to write the app's model to")
     parser.add_argument(
         "--text-weights",
-        choices=["int8", "fp16"],
+        choices=list(TEXT_WEIGHTS),
         default="int8",
-        help="the language model's weights: int8 (the default, like the Mac's 8-bit model) or fp16",
+        help="the language model's weights: int8 (symmetric, the default) or fp16",
     )
     parser.add_argument("--source", default="", help="where the checkpoint came from, for the manifest")
-    parser.add_argument("--device", default="CPU", help="OpenVINO device the checks run on")
     parser.add_argument("--skip-checks", action="store_true", help="don't compare the models with PyTorch")
     arguments = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
@@ -495,6 +660,7 @@ def main():
     conv = load_into(AudioConvolutions(audio_config), weights, "audio_tower.")
     encoder = load_into(AudioEncoder(audio_config), weights, "audio_tower.")
     text = load_into(TextModel(text_config), weights, "model.")
+    embeddings = TextEmbeddings(text.embed_tokens).eval()
     used = {f"audio_tower.{name}" for name in conv.state_dict()} | {f"audio_tower.{name}" for name in encoder.state_dict()}
     used |= {f"model.{name}" for name in text.state_dict()}
     unused = sorted(set(weights) - used - ({"lm_head.weight"} if text_config["tie_word_embeddings"] else set()))
@@ -513,11 +679,12 @@ def main():
     ov.save_model(encoder_model, partial / "audio-encoder.xml", compress_to_fp16=True)
 
     LOG.info("Converting the language model")
-    text_model = convert_text(text, text_config)
-    if arguments.text_weights == "int8":
-        text_model = nncf.compress_weights(text_model, mode=nncf.CompressWeightsMode.INT8_ASYM)
-    ov.save_model(text_model, partial / "text.xml", compress_to_fp16=True)
-    del text_model
+    mode = TEXT_WEIGHTS[arguments.text_weights]
+    for name, model in [("text-embeddings", convert_embeddings(embeddings)), ("text", convert_text(text, text_config))]:
+        if mode:
+            model = nncf.compress_weights(model, mode=getattr(nncf.CompressWeightsMode, mode))
+        ov.save_model(model, partial / f"{name}.xml", compress_to_fp16=True)
+        del model
 
     for name in COPIED_FILES:
         shutil.copyfile(arguments.model / name, partial / name)
@@ -536,24 +703,24 @@ def main():
             "layers": text_config["num_hidden_layers"],
             "audio_token_id": thinker["audio_token_id"],
         },
-        "weights": {"audio": "fp16", "text": arguments.text_weights},
+        "weights": {"audio": "fp16", "text": (TEXT_WEIGHTS[arguments.text_weights] or "fp16").lower()},
         "exported_with": {"openvino": ov.get_version(), "nncf": nncf.__version__, "torch": torch.__version__},
     }
     (partial / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
     if not arguments.skip_checks:
-        LOG.info("Checking the converted models against PyTorch on %s", arguments.device)
         core = ov.Core()
-        check_audio(core, partial, conv, encoder, audio_config, arguments.device)
         prompt, audio_start = prompt_for_check(arguments.model, thinker["audio_token_id"], 10)
-        check_text(core, partial, text, text_config, prompt, audio_start, arguments.device)
-        text_feeds = {
-            "input_ids": np.array([prompt], np.int64),
-            "audio_rows": np.zeros((1, len(prompt), text_config["hidden_size"]), np.float32),
-            "audio_mask": np.zeros((1, len(prompt)), np.int64),
-            "position_ids": np.arange(len(prompt), dtype=np.int64)[None],
-        }
-        check_cache(partial, audio_config, text_feeds, arguments.device)
+        # The NPU computes in 16-bit floats, so its audio gets a looser bound; its tokens are held
+        # to the CPU's.
+        devices = [("CPU", 2e-2)] + ([("NPU", 5e-2)] if "NPU" in core.available_devices else [])
+        for device, tolerance in devices:
+            LOG.info("Checking the converted models against PyTorch on %s", device)
+            check_audio(core, partial, conv, encoder, audio_config, device, tolerance)
+            check_text(core, partial, text, embeddings, text_config, prompt, audio_start, device, audio_config)
+            check_cache(partial, audio_config, text_config, prompt, device)
+        if len(devices) == 1:
+            LOG.info("No NPU here, so the models weren't checked on one")
 
     shutil.rmtree(out, ignore_errors=True)
     partial.rename(out)
