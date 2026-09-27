@@ -1,9 +1,10 @@
 # Golden cases
 
-Both apps must turn a transcript into the same text: the Mac app (Swift, in
+Both apps must turn speech into the same text: the Mac app (Swift, in
 `Packages/LiveTranscribeKit`) and the Linux and Windows app (Rust, in `linux-windows/`). These
-files pin down dictation's text path without the language model: snippets, spoken commands,
-vocabulary, filler removal, and list and letter layout.
+files pin down dictation's text path without the language model (snippets, spoken commands,
+vocabulary, filler removal, and list and letter layout), and what speech to text feeds the speech
+model.
 
 | File | What it holds |
 |---|---|
@@ -11,12 +12,23 @@ vocabulary, filler removal, and list and letter layout.
 | `dictation-settings.json` | The snippets, vocabulary and prompt limits every case runs with. |
 | `dictation-text.jsonl` | What the Mac app makes of each transcript: at each cleanup level (`none`, `light`, `medium`, `high`), in a single-line and a multi-line field, the text it types, the text Undo AI edit puts back (`uncleaned`), and whether it fell back. |
 | `emoji-names.tsv` | Every name an emoji command accepts, before its plural rule, and the emoji it inserts: the Mac app's common names, and each emoji's Unicode name that macOS resolves. |
+| `speech-features/*.f32` | Qwen3-ASR's log-mel features as the Mac app computes them (mlx-audio-swift) for three synthetic test clips, which both tests generate with integer arithmetic: 128 little-endian float32 values per frame. Compared within 1e-4. |
+| `speech-layout.tsv` | For every clip length from 101 to 1,000 mel frames, the audio placeholders mlx-audio-swift's Qwen3-ASR prompt gets and the rows its encoder makes. |
 
 The Swift implementation is the reference. `GoldenDictationFixtureTests` (in the package's
 DictationTests) checks it against `dictation-text.jsonl` and `emoji-names.tsv` on every
-`make test`. The Rust port runs the same cases with `cargo test` in `linux-windows/`, and builds
+`make test`, and `GoldenSpeechFeatureTests` (in TranscriptionTests) against the speech files. The Rust port runs the same cases with `cargo test` in `linux-windows/`, and builds
 `emoji-names.tsv` into its emoji command, so both apps accept the same emoji names whatever their
-Unicode data. The files keep LF line endings on every system (`.gitattributes`).
+Unicode data. The text files keep LF line endings on every system, and the `.f32` files are
+binary (`.gitattributes`).
+
+## Updating mlx-audio-swift
+
+The speech files change only when mlx-audio-swift changes how Qwen3-ASR prepares audio. The
+Sinhala model was trained on exactly what they record, so a change to them needs the model
+evaluated again, and possibly retrained, before the update ships. Run `make golden`, review the
+diff (`git diff --stat` for the features), and port the change to
+`linux-windows/crates/transcription` until `cargo test` passes.
 
 ## Changing the rules
 

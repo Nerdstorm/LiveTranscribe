@@ -1,3 +1,4 @@
 # Both apps read these files byte for byte, so they keep LF line endings on every system,
-# including a Windows checkout.
+# including a Windows checkout. The recorded speech features are float32 data, not text.
 * text eol=lf
+*.f32 binary
