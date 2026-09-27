@@ -1,10 +1,11 @@
 //! What the slices share: text with Swift's semantics, the phrase protector and its
-//! placeholders, word normalisation and the cleanup levels.
+//! placeholders, word normalisation, the cleanup levels and the audio format.
 //!
 //! Each module mirrors the file of the same name in the Mac app's `Shared` module
 //! (Packages/LiveTranscribeKit/Sources/Shared), and the golden cases in `Fixtures/golden` keep the
 //! two in step. Dictated text is never logged: only counts are.
 
+pub mod audio_format;
 mod cleanup_level;
 pub mod edit_distance;
 pub mod phrase_grammar;

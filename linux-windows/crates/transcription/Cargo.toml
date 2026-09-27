@@ -1,0 +1,19 @@
+[package]
+name = "lt-transcription"
+description = "Speech to text: Qwen3-ASR's audio front end, prompt and decoding, as the Mac app runs them."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lt-shared.workspace = true
+openvino.workspace = true
+realfft.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

@@ -31,6 +31,7 @@ same place in both apps:
 | `lt-vocabulary` | `Vocabulary` | The user's vocabulary |
 | `lt-cleanup` | `Cleanup` | Cleanup at each level; for now the rules that need no language model |
 | `lt-dictation` | `Dictation` | A transcript to the text dictation types |
+| `lt-transcription` | `Transcription`, and mlx-audio-swift's Qwen3-ASR | Speech to text: the log-mel features, the encoder's chunks and windows, the prompt, greedy decoding and its limits. The model's forward passes are behind the `SpeechModel` trait; `OpenVinoModel` runs them on OpenVINO |
 
 ## Matching the Mac app
 
@@ -55,5 +56,18 @@ accepts loose spellings ("fire works" for FIREWORKS).
 
 To change a rule, change the Swift first, regenerate the golden cases with `make golden` at the
 repository root, then port the change here until `cargo test` passes.
+
+Speech to text follows mlx-audio-swift's Qwen3-ASR at the revision the Mac app pins, not Qwen's
+own processor: mlx-audio-swift counts the prompt's audio placeholders in float32, so a clip can
+get a few more than Qwen's count, and the encoder fills only some of them. The Sinhala model was
+trained on exactly that, so the port copies it. `Fixtures/golden/speech-features/` holds the
+Mac app's log-mel features for three test clips, and `speech-layout.tsv` its placeholder and
+encoder row counts for every clip length from one to ten seconds; `make golden` records them, and
+`crates/transcription/tests/golden_speech_features.rs` checks the port against them. The tests
+that need a real model folder are ignored by default:
+
+```bash
+LT_QWEN3_ASR_DIR=/path/to/Qwen3-ASR-0.6B cargo test -p lt-transcription -- --ignored
+```
 
 Dictated text is never logged: log lines carry counts only.
