@@ -35,6 +35,7 @@ same place in both apps:
 | `lt-hotkey` | `Hotkey` | The hold, tap and double-tap gesture; what each key means for it; on Linux, reading the keyboards (evdev) |
 | `lt-capture` | `Capture` | Recording the default microphone (cpal) as 16 kHz mono, and its level for the meter |
 | `lt-insertion` | `Insertion` | What is known about the focused field, what the clipboard holds while text is pasted, and what an insertion did |
+| `lt-dictation-ui` | `DictationUI` | The panel shown while dictating (what it shows when, drawn to pixels) and what the tray says, with its icons |
 
 ## Matching the Mac app
 
