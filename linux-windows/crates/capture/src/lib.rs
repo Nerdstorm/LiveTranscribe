@@ -1,11 +1,15 @@
 //! Recording the microphone for dictation, mirroring the Mac app's DictationRecorder: the
-//! system's default input device, opened on start and closed on stop, its channels mixed to one
-//! and converted to the models' 16 kHz.
+//! microphone chosen in Settings, or the system's default input, opened on start and closed on
+//! stop, its channels mixed to one and converted to the models' 16 kHz.
+//!
+//! On Linux the microphones are the sound server's (PulseAudio's protocol, which PipeWire
+//! serves too), with ALSA's default device when there is no sound server.
 //!
 //! cpal's stream can't move between threads on every system, so it lives on a thread of its own
 //! and a [`Recorder`] talks to that thread: a recorder can be used from any thread. Audio is
 //! never written anywhere: it stays in memory until the caller takes it.
 
+mod devices;
 mod resample;
 
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -14,16 +18,20 @@ use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
 use std::time::Instant;
 
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{FromSample, Sample, SampleFormat, SizedSample};
+use cpal::traits::{DeviceTrait, StreamTrait};
+use cpal::{BufferSize, FromSample, Sample, SampleFormat, SizedSample, SupportedBufferSize};
 use lt_shared::audio_format::milliseconds_for_samples;
 
+pub use devices::{InputDevice, InputDevices, input_devices};
 pub use resample::{ResampleError, to_model_rate};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RecorderConfiguration {
     /// A recording longer than this keeps only its start, and says so.
     pub max_duration_seconds: u32,
+    /// The microphone to record ([`InputDevice::id`]); `None` for the system's default input. A
+    /// chosen microphone that isn't connected falls back to the default.
+    pub device: Option<String>,
 }
 
 /// What one recording captured.
@@ -49,6 +57,8 @@ pub struct Input {
     pub device: String,
     pub sample_rate: u32,
     pub channels: u16,
+    /// The chosen microphone isn't connected, so this is the system's default input.
+    pub chosen_missing: bool,
 }
 
 #[derive(Debug)]
@@ -93,6 +103,7 @@ impl From<cpal::Error> for CaptureError {
 }
 
 enum Command {
+    Configure(RecorderConfiguration),
     Start(mpsc::Sender<Result<Input, CaptureError>>),
     Stop(mpsc::Sender<Recording>),
     Cancel,
@@ -113,7 +124,7 @@ impl InputLevel {
     }
 }
 
-/// Records the default microphone, one recording at a time.
+/// Records the microphone, one recording at a time.
 pub struct Recorder {
     commands: mpsc::Sender<Command>,
     level: Arc<InputLevel>,
@@ -136,10 +147,16 @@ impl Recorder {
         Arc::clone(&self.level)
     }
 
+    /// Records with `configuration` from the next start; a recording in progress keeps the one it
+    /// started with.
+    pub fn configure(&self, configuration: RecorderConfiguration) {
+        // With the thread gone there is nothing to configure: the next start says so.
+        let _ = self.commands.send(Command::Configure(configuration));
+    }
+
     /// Opens the microphone and starts recording, replacing a recording in progress. Returns
-    /// once the stream has started, or the microphone failed to open. Audio follows within
-    /// milliseconds, except the first time after launch: through PipeWire's ALSA plugin, the first
-    /// recording misses its first ~150 ms.
+    /// once the stream has started (tens of milliseconds through the sound server), or the
+    /// microphone failed to open; what is said from then on is recorded.
     pub fn start(&self) -> Result<Input, CaptureError> {
         let (reply, answer) = mpsc::channel();
         self.commands
@@ -170,13 +187,14 @@ impl Recorder {
     }
 }
 
-fn run(configuration: RecorderConfiguration, commands: &mpsc::Receiver<Command>, level: &Arc<InputLevel>) {
+fn run(mut configuration: RecorderConfiguration, commands: &mpsc::Receiver<Command>, level: &Arc<InputLevel>) {
     let mut active: Option<Active> = None;
     for command in commands {
         match command {
+            Command::Configure(changed) => configuration = changed,
             Command::Start(reply) => {
                 active = None;
-                let answer = match Active::open(configuration, level) {
+                let answer = match Active::open(&configuration, level) {
                     Ok(opened) => {
                         let input = opened.input.clone();
                         active = Some(opened);
@@ -211,19 +229,18 @@ struct Active {
 }
 
 impl Active {
-    fn open(configuration: RecorderConfiguration, level: &Arc<InputLevel>) -> Result<Self, CaptureError> {
+    fn open(configuration: &RecorderConfiguration, level: &Arc<InputLevel>) -> Result<Self, CaptureError> {
         let started = Instant::now();
         let host = cpal::default_host();
-        let device = host.default_input_device().ok_or(CaptureError::NoInputDevice)?;
+        let (device, chosen_missing) = devices::device_to_open(&host, configuration.device.as_deref())?;
         let supported = device.default_input_config()?;
-        let config = supported.config();
+        let mut config = supported.config();
+        config.buffer_size = buffer_size(supported.buffer_size(), config.sample_rate);
         let input = Input {
-            device: device
-                .description()
-                .map(|description| description.name().to_owned())
-                .unwrap_or_else(|_| "the default microphone".to_owned()),
+            device: devices::name(&device).unwrap_or_else(|| "the default microphone".to_owned()),
             sample_rate: config.sample_rate,
             channels: config.channels,
+            chosen_missing,
         };
         let limit = configuration.max_duration_seconds as usize * config.sample_rate as usize;
         let captured = Arc::new(Mutex::new(Captured::new(limit, config.sample_rate as usize)));
@@ -278,6 +295,20 @@ impl Active {
             truncated: captured.truncated,
             failure,
         }
+    }
+}
+
+/// Audio in each callback, in milliseconds. The device's default can be long: a sound server's
+/// is two seconds, and its stream only starts once the first buffer has filled, which would lose
+/// the dictation's first words. Short buffers start at once, and move the meter smoothly.
+const BUFFER_MS: u32 = 20;
+
+fn buffer_size(supported: &SupportedBufferSize, sample_rate: u32) -> BufferSize {
+    match supported {
+        SupportedBufferSize::Range { min, max } => {
+            BufferSize::Fixed((sample_rate * BUFFER_MS / 1_000).clamp(*min, (*max).max(*min)))
+        }
+        SupportedBufferSize::Unknown => BufferSize::Default,
     }
 }
 
@@ -379,6 +410,15 @@ mod tests {
         assert_eq!(captured.samples.len(), 3);
         assert!((captured.samples[2] - 1.0).abs() < 1e-4);
         assert!(captured.truncated);
+    }
+
+    #[test]
+    fn buffers_are_short_where_the_device_allows() {
+        let range = |min, max| SupportedBufferSize::Range { min, max };
+        assert_eq!(buffer_size(&range(1, 1 << 20), 48_000), BufferSize::Fixed(960));
+        assert_eq!(buffer_size(&range(2_048, 8_192), 48_000), BufferSize::Fixed(2_048));
+        assert_eq!(buffer_size(&range(16, 256), 16_000), BufferSize::Fixed(256));
+        assert_eq!(buffer_size(&SupportedBufferSize::Unknown, 48_000), BufferSize::Default);
     }
 
     #[test]

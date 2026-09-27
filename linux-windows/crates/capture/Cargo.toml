@@ -13,5 +13,10 @@ lt-shared.workspace = true
 rubato.workspace = true
 tracing.workspace = true
 
+# Microphones by the sound server's names (PulseAudio's protocol, which PipeWire serves too),
+# rather than ALSA's devices.
+[target.'cfg(target_os = "linux")'.dependencies]
+cpal = { workspace = true, features = ["pulseaudio"] }
+
 [lints]
 workspace = true
