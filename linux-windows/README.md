@@ -36,6 +36,7 @@ same place in both apps:
 | `lt-capture` | `Capture` | Recording the default microphone (cpal) as 16 kHz mono, and its level for the meter |
 | `lt-insertion` | `Insertion` | What is known about the focused field, what the clipboard holds while text is pasted, and what an insertion did |
 | `lt-dictation-ui` | `DictationUI` | The panel shown while dictating (what it shows when, drawn to pixels) and what the tray says, with its icons |
+| `lt-wayland` | `Insertion`'s typing and the HUD's window, for Wayland | One connection for the desktop: the input method (input-method-v2), which reads the focused field and types straight into it; pasting where no field takes one (ext-data-control and a virtual keyboard); the panel below the text cursor, or at the bottom of the screen (wlr-layer-shell) |
 
 ## Matching the Mac app
 

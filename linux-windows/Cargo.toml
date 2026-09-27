@@ -24,6 +24,7 @@ lt-hotkey = { path = "crates/hotkey" }
 lt-capture = { path = "crates/capture" }
 lt-insertion = { path = "crates/insertion" }
 lt-dictation-ui = { path = "crates/dictation-ui" }
+lt-wayland = { path = "crates/wayland" }
 
 ab_glyph = "0.2"
 cpal = "0.18"
@@ -33,6 +34,7 @@ fontdb = "0.24"
 openvino = { version = "0.11", features = ["runtime-linking"] }
 realfft = "3"
 rubato = "5"
+rustix = { version = "1", features = ["event", "fs", "pipe"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tiny-skia = "0.12"
@@ -40,6 +42,10 @@ tracing = "0.1"
 unicode-normalization = "0.1"
 unicode-properties = "0.1"
 unicode-segmentation = "1"
+wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["client", "staging", "unstable"] }
+wayland-protocols-misc = { version = "0.3", features = ["client"] }
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -1,0 +1,21 @@
+[package]
+name = "lt-wayland"
+description = "The app's Wayland session on Linux: the input method, the clipboard and paste, and the dictation panel's surfaces."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+lt-dictation-ui.workspace = true
+lt-insertion.workspace = true
+rustix.workspace = true
+tracing.workspace = true
+wayland-client.workspace = true
+wayland-protocols.workspace = true
+wayland-protocols-misc.workspace = true
+wayland-protocols-wlr.workspace = true
+
+[lints]
+workspace = true
