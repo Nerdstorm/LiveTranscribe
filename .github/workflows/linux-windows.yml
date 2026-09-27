@@ -1,0 +1,53 @@
+# Checks the Linux and Windows app (linux-windows/) on both systems: formatting, lints and tests.
+# The tests include the golden cases shared with the Mac app, so a change to Fixtures/golden runs
+# them too.
+name: Linux and Windows
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "linux-windows/**"
+      - "Fixtures/golden/**"
+      - ".github/workflows/linux-windows.yml"
+  pull_request:
+    paths:
+      - "linux-windows/**"
+      - "Fixtures/golden/**"
+      - ".github/workflows/linux-windows.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch or pull request replaces a run in progress.
+concurrency:
+  group: linux-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: linux-windows
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: linux-windows
+      - name: Formatting
+        run: cargo fmt --all --check
+      - name: Lints
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Tests
+        run: cargo test --workspace --locked
