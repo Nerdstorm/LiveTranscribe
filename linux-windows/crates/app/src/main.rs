@@ -31,7 +31,7 @@ struct Cli {
 #[derive(Clone, clap::Args)]
 struct ModelOptions {
     /// The model folder tools/export-qwen3-asr.py wrote [default: the app's data folder's
-    /// models/qwen3-asr-0.6b-v2]
+    /// models/qwen3-asr-0.6b-sinhala]
     #[arg(long, value_name = "FOLDER")]
     model: Option<PathBuf>,
     /// Where the model runs: auto (the NPU if there is one, and the CPU for what the NPU can't

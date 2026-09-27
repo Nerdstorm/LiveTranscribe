@@ -11,8 +11,8 @@ prompt and decoding as the Mac app does, with the model running on OpenVINO. The
 a small circle by the mouse pointer shows the microphone's level while the text goes straight into
 the focused field.
 A tray menu starts, stops and cancels dictation, copies the last one and sets the cleanup level.
-The speech model runs on the NPU of an Intel Core Ultra, or on the CPU. The settings and history
-windows, and Windows, come later.
+The speech model, the Mac app's Sinhala fine-tune of Qwen3-ASR, runs on the NPU of an Intel Core
+Ultra, or on the CPU. The settings and history windows, and Windows, come later.
 
 ## Building and testing
 
@@ -58,17 +58,24 @@ machine, the setup kit (not in the repository) installs both in an Ubuntu 24.04 
    and `runtime/3rdparty/tbb/lib` on `LD_LIBRARY_PATH`. The app loads it when it starts, so it
    builds without it.
 2. Convert the model, in a Python environment with `openvino==2026.2.1`, `nncf==3.2.0`,
-   `transformers==5.13.1` and CPU PyTorch:
+   `transformers==5.13.1` and CPU PyTorch. The app's default model is the Mac app's,
+   [Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit](https://huggingface.co/Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit):
+   Qwen3-ASR-0.6B fine-tuned for Sinhala, which transcribes English nearly as well as the original.
 
    ```bash
-   python tools/export-qwen3-asr.py --model /path/to/Qwen3-ASR-0.6B --out ~/.local/share/live-transcribe/models/qwen3-asr-0.6b-v2
+   python tools/export-qwen3-asr.py --model /path/to/Qwen3-ASR-0.6B-Sinhala-8bit \
+     --source Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit@c123d53a5057d10b1efbd0cd578d5d70bcde8509 \
+     --out ~/.local/share/live-transcribe/models/qwen3-asr-0.6b-sinhala
    ```
 
-   It writes the audio convolutions and encoder (fp16) and the language model (symmetric int8
-   weights, which the NPU runs 50 times faster than asymmetric ones; its KV cache kept as state),
-   then checks each against PyTorch, and checks that OpenVINO's model cache gives them back
-   unchanged: OpenVINO 2026.2.1's CPU plugin corrupts one way of writing RoPE in its cache, which
-   made every start after the first transcribe gibberish.
+   That checkpoint is mlx-audio's, with 8-bit weights, which the exporter turns back into floats
+   first; it reads Qwen's own checkpoints, such as
+   [Qwen/Qwen3-ASR-0.6B](https://huggingface.co/Qwen/Qwen3-ASR-0.6B), too. It writes the audio
+   convolutions and encoder (fp16) and the language model (symmetric int8 weights, which the NPU
+   runs 50 times faster than asymmetric ones; its KV cache kept as state), then checks each against
+   PyTorch, and checks that OpenVINO's model cache gives them back unchanged: OpenVINO 2026.2.1's
+   CPU plugin corrupts one way of writing RoPE in its cache, which made every start after the first
+   transcribe gibberish.
 3. `cargo build --release -p lt-app` (the tray builds against WebKitGTK, libxdo and the app
    indicator library: Tauri's prerequisites), then:
 
@@ -145,3 +152,10 @@ LT_QWEN3_ASR_DIR=/path/to/Qwen3-ASR-0.6B cargo test -p lt-transcription -- --ign
 ```
 
 Dictated text is never logged: log lines carry counts only.
+
+## Credits
+
+The default speech model, [Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit](https://huggingface.co/Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit),
+is [Qwen3-ASR-0.6B](https://huggingface.co/Qwen/Qwen3-ASR-0.6B) by the Qwen team, Alibaba Cloud
+(Apache-2.0), fine-tuned for Sinhala by Nerdstorm on OpenSLR 52 (Google, CC BY-SA 4.0). The
+fine-tune is licensed CC-BY-SA-4.0.
