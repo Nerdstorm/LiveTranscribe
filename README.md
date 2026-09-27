@@ -19,7 +19,9 @@ Speech-to-text and a small language model run on your Apple silicon Mac with
 and once the models are downloaded it works offline. When you would rather watch than type, a
 live transcript window shows your words as you speak and tidies each line in place.
 
-Free and open source (MIT) · Apple silicon · macOS 14 or later (tested on macOS 27) · English ·
+Free and open source (MIT) · Apple silicon · macOS 14 or later (tested on macOS 27) ·
+[31 languages](#languages) ·
+[Download for Mac](https://github.com/Nerdstorm/LiveTranscribe/releases/latest) or
 [build from source](#build-and-run)
 
 ## See the difference
