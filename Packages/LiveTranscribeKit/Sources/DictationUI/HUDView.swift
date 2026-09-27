@@ -1,126 +1,138 @@
 import Dictation
 import SwiftUI
 
-/// The HUD's capsule: the microphone level and a hint while listening, a spinner while
-/// transcribing, or the latest message. A message about the dictation in progress (a change of
-/// microphone, a press while transcribing) takes the hint's line for a while.
-struct DictationHUDView: View {
+/// The HUD's sizes, in points.
+enum HUDMetrics {
+    /// The circle's diameter.
+    static let circle: CGFloat = 40
+    /// Transparent room around what is drawn, for the window's shadow.
+    static let shadowPadding: CGFloat = 4
+    /// The circle with the shadow's room on both sides: the square ``HUDPlacement`` keeps next
+    /// to the pointer, and the whole HUD while there is no bubble.
+    static let circleSquare: CGFloat = circle + 2 * shadowPadding
+    /// The ring a hands-free recording adds, just inside the circle's edge.
+    static let ringRadius: CGFloat = 17.5
+    static let ringWidth: CGFloat = 1.5
+    /// The transcribing spinner: three quarters of a ring, turning once every `spinnerPeriod`
+    /// seconds.
+    static let spinnerRadius: CGFloat = 8
+    static let spinnerWidth: CGFloat = 2
+    static let spinnerArc: CGFloat = 0.75
+    static let spinnerPeriod: TimeInterval = 1
+    /// The glyph for a notice between dictations.
+    static let glyph: CGFloat = 22
+    /// Between the circle and the bubble.
+    static let bubbleGap: CGFloat = 8
     /// Widest a message gets before it wraps onto a second line.
-    static let messageMaxWidth: CGFloat = 320
+    static let bubbleMaxWidth: CGFloat = 260
+    static let bubbleCornerRadius: CGFloat = 12
+}
 
-    let controller: DictationController
+/// The HUD: a circle with the microphone level, a spinner or a glyph, and beside it a bubble
+/// with a message when there is one. It has no words of its own and no buttons: Esc and the
+/// menu bar's *Cancel Dictation* cancel.
+struct DictationHUDView: View {
+    let state: HUDState
+    /// The microphone level, 0...1, drawn while recording.
+    let level: Float
+    let bubbleSide: HUDBubbleSide
 
     var body: some View {
-        HStack(spacing: 10) {
-            content
+        HStack(spacing: HUDMetrics.bubbleGap) {
+            if bubbleSide == .leading { bubble }
+            circle
+            if bubbleSide == .trailing { bubble }
         }
-        .font(.callout)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .frame(minWidth: 180)
-        .background(.regularMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(.quaternary))
         .fixedSize()
-        // Room for the window shadow around the capsule.
-        .padding(4)
+        // Room for the window shadow around the circle and the bubble.
+        .padding(HUDMetrics.shadowPadding)
     }
 
-    @ViewBuilder private var content: some View {
-        switch controller.phase {
-        case .recording(let handsFree):
-            HUDLevelMeter(level: controller.inputLevel)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(handsFree ? "Listening, hands-free" : "Listening")
-                caption(Self.recordingCaption(
-                    progress: controller.progressNotice, hotkeyState: controller.hotkeyState, handsFree: handsFree
-                ))
+    private var circle: some View {
+        indicator
+            .frame(width: HUDMetrics.circle, height: HUDMetrics.circle)
+            .background(.regularMaterial, in: Circle())
+            .overlay(Circle().strokeBorder(.quaternary))
+    }
+
+    @ViewBuilder private var indicator: some View {
+        switch state.indicator {
+        case .level(let handsFree):
+            let radius = HUDLevel.discRadius(level)
+            ZStack {
+                if handsFree {
+                    Circle()
+                        .stroke(.secondary, lineWidth: HUDMetrics.ringWidth)
+                        .frame(width: 2 * HUDMetrics.ringRadius, height: 2 * HUDMetrics.ringRadius)
+                }
+                Circle()
+                    .fill(.red)
+                    .frame(width: 2 * radius, height: 2 * radius)
+                    .animation(.easeOut(duration: 0.1), value: level)
             }
-            .accessibilityElement(children: .combine)
-            cancelButton
-        case .processing:
-            ProgressView()
-                .controlSize(.small)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(handsFree ? "Listening, hands-free" : "Listening")
+        case .spinner:
+            HUDSpinner()
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Transcribing")
+        case .notice(let isProblem):
+            Image(systemName: isProblem ? "exclamationmark.circle.fill" : "info.circle.fill")
+                .font(.system(size: HUDMetrics.glyph))
+                .foregroundStyle(isProblem ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Transcribing…")
-                if let progress = controller.progressNotice {
-                    caption(progress.message)
-                }
+        }
+    }
+
+    @ViewBuilder private var bubble: some View {
+        if let message = state.message {
+            HUDWidthLimit(maxWidth: HUDMetrics.bubbleMaxWidth) {
+                Text(message)
+                    .lineLimit(2)
             }
-            .accessibilityElement(children: .combine)
-            cancelButton
-        case .idle:
-            if let notice = controller.notice {
-                Image(systemName: notice.isProblem ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                    .foregroundStyle(notice.isProblem ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
-                    .accessibilityHidden(true)
-                HUDWidthLimit(maxWidth: Self.messageMaxWidth) {
-                    Text(notice.message)
-                        .lineLimit(2)
-                }
-            }
+            .font(.callout)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: HUDMetrics.bubbleCornerRadius))
+            .overlay(RoundedRectangle(cornerRadius: HUDMetrics.bubbleCornerRadius).strokeBorder(.quaternary))
         }
-    }
-
-    private var cancelButton: some View {
-        Button {
-            controller.cancel()
-        } label: {
-            Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .help(Self.cancelHelp(hotkeyState: controller.hotkeyState))
-        .accessibilityLabel("Cancel dictation")
-    }
-
-    /// The line under a title: the hint, or a progress notice, which can be long enough to wrap.
-    private func caption(_ text: String) -> some View {
-        HUDWidthLimit(maxWidth: Self.messageMaxWidth) {
-            Text(text)
-                .lineLimit(2)
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-    }
-
-    /// The line under *Listening*: the latest progress notice while it shows, otherwise the hint.
-    static func recordingCaption(progress: DictationNotice?, hotkeyState: HotkeyState, handsFree: Bool) -> String {
-        progress?.message ?? hint(hotkeyState: hotkeyState, handsFree: handsFree)
-    }
-
-    /// How to finish and cancel. Esc is caught only by the shortcut's keyboard tap, which runs
-    /// only while the state is ``HotkeyState/running(hotkey:)``. In any other state (dictation
-    /// turned off, no Accessibility, a tap that failed) the dictation was started from the menu
-    /// and Esc would go to the app in front, so the hint names the menu and the × button.
-    static func hint(hotkeyState: HotkeyState, handsFree: Bool) -> String {
-        guard case .running(let hotkey) = hotkeyState else { return "Finish from the menu bar · × to cancel" }
-        return handsFree ? "Press \(hotkey) to finish · esc to cancel" : "Release \(hotkey) to finish · esc to cancel"
-    }
-
-    /// The cancel button's tooltip, which names Esc only while Esc cancels; see
-    /// ``hint(hotkeyState:handsFree:)``.
-    static func cancelHelp(hotkeyState: HotkeyState) -> String {
-        if case .running = hotkeyState { "Cancel (esc)" } else { "Cancel" }
     }
 }
 
-/// Five bars that rise with the microphone level.
-private struct HUDLevelMeter: View {
-    let level: Float
-    /// Level at which each bar lights, for a meter that moves with normal speech.
-    private let thresholds: [Float] = [0.005, 0.015, 0.03, 0.06, 0.12]
+/// The transcribing spinner: three quarters of a ring, turning clockwise once a second. Its angle
+/// comes from the clock rather than from an animation, so it is the same whenever it is drawn.
+struct HUDSpinner: View {
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 60)) { context in
+            Circle()
+                .trim(from: 0, to: HUDMetrics.spinnerArc)
+                .stroke(.secondary, style: StrokeStyle(lineWidth: HUDMetrics.spinnerWidth, lineCap: .round))
+                .frame(width: 2 * HUDMetrics.spinnerRadius, height: 2 * HUDMetrics.spinnerRadius)
+                .rotationEffect(Self.angle(at: context.date.timeIntervalSinceReferenceDate))
+        }
+    }
+
+    /// How far the ring has turned at `time`, in seconds: a whole turn every
+    /// ``HUDMetrics/spinnerPeriod``. SwiftUI's y axis points down, so a growing angle turns it
+    /// clockwise.
+    nonisolated static func angle(at time: TimeInterval) -> Angle {
+        let turns = time / HUDMetrics.spinnerPeriod
+        return .degrees(360 * (turns - turns.rounded(.down)))
+    }
+}
+
+/// The panel's content: ``DictationHUDView`` with the controller's microphone level, which
+/// changes many times a second. The hosting view redraws for it by itself, without the panel
+/// being measured or moved. Draws nothing without a state, so nothing animates while hidden.
+struct LiveDictationHUDView: View {
+    let controller: DictationController
+    let state: HUDState?
+    let bubbleSide: HUDBubbleSide
 
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(thresholds.indices, id: \.self) { index in
-                Capsule()
-                    .fill(level >= thresholds[index] ? AnyShapeStyle(.red) : AnyShapeStyle(.quaternary))
-                    .frame(width: 3, height: CGFloat(6 + index * 3))
-            }
+        if let state {
+            DictationHUDView(state: state, level: controller.inputLevel, bubbleSide: bubbleSide)
         }
-        .frame(height: 18)
-        .animation(.easeOut(duration: 0.1), value: level)
-        .accessibilityHidden(true)
     }
 }
 
@@ -129,7 +141,7 @@ private struct HUDLevelMeter: View {
 ///
 /// The HUD is measured at its ideal size (`fixedSize`), and an ideal-size measurement offers no
 /// width. `.frame(maxWidth:)` then passes "no width" on, so a text is measured on one line and
-/// only drawn wrapped, spilling out of a capsule sized for one line. This offers the text the
+/// only drawn wrapped, spilling out of a bubble sized for one line. This offers the text the
 /// width instead, so it is measured the way it is drawn.
 struct HUDWidthLimit: Layout {
     let maxWidth: CGFloat

@@ -254,7 +254,7 @@ final class AppComposition {
             viewModel.showCaptureNotice(notice.message)
         case .dictation:
             // Counted as shown now: the controller shows it at once between dictations, and
-            // under Listening during one and again once that dictation ends.
+            // beside the HUD's circle during one and again once that dictation ends.
             guard captureNotices.shouldShow(notice) else { return }
             dictation.showMicrophoneNotice(notice.message)
         }

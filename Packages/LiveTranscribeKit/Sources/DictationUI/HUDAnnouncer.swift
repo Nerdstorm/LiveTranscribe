@@ -2,16 +2,18 @@ import AppKit
 import Dictation
 
 /// Decides which HUD messages VoiceOver announces: each notice once, when it appears, and not
-/// again while it stays up and the HUD redraws or moves.
+/// again while it stays up and the HUD redraws or follows the pointer.
 ///
 /// A notice that goes away and comes back is announced again. The same notice shown twice in a
 /// row without going away (say, *Nothing to undo* twice within the notice time) is announced
 /// once, like the HUD, which does not change either.
 ///
-/// Only notices the HUD shows between dictations are announced. Nothing is announced while
-/// recording, *Listening* included: VoiceOver speaking while the microphone is open would be
-/// dictated along with the user. A notice still set when the next recording starts is dropped,
-/// not announced once the microphone is open. A progress notice shown under *Listening* is not
+/// Every notice between dictations is announced, including the two the HUD shows no words for
+/// (*Cancelled*, *Restored what you said*): someone who can't see the circle go away or the
+/// text change back still needs to hear what happened. Nothing is announced while recording:
+/// VoiceOver speaking while the microphone is open would be dictated along with the user. A
+/// notice still set when the next recording starts is dropped, not announced once the
+/// microphone is open. A progress notice shown beside the circle during a dictation is not
 /// announced there; the controller shows it again once the dictation ends, and it is announced
 /// then.
 struct HUDAnnouncer {

@@ -8,62 +8,70 @@ struct HUDScreen: Equatable, Sendable {
     let visibleFrame: CGRect
 }
 
-/// Where the dictation HUD goes: just below the caret, above it when there is no room below,
-/// and centred near the bottom of the pointer's display when the caret is unknown.
+/// Which side of the HUD's circle its bubble goes on.
+enum HUDBubbleSide: Equatable, Sendable {
+    /// Right of the circle, while the HUD is right of the pointer.
+    case trailing
+    /// Left of the circle, while the HUD is flipped to the left of the pointer, so the circle
+    /// stays next to the pointer.
+    case leading
+}
+
+/// Where the dictation HUD goes: its circle just below and to the right of the mouse pointer.
+/// Near the right edge of the display it flips to the pointer's left, with the bubble on the
+/// circle's left; near the bottom it flips above the pointer. It is always kept on the display.
 ///
 /// Pure, with the displays and the pointer passed in, so multi-display layouts are unit-tested.
-enum HUDPlacement {
-    /// Gap between the caret and the HUD, and between the HUD and the edge of the display.
-    static let margin: CGFloat = 10
-    /// Height of the HUD's bottom edge above the Dock when the caret is unknown.
-    static let bottomInset: CGFloat = 60
+struct HUDPlacement: Equatable, Sendable {
+    /// The HUD window's origin, in AppKit coordinates.
+    let origin: CGPoint
+    let bubbleSide: HUDBubbleSide
 
-    /// The HUD's window origin, in AppKit coordinates.
+    /// Between the HUD and the edges of the display's visible frame.
+    static let margin: CGFloat = 10
+    /// Between the pointer and the circle's square: right of the pointer, or left of it when flipped.
+    static let horizontalGap: CGFloat = 16
+    /// Between the pointer and the circle's square: below the pointer, or above it when flipped.
+    static let verticalGap: CGFloat = 18
+
+    /// Places the HUD next to `pointer`.
+    ///
+    /// Normally the top-left corner of the circle's square is `horizontalGap` right of the pointer
+    /// and `verticalGap` below it. When the HUD would cross the visible frame's right edge (less
+    /// the margin) it flips left, its right edge `horizontalGap` left of the pointer, and the
+    /// bubble goes on the circle's leading side. When it would cross the bottom it flips up, the
+    /// circle's square `verticalGap` above the pointer. Then it is clamped inside the visible
+    /// frame, less the margin.
     ///
     /// - Parameters:
-    ///   - size: the HUD's size.
-    ///   - caret: the caret or selection, in Accessibility coordinates (top-left origin on the
-    ///     primary display, y grows downwards), as ``InsertionTarget/caretRect`` reports it;
-    ///     `nil` when unknown.
-    ///   - screens: every display, the primary first, as `NSScreen.screens` lists them.
-    ///   - mouse: the pointer, in AppKit coordinates, for when the caret is unknown or off-screen.
-    static func origin(for size: CGSize, caret: CGRect?, screens: [HUDScreen], mouse: CGPoint) -> CGPoint {
-        guard let primary = screens.first else { return .zero }
-        if let caret = caret.flatMap({ appKitRect(fromAccessibility: $0, primary: primary) }),
-           let screen = screen(containing: CGPoint(x: caret.midX, y: caret.midY), in: screens) {
-            return origin(for: size, near: caret, in: screen.visibleFrame)
-        }
-        let screen = screens.first { isPointer(mouse, on: $0.frame) } ?? primary
-        let visible = screen.visibleFrame
-        return CGPoint(
-            x: clamped(visible.midX - size.width / 2, visible.minX + margin, visible.maxX - size.width - margin),
-            y: clamped(visible.minY + bottomInset, visible.minY + margin, visible.maxY - size.height - margin)
-        )
-    }
+    ///   - pointer: the mouse pointer, in AppKit coordinates (`NSEvent.mouseLocation`).
+    ///   - size: the HUD's size, the shadow's padding included.
+    ///   - circle: the side of the circle's square: its diameter with the shadow's padding on
+    ///     both sides. A message on two lines makes the HUD taller than that, with the circle
+    ///     centred vertically; the circle, not the HUD's edge, is what is kept by the pointer.
+    ///   - screens: every display, the primary first, as `NSScreen.screens` lists them. The
+    ///     HUD goes on the pointer's display, or the primary if the pointer is on none.
+    static func beside(pointer: CGPoint, size: CGSize, circle: CGFloat, screens: [HUDScreen]) -> HUDPlacement {
+        guard let primary = screens.first else { return HUDPlacement(origin: .zero, bubbleSide: .trailing) }
+        let visible = (screens.first { isPointer(pointer, on: $0.frame) } ?? primary).visibleFrame
+        // How far the circle's square is from the HUD's top and bottom edges.
+        let inset = max(0, size.height - circle) / 2
 
-    /// Below the caret if the HUD fits there, otherwise above it, kept inside `visible`.
-    private static func origin(for size: CGSize, near caret: CGRect, in visible: CGRect) -> CGPoint {
-        let below = caret.minY - margin - size.height
-        let above = caret.maxY + margin
-        let y = below >= visible.minY + margin ? below : above
-        return CGPoint(
-            x: clamped(caret.midX - size.width / 2, visible.minX + margin, visible.maxX - size.width - margin),
+        var bubbleSide = HUDBubbleSide.trailing
+        var x = pointer.x + horizontalGap
+        if x + size.width > visible.maxX - margin {
+            bubbleSide = .leading
+            x = pointer.x - horizontalGap - size.width
+        }
+        var y = pointer.y - verticalGap - circle - inset
+        if y < visible.minY + margin {
+            y = pointer.y + verticalGap - inset
+        }
+        let origin = CGPoint(
+            x: clamped(x, visible.minX + margin, visible.maxX - size.width - margin),
             y: clamped(y, visible.minY + margin, visible.maxY - size.height - margin)
         )
-    }
-
-    /// Flips a rectangle from Accessibility coordinates to AppKit ones. Both spaces span every
-    /// display and differ only in where y starts and which way it grows, measured against the
-    /// primary display. `nil` for a rectangle that cannot be a caret (null, infinite, or NaN).
-    static func appKitRect(fromAccessibility rect: CGRect, primary: HUDScreen) -> CGRect? {
-        guard !rect.isNull, !rect.isInfinite,
-              [rect.origin.x, rect.origin.y, rect.width, rect.height].allSatisfy(\.isFinite)
-        else { return nil }
-        return CGRect(x: rect.minX, y: primary.frame.maxY - rect.maxY, width: rect.width, height: rect.height)
-    }
-
-    private static func screen(containing point: CGPoint, in screens: [HUDScreen]) -> HUDScreen? {
-        screens.first { $0.frame.contains(point) }
+        return HUDPlacement(origin: origin, bubbleSide: bubbleSide)
     }
 
     /// Whether the pointer is on the display with `frame`, the way `NSMouseInRect` decides it.
@@ -76,7 +84,7 @@ enum HUDPlacement {
     }
 
     /// `value` kept within `lower...upper`; `lower` wins when the range is empty, so a HUD
-    /// wider than the display keeps its leading edge on screen.
+    /// wider or taller than the display keeps its leading or bottom edge on screen.
     private static func clamped(_ value: CGFloat, _ lower: CGFloat, _ upper: CGFloat) -> CGFloat {
         max(min(value, upper), lower)
     }

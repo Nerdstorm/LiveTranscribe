@@ -5,8 +5,8 @@ import Shared
 import Testing
 
 /// Notices raised during a dictation (a change of microphone, a press while processing) show
-/// under *Listening* and again once it ends; notices at the end of a dictation follow one
-/// another instead of hiding each other.
+/// beside the HUD's circle during it and again once it ends; notices at the end of a dictation
+/// follow one another instead of hiding each other.
 @MainActor
 @Suite("DictationController notices")
 struct DictationNoticeFlowTests {
@@ -20,12 +20,12 @@ struct DictationNoticeFlowTests {
         }
     }
 
-    @Test func aMicrophoneNoticeDuringARecordingShowsUnderListeningAndAgainAfterIt() async {
+    @Test func aMicrophoneNoticeDuringARecordingShowsDuringItAndAgainAfterIt() async {
         let h = Harness()
         h.controller.start()
         await h.hold(milliseconds: 500)
         h.controller.showMicrophoneNotice(Self.fallback.message)
-        #expect(h.controller.progressNotice == Self.fallback, "shown under Listening")
+        #expect(h.controller.progressNotice == Self.fallback, "shown during the recording")
         #expect(h.controller.notice == nil)
 
         await h.release()
@@ -60,7 +60,7 @@ struct DictationNoticeFlowTests {
         #expect(await eventually { h.controller.notice == Self.fallback })
     }
 
-    @Test func aProgressNoticeGivesTheHintBackAfterTheNoticeTimeButIsStillShownAfterwards() async {
+    @Test func aProgressNoticeGoesAfterTheNoticeTimeButIsStillShownAfterwards() async {
         let h = briefNotices()
         h.controller.start()
         await h.hold(milliseconds: 500)
@@ -174,6 +174,39 @@ struct DictationNoticeTests {
         #expect(DictationNotice.copiedAfterFocusMoved.message == "Another app took focus, so the text is on the clipboard: press ⌘V")
         #expect(DictationNotice.pasteNotAllowed(needsReopen: true).isProblem, "Live Transcribe needs fixing")
         #expect(!DictationNotice.copiedAfterFocusMoved.isProblem, "nothing is wrong: the user moved on")
+    }
+
+    /// The HUD puts only these in words. A cancel, or an undo that worked, shows for itself: the
+    /// HUD goes away, or the text changes back.
+    @Test("Every notice needs attention but a cancel and an undo that worked", arguments: [
+        (DictationNotice.modelsLoading, true),
+        (.modelsUnavailable("The model files are missing"), true),
+        (.liveTranscriptRunning, true),
+        (.microphoneDenied, true),
+        (.secureField, true),
+        (.nothingHeard, true),
+        (.cancelled, false),
+        (.copiedToClipboard(app: "Slack"), true),
+        (.copiedToClipboard(app: nil), true),
+        (.copiedAfterFocusMoved, true),
+        (.pasteNotAllowed(needsReopen: true), true),
+        (.pasteNotAllowed(needsReopen: false), true),
+        (.insertionFailed, true),
+        (.captureFailed("The device was disconnected"), true),
+        (.captureStoppedEarly(afterSeconds: 12), true),
+        (.transcriptionFailed("The model stopped"), true),
+        (.recordingTruncated(seconds: 300), true),
+        (.undone, false),
+        (.undoCopiedToClipboard, true),
+        (.nothingToUndo, true),
+        (.undoRefused("Switch back to the app you dictated into to undo"), true),
+        (.undoFailed, true),
+        (.microphone("Now using AirPods."), true),
+        (.stillProcessing, true),
+        (.recordingShortcut, true),
+    ])
+    func needsAttention(notice: DictationNotice, expected: Bool) {
+        #expect(notice.needsAttention == expected)
     }
 
     private func recording(ms: Int, truncated: Bool = false, failure: String? = nil) -> DictationRecorder.Recording {
