@@ -735,6 +735,34 @@ fn read_manifest(folder: &Path) -> Result<Manifest, OpenVinoError> {
         })
 }
 
+/// What a model folder holds, for choosing among the models converted on this machine.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ModelSummary {
+    /// The checkpoint it was converted from, as `export-qwen3-asr.py --source` recorded it
+    /// (`Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit@c123d53…`); empty when it didn't.
+    pub source: String,
+    /// Why this build can't run it, if it can't.
+    pub problem: Option<String>,
+}
+
+/// Describes the model in `folder`, from its manifest. `None` when the folder holds no manifest,
+/// so it isn't a converted model at all.
+pub fn inspect_model(folder: &Path) -> Option<ModelSummary> {
+    #[derive(Deserialize)]
+    struct Header {
+        #[serde(default)]
+        source: String,
+    }
+    let text = std::fs::read_to_string(folder.join("manifest.json")).ok()?;
+    let source = serde_json::from_str::<Header>(&text)
+        .map(|header| header.source)
+        .unwrap_or_default();
+    Some(ModelSummary {
+        source,
+        problem: parse_manifest(&text).err(),
+    })
+}
+
 /// The manifest, if this build can run the models it describes; otherwise what's wrong.
 fn parse_manifest(text: &str) -> Result<Manifest, String> {
     let manifest: Manifest =
@@ -806,6 +834,31 @@ fn to_dimension(count: usize) -> i64 {
 mod tests {
     use super::super::EncoderLayout;
     use super::*;
+
+    #[test]
+    fn a_model_folder_is_described_by_its_manifest() {
+        let folder = std::env::temp_dir().join(format!("lt-inspect-model-{}", std::process::id()));
+        std::fs::create_dir_all(&folder).unwrap();
+        assert_eq!(inspect_model(&folder), None, "no manifest, no model");
+        let with_source = MANIFEST.replacen('{', r#"{"source": "Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit@c123", "#, 1);
+        std::fs::write(folder.join("manifest.json"), &with_source).unwrap();
+        assert_eq!(
+            inspect_model(&folder),
+            Some(ModelSummary {
+                source: "Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit@c123".to_owned(),
+                problem: None,
+            })
+        );
+        std::fs::write(
+            folder.join("manifest.json"),
+            with_source.replace("\"format\": 2", "\"format\": 1"),
+        )
+        .unwrap();
+        let old = inspect_model(&folder).unwrap();
+        assert_eq!(old.source, "Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit@c123");
+        assert!(old.problem.unwrap().contains("convert the model again"));
+        let _ = std::fs::remove_dir_all(folder);
+    }
 
     const MANIFEST: &str = r#"{"format": 2, "model": "qwen3-asr",
         "audio": {"mel_bins": 128, "width": 896, "output_width": 1024},
