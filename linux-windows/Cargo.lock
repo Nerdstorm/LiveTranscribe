@@ -555,6 +555,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "lt-insertion"
+version = "0.1.0"
+dependencies = [
+ "tracing",
+]
+
+[[package]]
 name = "lt-shared"
 version = "0.1.0"
 dependencies = [
