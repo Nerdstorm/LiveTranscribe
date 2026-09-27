@@ -20,7 +20,9 @@ lt-vocabulary = { path = "crates/vocabulary" }
 lt-cleanup = { path = "crates/cleanup" }
 lt-dictation = { path = "crates/dictation" }
 lt-transcription = { path = "crates/transcription" }
+lt-hotkey = { path = "crates/hotkey" }
 
+evdev = "0.13"
 openvino = { version = "0.11", features = ["runtime-linking"] }
 realfft = "3"
 serde = { version = "1", features = ["derive"] }
