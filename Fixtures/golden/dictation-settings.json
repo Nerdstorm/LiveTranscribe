@@ -1,0 +1,71 @@
+{
+  "snippets": [
+    {
+      "trigger": "my calendar link",
+      "expansion": "https://cal.example.com/me"
+    },
+    {
+      "trigger": "my name",
+      "expansion": "Jordan Lee"
+    },
+    {
+      "trigger": "heart emoji",
+      "expansion": "<3"
+    }
+  ],
+  "vocabulary": [
+    {
+      "term": "Nerdstorm",
+      "spokenVariants": [
+        "nerd storm",
+        "nerd store"
+      ]
+    },
+    {
+      "term": "GitHub",
+      "spokenVariants": [
+        "git hub"
+      ]
+    },
+    {
+      "term": "Qwen",
+      "spokenVariants": [
+        "quen"
+      ]
+    },
+    {
+      "term": "Qwen3",
+      "spokenVariants": [
+        "quen three",
+        "qwen three"
+      ]
+    },
+    {
+      "term": "StormCloud",
+      "spokenVariants": [
+        "storm cloud"
+      ]
+    },
+    {
+      "term": "Siobhan",
+      "spokenVariants": [
+        "shivon"
+      ]
+    },
+    {
+      "term": "Visual Studio Code",
+      "spokenVariants": [
+        "v s code",
+        "visual studios code"
+      ]
+    },
+    {
+      "term": "Kubernetes",
+      "spokenVariants": [
+        "cube"
+      ]
+    }
+  ],
+  "vocabularyPromptLimit": 50,
+  "vocabularySimilarityThreshold": 0.8
+}
