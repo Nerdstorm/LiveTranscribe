@@ -4,6 +4,11 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
+# The openvino crate, with a way to pass properties to compile_model: see vendor/openvino/VENDORED.md.
+exclude = ["vendor/openvino"]
+
+[patch.crates-io]
+openvino = { path = "vendor/openvino" }
 
 [workspace.package]
 edition = "2024"
