@@ -66,9 +66,10 @@ impl Notice {
         }
     }
 
-    /// Shown in the dictation panel. Text that went in needs no message: the panel just goes.
-    pub fn in_panel(&self) -> bool {
-        !matches!(self, Self::Typed { .. })
+    /// Worth words on screen, which the panel shows beside its circle. Text that went in, or a
+    /// cancel, needs none: it shows as the panel going away, as on the Mac.
+    pub fn needs_attention(&self) -> bool {
+        !matches!(self, Self::Typed { .. } | Self::Cancelled)
     }
 
     /// Shown as a problem rather than as information.
@@ -128,15 +129,17 @@ mod tests {
     }
 
     #[test]
-    fn text_that_went_in_needs_no_panel() {
+    fn text_that_went_in_and_a_cancel_need_no_words() {
         let typed = Notice::Typed {
             characters: 1,
             method: InsertionMethod::Paste,
             latency_ms: 0,
         };
-        assert!(!typed.in_panel());
-        assert!(Notice::CopiedToClipboard.in_panel());
-        assert!(Notice::Cancelled.in_panel());
+        assert!(!typed.needs_attention());
+        assert!(!Notice::Cancelled.needs_attention());
+        assert!(Notice::CopiedToClipboard.needs_attention());
+        assert!(Notice::NothingHeard.needs_attention());
+        assert!(Notice::StillProcessing.needs_attention());
     }
 
     #[test]

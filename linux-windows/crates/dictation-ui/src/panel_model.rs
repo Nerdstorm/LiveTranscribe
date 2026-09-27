@@ -1,11 +1,13 @@
 //! What the panel shows, and for how long: the Mac DictationController's notice handling and
-//! HUDView's choice of content.
+//! HUDState's choice of content. Ordinary dictation is wordless; only a notice that needs
+//! attention ([`Notice::needs_attention`]) is put in words, in a bubble beside the circle.
 //!
-//! - While recording: *Listening* and how to finish, or a message about the dictation in progress.
-//! - While processing: *Transcribing…*, with such a message under it.
+//! - While recording: the microphone's level, and a ring when hands-free.
+//! - While processing: a spinning ring.
+//! - Either way, a message about the dictation in progress beside it, while it lasts.
 //! - Between dictations: the messages the last one ended with, one after another, each for the
-//!   notice time, followed by the messages it had during it. Text that went in needs none: the
-//!   panel just goes.
+//!   notice time, followed by the messages it had during it. Text that went in, or a cancel, needs
+//!   none: the panel just goes.
 //!
 //! Time is milliseconds from the caller's monotonic clock; [`PanelModel::next_deadline`] says when
 //! to call [`PanelModel::advance`].
@@ -14,40 +16,36 @@ use std::collections::VecDeque;
 
 use lt_dictation::{Notice, Phase};
 
-/// What the panel shows.
+/// What the panel shows: what its circle holds, and the message in the bubble beside it, if any.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum PanelContent {
-    Listening {
-        hands_free: bool,
-        /// How to finish, or a message about the dictation in progress.
-        caption: String,
-    },
-    Transcribing {
-        caption: Option<String>,
-    },
-    Message {
-        text: String,
-        problem: bool,
-    },
+pub struct PanelContent {
+    pub indicator: Indicator,
+    /// The bubble's text; `None` for no bubble.
+    pub message: Option<String>,
+}
+
+/// What the panel's circle holds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Indicator {
+    /// The microphone's level, while recording. Hands-free adds a ring, because the recording
+    /// ends only when the hotkey is pressed again.
+    Level { hands_free: bool },
+    /// A spinning ring, while transcribing.
+    Spinner,
+    /// A glyph for a message between dictations.
+    Notice { problem: bool },
 }
 
 impl PanelContent {
-    /// It moves (the level meter, the spinner), so it is drawn again every frame.
+    /// It moves (the level, the spinner), so it is drawn again every frame.
     pub fn is_animated(&self) -> bool {
-        !matches!(self, Self::Message { .. })
-    }
-
-    /// It has the × that cancels the dictation.
-    pub fn can_cancel(&self) -> bool {
-        self.is_animated()
+        !matches!(self.indicator, Indicator::Notice { .. })
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct PanelModel {
     notice_ms: u64,
-    /// The hotkey's name, for the hint.
-    hotkey: String,
     phase: Phase,
     /// The message shown between dictations, and until when.
     message: Option<(Notice, u64)>,
@@ -62,10 +60,9 @@ pub struct PanelModel {
 
 impl PanelModel {
     /// `notice_ms`: how long each message shows (the Mac's default is 2.5 s).
-    pub fn new(hotkey: impl Into<String>, notice_ms: u64) -> Self {
+    pub fn new(notice_ms: u64) -> Self {
         Self {
             notice_ms,
-            hotkey: hotkey.into(),
             phase: Phase::Idle,
             message: None,
             waiting: VecDeque::new(),
@@ -95,7 +92,11 @@ impl PanelModel {
         self.phase = Phase::Idle;
         self.progress = None;
         let carried = std::mem::take(&mut self.carried);
-        self.waiting = notices.into_iter().chain(carried).filter(Notice::in_panel).collect();
+        self.waiting = notices
+            .into_iter()
+            .chain(carried)
+            .filter(Notice::needs_attention)
+            .collect();
         self.message = self.waiting.pop_front().map(|notice| (notice, now_ms + self.notice_ms));
     }
 
@@ -103,6 +104,9 @@ impl PanelModel {
     pub fn show_progress(&mut self, notice: Notice, now_ms: u64) {
         if self.phase == Phase::Idle {
             return self.end_dictation(vec![notice], now_ms);
+        }
+        if !notice.needs_attention() {
+            return;
         }
         self.carried.retain(|carried| carried != &notice);
         self.carried.push(notice.clone());
@@ -130,24 +134,20 @@ impl PanelModel {
     pub fn content(&self) -> Option<PanelContent> {
         let progress = self.progress.as_ref().map(|(notice, _)| notice.message());
         match self.phase {
-            Phase::Recording { hands_free } => Some(PanelContent::Listening {
-                hands_free,
-                caption: progress.unwrap_or_else(|| self.hint(hands_free)),
+            Phase::Recording { hands_free } => Some(PanelContent {
+                indicator: Indicator::Level { hands_free },
+                message: progress,
             }),
-            Phase::Processing { .. } => Some(PanelContent::Transcribing { caption: progress }),
-            Phase::Idle => self.message.as_ref().map(|(notice, _)| PanelContent::Message {
-                text: notice.message(),
-                problem: notice.is_problem(),
+            Phase::Processing { .. } => Some(PanelContent {
+                indicator: Indicator::Spinner,
+                message: progress,
             }),
-        }
-    }
-
-    /// How to finish and cancel, as the Mac's HUDView.hint says it.
-    fn hint(&self, hands_free: bool) -> String {
-        if hands_free {
-            format!("Press {} to finish · esc to cancel", self.hotkey)
-        } else {
-            format!("Release {} to finish · esc to cancel", self.hotkey)
+            Phase::Idle => self.message.as_ref().map(|(notice, _)| PanelContent {
+                indicator: Indicator::Notice {
+                    problem: notice.is_problem(),
+                },
+                message: Some(notice.message()),
+            }),
         }
     }
 }
@@ -161,38 +161,44 @@ mod tests {
     const NOTICE_MS: u64 = 2_500;
 
     fn model() -> PanelModel {
-        PanelModel::new("Right Ctrl", NOTICE_MS)
+        PanelModel::new(NOTICE_MS)
     }
 
     fn message(notice: &Notice) -> Option<PanelContent> {
-        Some(PanelContent::Message {
-            text: notice.message(),
-            problem: notice.is_problem(),
+        Some(PanelContent {
+            indicator: Indicator::Notice {
+                problem: notice.is_problem(),
+            },
+            message: Some(notice.message()),
+        })
+    }
+
+    fn wordless(indicator: Indicator) -> Option<PanelContent> {
+        Some(PanelContent {
+            indicator,
+            message: None,
         })
     }
 
     #[test]
-    fn listening_says_how_to_finish() {
+    fn dictating_is_wordless() {
         let mut panel = model();
         assert_eq!(panel.content(), None);
         panel.phase_changed(Phase::Recording { hands_free: false });
-        assert_eq!(
-            panel.content(),
-            Some(PanelContent::Listening {
-                hands_free: false,
-                caption: "Release Right Ctrl to finish · esc to cancel".to_owned()
-            })
-        );
+        assert_eq!(panel.content(), wordless(Indicator::Level { hands_free: false }));
         panel.phase_changed(Phase::Recording { hands_free: true });
-        assert_eq!(
-            panel.content(),
-            Some(PanelContent::Listening {
-                hands_free: true,
-                caption: "Press Right Ctrl to finish · esc to cancel".to_owned()
-            })
-        );
+        assert_eq!(panel.content(), wordless(Indicator::Level { hands_free: true }));
         panel.phase_changed(Phase::Processing { audio_ms: 900 });
-        assert_eq!(panel.content(), Some(PanelContent::Transcribing { caption: None }));
+        assert_eq!(panel.content(), wordless(Indicator::Spinner));
+    }
+
+    #[test]
+    fn a_cancel_hides_the_panel_without_a_word() {
+        let mut panel = model();
+        panel.phase_changed(Phase::Recording { hands_free: false });
+        panel.end_dictation(vec![Notice::Cancelled], 1_000);
+        assert_eq!(panel.content(), None);
+        assert_eq!(panel.next_deadline(), None);
     }
 
     #[test]
@@ -229,20 +235,20 @@ mod tests {
     }
 
     #[test]
-    fn a_progress_message_shows_under_the_title_then_again_at_the_end() {
+    fn a_progress_message_shows_beside_the_circle_then_again_at_the_end() {
         let mut panel = model();
         panel.phase_changed(Phase::Processing { audio_ms: 900 });
         panel.show_progress(Notice::StillProcessing, 0);
         panel.show_progress(Notice::StillProcessing, 100);
-        let still = Notice::StillProcessing.message();
         assert_eq!(
             panel.content(),
-            Some(PanelContent::Transcribing {
-                caption: Some(still.clone())
+            Some(PanelContent {
+                indicator: Indicator::Spinner,
+                message: Some(Notice::StillProcessing.message()),
             })
         );
         panel.advance(2_600);
-        assert_eq!(panel.content(), Some(PanelContent::Transcribing { caption: None }));
+        assert_eq!(panel.content(), wordless(Indicator::Spinner));
 
         panel.end_dictation(vec![Notice::CopiedToClipboard], 3_000);
         assert_eq!(panel.content(), message(&Notice::CopiedToClipboard));
@@ -267,17 +273,9 @@ mod tests {
     }
 
     #[test]
-    fn content_says_what_moves_and_what_can_be_cancelled() {
-        let listening = PanelContent::Listening {
-            hands_free: false,
-            caption: String::new(),
-        };
-        let note = PanelContent::Message {
-            text: "Cancelled".to_owned(),
-            problem: false,
-        };
-        assert!(listening.is_animated() && listening.can_cancel());
-        assert!(PanelContent::Transcribing { caption: None }.can_cancel());
-        assert!(!note.is_animated() && !note.can_cancel());
+    fn the_level_and_the_spinner_move_and_a_message_doesnt() {
+        assert!(wordless(Indicator::Level { hands_free: false }).is_some_and(|content| content.is_animated()));
+        assert!(wordless(Indicator::Spinner).is_some_and(|content| content.is_animated()));
+        assert!(message(&Notice::NothingHeard).is_some_and(|content| !content.is_animated()));
     }
 }

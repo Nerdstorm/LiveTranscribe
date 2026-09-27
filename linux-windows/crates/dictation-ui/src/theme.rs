@@ -1,5 +1,5 @@
-//! The panel's colours, after the Mac HUD's: a translucent capsule, primary and secondary text,
-//! a red level meter and an orange warning.
+//! The panel's colours, after the Mac HUD's: a translucent circle and bubble, primary and
+//! secondary text, a red level and an orange warning.
 
 use tiny_skia::Color;
 
@@ -15,8 +15,6 @@ pub(crate) struct Palette {
     pub shadow: Color,
     pub primary: Color,
     pub secondary: Color,
-    /// Unlit meter bars.
-    pub quaternary: Color,
     pub meter: Color,
     pub warning: Color,
 }
@@ -41,7 +39,6 @@ impl Theme {
                 shadow: rgba(0, 0, 0, 0.22),
                 primary: rgba(255, 255, 255, 0.94),
                 secondary: rgba(235, 235, 245, 0.62),
-                quaternary: rgba(255, 255, 255, 0.18),
                 meter: rgba(255, 69, 58, 1.0),
                 warning: rgba(255, 159, 10, 1.0),
             },
@@ -51,7 +48,6 @@ impl Theme {
                 shadow: rgba(0, 0, 0, 0.14),
                 primary: rgba(0, 0, 0, 0.86),
                 secondary: rgba(60, 60, 67, 0.64),
-                quaternary: rgba(0, 0, 0, 0.12),
                 meter: rgba(255, 59, 48, 1.0),
                 warning: rgba(255, 149, 0, 1.0),
             },

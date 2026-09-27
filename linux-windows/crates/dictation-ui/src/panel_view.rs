@@ -1,38 +1,52 @@
-//! Draws the panel as the Mac's HUDView lays it out: in a capsule, the level meter, a spinner or a
-//! symbol; then a title with a caption, or a message of up to two lines; then the × that cancels.
+//! Draws the panel as the Mac's DictationHUDView lays it out: a circle holding the microphone's
+//! level, a spinning ring or a glyph, and beside it, when there is a message, a bubble with the
+//! message on up to two lines. It has no words of its own and no buttons: Esc and the tray's menu
+//! cancel.
 //!
 //! Lengths are in logical pixels, as the Mac's points: the platform gives the scale, and the
-//! pixmap has that many pixels per logical pixel. A transparent margin around the capsule holds
-//! its shadow, and whatever gap the platform wants between the panel and what it points at.
+//! pixmap has that many pixels per logical pixel. A transparent margin round what is drawn holds
+//! its shadow.
 
-use std::f32::consts::TAU;
+use std::f32::consts::{FRAC_PI_2, TAU};
 
 use tiny_skia::{Color, FillRule, LineCap, Paint, Path, PathBuilder, Pixmap, Rect, Stroke, Transform};
 
 use crate::text::Typeface;
 use crate::theme::Palette;
-use crate::{PanelContent, Theme};
+use crate::{Indicator, PanelContent, Theme};
 
-const TITLE_EM: f32 = 13.0;
-const CAPTION_EM: f32 = 11.0;
-const PADDING_X: f32 = 14.0;
-const PADDING_Y: f32 = 10.0;
-const SPACING: f32 = 10.0;
-const MIN_WIDTH: f32 = 180.0;
-/// Around the capsule, for its shadow.
+/// The circle's diameter.
+const CIRCLE: f32 = 40.0;
+/// Round what is drawn, for its shadow.
 const SHADOW: f32 = 4.0;
-/// Widest a message or caption gets before it wraps onto a second line.
-const MESSAGE_MAX_WIDTH: f32 = 320.0;
-const TITLE_CAPTION_GAP: f32 = 1.0;
-const SYMBOL: f32 = 16.0;
-const METER_BAR_WIDTH: f32 = 3.0;
-const METER_GAP: f32 = 2.0;
-const METER_HEIGHT: f32 = 18.0;
-/// Level at which each bar lights, for a meter that moves with normal speech (the Mac's).
-const METER_THRESHOLDS: [f32; 5] = [0.005, 0.015, 0.03, 0.06, 0.12];
-const SPINNER_SPOKES: usize = 12;
-/// The × is easier to hit than it is to see.
-const CANCEL_SLOP: f32 = 4.0;
+/// The circle with the shadow's room on both sides: the square [`crate::PanelPlacement`] keeps by
+/// the pointer, and the whole panel while there is no bubble.
+pub const CIRCLE_SQUARE: f32 = CIRCLE + 2.0 * SHADOW;
+/// The ring a hands-free recording adds, just inside the circle's edge.
+const RING_RADIUS: f32 = 17.5;
+const RING_WIDTH: f32 = 1.5;
+/// The glyph for a message between dictations.
+const GLYPH: f32 = 22.0;
+/// Between the circle and the bubble.
+const BUBBLE_GAP: f32 = 8.0;
+const BUBBLE_PADDING_X: f32 = 12.0;
+const BUBBLE_PADDING_Y: f32 = 8.0;
+const BUBBLE_CORNER_RADIUS: f32 = 12.0;
+/// The Mac's callout text.
+const MESSAGE_EM: f32 = 12.0;
+/// Widest a message gets before it wraps onto a second line.
+const MESSAGE_MAX_WIDTH: f32 = 260.0;
+/// The level at which the disc starts to grow, and the one at which it is full size: the first
+/// and last thresholds of the five-bar meter it replaced, so it moves with normal speech.
+const QUIET: f32 = 0.005;
+const LOUD: f32 = 0.12;
+/// The disc's radius in silence, and how much it grows from silence to [`LOUD`].
+const DISC_MIN_RADIUS: f32 = 6.0;
+const DISC_GROWTH: f32 = 10.0;
+/// The spinner: an arc of three quarters of a ring, turning once a second.
+const SPINNER_RADIUS: f32 = 8.0;
+const SPINNER_WIDTH: f32 = 2.0;
+const SPINNER_SWEEP: f32 = 0.75 * TAU;
 
 /// What moves: the microphone's level, and how far round the spinner is (0 to 1).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -41,11 +55,15 @@ pub struct Animation {
     pub spin: f32,
 }
 
-/// Transparent space above and below the capsule and its shadow, in logical pixels.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Margins {
-    pub top: f32,
-    pub bottom: f32,
+/// Which side of the circle the bubble goes on.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum BubbleSide {
+    /// Right of the circle, while the panel is right of the pointer.
+    #[default]
+    Trailing,
+    /// Left of the circle, while the panel is flipped to the pointer's left, so the circle stays
+    /// next to the pointer.
+    Leading,
 }
 
 /// A drawn panel.
@@ -55,8 +73,6 @@ pub struct Rendered {
     /// The panel's size in logical pixels.
     pub width: u32,
     pub height: u32,
-    /// Where a click cancels the dictation, in logical pixels.
-    pub cancel: Option<Rect>,
 }
 
 impl Rendered {
@@ -68,44 +84,30 @@ impl Rendered {
         }
         bytes
     }
-
-    pub fn hits_cancel(&self, x: f32, y: f32) -> bool {
-        self.cancel
-            .is_some_and(|area| x >= area.left() && x <= area.right() && y >= area.top() && y <= area.bottom())
-    }
 }
 
 pub struct PanelView {
     typeface: Typeface,
 }
 
-/// What sits before the text.
-#[derive(Clone, Copy)]
-enum Leading {
-    Meter,
-    Spinner,
-    Symbol { problem: bool },
-}
-
-impl Leading {
-    fn size(self) -> (f32, f32) {
-        match self {
-            Self::Meter => (5.0 * METER_BAR_WIDTH + 4.0 * METER_GAP, METER_HEIGHT),
-            Self::Spinner | Self::Symbol { .. } => (SYMBOL, SYMBOL),
-        }
-    }
-}
-
-/// A line of text and how it is set.
-struct Line {
-    text: String,
-    em: f32,
-    secondary: bool,
+/// Where things go in a panel of some content, in logical pixels.
+struct Layout {
+    width: f32,
+    height: f32,
+    /// The message's lines, and the bubble round them.
+    lines: Vec<String>,
+    bubble: Option<(f32, f32)>,
 }
 
 impl PanelView {
     pub fn new(typeface: Typeface) -> Self {
         Self { typeface }
+    }
+
+    /// The panel's size for `content` in logical pixels, which the bubble's side doesn't change.
+    pub fn size(&self, content: &PanelContent) -> (u32, u32) {
+        let layout = self.lay_out(content);
+        (layout.width as u32, layout.height as u32)
     }
 
     pub fn render(
@@ -114,152 +116,114 @@ impl PanelView {
         animation: Animation,
         scale: f32,
         theme: Theme,
-        margins: Margins,
+        side: BubbleSide,
     ) -> Rendered {
         let palette = theme.palette();
-        let (leading, lines) = self.lay_out(content);
-        let cancels = content.can_cancel();
-
-        // The text block: lines one under another, a hairline between title and caption.
-        let text_width = lines
-            .iter()
-            .map(|line| self.typeface.width(&line.text, line.em))
-            .fold(0.0_f32, f32::max);
-        let text_height: f32 = lines
-            .iter()
-            .enumerate()
-            .map(|(index, line)| {
-                let gap = if index > 0 && line.em != lines[index - 1].em {
-                    TITLE_CAPTION_GAP
-                } else {
-                    0.0
-                };
-                self.typeface.line_height(line.em) + gap
-            })
-            .sum();
-        let (leading_width, leading_height) = leading.size();
-        let cancel_width = if cancels { SPACING + SYMBOL } else { 0.0 };
-        let row_width = leading_width + SPACING + text_width + cancel_width;
-        let row_height = leading_height.max(text_height).max(if cancels { SYMBOL } else { 0.0 });
-        let capsule_width = (row_width + 2.0 * PADDING_X).max(MIN_WIDTH).ceil();
-        let capsule_height = (row_height + 2.0 * PADDING_Y).ceil();
-        let width = capsule_width + 2.0 * SHADOW;
-        let height = capsule_height + 2.0 * SHADOW + margins.top + margins.bottom;
-        let capsule = Rect::from_xywh(SHADOW, SHADOW + margins.top, capsule_width, capsule_height)
-            .expect("a capsule has a positive size");
-
+        let layout = self.lay_out(content);
         // The size is whole logical pixels; its pixels are that times the scale, rounded, as
         // Wayland's fractional scaling has them.
-        let pixel_width = (width * scale).round().max(1.0) as u32;
-        let pixel_height = (height * scale).round().max(1.0) as u32;
+        let pixel_width = (layout.width * scale).round().max(1.0) as u32;
+        let pixel_height = (layout.height * scale).round().max(1.0) as u32;
         let mut pixmap = Pixmap::new(pixel_width, pixel_height).expect("a panel has a positive size");
         let transform = Transform::from_scale(scale, scale);
+        let middle = layout.height / 2.0;
 
-        draw_capsule(&mut pixmap, capsule, &palette, transform);
-
-        // The row, centred in the capsule as SwiftUI centres content narrower than its frame.
-        let mut x = capsule.left() + (capsule_width - row_width) / 2.0;
-        let middle = capsule.top() + capsule_height / 2.0;
-        match leading {
-            Leading::Meter => draw_meter(&mut pixmap, x, middle, animation.level, &palette, transform),
-            Leading::Spinner => draw_spinner(&mut pixmap, x, middle, animation.spin, &palette, transform),
-            Leading::Symbol { problem } => draw_symbol(&mut pixmap, x, middle, problem, &palette, transform),
-        }
-        x += leading_width + SPACING;
-
-        let mut top = middle - text_height / 2.0;
-        for (index, line) in lines.iter().enumerate() {
-            if index > 0 && line.em != lines[index - 1].em {
-                top += TITLE_CAPTION_GAP;
+        // The circle and the bubble side by side, centred on one line, as an HStack has them.
+        let circle_left = match side {
+            BubbleSide::Trailing => SHADOW,
+            BubbleSide::Leading => layout.width - SHADOW - CIRCLE,
+        };
+        let circle = Rect::from_xywh(circle_left, middle - CIRCLE / 2.0, CIRCLE, CIRCLE).expect("a circle has a size");
+        draw_raised(&mut pixmap, circle, CIRCLE / 2.0, &palette, transform);
+        let (center_x, center_y) = (circle_left + CIRCLE / 2.0, middle);
+        match content.indicator {
+            Indicator::Level { hands_free } => {
+                draw_level(
+                    &mut pixmap,
+                    center_x,
+                    center_y,
+                    animation.level,
+                    hands_free,
+                    &palette,
+                    transform,
+                );
             }
-            let baseline = top + self.typeface.ascent(line.em);
-            let color = if line.secondary {
-                palette.secondary
-            } else {
-                palette.primary
-            };
-            self.typeface.draw(
-                &mut pixmap,
-                &line.text,
-                line.em * scale,
-                x * scale,
-                baseline * scale,
-                color,
-            );
-            top += self.typeface.line_height(line.em);
+            Indicator::Spinner => draw_spinner(&mut pixmap, center_x, center_y, animation.spin, &palette, transform),
+            Indicator::Notice { problem } => draw_glyph(&mut pixmap, center_x, center_y, problem, &palette, transform),
         }
 
-        let cancel = cancels.then(|| {
-            let left = x + text_width + SPACING;
-            draw_cancel(&mut pixmap, left, middle, &palette, transform);
-            Rect::from_xywh(
-                left - CANCEL_SLOP,
-                middle - SYMBOL / 2.0 - CANCEL_SLOP,
-                SYMBOL + 2.0 * CANCEL_SLOP,
-                SYMBOL + 2.0 * CANCEL_SLOP,
-            )
-            .expect("the × has a positive size")
-        });
+        if let Some((bubble_width, bubble_height)) = layout.bubble {
+            let bubble_left = match side {
+                BubbleSide::Trailing => SHADOW + CIRCLE + BUBBLE_GAP,
+                BubbleSide::Leading => SHADOW,
+            };
+            let top = middle - bubble_height / 2.0;
+            let bubble = Rect::from_xywh(bubble_left, top, bubble_width, bubble_height).expect("a bubble has a size");
+            draw_raised(&mut pixmap, bubble, BUBBLE_CORNER_RADIUS, &palette, transform);
+            let mut line_top = top + BUBBLE_PADDING_Y;
+            for line in &layout.lines {
+                let baseline = line_top + self.typeface.ascent(MESSAGE_EM);
+                self.typeface.draw(
+                    &mut pixmap,
+                    line,
+                    MESSAGE_EM * scale,
+                    (bubble_left + BUBBLE_PADDING_X) * scale,
+                    baseline * scale,
+                    palette.primary,
+                );
+                line_top += self.typeface.line_height(MESSAGE_EM);
+            }
+        }
 
         Rendered {
             pixmap,
-            width: width.ceil() as u32,
-            height: height.ceil() as u32,
-            cancel,
+            width: layout.width as u32,
+            height: layout.height as u32,
         }
     }
 
-    fn lay_out(&self, content: &PanelContent) -> (Leading, Vec<Line>) {
-        let caption = |text: &str| {
-            self.typeface
-                .wrap(text, CAPTION_EM, MESSAGE_MAX_WIDTH, 2)
-                .into_iter()
-                .map(|text| Line {
-                    text,
-                    em: CAPTION_EM,
-                    secondary: true,
-                })
+    fn lay_out(&self, content: &PanelContent) -> Layout {
+        let lines = content
+            .message
+            .as_deref()
+            .map(|text| self.typeface.wrap(text, MESSAGE_EM, MESSAGE_MAX_WIDTH, 2))
+            .unwrap_or_default();
+        let bubble = (!lines.is_empty()).then(|| {
+            let text_width = lines
+                .iter()
+                .map(|line| self.typeface.width(line, MESSAGE_EM))
+                .fold(0.0_f32, f32::max);
+            let text_height = lines.len() as f32 * self.typeface.line_height(MESSAGE_EM);
+            (
+                (text_width + 2.0 * BUBBLE_PADDING_X).ceil(),
+                (text_height + 2.0 * BUBBLE_PADDING_Y).ceil(),
+            )
+        });
+        let (content_width, content_height) = match bubble {
+            Some((width, height)) => (CIRCLE + BUBBLE_GAP + width, height.max(CIRCLE)),
+            None => (CIRCLE, CIRCLE),
         };
-        let title = |text: &str| Line {
-            text: text.to_owned(),
-            em: TITLE_EM,
-            secondary: false,
-        };
-        match content {
-            PanelContent::Listening {
-                hands_free,
-                caption: hint,
-            } => {
-                let heading = if *hands_free {
-                    "Listening, hands-free"
-                } else {
-                    "Listening"
-                };
-                (
-                    Leading::Meter,
-                    std::iter::once(title(heading)).chain(caption(hint)).collect(),
-                )
-            }
-            PanelContent::Transcribing { caption: progress } => {
-                let mut lines = vec![title("Transcribing…")];
-                lines.extend(progress.iter().flat_map(|text| caption(text)));
-                (Leading::Spinner, lines)
-            }
-            PanelContent::Message { text, problem } => {
-                let lines = self
-                    .typeface
-                    .wrap(text, TITLE_EM, MESSAGE_MAX_WIDTH, 2)
-                    .into_iter()
-                    .map(|text| Line {
-                        text,
-                        em: TITLE_EM,
-                        secondary: false,
-                    })
-                    .collect();
-                (Leading::Symbol { problem: *problem }, lines)
-            }
+        Layout {
+            width: (content_width + 2.0 * SHADOW).ceil(),
+            height: (content_height + 2.0 * SHADOW).ceil(),
+            lines,
+            bubble,
         }
     }
+}
+
+/// `level` between [`QUIET`] (0) and [`LOUD`] (1) on a log scale, clamped to 0 to 1; 0 for
+/// silence, a negative level or NaN.
+fn level_fraction(level: f32) -> f32 {
+    if level.is_nan() || level <= 0.0 {
+        return 0.0;
+    }
+    ((level.log10() - QUIET.log10()) / (LOUD.log10() - QUIET.log10())).clamp(0.0, 1.0)
+}
+
+/// The level disc's radius for `level`.
+fn disc_radius(level: f32) -> f32 {
+    DISC_MIN_RADIUS + DISC_GROWTH * level_fraction(level)
 }
 
 fn paint(color: Color) -> Paint<'static> {
@@ -327,33 +291,62 @@ fn circle(center_x: f32, center_y: f32, radius: f32) -> Option<Path> {
     PathBuilder::from_circle(center_x, center_y, radius)
 }
 
-fn draw_capsule(pixmap: &mut Pixmap, capsule: Rect, palette: &Palette, transform: Transform) {
-    // A soft shadow: the capsule's outline, grown a little at a time, each faint.
+/// An arc of `radius` round a centre, from `start` (radians, clockwise from the right, as y grows
+/// downwards) through `sweep`, in cubics of at most a quarter turn.
+fn arc(center_x: f32, center_y: f32, radius: f32, start: f32, sweep: f32) -> Option<Path> {
+    let segments = (sweep / FRAC_PI_2).ceil().max(1.0);
+    let step = sweep / segments;
+    // How far a cubic's control points sit along the tangent to follow `step` of a circle.
+    let control = radius * 4.0 / 3.0 * (step / 4.0).tan();
+    let point = |angle: f32| (center_x + radius * angle.cos(), center_y + radius * angle.sin());
+    let mut path = PathBuilder::new();
+    let (x, y) = point(start);
+    path.move_to(x, y);
+    for segment in 0..segments as usize {
+        let from = start + step * segment as f32;
+        let to = from + step;
+        let (from_x, from_y) = point(from);
+        let (to_x, to_y) = point(to);
+        path.cubic_to(
+            from_x - control * from.sin(),
+            from_y + control * from.cos(),
+            to_x + control * to.sin(),
+            to_y - control * to.cos(),
+            to_x,
+            to_y,
+        );
+    }
+    path.finish()
+}
+
+/// A shape raised off the screen: a soft shadow, a translucent fill and a hairline border inside
+/// its edge, as SwiftUI's strokeBorder draws it.
+fn draw_raised(pixmap: &mut Pixmap, rect: Rect, radius: f32, palette: &Palette, transform: Transform) {
+    // The shape's outline, grown a little at a time and a little lower, each faint.
     for step in 1..=3 {
         let grow = step as f32;
         if let Some(outline) = Rect::from_ltrb(
-            capsule.left() - grow,
-            capsule.top() - grow + 1.0,
-            capsule.right() + grow,
-            capsule.bottom() + grow + 1.0,
+            rect.left() - grow,
+            rect.top() - grow + 1.0,
+            rect.right() + grow,
+            rect.bottom() + grow + 1.0,
         )
-        .and_then(|rect| rounded_rect(rect, rect.height() / 2.0))
+        .and_then(|grown| rounded_rect(grown, radius + grow))
         {
             let shadow = with_alpha(palette.shadow, 0.35 / grow);
             pixmap.fill_path(&outline, &paint(shadow), FillRule::Winding, transform, None);
         }
     }
-    if let Some(shape) = rounded_rect(capsule, capsule.height() / 2.0) {
+    if let Some(shape) = rounded_rect(rect, radius) {
         pixmap.fill_path(&shape, &paint(palette.background), FillRule::Winding, transform, None);
     }
-    // The border sits inside the capsule's edge, as SwiftUI's strokeBorder draws it.
     if let Some(inner) = Rect::from_ltrb(
-        capsule.left() + 0.5,
-        capsule.top() + 0.5,
-        capsule.right() - 0.5,
-        capsule.bottom() - 0.5,
+        rect.left() + 0.5,
+        rect.top() + 0.5,
+        rect.right() - 0.5,
+        rect.bottom() - 0.5,
     )
-    .and_then(|rect| rounded_rect(rect, rect.height() / 2.0))
+    .and_then(|inner| rounded_rect(inner, radius - 0.5))
     {
         let stroke = Stroke {
             width: 1.0,
@@ -363,119 +356,75 @@ fn draw_capsule(pixmap: &mut Pixmap, capsule: Rect, palette: &Palette, transform
     }
 }
 
-/// Five bars that rise with the microphone's level.
-fn draw_meter(pixmap: &mut Pixmap, left: f32, middle: f32, level: f32, palette: &Palette, transform: Transform) {
-    for (index, threshold) in METER_THRESHOLDS.iter().enumerate() {
-        let bar_height = 6.0 + 3.0 * index as f32;
-        let x = left + index as f32 * (METER_BAR_WIDTH + METER_GAP);
-        let color = if level >= *threshold {
-            palette.meter
-        } else {
-            palette.quaternary
+/// A red disc that grows with the microphone's level, and a ring round it when hands-free.
+fn draw_level(
+    pixmap: &mut Pixmap,
+    center_x: f32,
+    center_y: f32,
+    level: f32,
+    hands_free: bool,
+    palette: &Palette,
+    transform: Transform,
+) {
+    if hands_free && let Some(ring) = circle(center_x, center_y, RING_RADIUS) {
+        let stroke = Stroke {
+            width: RING_WIDTH,
+            ..Stroke::default()
         };
-        if let Some(bar) = Rect::from_xywh(x, middle - bar_height / 2.0, METER_BAR_WIDTH, bar_height)
-            .and_then(|rect| rounded_rect(rect, METER_BAR_WIDTH / 2.0))
-        {
-            pixmap.fill_path(&bar, &paint(color), FillRule::Winding, transform, None);
-        }
+        pixmap.stroke_path(&ring, &paint(palette.secondary), &stroke, transform, None);
+    }
+    if let Some(disc) = circle(center_x, center_y, disc_radius(level)) {
+        pixmap.fill_path(&disc, &paint(palette.meter), FillRule::Winding, transform, None);
     }
 }
 
-/// Spokes round a centre, the leading one darkest, turning with `spin`.
-fn draw_spinner(pixmap: &mut Pixmap, left: f32, middle: f32, spin: f32, palette: &Palette, transform: Transform) {
-    let (center_x, center_y) = (left + SYMBOL / 2.0, middle);
-    let stroke = Stroke {
-        width: 1.6,
-        line_cap: LineCap::Round,
-        ..Stroke::default()
-    };
-    // The spinner steps from spoke to spoke, as the Mac's does.
-    let step = (spin.rem_euclid(1.0) * SPINNER_SPOKES as f32).floor();
-    for spoke in 0..SPINNER_SPOKES {
-        let angle = (spoke as f32 + step) / SPINNER_SPOKES as f32 * TAU;
-        let (sin, cos) = angle.sin_cos();
-        let mut path = PathBuilder::new();
-        path.move_to(center_x + cos * 3.6, center_y + sin * 3.6);
-        path.line_to(center_x + cos * 7.0, center_y + sin * 7.0);
-        let fade = 0.15 + 0.85 * (spoke as f32 + 1.0) / SPINNER_SPOKES as f32;
-        if let Some(path) = path.finish() {
-            pixmap.stroke_path(
-                &path,
-                &paint(with_alpha(palette.primary, fade)),
-                &stroke,
-                transform,
-                None,
-            );
-        }
+/// Three quarters of a ring, turning clockwise with `spin`.
+fn draw_spinner(pixmap: &mut Pixmap, center_x: f32, center_y: f32, spin: f32, palette: &Palette, transform: Transform) {
+    // From the top at no spin.
+    let start = spin.rem_euclid(1.0) * TAU - FRAC_PI_2;
+    if let Some(ring) = arc(center_x, center_y, SPINNER_RADIUS, start, SPINNER_SWEEP) {
+        let stroke = Stroke {
+            width: SPINNER_WIDTH,
+            line_cap: LineCap::Round,
+            ..Stroke::default()
+        };
+        pixmap.stroke_path(&ring, &paint(palette.secondary), &stroke, transform, None);
     }
 }
 
-/// A filled warning triangle for a problem, a filled check mark otherwise, with their marks cut
-/// out in the capsule's colour.
-fn draw_symbol(pixmap: &mut Pixmap, left: f32, middle: f32, problem: bool, palette: &Palette, transform: Transform) {
-    let (center_x, center_y) = (left + SYMBOL / 2.0, middle);
-    let mark = Stroke {
-        width: 1.8,
-        line_cap: LineCap::Round,
-        ..Stroke::default()
-    };
-    if problem {
-        let mut triangle = PathBuilder::new();
-        triangle.move_to(center_x, center_y - 7.0);
-        triangle.line_to(center_x + 7.8, center_y + 6.5);
-        triangle.line_to(center_x - 7.8, center_y + 6.5);
-        triangle.close();
-        if let Some(triangle) = triangle.finish() {
-            let rounded = Stroke {
-                width: 1.6,
-                line_join: tiny_skia::LineJoin::Round,
-                ..Stroke::default()
-            };
-            pixmap.fill_path(&triangle, &paint(palette.warning), FillRule::Winding, transform, None);
-            pixmap.stroke_path(&triangle, &paint(palette.warning), &rounded, transform, None);
-        }
-        let mut bar = PathBuilder::new();
-        bar.move_to(center_x, center_y - 2.6);
-        bar.line_to(center_x, center_y + 1.6);
-        if let Some(bar) = bar.finish() {
-            pixmap.stroke_path(&bar, &paint(palette.background), &mark, transform, None);
-        }
-        if let Some(dot) = circle(center_x, center_y + 4.2, 1.0) {
-            pixmap.fill_path(&dot, &paint(palette.background), FillRule::Winding, transform, None);
-        }
+/// A filled circle with its mark cut out, as the Mac's SF Symbols: an orange "!" for a problem,
+/// a grey "i" otherwise.
+fn draw_glyph(
+    pixmap: &mut Pixmap,
+    center_x: f32,
+    center_y: f32,
+    problem: bool,
+    palette: &Palette,
+    transform: Transform,
+) {
+    let color = if problem { palette.warning } else { palette.secondary };
+    if let Some(disc) = circle(center_x, center_y, GLYPH / 2.0) {
+        pixmap.fill_path(&disc, &paint(color), FillRule::Winding, transform, None);
+    }
+    // The bar and the dot: the bar above the dot for "!", below it for "i".
+    let (bar, dot) = if problem {
+        ((center_y - 5.5, center_y + 1.5), center_y + 5.0)
     } else {
-        if let Some(disc) = circle(center_x, center_y, SYMBOL / 2.0) {
-            pixmap.fill_path(&disc, &paint(palette.secondary), FillRule::Winding, transform, None);
-        }
-        let mut check = PathBuilder::new();
-        check.move_to(center_x - 3.6, center_y + 0.2);
-        check.line_to(center_x - 1.0, center_y + 2.8);
-        check.line_to(center_x + 3.8, center_y - 2.6);
-        if let Some(check) = check.finish() {
-            pixmap.stroke_path(&check, &paint(palette.background), &mark, transform, None);
-        }
-    }
-}
-
-/// A filled circle with a × cut out.
-fn draw_cancel(pixmap: &mut Pixmap, left: f32, middle: f32, palette: &Palette, transform: Transform) {
-    let (center_x, center_y) = (left + SYMBOL / 2.0, middle);
-    if let Some(disc) = circle(center_x, center_y, SYMBOL / 2.0) {
-        pixmap.fill_path(&disc, &paint(palette.secondary), FillRule::Winding, transform, None);
-    }
-    let arm = 2.9;
-    let mut cross = PathBuilder::new();
-    cross.move_to(center_x - arm, center_y - arm);
-    cross.line_to(center_x + arm, center_y + arm);
-    cross.move_to(center_x + arm, center_y - arm);
-    cross.line_to(center_x - arm, center_y + arm);
+        ((center_y - 1.5, center_y + 5.5), center_y - 5.0)
+    };
+    let mut line = PathBuilder::new();
+    line.move_to(center_x, bar.0);
+    line.line_to(center_x, bar.1);
     let stroke = Stroke {
-        width: 1.6,
+        width: 2.2,
         line_cap: LineCap::Round,
         ..Stroke::default()
     };
-    if let Some(cross) = cross.finish() {
-        pixmap.stroke_path(&cross, &paint(palette.background), &stroke, transform, None);
+    if let Some(line) = line.finish() {
+        pixmap.stroke_path(&line, &paint(palette.background), &stroke, transform, None);
+    }
+    if let Some(dot) = circle(center_x, dot, 1.3) {
+        pixmap.fill_path(&dot, &paint(palette.background), FillRule::Winding, transform, None);
     }
 }
 
@@ -491,140 +440,163 @@ mod tests {
     }
 
     fn contents() -> Vec<(&'static str, PanelContent)> {
+        let content = |indicator, message: Option<String>| PanelContent { indicator, message };
         vec![
-            (
-                "listening",
-                PanelContent::Listening {
-                    hands_free: false,
-                    caption: "Release Right Ctrl to finish · esc to cancel".to_owned(),
-                },
-            ),
-            (
-                "hands-free",
-                PanelContent::Listening {
-                    hands_free: true,
-                    caption: "Press Right Ctrl to finish · esc to cancel".to_owned(),
-                },
-            ),
-            ("transcribing", PanelContent::Transcribing { caption: None }),
+            ("listening", content(Indicator::Level { hands_free: false }, None)),
+            ("hands-free", content(Indicator::Level { hands_free: true }, None)),
+            ("transcribing", content(Indicator::Spinner, None)),
             (
                 "still-processing",
-                PanelContent::Transcribing {
-                    caption: Some(Notice::StillProcessing.message()),
-                },
+                content(Indicator::Spinner, Some(Notice::StillProcessing.message())),
             ),
             (
                 "nothing-heard",
-                PanelContent::Message {
-                    text: Notice::NothingHeard.message(),
-                    problem: false,
-                },
+                content(
+                    Indicator::Notice { problem: false },
+                    Some(Notice::NothingHeard.message()),
+                ),
             ),
             (
                 "copied",
-                PanelContent::Message {
-                    text: Notice::CopiedToClipboard.message(),
-                    problem: false,
-                },
+                content(
+                    Indicator::Notice { problem: false },
+                    Some(Notice::CopiedToClipboard.message()),
+                ),
             ),
             (
                 "microphone-stopped",
-                PanelContent::Message {
-                    text: Notice::CaptureFailed(
-                        "the input device was disconnected while the recording was in progress".to_owned(),
-                    )
-                    .message(),
-                    problem: true,
-                },
+                content(
+                    Indicator::Notice { problem: true },
+                    Some(
+                        Notice::CaptureFailed(
+                            "the input device was disconnected while the recording was in progress".to_owned(),
+                        )
+                        .message(),
+                    ),
+                ),
             ),
         ]
     }
 
-    /// Set LT_PANEL_SNAPSHOTS to a folder to see every panel, at 2×, in both themes.
+    /// The pixel at `x`, `y` in logical pixels of a panel drawn at 2×.
+    fn alpha_at(rendered: &Rendered, x: f32, y: f32) -> u8 {
+        rendered
+            .pixmap
+            .pixel((x * 2.0) as u32, (y * 2.0) as u32)
+            .map_or(0, |pixel| pixel.alpha())
+    }
+
+    /// Set LT_PANEL_SNAPSHOTS to a folder to see every panel, at 2×, in both themes, with the
+    /// bubble on either side.
     #[test]
     fn every_panel_draws_inside_its_bounds() {
         let view = view();
         let folder = std::env::var_os("LT_PANEL_SNAPSHOTS").map(std::path::PathBuf::from);
         for (name, content) in contents() {
             for theme in [Theme::Dark, Theme::Light] {
-                let animation = Animation { level: 0.04, spin: 0.3 };
-                let rendered = view.render(&content, animation, 2.0, theme, Margins::default());
-                assert_eq!(rendered.pixmap.width(), rendered.width * 2, "{name}");
-                assert!(
-                    rendered.width >= 188 && rendered.width <= 460,
-                    "{name}: {} wide",
-                    rendered.width
-                );
-                assert!(
-                    rendered.height >= 40 && rendered.height <= 90,
-                    "{name}: {} high",
-                    rendered.height
-                );
-                // The capsule's middle is painted; the corners hold only the shadow's edge.
-                let middle = rendered
-                    .pixmap
-                    .pixel(rendered.pixmap.width() / 2, rendered.pixmap.height() / 2);
-                assert!(middle.is_some_and(|pixel| pixel.alpha() > 200), "{name}");
-                assert_eq!(
-                    rendered.pixmap.pixel(0, 0).map(|pixel| pixel.alpha()),
-                    Some(0),
-                    "{name}"
-                );
-                assert_eq!(rendered.cancel.is_some(), content.can_cancel(), "{name}");
-                if let Some(folder) = &folder {
-                    std::fs::create_dir_all(folder).expect("the snapshot folder");
-                    let file = folder.join(format!("{name}-{theme:?}.png").to_lowercase());
-                    rendered.pixmap.save_png(file).expect("a snapshot");
+                for side in [BubbleSide::Trailing, BubbleSide::Leading] {
+                    let animation = Animation { level: 0.04, spin: 0.3 };
+                    let rendered = view.render(&content, animation, 2.0, theme, side);
+                    assert_eq!((rendered.width, rendered.height), view.size(&content), "{name}");
+                    assert_eq!(rendered.pixmap.width(), rendered.width * 2, "{name}");
+                    let (width, height) = (rendered.width as f32, rendered.height as f32);
+                    if content.message.is_none() {
+                        assert_eq!((width, height), (CIRCLE_SQUARE, CIRCLE_SQUARE), "{name}");
+                    } else {
+                        assert!(width > CIRCLE_SQUARE && width <= 360.0, "{name}: {width} wide");
+                        assert!((CIRCLE_SQUARE..=64.0).contains(&height), "{name}: {height} high");
+                    }
+                    // The circle is painted where the side puts it; the corners hold nothing.
+                    let circle_x = match side {
+                        BubbleSide::Trailing => CIRCLE_SQUARE / 2.0,
+                        BubbleSide::Leading => width - CIRCLE_SQUARE / 2.0,
+                    };
+                    assert!(alpha_at(&rendered, circle_x, height / 2.0) > 200, "{name}");
+                    assert_eq!(alpha_at(&rendered, 0.0, 0.0), 0, "{name}");
+                    assert_eq!(alpha_at(&rendered, width - 0.5, height - 0.5), 0, "{name}");
+                    if let Some(folder) = &folder {
+                        std::fs::create_dir_all(folder).expect("the snapshot folder");
+                        let file = folder.join(format!("{name}-{theme:?}-{side:?}.png").to_lowercase());
+                        rendered.pixmap.save_png(file).expect("a snapshot");
+                    }
                 }
             }
         }
     }
 
     #[test]
-    fn the_cancel_button_is_where_it_is_drawn() {
-        let content = PanelContent::Listening {
-            hands_free: false,
-            caption: "Release Right Ctrl to finish · esc to cancel".to_owned(),
-        };
-        let rendered = view().render(&content, Animation::default(), 1.0, Theme::Dark, Margins::default());
-        let area = rendered.cancel.expect("a ×");
-        assert!(rendered.hits_cancel(area.left() + area.width() / 2.0, area.top() + area.height() / 2.0));
-        assert!(!rendered.hits_cancel(10.0, 10.0));
-        assert!(area.right() <= rendered.width as f32, "inside the panel");
-    }
+    fn the_disc_grows_with_the_level_on_a_log_scale() {
+        assert_eq!(disc_radius(0.0), DISC_MIN_RADIUS);
+        assert_eq!(disc_radius(-1.0), DISC_MIN_RADIUS);
+        assert_eq!(disc_radius(f32::NAN), DISC_MIN_RADIUS);
+        assert_eq!(disc_radius(QUIET), DISC_MIN_RADIUS);
+        assert_eq!(disc_radius(LOUD), DISC_MIN_RADIUS + DISC_GROWTH);
+        assert_eq!(disc_radius(1.0), DISC_MIN_RADIUS + DISC_GROWTH);
+        // Halfway on the log scale is the geometric mean.
+        let middle = (QUIET * LOUD).sqrt();
+        assert!((level_fraction(middle) - 0.5).abs() < 1e-4);
+        assert!(disc_radius(0.01) < disc_radius(0.03) && disc_radius(0.03) < disc_radius(0.06));
 
-    #[test]
-    fn margins_make_room_above_and_below() {
-        let content = PanelContent::Transcribing { caption: None };
+        // A loud level paints more of the circle red than a quiet one.
         let view = view();
-        let plain = view.render(&content, Animation::default(), 1.0, Theme::Dark, Margins::default());
-        let spaced = view.render(
-            &content,
-            Animation::default(),
-            1.0,
-            Theme::Dark,
-            Margins { top: 10.0, bottom: 0.0 },
-        );
-        assert_eq!(spaced.height, plain.height + 10);
-        let shifted = spaced.cancel.expect("a ×").top() - plain.cancel.expect("a ×").top();
-        assert!((shifted - 10.0).abs() < 1e-3);
+        let content = PanelContent {
+            indicator: Indicator::Level { hands_free: false },
+            message: None,
+        };
+        let red = |level| {
+            let rendered = view.render(
+                &content,
+                Animation { level, spin: 0.0 },
+                1.0,
+                Theme::Dark,
+                BubbleSide::Trailing,
+            );
+            rendered
+                .pixmap
+                .pixels()
+                .iter()
+                .filter(|pixel| pixel.red() > 200 && pixel.green() < 100)
+                .count()
+        };
+        assert!(red(0.1) > 3 * red(0.005));
     }
 
     #[test]
-    fn long_messages_wrap_to_two_lines_and_end_in_an_ellipsis() {
+    fn the_spinner_turns() {
+        let view = view();
+        let content = PanelContent {
+            indicator: Indicator::Spinner,
+            message: None,
+        };
+        let draw = |spin| {
+            view.render(
+                &content,
+                Animation { level: 0.0, spin },
+                2.0,
+                Theme::Dark,
+                BubbleSide::Trailing,
+            )
+            .pixmap
+        };
+        assert_ne!(draw(0.0).data(), draw(0.5).data());
+        assert_eq!(draw(0.25).data(), draw(1.25).data(), "a turn a second");
+    }
+
+    #[test]
+    fn a_long_message_wraps_to_two_lines_and_ends_in_an_ellipsis() {
         let typeface = load_interface_font().expect("a font");
         let text = "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen \
                     sixteen seventeen eighteen nineteen twenty twenty-one twenty-two twenty-three";
-        let lines = typeface.wrap(text, TITLE_EM, MESSAGE_MAX_WIDTH, 2);
+        let lines = typeface.wrap(text, MESSAGE_EM, MESSAGE_MAX_WIDTH, 2);
         assert_eq!(lines.len(), 2);
         assert!(lines[1].ends_with('…'));
         assert!(
             lines
                 .iter()
-                .all(|line| typeface.width(line, TITLE_EM) <= MESSAGE_MAX_WIDTH)
+                .all(|line| typeface.width(line, MESSAGE_EM) <= MESSAGE_MAX_WIDTH)
         );
         assert_eq!(
-            typeface.wrap("Didn't catch that", TITLE_EM, MESSAGE_MAX_WIDTH, 2),
+            typeface.wrap("Didn't catch that", MESSAGE_EM, MESSAGE_MAX_WIDTH, 2),
             ["Didn't catch that"]
         );
     }
@@ -637,7 +609,6 @@ mod tests {
             pixmap,
             width: 1,
             height: 1,
-            cancel: None,
         };
         assert_eq!(rendered.argb8888(), [30, 20, 10, 255]);
     }
