@@ -323,7 +323,15 @@ class TextModel(nn.Module):
 # MARK: - Checkpoint
 
 
-def load_checkpoint(folder):
+def load_checkpoint(folder, config):
+    """The checkpoint's weights in float32, named as transformers names them without "thinker.".
+
+    It is either Qwen's own checkpoint, as transformers saves it, or one mlx-audio made for the
+    Mac app, such as the Sinhala fine-tune (Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit). mlx-audio
+    drops the "thinker." prefix, keeps convolution weights channels last and, when config.json has
+    a "quantization", stores the language model's layers and embeddings quantised; those are put
+    back as PyTorch has them, dequantised to exactly the values the Mac app computes with.
+    """
     from safetensors.torch import load_file
 
     shards = sorted(folder.glob("*.safetensors"))
@@ -332,7 +340,50 @@ def load_checkpoint(folder):
     weights = {}
     for shard in shards:
         weights.update(load_file(shard))
-    return {name.removeprefix("thinker."): tensor.to(torch.float32) for name, tensor in weights.items()}
+    if any(name.startswith("thinker.") for name in weights):
+        return {name.removeprefix("thinker."): tensor.to(torch.float32) for name, tensor in weights.items()}
+    LOG.info("Reading an mlx-audio checkpoint")
+    quantization = config.get("quantization")
+    if quantization:
+        weights = dequantize_mlx(weights, quantization)
+    converted = {}
+    for name, tensor in weights.items():
+        tensor = tensor.to(torch.float32)
+        if name.startswith("audio_tower.conv2d") and name.endswith(".weight"):
+            # MLX's Conv2d weight is [out, height, width, in]; PyTorch's is [out, in, height, width].
+            tensor = tensor.permute(0, 3, 1, 2).contiguous()
+        converted[name] = tensor
+    return converted
+
+
+def dequantize_mlx(weights, quantization):
+    """`weights` with every layer MLX quantised (a uint32 "weight" beside its "scales" and "biases")
+    dequantised: each group of `group_size` inputs is `level × scale + bias`, the levels packed
+    32 / `bits` to a uint32, lowest bits first. Scales and biases are bfloat16, and are widened to
+    float32 before they multiply, as the Sinhala trainer does, so the result is exact."""
+    mode = quantization.get("mode", "affine")
+    bits, group_size = quantization["bits"], quantization["group_size"]
+    if mode != "affine" or 32 % bits:
+        sys.exit(f"the checkpoint is quantised as {quantization}; this script reads only affine quantisation")
+    per_word = 32 // bits
+    shifts = torch.arange(per_word, dtype=torch.int64) * bits
+    dequantized = {}
+    for name, tensor in weights.items():
+        if name.endswith((".scales", ".biases")):
+            continue
+        prefix = name.removesuffix(".weight")
+        scales = weights.get(prefix + ".scales")
+        if scales is None:
+            dequantized[name] = tensor
+            continue
+        biases = weights[prefix + ".biases"]
+        # torch has few operations for uint32, so the words are read as int32 and widened.
+        words = tensor.view(torch.int32).to(torch.int64) & 0xFFFFFFFF
+        levels = (words.unsqueeze(-1) >> shifts) & ((1 << bits) - 1)
+        rows = levels.reshape(tensor.shape[0], -1, group_size).to(torch.float32)
+        values = rows * scales.to(torch.float32).unsqueeze(-1) + biases.to(torch.float32).unsqueeze(-1)
+        dequantized[name] = values.reshape(tensor.shape[0], -1)
+    return dequantized
 
 
 def load_into(module, weights, prefix):
@@ -656,7 +707,7 @@ def main():
     torch.set_grad_enabled(False)
 
     LOG.info("Loading %s", arguments.model)
-    weights = load_checkpoint(arguments.model)
+    weights = load_checkpoint(arguments.model, config)
     conv = load_into(AudioConvolutions(audio_config), weights, "audio_tower.")
     encoder = load_into(AudioEncoder(audio_config), weights, "audio_tower.")
     text = load_into(TextModel(text_config), weights, "model.")
