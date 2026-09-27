@@ -51,11 +51,11 @@
   the dictation ends, what was heard is typed, and the panel says how many seconds it caught.
 - **Change your mind with Esc.** Esc throws the dictation away while you are talking or while
   the text is being prepared, and nothing is typed or saved. (Esc needs the shortcut to be on;
-  the **×** on the panel always cancels.)
-- **Always know what it is doing.** A small panel by your cursor (or near the bottom of the
-  screen in apps that don't report the cursor's position), on any display and over full-screen
-  apps, shows a live microphone level, then **Transcribing…**, and never takes focus from your
-  app. If something needs you, it says so in one plain sentence.
+  **Cancel Dictation** in the menu bar always cancels.)
+- **Always know what it is doing.** A small circle next to the mouse pointer, on any display and
+  over full-screen apps, shows a live microphone level, then a spinner while the text is
+  prepared, and never takes focus or clicks from your app. If something needs you, a bubble
+  beside it says so in one plain sentence.
 - **Speak Sinhala, or 30 other languages.** The speech model works out which language you are
   speaking. Sinhala comes out in Sinhala script with English words in English letters ("meeting
   එක cancel කරන්න"). Cleanup is written for English: Sinhala is typed as recognised, and the

@@ -29,9 +29,8 @@ without cleanup and offers **Retry**.
 - **Double-tap** it to dictate hands-free, and press it once more to finish. (**Double-tap the
   shortcut for hands-free**, on by default.) A single short tap does nothing.
 - **Esc** cancels, while recording or while the text is being prepared. Esc works while the
-  shortcut is running (dictation on and Accessibility granted); the **×** in the floating panel
-  and **Cancel Dictation** in the menu always cancel. A cancelled dictation is neither inserted
-  nor saved.
+  shortcut is running (dictation on and Accessibility granted); **Cancel Dictation** in the menu
+  always cancels. A cancelled dictation is neither inserted nor saved.
 - **Start Dictation** in the menu bar starts a hands-free dictation without the shortcut; press
   the shortcut or choose **Stop Dictation** to finish.
 - The text is inserted in the first way that works:
@@ -62,7 +61,8 @@ without cleanup and offers **Retry**.
 - **Copy Last Dictation** puts the last dictated text on the clipboard, until the app quits.
 - Recordings shorter than 300 ms are ignored ("Didn't catch that").
 - Only the first 5 minutes of a recording are kept (**Longest recording** in **Timing**, from
-  10 seconds to 30 minutes). The panel keeps showing **Listening** and doesn't warn at the limit.
+  10 seconds to 30 minutes). The panel keeps showing the microphone level and doesn't warn at the
+  limit.
   When you finish, those 5 minutes are inserted and the panel says "Recording stopped at 5 min;
   the rest wasn't heard".
 - Long dictations have not been measured. Cleanup runs on the whole dictation in one call,

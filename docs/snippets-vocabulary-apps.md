@@ -48,9 +48,6 @@ In every app, whatever its settings:
   pasted again.
 - **Spaces where they belong.** A space is added after a word, but not after an opening bracket
   or before a full stop, in apps that let Accessibility read the text before the cursor.
-- **The panel sits at your cursor** where the app reports it, and near the bottom of the screen
-  otherwise.
 - **Undo AI Edit stays in its field.** It works only in the app, and the field, the dictation
   went into.
-- **Apps that hide their fields** from Accessibility get paste only, no automatic space, and the
-  panel near the bottom of the screen.
+- **Apps that hide their fields** from Accessibility get paste only and no automatic space.
