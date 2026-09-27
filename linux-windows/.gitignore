@@ -1,2 +1,4 @@
 /target/
 __pycache__/
+# Written by the tray's build step (tauri-build) on every build.
+/crates/app/gen/

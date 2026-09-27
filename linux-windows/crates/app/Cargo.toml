@@ -1,0 +1,39 @@
+[package]
+name = "lt-app"
+description = "The livetranscribe command: dictation with its panel and tray, and transcribing audio files."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "livetranscribe"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+dirs.workspace = true
+hound.workspace = true
+lt-capture.workspace = true
+lt-dictation.workspace = true
+lt-hotkey.workspace = true
+lt-insertion.workspace = true
+lt-shared.workspace = true
+lt-transcription.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# Dictation, with its panel and tray, runs on Linux for now; Windows follows.
+[target.'cfg(target_os = "linux")'.dependencies]
+lt-dictation-ui.workspace = true
+lt-wayland.workspace = true
+tauri.workspace = true
+
+[build-dependencies]
+tauri-build.workspace = true
+
+[lints]
+workspace = true

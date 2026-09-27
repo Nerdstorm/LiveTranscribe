@@ -27,18 +27,24 @@ lt-dictation-ui = { path = "crates/dictation-ui" }
 lt-wayland = { path = "crates/wayland" }
 
 ab_glyph = "0.2"
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
 cpal = "0.18"
 dirs = "6"
 evdev = "0.13"
 fontdb = "0.24"
+hound = "3"
 openvino = { version = "0.11", features = ["runtime-linking"] }
 realfft = "3"
 rubato = "5"
 rustix = { version = "1", features = ["event", "fs", "pipe"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tauri = { version = "2.12", features = ["tray-icon"] }
+tauri-build = "2.7"
 tiny-skia = "0.12"
 tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 unicode-normalization = "0.1"
 unicode-properties = "0.1"
 unicode-segmentation = "1"

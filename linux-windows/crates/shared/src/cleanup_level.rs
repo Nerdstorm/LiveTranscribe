@@ -29,6 +29,26 @@ impl CleanupLevel {
         }
     }
 
+    /// The name menus and settings show.
+    pub fn display_name(self) -> &'static str {
+        match self {
+            Self::None => "None",
+            Self::Light => "Light",
+            Self::Medium => "Medium",
+            Self::High => "High",
+        }
+    }
+
+    /// One line for menus and pickers, as the Mac app says it.
+    pub fn summary(self) -> &'static str {
+        match self {
+            Self::None => "No cleanup, but dictation still applies your snippets, vocabulary and spoken commands",
+            Self::Light => "Punctuation, casing and misheard words",
+            Self::Medium => "Also removes fillers, resolves self-corrections and lays out lists and letters",
+            Self::High => "Also rewords lightly for clarity",
+        }
+    }
+
     pub fn uses_language_model(self) -> bool {
         self != Self::None
     }

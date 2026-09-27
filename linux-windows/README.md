@@ -4,8 +4,13 @@ One Rust codebase for the Linux and Windows desktop app, which will run speech-t
 computer's NPU. The Mac app stays in Swift (`Packages/LiveTranscribeKit`); the two share their
 behaviour through the golden cases in [`Fixtures/golden`](../Fixtures/golden/README.md).
 
-This is the start: the dictation text rules, ported from the Mac app, type the same text as the
-Mac app for all 9,728 golden cases. There is no app to run yet.
+This is the start. The dictation text rules, ported from the Mac app, type the same text as the
+Mac app for all 9,728 golden cases, and speech to text computes Qwen3-ASR's audio features,
+prompt and decoding as the Mac app does, with the model running on OpenVINO. The app,
+`livetranscribe`, dictates on Linux under Wayland as the Mac app does: hold a key and speak, and
+the Mac's panel shows below the text cursor while the text goes straight into the focused field.
+A tray menu starts, stops and cancels dictation, copies the last one and sets the cleanup level.
+It runs on the CPU for now; the settings and history windows, Windows and the NPU come later.
 
 ## Building and testing
 
@@ -37,6 +42,48 @@ same place in both apps:
 | `lt-insertion` | `Insertion` | What is known about the focused field, what the clipboard holds while text is pasted, and what an insertion did |
 | `lt-dictation-ui` | `DictationUI` | The panel shown while dictating (what it shows when, drawn to pixels) and what the tray says, with its icons |
 | `lt-wayland` | `Insertion`'s typing and the HUD's window, for Wayland | One connection for the desktop: the input method (input-method-v2), which reads the focused field and types straight into it; pasting where no field takes one (ext-data-control and a virtual keyboard); the panel below the text cursor, or at the bottom of the screen (wlr-layer-shell) |
+| `lt-app` | the app | The `livetranscribe` command: `run` (dictation, with the tray, Tauri's), `keys`, `transcribe` |
+
+## Running it
+
+The app needs OpenVINO 2026.2 and the speech model converted for it. On the owner's Fedora
+machine, the setup kit (not in the repository) installs both in an Ubuntu 24.04 toolbox. By hand:
+
+1. Install OpenVINO's runtime and point `INTEL_OPENVINO_DIR` at it, with its `runtime/lib/intel64`
+   and `runtime/3rdparty/tbb/lib` on `LD_LIBRARY_PATH`. The app loads it when it starts, so it
+   builds without it.
+2. Convert the model, in a Python environment with `openvino==2026.2.1`, `nncf==3.2.0`,
+   `transformers==5.13.1` and CPU PyTorch:
+
+   ```bash
+   python tools/export-qwen3-asr.py --model /path/to/Qwen3-ASR-0.6B --out ~/.local/share/live-transcribe/models/qwen3-asr-0.6b
+   ```
+
+   It writes the audio convolutions and encoder (fp16) and the language model (int8 weights, its
+   KV cache kept as state), then checks each against PyTorch, and checks that OpenVINO's model
+   cache gives them back unchanged: OpenVINO 2026.2.1's CPU plugin corrupts one way of writing
+   RoPE in its cache, which made every start after the first transcribe gibberish.
+3. `cargo build --release -p lt-app` (the tray builds against WebKitGTK, libxdo and the app
+   indicator library: Tauri's prerequisites), then:
+
+   ```bash
+   target/release/livetranscribe run
+   ```
+
+   Its options go after `run`: `livetranscribe run --key KEY_RIGHTALT` holds Right Alt instead of
+   Right Ctrl. `livetranscribe keys` names the keys you press.
+
+Dictation reads the keyboard from `/dev/input`, so the user needs read access to it; a udev rule
+with `TAG+="uaccess"` gives it to whoever is logged in at the machine. The app registers as the
+desktop's input method, so text goes straight into fields that take one (GTK, Qt, Firefox,
+Chromium with Wayland IME, COSMIC's apps and most Wayland terminals). Those fields say what they
+are: password fields are refused, as on the Mac; terminals and fields for one value (an address, a
+number) keep dictated text on one line, and other fields take line breaks, as the Mac app decides
+(most say nothing either way); and the character before the cursor decides the leading space.
+Elsewhere it pastes: the text goes on the clipboard, a virtual keyboard types Ctrl+V, and the
+clipboard is put back. COSMIC has everything this needs. KDE Plasma has no input-method-v2, so
+there it always pastes and the panel shows at the bottom of the screen; GNOME has none of it. With
+IBus or Fcitx running, they hold the input method, and the app pastes.
 
 ## Matching the Mac app
 
