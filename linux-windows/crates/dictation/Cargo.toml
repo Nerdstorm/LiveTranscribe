@@ -1,0 +1,24 @@
+[package]
+name = "lt-dictation"
+description = "Turns a transcript into the text dictation types."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lt-shared.workspace = true
+lt-styles.workspace = true
+lt-spoken-commands.workspace = true
+lt-snippets.workspace = true
+lt-vocabulary.workspace = true
+lt-cleanup.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+serde.workspace = true
+serde_json.workspace = true

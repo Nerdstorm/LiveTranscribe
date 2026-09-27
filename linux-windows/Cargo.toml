@@ -1,0 +1,43 @@
+# Live Transcribe for Linux and Windows. One crate per slice, mirroring the Mac app's Swift
+# package (Packages/LiveTranscribeKit), so a rule lives in the same-named place in both. The
+# golden cases in ../Fixtures/golden keep the two implementations typing the same text.
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.98"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+lt-shared = { path = "crates/shared" }
+lt-styles = { path = "crates/styles" }
+lt-spoken-commands = { path = "crates/spoken-commands" }
+lt-snippets = { path = "crates/snippets" }
+lt-vocabulary = { path = "crates/vocabulary" }
+lt-cleanup = { path = "crates/cleanup" }
+lt-dictation = { path = "crates/dictation" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+unicode-normalization = "0.1"
+unicode-properties = "0.1"
+unicode-segmentation = "1"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+# The text rules walk strings character by character (grapheme clusters), which is ten times
+# slower unoptimised. Light optimisation in debug builds, and full for dependencies, keeps the
+# golden cases at about a second under `cargo test`.
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
