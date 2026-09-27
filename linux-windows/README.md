@@ -10,9 +10,10 @@ prompt and decoding as the Mac app does, with the model running on OpenVINO. The
 `livetranscribe`, dictates on Linux under Wayland as the Mac app does: hold a key and speak, and
 a small circle by the mouse pointer shows the microphone's level while the text goes straight into
 the focused field.
-A tray menu starts, stops and cancels dictation, copies the last one and sets the cleanup level.
-The speech model, the Mac app's Sinhala fine-tune of Qwen3-ASR, runs on the NPU of an Intel Core
-Ultra, or on the CPU. The settings and history windows, and Windows, come later.
+A tray menu starts, stops and cancels dictation, copies the last one, sets the cleanup level and
+opens Settings, whose General and Advanced tabs change dictation without a restart. The speech
+model, the Mac app's Sinhala fine-tune of Qwen3-ASR, runs on the NPU of an Intel Core Ultra, or on
+the CPU. Settings' other tabs, the history window, and Windows come later.
 
 ## Building and testing
 
@@ -43,11 +44,11 @@ same place in both apps:
 | `lt-dictation` | `Dictation` | The dictation flow from hotkey to typed text, and a transcript to the text it types |
 | `lt-transcription` | `Transcription`, and mlx-audio-swift's Qwen3-ASR | Speech to text: the log-mel features, the encoder's chunks and windows, the prompt, greedy decoding and its limits. The model's forward passes are behind the `SpeechModel` trait; `OpenVinoModel` runs them on OpenVINO |
 | `lt-hotkey` | `Hotkey` | The hold, tap and double-tap gesture; what each key means for it; on Linux, reading the keyboards (evdev) |
-| `lt-capture` | `Capture` | Recording the default microphone (cpal) as 16 kHz mono, and its level for the meter |
+| `lt-capture` | `Capture` | Recording the microphone chosen in Settings, or the default one (cpal; on Linux, the sound server's), as 16 kHz mono, and its level for the meter |
 | `lt-insertion` | `Insertion` | What is known about the focused field, what the clipboard holds while text is pasted, and what an insertion did |
 | `lt-dictation-ui` | `DictationUI` | The panel shown while dictating (what it shows when, drawn to pixels, and where by the pointer) and what the tray says, with its icons |
 | `lt-wayland` | `Insertion`'s typing and the HUD's window, for Wayland | One connection for the desktop: the input method (input-method-v2), which reads the focused field and types straight into it; pasting where no field takes one (ext-data-control and a virtual keyboard); the panel by the mouse pointer (wlr-layer-shell, with ext-image-copy-capture's cursor sessions saying where the pointer is), or at the bottom of the screen |
-| `lt-app` | the app | The `livetranscribe` command: `run` (dictation, with the tray, Tauri's), `keys`, `transcribe` |
+| `lt-app` | the app | The `livetranscribe` command: `run` (dictation, with the tray and the Settings window, Tauri's; `ui/` holds the window's page), `keys`, `transcribe`; the settings file |
 
 ## Running it
 
@@ -75,7 +76,8 @@ machine, the setup kit (not in the repository) installs both in an Ubuntu 24.04 
    runs 50 times faster than asymmetric ones; its KV cache kept as state), then checks each against
    PyTorch, and checks that OpenVINO's model cache gives them back unchanged: OpenVINO 2026.2.1's
    CPU plugin corrupts one way of writing RoPE in its cache, which made every start after the first
-   transcribe gibberish.
+   transcribe gibberish. Settings › Advanced chooses among the models converted into
+   `~/.local/share/live-transcribe/models`.
 3. `cargo build --release -p lt-app` (the tray builds against WebKitGTK, libxdo and the app
    indicator library: Tauri's prerequisites), then:
 
@@ -83,15 +85,18 @@ machine, the setup kit (not in the repository) installs both in an Ubuntu 24.04 
    target/release/livetranscribe run
    ```
 
-   Its options go after `run`: `livetranscribe run --key KEY_RIGHTALT` holds Right Alt instead of
-   Right Ctrl. `livetranscribe keys` names the keys you press.
+   The tray's *Settings…* sets the hotkey, hands-free, the cleanup level, the microphone, the
+   timing, and the model and where it runs, each at once, and keeps them in
+   `~/.config/live-transcribe/settings.json`. Options after `run` set one for that run only:
+   `livetranscribe run --key KEY_RIGHTALT` holds Right Alt instead of Right Ctrl.
+   `livetranscribe keys` names the keys you press.
 
 The speech model runs on the NPU when OpenVINO sees one: the audio encoder at fixed shapes, and the
 language model in the NPU's LLM mode, for prompts of up to 1,024 tokens (about 75 seconds of
 speech). A longer prompt, a reply that outgrows the NPU's cache, and anything the NPU can't compile
-go to the CPU. `--device CPU` keeps it all on the CPU. The first start compiles the model for the
-NPU, which takes a few seconds; OpenVINO keeps what it compiled in `~/.cache/live-transcribe`, so
-later starts take under a second.
+go to the CPU. Settings › Advanced (or `--device CPU`) keeps it all on the CPU. The first start
+compiles the model for the NPU, which takes a few seconds; OpenVINO keeps what it compiled in
+`~/.cache/live-transcribe`, so later starts take under a second.
 
 Dictation reads the keyboard from `/dev/input`, so the user needs read access to it; a udev rule
 with `TAG+="uaccess"` gives it to whoever is logged in at the machine. The app registers as the

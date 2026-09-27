@@ -11,7 +11,10 @@ use lt_dictation_ui::{PanelContent, PanelModel};
 use lt_insertion::InsertionTarget;
 use lt_wayland::WaylandSession;
 
+use super::configuration;
 use super::engine::Message;
+use super::transcriber::Jobs;
+use crate::settings::Settings;
 
 /// Milliseconds since the engine started: the one clock the controller and the panel share.
 #[derive(Clone, Copy, Debug)]
@@ -29,7 +32,8 @@ impl Clock {
 
 pub(crate) struct Platform {
     recorder: Recorder,
-    transcriber: Sender<(Job, Vec<f32>)>,
+    /// The speech model's jobs, while it is loaded.
+    transcriber: Option<Jobs>,
     session: WaylandSession,
     messages: Sender<Message>,
     panel: PanelModel,
@@ -41,7 +45,6 @@ pub(crate) struct Platform {
 impl Platform {
     pub(crate) fn new(
         recorder: Recorder,
-        transcriber: Sender<(Job, Vec<f32>)>,
         session: WaylandSession,
         messages: Sender<Message>,
         panel: PanelModel,
@@ -49,13 +52,25 @@ impl Platform {
     ) -> Self {
         Self {
             recorder,
-            transcriber,
+            transcriber: None,
             session,
             messages,
             panel,
             shown: None,
             clock,
         }
+    }
+
+    /// Sends jobs to `transcriber` from now on; `None` while no model is loaded.
+    pub(crate) fn set_transcriber(&mut self, transcriber: Option<Jobs>) {
+        self.transcriber = transcriber;
+    }
+
+    /// Records, shows messages and pastes with `settings` from the next time each happens.
+    pub(crate) fn configure(&mut self, settings: &Settings) {
+        self.recorder.configure(configuration::recorder(settings));
+        self.panel.set_notice_ms(configuration::notice_ms(settings));
+        self.session.set_insertion(configuration::insertion(settings));
     }
 
     /// When the panel's message runs out: call [`Self::advance_panel`] then.
@@ -85,6 +100,12 @@ impl Platform {
 impl Dependencies for Platform {
     fn start_recording(&mut self) -> Result<(), String> {
         let input = self.recorder.start().map_err(|error| error.to_string())?;
+        if input.chosen_missing {
+            eprintln!(
+                "⚠ The microphone chosen in Settings isn't connected; recording from {}",
+                input.device
+            );
+        }
         tracing::info!(
             "Recording from {} at {} Hz, {} channels",
             input.device,
@@ -112,10 +133,14 @@ impl Dependencies for Platform {
     }
 
     fn transcribe(&mut self, job: Job, samples: Vec<f32>) {
-        if self.transcriber.send((job, samples)).is_err() {
+        let sent = match &self.transcriber {
+            Some(transcriber) => transcriber.send((job, samples)).is_ok(),
+            None => false,
+        };
+        if !sent {
             let _ = self.messages.send(Message::Transcribed {
                 job,
-                result: Err("the speech model has stopped; restart livetranscribe".to_owned()),
+                result: Err("the speech model isn't loaded".to_owned()),
             });
         }
     }

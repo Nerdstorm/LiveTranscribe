@@ -8,8 +8,9 @@
   "app": {
     "windows": [],
     "security": {
-      "csp": "default-src 'self'"
-    }
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost"
+    },
+    "withGlobalTauri": true
   },
   "bundle": {
     "active": false,

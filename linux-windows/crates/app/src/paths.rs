@@ -1,5 +1,6 @@
-//! Where the app keeps its files: the platform's data and cache folders (on Linux,
-//! `$XDG_DATA_HOME` and `$XDG_CACHE_HOME`, or `~/.local/share` and `~/.cache`), in `live-transcribe`.
+//! Where the app keeps its files: the platform's data, config and cache folders (on Linux,
+//! `$XDG_DATA_HOME`, `$XDG_CONFIG_HOME` and `$XDG_CACHE_HOME`, or `~/.local/share`, `~/.config`
+//! and `~/.cache`), in `live-transcribe`.
 
 use std::path::PathBuf;
 
@@ -27,4 +28,13 @@ pub fn default_model() -> anyhow::Result<PathBuf> {
 /// Where OpenVINO keeps compiled models between runs.
 pub fn openvino_cache() -> Option<PathBuf> {
     dirs::cache_dir().map(|cache| cache.join(APP_FOLDER).join("openvino"))
+}
+
+/// The settings file.
+#[cfg(target_os = "linux")]
+pub fn settings_file() -> anyhow::Result<PathBuf> {
+    Ok(dirs::config_dir()
+        .context("the config folder is unknown; set HOME or XDG_CONFIG_HOME")?
+        .join(APP_FOLDER)
+        .join("settings.json"))
 }

@@ -6,6 +6,8 @@ mod dictation;
 #[cfg(target_os = "linux")]
 mod keys;
 mod paths;
+#[cfg(target_os = "linux")]
+mod settings;
 mod transcribe;
 mod wav;
 
@@ -42,7 +44,8 @@ struct ModelOptions {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Dictation: hold the hotkey, speak, and the text is typed into the focused app
+    /// Dictation: hold the hotkey, speak, and the text is typed into the focused app. The tray's
+    /// Settings… sets it up; the options here set it for one run
     #[cfg(target_os = "linux")]
     Run(dictation::Options),
     /// Prints the name of each key pressed, for choosing the hotkey

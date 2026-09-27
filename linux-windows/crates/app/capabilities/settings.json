@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "settings",
+  "description": "The Settings window hears changed settings and how dictation stands. The app's own commands need no permission.",
+  "windows": ["settings"],
+  "permissions": ["core:event:default"]
+}

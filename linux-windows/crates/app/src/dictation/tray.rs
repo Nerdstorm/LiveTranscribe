@@ -1,57 +1,76 @@
 //! The tray icon and its menu, as the Mac app's menu bar extra (MenuBarContent) has them: the
 //! status line, Start or Stop Dictation, Cancel Dictation, Copy Last Dictation, the Cleanup level,
-//! and Quit. Tauri owns the main thread and the menu; the engine's status arrives from its thread,
-//! and the menu's choices go back to it as messages. The icon is drawn for the desktop's light or
-//! dark mode each time it changes.
+//! Settings and Quit. Tauri owns the main thread, the menu and the Settings window; the engine's
+//! status arrives from its thread, and the menu's choices go back to it as messages, or as changed
+//! settings. The icon is drawn for the desktop's light or dark mode each time it changes.
 
 use std::cell::Cell;
+use std::sync::Arc;
 use std::sync::mpsc::Sender;
 
 use anyhow::Context;
-use lt_dictation_ui::{MenuBarIcon, MenuBarStatus, Theme, draw_icon};
+use lt_dictation_ui::{MenuBarIcon, MenuBarStatus, ModelState, Theme, draw_icon};
 use lt_shared::CleanupLevel;
+use serde_json::{Map, Value};
 use tauri::image::Image;
 use tauri::menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{TrayIcon, TrayIconBuilder};
 use tauri::{AppHandle, RunEvent, Wry};
 
-use super::engine::{MenuCommand, Message};
+use super::engine::{DictationStatus, MenuCommand, Message, StatusSink};
+use crate::settings::{self, AppControl, SettingsService, StatusView, WindowState};
 
 /// Pixels on a side of the tray icon; the tray scales it to fit.
 const ICON_SIZE: u32 = 64;
-
-/// What the tray shows.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct TrayStatus {
-    pub(crate) menu: MenuBarStatus,
-    pub(crate) cleanup: CleanupLevel,
-}
-
-/// Where the engine sends the status, from its thread.
-pub(crate) type StatusSink = Box<dyn Fn(&TrayStatus) + Send>;
 
 /// Runs the app's main loop with the tray in it, calling `start` once the tray is up. Returns
 /// only if the tray can't start: quitting ends the process.
 pub(crate) fn run(
     messages: Sender<Message>,
-    cleanup: CleanupLevel,
+    settings: Arc<SettingsService>,
+    control: Box<dyn AppControl>,
     start: impl FnOnce(StatusSink) + Send + 'static,
 ) -> anyhow::Result<()> {
     let app = tauri::Builder::default()
+        .manage(WindowState::new(Arc::clone(&settings), control))
+        .invoke_handler(settings::commands())
         .setup(move |app| {
-            let tray = Tray::build(app.handle(), messages, cleanup)?;
-            start(Box::new(move |status| tray.show(status)));
+            settings::follow_changes(app.handle(), &settings);
+            let tray = Tray::build(app.handle(), messages, settings)?;
+            let handle = app.handle().clone();
+            start(Box::new(move |status| {
+                tray.show(status);
+                settings::show_status(&handle, status_view(status));
+            }));
             Ok(())
         })
         .build(tauri::generate_context!())
         .context("couldn't start the tray")?;
     app.run(|_, event| {
-        // Closing a window (Settings, one day) leaves the app running in the tray.
+        // Closing the Settings window leaves the app running in the tray.
         if let RunEvent::ExitRequested { code: None, api, .. } = event {
             api.prevent_exit();
         }
     });
     Ok(())
+}
+
+/// How dictation stands, for the Settings window.
+fn status_view(status: &DictationStatus) -> StatusView {
+    match &status.model {
+        ModelState::Loading => StatusView {
+            model: "loading",
+            detail: None,
+        },
+        ModelState::Ready => StatusView {
+            model: "ready",
+            detail: status.placement.clone(),
+        },
+        ModelState::Failed(error) => StatusView {
+            model: "failed",
+            detail: Some(error.clone()),
+        },
+    }
 }
 
 struct Tray {
@@ -66,7 +85,8 @@ struct Tray {
 }
 
 impl Tray {
-    fn build(app: &AppHandle, messages: Sender<Message>, cleanup: CleanupLevel) -> tauri::Result<Self> {
+    fn build(app: &AppHandle, messages: Sender<Message>, settings: Arc<SettingsService>) -> tauri::Result<Self> {
+        let cleanup = settings.current().0.cleanup_level;
         let status = MenuItem::with_id(app, "status", "Loading speech models…", false, None::<&str>)?;
         let toggle = MenuItem::with_id(app, "toggle", "Start Dictation", false, None::<&str>)?;
         let cancel = MenuItem::with_id(app, "cancel", "Cancel Dictation", false, None::<&str>)?;
@@ -88,6 +108,7 @@ impl Tray {
         let level_items: Vec<&dyn IsMenuItem<Wry>> =
             levels.iter().map(|(_, item)| item as &dyn IsMenuItem<Wry>).collect();
         let cleanup_menu = Submenu::with_id_and_items(app, "cleanup", "Cleanup", true, &level_items)?;
+        let open_settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
         let quit = MenuItem::with_id(app, "quit", "Quit Live Transcribe", true, None::<&str>)?;
         let menu = Menu::with_items(
             app,
@@ -99,6 +120,7 @@ impl Tray {
                 &copy,
                 &PredefinedMenuItem::separator(app)?,
                 &cleanup_menu,
+                &open_settings,
                 &PredefinedMenuItem::separator(app)?,
                 &quit,
             ],
@@ -112,26 +134,25 @@ impl Tray {
             .show_menu_on_left_click(true)
             .on_menu_event(move |app, event| {
                 let command = match event.id().as_ref() {
-                    "toggle" => Some(MenuCommand::ToggleDictation),
-                    "cancel" => Some(MenuCommand::CancelDictation),
-                    "copy" => Some(MenuCommand::CopyLastDictation),
+                    "toggle" => Some(MenuCommand::Toggle),
+                    "cancel" => Some(MenuCommand::Cancel),
+                    "copy" => Some(MenuCommand::CopyLast),
+                    "settings" => {
+                        if let Err(error) = settings::open_window(app) {
+                            tracing::error!("Couldn't open the Settings window: {error}");
+                        }
+                        None
+                    }
                     "quit" => {
                         app.exit(0);
                         None
                     }
-                    id => choices
-                        .iter()
-                        .find(|(level, _)| id == cleanup_id(*level))
-                        .map(|(level, _)| {
-                            // Each item ticks itself when chosen; the rest untick here, so the
-                            // four read as one choice.
-                            for (other, item) in &choices {
-                                if let Err(error) = item.set_checked(other == level) {
-                                    tracing::warn!("Couldn't update the Cleanup menu: {error}");
-                                }
-                            }
-                            MenuCommand::SetCleanup(*level)
-                        }),
+                    id => {
+                        if let Some((level, _)) = choices.iter().find(|(level, _)| id == cleanup_id(*level)) {
+                            choose_cleanup(&settings, &choices, *level);
+                        }
+                        None
+                    }
                 };
                 if let Some(command) = command {
                     let _ = messages.send(Message::Menu(command));
@@ -149,8 +170,13 @@ impl Tray {
         })
     }
 
-    fn show(&self, status: &TrayStatus) {
-        let menu = &status.menu;
+    fn show(&self, status: &DictationStatus) {
+        let menu = &MenuBarStatus::new(
+            status.phase,
+            &status.model,
+            status.hotkey.as_deref(),
+            status.has_last_dictation,
+        );
         let indicator = &menu.indicator;
         let mut results = vec![
             self.status.set_text(indicator.status_text()),
@@ -173,6 +199,25 @@ impl Tray {
         );
         for error in results.into_iter().filter_map(Result::err) {
             tracing::warn!("Couldn't update the tray: {error}");
+        }
+    }
+}
+
+/// Saves the cleanup level chosen in the menu, which tells dictation and the Settings window.
+fn choose_cleanup(settings: &SettingsService, choices: &[(CleanupLevel, CheckMenuItem<Wry>)], chosen: CleanupLevel) {
+    let mut change = Map::new();
+    change.insert("cleanupLevel".to_owned(), Value::from(chosen.as_str()));
+    let level = match settings.change(&change) {
+        Ok(settings) => settings.cleanup_level,
+        Err(error) => {
+            tracing::error!("Couldn't change the cleanup level: {error}");
+            settings.current().0.cleanup_level
+        }
+    };
+    // Each item ticks itself when chosen; the rest untick here, so the four read as one choice.
+    for (other, item) in choices {
+        if let Err(error) = item.set_checked(*other == level) {
+            tracing::warn!("Couldn't update the Cleanup menu: {error}");
         }
     }
 }

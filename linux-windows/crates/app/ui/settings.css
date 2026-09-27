@@ -1,0 +1,447 @@
+/* Settings, in the look of a Linux desktop's own preferences: a tab switcher in the header, then
+   groups of rows, each row a title and a line of help on the left and its control on the right.
+   Light and dark follow the desktop (settings.js sets data-theme from the app's own reading of
+   it); the system's preference is the fallback. */
+
+:root {
+  --ground: #f4f4f6;
+  --card: #ffffff;
+  --card-hover: #f8f8fa;
+  --line: rgb(20 20 40 / 9%);
+  --text: #1d1d1f;
+  --muted: #676771;
+  --accent: #2b6fd6;
+  --accent-text: #ffffff;
+  --accent-soft: rgb(43 111 214 / 14%);
+  --control: #e7e7ec;
+  --control-line: rgb(20 20 40 / 16%);
+  --knob: #ffffff;
+  --override: #93540a;
+  --problem: #c22f2f;
+  --ready: #2f9e57;
+  --busy: #d08b12;
+  --toast: #2b2b30;
+  --toast-text: #f4f4f6;
+  --shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 0 0 1px var(--line);
+  --radius: 12px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #1c1c1f;
+    --card: #28282c;
+    --card-hover: #2e2e33;
+    --line: rgb(255 255 255 / 8%);
+    --text: #f2f2f4;
+    --muted: #a2a2ad;
+    --accent: #5b9bff;
+    --accent-text: #0e1726;
+    --accent-soft: rgb(91 155 255 / 18%);
+    --control: #3a3a40;
+    --control-line: rgb(255 255 255 / 14%);
+    --knob: #f2f2f4;
+    --override: #f1b35c;
+    --problem: #ff7a72;
+    --ready: #5ccf86;
+    --busy: #f0b54a;
+    --toast: #f2f2f4;
+    --toast-text: #1c1c1f;
+    --shadow: 0 0 0 1px var(--line);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground: #1c1c1f;
+  --card: #28282c;
+  --card-hover: #2e2e33;
+  --line: rgb(255 255 255 / 8%);
+  --text: #f2f2f4;
+  --muted: #a2a2ad;
+  --accent: #5b9bff;
+  --accent-text: #0e1726;
+  --accent-soft: rgb(91 155 255 / 18%);
+  --control: #3a3a40;
+  --control-line: rgb(255 255 255 / 14%);
+  --knob: #f2f2f4;
+  --override: #f1b35c;
+  --problem: #ff7a72;
+  --ready: #5ccf86;
+  --busy: #f0b54a;
+  --toast: #f2f2f4;
+  --toast-text: #1c1c1f;
+  --shadow: 0 0 0 1px var(--line);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font: 14px/1.4 system-ui, "Open Sans", "Cantarell", "Noto Sans", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The header and its tabs */
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  padding: 10px 16px;
+  background: var(--ground);
+  border-bottom: 1px solid var(--line);
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--control);
+}
+
+.tab {
+  min-width: 108px;
+  padding: 5px 16px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tab[aria-selected="true"] {
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+}
+
+/* Groups and rows */
+
+main {
+  max-width: 660px;
+  margin: 0 auto;
+  padding: 20px 20px 40px;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.group h2 {
+  margin: 0 0 8px 2px;
+  font-size: 14px;
+  font-weight: 650;
+  text-wrap: balance;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 56px;
+  padding: 10px 16px;
+}
+
+.row + .row {
+  border-top: 1px solid var(--line);
+}
+
+label.row {
+  cursor: pointer;
+}
+
+label.row:hover {
+  background: var(--card-hover);
+}
+
+.text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.title {
+  font-weight: 500;
+}
+
+.subtitle {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.override {
+  color: var(--override);
+  font-size: 12.5px;
+}
+
+.group > .override {
+  display: block;
+  margin: 6px 2px 0;
+}
+
+.problem {
+  color: var(--problem);
+  font-size: 12.5px;
+}
+
+.footnote {
+  max-width: 62ch;
+  margin: 8px 2px 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+code {
+  font: 12px ui-monospace, "Fira Mono", "DejaVu Sans Mono", monospace;
+}
+
+/* Controls */
+
+.switch {
+  flex: none;
+  position: relative;
+  width: 42px;
+  height: 24px;
+  margin: 0;
+  border-radius: 12px;
+  background: var(--control);
+  box-shadow: inset 0 0 0 1px var(--control-line);
+  appearance: none;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--knob);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 25%);
+  transition: transform 120ms ease;
+}
+
+.switch:checked {
+  background: var(--accent);
+  box-shadow: none;
+}
+
+.switch:checked::after {
+  transform: translateX(18px);
+}
+
+select {
+  flex: none;
+  max-width: 55%;
+  padding: 5px 8px;
+  border: 1px solid var(--control-line);
+  border-radius: 8px;
+  background: var(--control);
+}
+
+.number {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.number input {
+  width: 84px;
+  padding: 5px 8px;
+  border: 1px solid var(--control-line);
+  border-radius: 8px;
+  background: var(--control);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.unit {
+  width: 22px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.keycap {
+  flex: none;
+  min-width: 112px;
+  padding: 5px 14px;
+  border: 1px solid var(--control-line);
+  border-bottom-width: 3px;
+  border-radius: 8px;
+  background: var(--card);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.keycap.recording {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  animation: breathe 1.4s ease-in-out infinite;
+}
+
+.plain {
+  flex: none;
+  padding: 6px 14px;
+  border: 1px solid var(--control-line);
+  border-radius: 8px;
+  background: var(--control);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.plain:hover {
+  background: var(--card-hover);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Cleanup: a radio per level */
+
+.choice input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+/* The model's status */
+
+.status .light {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--busy);
+  animation: breathe 1.4s ease-in-out infinite;
+}
+
+.status[data-state="ready"] .light {
+  background: var(--ready);
+  animation: none;
+}
+
+.status[data-state="failed"] .light {
+  background: var(--problem);
+  animation: none;
+}
+
+.status .subtitle {
+  overflow-wrap: anywhere;
+}
+
+/* Timing folds away, as on the Mac */
+
+details > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+  cursor: pointer;
+}
+
+details > summary::-webkit-details-marker {
+  display: none;
+}
+
+details > summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  margin: 0 2px 8px 4px;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 6px solid var(--muted);
+  transition: transform 120ms ease;
+}
+
+details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+/* A message about a change that couldn't be made */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  max-width: min(560px, calc(100% - 32px));
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--toast);
+  color: var(--toast-text);
+  font-size: 13px;
+  transform: translateX(-50%);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 25%);
+}
+
+@keyframes breathe {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .row {
+    flex-wrap: wrap;
+  }
+
+  select {
+    max-width: 100%;
+  }
+}

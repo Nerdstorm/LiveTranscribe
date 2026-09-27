@@ -30,6 +30,7 @@ tracing-subscriber.workspace = true
 [target.'cfg(target_os = "linux")'.dependencies]
 lt-dictation-ui.workspace = true
 lt-wayland.workspace = true
+serde.workspace = true
 tauri.workspace = true
 
 [build-dependencies]
