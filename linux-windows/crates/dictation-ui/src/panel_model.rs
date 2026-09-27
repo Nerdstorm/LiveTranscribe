@@ -71,6 +71,11 @@ impl PanelModel {
         }
     }
 
+    /// How long each message shows from the next one on.
+    pub fn set_notice_ms(&mut self, notice_ms: u64) {
+        self.notice_ms = notice_ms;
+    }
+
     pub fn phase(&self) -> Phase {
         self.phase
     }

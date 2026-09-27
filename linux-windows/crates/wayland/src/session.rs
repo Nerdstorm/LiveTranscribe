@@ -71,6 +71,7 @@ pub(crate) enum Command {
         done: Done,
     },
     Copy(String),
+    Configure(InsertionConfiguration),
     Panel(Option<PanelContent>),
 }
 
@@ -144,6 +145,11 @@ impl WaylandSession {
     /// Puts `text` on the clipboard, as copying it in an app would.
     pub fn copy(&self, text: String) {
         self.send(Command::Copy(text));
+    }
+
+    /// Pastes with `configuration` from the next paste on.
+    pub fn set_insertion(&self, configuration: InsertionConfiguration) {
+        self.send(Command::Configure(configuration));
     }
 
     /// Shows the dictation panel with `content`, or hides it.

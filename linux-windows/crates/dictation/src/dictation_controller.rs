@@ -177,6 +177,13 @@ impl<D: Dependencies> DictationController<D> {
         self.configuration.text.level = level;
     }
 
+    /// Settings changed: the text rules and limits apply from the next dictation transcribed, and
+    /// the gesture's timing from the next gesture.
+    pub fn set_configuration(&mut self, configuration: ControllerConfiguration) {
+        self.gesture.set_configuration(configuration.gesture);
+        self.configuration = configuration;
+    }
+
     /// The last text dictated, as the text rules made it, for *Copy Last Dictation*. Nothing
     /// after a dictation into a private field.
     pub fn last_text(&self) -> Option<&str> {

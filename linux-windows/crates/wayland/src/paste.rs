@@ -111,6 +111,11 @@ pub(crate) struct Paster {
 }
 
 impl Paster {
+    /// Pastes from now on with `configuration`; a paste under way keeps its timing.
+    pub(crate) fn set_configuration(&mut self, configuration: InsertionConfiguration) {
+        self.configuration = configuration;
+    }
+
     pub(crate) fn bind(
         globals: &GlobalList,
         seat: &WlSeat,

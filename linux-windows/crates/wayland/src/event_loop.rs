@@ -244,6 +244,7 @@ impl Session {
             }
             Command::Insert { text, done } => self.waiting.push_back((text, done)),
             Command::Copy(text) => self.paster.copy(&mut self.wayland, &text)?,
+            Command::Configure(insertion) => self.paster.set_configuration(insertion),
             Command::Panel(content) => {
                 if let Some(panel) = &mut self.panel {
                     panel.show(content);
