@@ -35,7 +35,7 @@ impl EncoderLayout {
             .map(|start| CHUNK_FRAMES.min(frames - start))
             .collect();
         let padded_length = chunk_lengths[0];
-        let convolved_length = convolved(convolved(convolved(padded_length)));
+        let convolved_length = chunk_rows(padded_length);
         let chunk_rows: Vec<usize> = chunk_lengths
             .iter()
             .map(|&length| convolved_length.min(placeholders(length)))
@@ -111,8 +111,13 @@ pub fn placeholders(frames: usize) -> usize {
     (after_third as f32 + frames as f32 / 100.0 * 13.0) as usize
 }
 
+/// Rows the encoder's three convolutions make of a chunk of `frames` frames.
+pub(crate) const fn chunk_rows(frames: usize) -> usize {
+    convolved(convolved(convolved(frames)))
+}
+
 /// Rows a 3×3 convolution with stride 2 and padding 1 makes of `length` rows.
-fn convolved(length: usize) -> usize {
+const fn convolved(length: usize) -> usize {
     (length - 1) / 2 + 1
 }
 

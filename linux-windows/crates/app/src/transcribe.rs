@@ -19,10 +19,10 @@ pub fn run(options: &ModelOptions, files: &[PathBuf], json: bool) -> anyhow::Res
     let mut transcriber = open_transcriber(&folder, &options.device, paths::openvino_cache().as_deref())
         .with_context(|| format!("couldn't load the speech model from {}", folder.display()))?;
     eprintln!(
-        "Loaded {} on {} in {:.1} s",
+        "Loaded {} in {:.1} s: {}",
         folder.display(),
-        options.device,
-        started.elapsed().as_secs_f32()
+        started.elapsed().as_secs_f32(),
+        transcriber.model().placement()
     );
 
     for file in files {

@@ -23,7 +23,7 @@ use lt_shared::audio_format::{SAMPLE_RATE, samples_for_milliseconds};
 pub use encoder_layout::{CHUNK_FRAMES, CHUNKS_PER_WINDOW, EncoderLayout, placeholders};
 pub use generation::{Decoded, Stop};
 pub use log_mel::{HOP_LENGTH, LogMel, LogMelError, LogMelExtractor, MEL_BINS, N_FFT};
-pub use openvino_model::{OpenError, OpenVinoError, OpenVinoModel, open_transcriber};
+pub use openvino_model::{DeviceChoice, OpenError, OpenVinoError, OpenVinoModel, open_transcriber};
 pub use prompt::PromptFormat;
 pub use tokenizer::{Tokenizer, TokenizerError};
 pub use transcript::{Languages, Reply};
@@ -230,6 +230,11 @@ impl<M: SpeechModel> Transcriber<M> {
             languages,
             log_mel: LogMelExtractor::new(),
         })
+    }
+
+    /// The model it runs, to ask where it runs.
+    pub fn model(&self) -> &M {
+        &self.model
     }
 
     /// The transcript of `samples`, 16 kHz mono.

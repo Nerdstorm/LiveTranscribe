@@ -23,7 +23,7 @@ pub(crate) fn spawn(options: &ModelOptions, messages: Sender<Message>) -> anyhow
     let device = options.device.clone();
     let (jobs, received) = mpsc::channel::<(Job, Vec<f32>)>();
     let (ready, answer) = mpsc::channel();
-    eprintln!("Loading the speech model on {device}");
+    eprintln!("Loading the speech model");
     thread::Builder::new()
         .name("transcriber".to_owned())
         .spawn(move || {
@@ -41,7 +41,7 @@ pub(crate) fn spawn(options: &ModelOptions, messages: Sender<Message>) -> anyhow
             if let Err(error) = transcriber.transcribe(&vec![0.0; SAMPLE_RATE]) {
                 tracing::warn!("Warming up the speech model failed: {error}");
             }
-            let _ = ready.send(Ok(started.elapsed()));
+            let _ = ready.send(Ok((started.elapsed(), transcriber.model().placement())));
             for (job, samples) in received {
                 let started = Instant::now();
                 let result = transcriber
@@ -59,9 +59,9 @@ pub(crate) fn spawn(options: &ModelOptions, messages: Sender<Message>) -> anyhow
             }
         })
         .context("couldn't start the transcriber")?;
-    let loaded_in = answer
+    let (loaded_in, placement) = answer
         .recv()
         .map_err(|_| anyhow!("the speech model's thread stopped while loading"))??;
-    eprintln!("Speech model ready in {:.1} s", loaded_in.as_secs_f32());
+    eprintln!("Speech model ready in {:.1} s: {placement}", loaded_in.as_secs_f32());
     Ok(jobs)
 }

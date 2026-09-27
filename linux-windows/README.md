@@ -10,7 +10,8 @@ prompt and decoding as the Mac app does, with the model running on OpenVINO. The
 `livetranscribe`, dictates on Linux under Wayland as the Mac app does: hold a key and speak, and
 the Mac's panel shows below the text cursor while the text goes straight into the focused field.
 A tray menu starts, stops and cancels dictation, copies the last one and sets the cleanup level.
-It runs on the CPU for now; the settings and history windows, Windows and the NPU come later.
+The speech model runs on the NPU of an Intel Core Ultra, or on the CPU. The settings and history
+windows, and Windows, come later.
 
 ## Building and testing
 
@@ -23,6 +24,9 @@ include the golden cases (`crates/dictation/tests/golden.rs`). CI runs formattin
 tests on Linux and Windows (`.github/workflows/linux-windows.yml`).
 
 ## Layout
+The workspace builds its own copy of the `openvino` crate, which can pass properties to a model's
+compilation, as the NPU's LLM mode needs: see [`vendor/openvino/VENDORED.md`](vendor/openvino/VENDORED.md).
+
 
 One crate per slice of the Mac app's Swift package, with the same names, so a rule lives in the
 same place in both apps:
@@ -56,13 +60,14 @@ machine, the setup kit (not in the repository) installs both in an Ubuntu 24.04 
    `transformers==5.13.1` and CPU PyTorch:
 
    ```bash
-   python tools/export-qwen3-asr.py --model /path/to/Qwen3-ASR-0.6B --out ~/.local/share/live-transcribe/models/qwen3-asr-0.6b
+   python tools/export-qwen3-asr.py --model /path/to/Qwen3-ASR-0.6B --out ~/.local/share/live-transcribe/models/qwen3-asr-0.6b-v2
    ```
 
-   It writes the audio convolutions and encoder (fp16) and the language model (int8 weights, its
-   KV cache kept as state), then checks each against PyTorch, and checks that OpenVINO's model
-   cache gives them back unchanged: OpenVINO 2026.2.1's CPU plugin corrupts one way of writing
-   RoPE in its cache, which made every start after the first transcribe gibberish.
+   It writes the audio convolutions and encoder (fp16) and the language model (symmetric int8
+   weights, which the NPU runs 50 times faster than asymmetric ones; its KV cache kept as state),
+   then checks each against PyTorch, and checks that OpenVINO's model cache gives them back
+   unchanged: OpenVINO 2026.2.1's CPU plugin corrupts one way of writing RoPE in its cache, which
+   made every start after the first transcribe gibberish.
 3. `cargo build --release -p lt-app` (the tray builds against WebKitGTK, libxdo and the app
    indicator library: Tauri's prerequisites), then:
 
@@ -74,6 +79,13 @@ machine, the setup kit (not in the repository) installs both in an Ubuntu 24.04 
    Right Ctrl. `livetranscribe keys` names the keys you press.
 
 Dictation reads the keyboard from `/dev/input`, so the user needs read access to it; a udev rule
+The speech model runs on the NPU when OpenVINO sees one: the audio encoder at fixed shapes, and the
+language model in the NPU's LLM mode, for prompts of up to 1,024 tokens (about 75 seconds of
+speech). A longer prompt, a reply that outgrows the NPU's cache, and anything the NPU can't compile
+go to the CPU. `--device CPU` keeps it all on the CPU. The first start compiles the model for the
+NPU, which takes a few seconds; OpenVINO keeps what it compiled in `~/.cache/live-transcribe`, so
+later starts take under a second.
+
 with `TAG+="uaccess"` gives it to whoever is logged in at the machine. The app registers as the
 desktop's input method, so text goes straight into fields that take one (GTK, Qt, Firefox,
 Chromium with Wayland IME, COSMIC's apps and most Wayland terminals). Those fields say what they

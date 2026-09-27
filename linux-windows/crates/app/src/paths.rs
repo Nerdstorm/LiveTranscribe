@@ -13,7 +13,7 @@ pub fn default_model() -> anyhow::Result<PathBuf> {
         .context("the data folder is unknown; set HOME or XDG_DATA_HOME, or pass --model")?
         .join(APP_FOLDER)
         .join("models")
-        .join("qwen3-asr-0.6b"))
+        .join("qwen3-asr-0.6b-v2"))
 }
 
 /// Where OpenVINO keeps compiled models between runs.

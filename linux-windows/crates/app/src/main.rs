@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
+use lt_transcription::qwen3_asr::DeviceChoice;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
@@ -30,12 +31,13 @@ struct Cli {
 #[derive(Clone, clap::Args)]
 struct ModelOptions {
     /// The model folder tools/export-qwen3-asr.py wrote [default: the app's data folder's
-    /// models/qwen3-asr-0.6b]
+    /// models/qwen3-asr-0.6b-v2]
     #[arg(long, value_name = "FOLDER")]
     model: Option<PathBuf>,
-    /// The OpenVINO device that runs the model: CPU, GPU or NPU
-    #[arg(long, default_value = "CPU")]
-    device: String,
+    /// Where the model runs: auto (the NPU if there is one, and the CPU for what the NPU can't
+    /// run), or only on one OpenVINO device: CPU, GPU or NPU
+    #[arg(long, default_value = "auto", value_name = "DEVICE")]
+    device: DeviceChoice,
 }
 
 #[derive(Subcommand)]
