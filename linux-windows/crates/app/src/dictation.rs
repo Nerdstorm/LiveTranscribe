@@ -1,8 +1,8 @@
 //! `livetranscribe run`: dictation, as the Mac app's menu bar app has it. Hold the hotkey and
 //! speak; on release the speech is transcribed, the text rules applied, and the text typed into
 //! the focused field. A double tap records hands-free until the next press; Esc cancels. While
-//! you dictate, the panel shows below the text cursor, and the tray's menu starts, stops and
-//! cancels dictation, copies the last one and sets the cleanup level.
+//! you dictate, a small circle by the mouse pointer shows the microphone's level, and the tray's
+//! menu starts, stops and cancels dictation, copies the last one and sets the cleanup level.
 //!
 //! The flow is lt_dictation's DictationController, as on the Mac, on a thread of its own
 //! ([`engine`]); the tray (Tauri) has the main thread. What was said is never printed or logged:
@@ -24,7 +24,7 @@ use lt_dictation_ui::{PanelView, load_interface_font};
 use lt_hotkey::{HotkeyGestureConfiguration, display_name, key_code, key_name, watch_hotkey};
 use lt_insertion::InsertionConfiguration;
 use lt_shared::CleanupLevel;
-use lt_wayland::{PanelConfiguration, SessionConfiguration, SessionEvent, WaylandSession};
+use lt_wayland::{PanelConfiguration, SessionConfiguration, WaylandSession};
 
 use crate::ModelOptions;
 use engine::{Engine, Message};
@@ -89,21 +89,13 @@ pub fn run(options: &Options) -> anyhow::Result<()> {
         }
     };
     let (messages, received) = mpsc::channel();
-    let clicks = messages.clone();
-    let session = WaylandSession::connect(
-        SessionConfiguration {
-            insertion: InsertionConfiguration {
-                restore_delay: PASTE_RESTORE_DELAY,
-                read_timeout: PASTE_READ_TIMEOUT,
-            },
-            panel,
+    let session = WaylandSession::connect(SessionConfiguration {
+        insertion: InsertionConfiguration {
+            restore_delay: PASTE_RESTORE_DELAY,
+            read_timeout: PASTE_READ_TIMEOUT,
         },
-        move |event| match event {
-            SessionEvent::CancelClicked => {
-                let _ = clicks.send(Message::CancelClicked);
-            }
-        },
-    )?;
+        panel,
+    })?;
     let hotkey_messages = messages.clone();
     let keyboards = watch_hotkey(hotkey, move |event| {
         let _ = hotkey_messages.send(Message::Hotkey(event));

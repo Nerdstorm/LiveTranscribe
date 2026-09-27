@@ -28,22 +28,17 @@ pub struct PanelConfiguration {
     pub level: Box<dyn Fn() -> f32 + Send>,
 }
 
-/// What the session tells the app, from its thread.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SessionEvent {
-    /// The × on the dictation panel was clicked.
-    CancelClicked,
-}
-
 /// What this desktop lets the session do beyond pasting.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Capabilities {
-    /// Text goes straight into fields that take an input method, and the panel shows below the
-    /// text cursor. Not when the compositor lacks input-method-v2, nor when another input method
-    /// (IBus, Fcitx) has the seat.
+    /// Text goes straight into fields that take an input method. Not when the compositor lacks
+    /// input-method-v2, nor when another input method (IBus, Fcitx) has the seat.
     pub input_method: bool,
-    /// The panel can show at the bottom of the screen (wlr-layer-shell), for apps without one.
+    /// The panel can show (wlr-layer-shell).
     pub overlay: bool,
+    /// The panel follows the mouse pointer (ext-image-copy-capture-v1's cursor sessions);
+    /// otherwise it shows at the bottom of the screen.
+    pub follows_pointer: bool,
 }
 
 type Callback = Box<dyn FnOnce(Result<Inserted, SessionError>) + Send>;
@@ -87,19 +82,15 @@ pub struct WaylandSession {
 }
 
 impl WaylandSession {
-    /// Connects to the compositor and checks it offers what typing needs. `events` is called from
-    /// the session's thread.
-    pub fn connect(
-        configuration: SessionConfiguration,
-        events: impl Fn(SessionEvent) + Send + 'static,
-    ) -> Result<Self, SessionError> {
+    /// Connects to the compositor and checks it offers what typing needs.
+    pub fn connect(configuration: SessionConfiguration) -> Result<Self, SessionError> {
         let (commands, received) = mpsc::channel();
         let (wake_reader, wake) = pipe_with(PipeFlags::CLOEXEC | PipeFlags::NONBLOCK)
             .map_err(|error| SessionError::Connection(format!("couldn't make a pipe: {error}")))?;
         let (ready, answer) = mpsc::channel();
         thread::Builder::new()
             .name("wayland".to_owned())
-            .spawn(move || match Session::connect(configuration, Box::new(events)) {
+            .spawn(move || match Session::connect(configuration) {
                 Ok(mut session) => {
                     let _ = ready.send(Ok(session.capabilities()));
                     session.run(&received, wake_reader);

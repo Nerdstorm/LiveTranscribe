@@ -189,10 +189,6 @@ impl InputMethod {
         })
     }
 
-    pub(crate) fn object(&self) -> &ZwpInputMethodV2 {
-        &self.object
-    }
-
     pub(crate) fn is_busy(&self) -> bool {
         self.committing.is_some()
     }

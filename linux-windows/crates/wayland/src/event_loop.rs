@@ -19,7 +19,8 @@ use wayland_client::{Connection, Dispatch, EventQueue, QueueHandle};
 use crate::input_method::{InputMethod, InputMethodState};
 use crate::panel::{Panel, PanelState};
 use crate::paste::{ClipboardState, Paster};
-use crate::session::{Capabilities, Command, Done, SessionConfiguration, SessionError, SessionEvent};
+use crate::pointer::PointerState;
+use crate::session::{Capabilities, Command, Done, SessionConfiguration, SessionError};
 
 /// What the compositor has told the session, by the part it concerns.
 #[derive(Default)]
@@ -27,6 +28,7 @@ pub(crate) struct State {
     pub(crate) clipboard: ClipboardState,
     pub(crate) input_method: InputMethodState,
     pub(crate) panel: PanelState,
+    pub(crate) pointer: PointerState,
 }
 
 /// The connection's queue, and what its events have said.
@@ -57,18 +59,19 @@ pub(crate) struct Session {
     panel: Option<Panel>,
     /// Text waiting for the insertion before it.
     waiting: VecDeque<(String, Done)>,
-    events: Box<dyn Fn(SessionEvent) + Send>,
 }
 
 impl Session {
-    pub(crate) fn connect(
-        configuration: SessionConfiguration,
-        events: Box<dyn Fn(SessionEvent) + Send>,
-    ) -> Result<Self, SessionError> {
+    pub(crate) fn connect(configuration: SessionConfiguration) -> Result<Self, SessionError> {
         let connection = Connection::connect_to_env().map_err(|error| SessionError::NoDisplay(error.to_string()))?;
         let (globals, queue) =
             registry_queue_init::<State>(&connection).map_err(|error| SessionError::Connection(error.to_string()))?;
-        let handle = queue.handle();
+        let mut wayland = Wayland {
+            handle: queue.handle(),
+            queue,
+            state: State::default(),
+        };
+        let handle = wayland.handle.clone();
         let seat: WlSeat = globals
             .bind(&handle, 1..=5, ())
             .map_err(|_| SessionError::Connection("the compositor has no seat".to_owned()))?;
@@ -76,13 +79,9 @@ impl Session {
         let input_method = InputMethod::bind(&globals, &seat, &handle);
         let panel = configuration
             .panel
-            .and_then(|panel| Panel::bind(&globals, &seat, &handle, panel));
-        let mut wayland = Wayland {
-            queue,
-            handle,
-            state: State::default(),
-        };
-        // Brings the clipboard's offer, the seat's pointer, and whether the input method is ours.
+            .and_then(|panel| Panel::bind(&globals, &seat, &mut wayland, panel));
+        // Brings the clipboard's offer, the seat's pointer, the outputs, and whether the input
+        // method is ours.
         wayland.roundtrip().map_err(SessionError::Connection)?;
         let mut session = Self {
             wayland,
@@ -90,7 +89,6 @@ impl Session {
             input_method,
             panel,
             waiting: VecDeque::new(),
-            events,
         };
         session.drop_unavailable_input_method();
         let capabilities = session.capabilities();
@@ -101,12 +99,13 @@ impl Session {
             } else {
                 "is pasted"
             },
-            match (session.panel.is_some(), capabilities.input_method, capabilities.overlay) {
-                (false, _, _) => "nowhere",
-                (true, true, true) => "at the text cursor, or at the bottom of the screen",
-                (true, true, false) => "only at the text cursor",
-                (true, false, true) => "at the bottom of the screen",
-                (true, false, false) => "nowhere: this desktop has neither input-method-v2 nor wlr-layer-shell",
+            match (capabilities.overlay, capabilities.follows_pointer) {
+                (false, _) => "nowhere",
+                (true, true) => "by the mouse pointer",
+                (true, false) => {
+                    "at the bottom of the screen: this desktop doesn't say where the pointer is \
+                     (no ext-image-copy-capture-v1)"
+                }
             }
         );
         Ok(session)
@@ -115,7 +114,8 @@ impl Session {
     pub(crate) fn capabilities(&self) -> Capabilities {
         Capabilities {
             input_method: self.input_method.is_some(),
-            overlay: self.panel.as_ref().is_some_and(Panel::has_overlay),
+            overlay: self.panel.is_some(),
+            follows_pointer: self.panel.as_ref().is_some_and(Panel::follows_pointer),
         }
     }
 
@@ -173,14 +173,7 @@ impl Session {
             self.start_insertion(text, done)?;
         }
         if let Some(panel) = &mut self.panel {
-            let focused = self
-                .input_method
-                .as_ref()
-                .filter(|_| self.wayland.state.input_method.is_active())
-                .map(InputMethod::object);
-            if let Some(event) = panel.update(&mut self.wayland, focused, now) {
-                (self.events)(event);
-            }
+            panel.update(&mut self.wayland, now);
         }
         if wake.is_none() && !self.is_inserting() && self.waiting.is_empty() {
             return Ok(false);
@@ -280,10 +273,7 @@ impl Session {
         if self.wayland.state.input_method.unavailable
             && let Some(input_method) = self.input_method.take()
         {
-            tracing::warn!(
-                "Another input method (IBus or Fcitx?) has this seat, so dictated text is pasted, \
-                 and the panel shows at the bottom of the screen"
-            );
+            tracing::warn!("Another input method (IBus or Fcitx?) has this seat, so dictated text is pasted");
             input_method.destroy();
         }
     }
@@ -293,14 +283,24 @@ pub(crate) fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
+/// Globals the compositor adds or removes once the session runs: outputs, for the panel.
 impl Dispatch<WlRegistry, GlobalListContents> for State {
     fn event(
-        _: &mut Self,
+        state: &mut Self,
         _: &WlRegistry,
-        _: wl_registry::Event,
+        event: wl_registry::Event,
         _: &GlobalListContents,
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
+        match event {
+            wl_registry::Event::Global {
+                name,
+                interface,
+                version,
+            } => state.pointer.global_added(name, &interface, version),
+            wl_registry::Event::GlobalRemove { name } => state.pointer.global_removed(name),
+            _ => {}
+        }
     }
 }

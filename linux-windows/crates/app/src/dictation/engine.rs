@@ -1,6 +1,6 @@
 //! The dictation engine, on a thread of its own. It loads the speech model, then feeds the
-//! controller what happens (the hotkey, the menu, the panel's ×, the workers' results) in the
-//! order it happens, with times from one clock, and runs the gesture's and the panel's timers.
+//! controller what happens (the hotkey, the menu, the workers' results) in the order it happens,
+//! with times from one clock, and runs the gesture's and the panel's timers.
 //! After each, the tray hears how things stand, when that has changed.
 
 use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender};
@@ -23,16 +23,8 @@ use crate::ModelOptions;
 pub(crate) enum Message {
     Hotkey(HotkeyEvent),
     Menu(MenuCommand),
-    /// The × on the panel.
-    CancelClicked,
-    Transcribed {
-        job: Job,
-        result: Result<String, String>,
-    },
-    Inserted {
-        job: Job,
-        result: Result<Inserted, String>,
-    },
+    Transcribed { job: Job, result: Result<String, String> },
+    Inserted { job: Job, result: Result<Inserted, String> },
 }
 
 /// What the tray's menu asks for.
@@ -109,7 +101,7 @@ impl Engine {
             transcriber,
             self.session,
             self.messages,
-            PanelModel::new(self.hotkey, self.notice_ms),
+            PanelModel::new(self.notice_ms),
             clock,
         );
         let mut controller = DictationController::new(self.configuration, platform);
@@ -160,7 +152,7 @@ fn dictate(
         match message {
             Message::Hotkey(event) => controller.hotkey(event, now),
             Message::Menu(MenuCommand::ToggleDictation) => controller.toggle_dictation(now),
-            Message::Menu(MenuCommand::CancelDictation) | Message::CancelClicked => controller.cancel(),
+            Message::Menu(MenuCommand::CancelDictation) => controller.cancel(),
             Message::Menu(MenuCommand::CopyLastDictation) => {
                 if let Some(text) = controller.last_text().map(str::to_owned) {
                     eprintln!("Copied the last dictation ({} characters)", text.chars().count());

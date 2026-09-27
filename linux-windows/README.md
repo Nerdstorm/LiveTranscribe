@@ -8,7 +8,8 @@ This is the start. The dictation text rules, ported from the Mac app, type the s
 Mac app for all 9,728 golden cases, and speech to text computes Qwen3-ASR's audio features,
 prompt and decoding as the Mac app does, with the model running on OpenVINO. The app,
 `livetranscribe`, dictates on Linux under Wayland as the Mac app does: hold a key and speak, and
-the Mac's panel shows below the text cursor while the text goes straight into the focused field.
+a small circle by the mouse pointer shows the microphone's level while the text goes straight into
+the focused field.
 A tray menu starts, stops and cancels dictation, copies the last one and sets the cleanup level.
 The speech model runs on the NPU of an Intel Core Ultra, or on the CPU. The settings and history
 windows, and Windows, come later.
@@ -23,10 +24,10 @@ cargo test
 include the golden cases (`crates/dictation/tests/golden.rs`). CI runs formatting, clippy and the
 tests on Linux and Windows (`.github/workflows/linux-windows.yml`).
 
-## Layout
 The workspace builds its own copy of the `openvino` crate, which can pass properties to a model's
 compilation, as the NPU's LLM mode needs: see [`vendor/openvino/VENDORED.md`](vendor/openvino/VENDORED.md).
 
+## Layout
 
 One crate per slice of the Mac app's Swift package, with the same names, so a rule lives in the
 same place in both apps:
@@ -44,8 +45,8 @@ same place in both apps:
 | `lt-hotkey` | `Hotkey` | The hold, tap and double-tap gesture; what each key means for it; on Linux, reading the keyboards (evdev) |
 | `lt-capture` | `Capture` | Recording the default microphone (cpal) as 16 kHz mono, and its level for the meter |
 | `lt-insertion` | `Insertion` | What is known about the focused field, what the clipboard holds while text is pasted, and what an insertion did |
-| `lt-dictation-ui` | `DictationUI` | The panel shown while dictating (what it shows when, drawn to pixels) and what the tray says, with its icons |
-| `lt-wayland` | `Insertion`'s typing and the HUD's window, for Wayland | One connection for the desktop: the input method (input-method-v2), which reads the focused field and types straight into it; pasting where no field takes one (ext-data-control and a virtual keyboard); the panel below the text cursor, or at the bottom of the screen (wlr-layer-shell) |
+| `lt-dictation-ui` | `DictationUI` | The panel shown while dictating (what it shows when, drawn to pixels, and where by the pointer) and what the tray says, with its icons |
+| `lt-wayland` | `Insertion`'s typing and the HUD's window, for Wayland | One connection for the desktop: the input method (input-method-v2), which reads the focused field and types straight into it; pasting where no field takes one (ext-data-control and a virtual keyboard); the panel by the mouse pointer (wlr-layer-shell, with ext-image-copy-capture's cursor sessions saying where the pointer is), or at the bottom of the screen |
 | `lt-app` | the app | The `livetranscribe` command: `run` (dictation, with the tray, Tauri's), `keys`, `transcribe` |
 
 ## Running it
@@ -78,7 +79,6 @@ machine, the setup kit (not in the repository) installs both in an Ubuntu 24.04 
    Its options go after `run`: `livetranscribe run --key KEY_RIGHTALT` holds Right Alt instead of
    Right Ctrl. `livetranscribe keys` names the keys you press.
 
-Dictation reads the keyboard from `/dev/input`, so the user needs read access to it; a udev rule
 The speech model runs on the NPU when OpenVINO sees one: the audio encoder at fixed shapes, and the
 language model in the NPU's LLM mode, for prompts of up to 1,024 tokens (about 75 seconds of
 speech). A longer prompt, a reply that outgrows the NPU's cache, and anything the NPU can't compile
@@ -86,6 +86,7 @@ go to the CPU. `--device CPU` keeps it all on the CPU. The first start compiles 
 NPU, which takes a few seconds; OpenVINO keeps what it compiled in `~/.cache/live-transcribe`, so
 later starts take under a second.
 
+Dictation reads the keyboard from `/dev/input`, so the user needs read access to it; a udev rule
 with `TAG+="uaccess"` gives it to whoever is logged in at the machine. The app registers as the
 desktop's input method, so text goes straight into fields that take one (GTK, Qt, Firefox,
 Chromium with Wayland IME, COSMIC's apps and most Wayland terminals). Those fields say what they
@@ -94,8 +95,17 @@ number) keep dictated text on one line, and other fields take line breaks, as th
 (most say nothing either way); and the character before the cursor decides the leading space.
 Elsewhere it pastes: the text goes on the clipboard, a virtual keyboard types Ctrl+V, and the
 clipboard is put back. COSMIC has everything this needs. KDE Plasma has no input-method-v2, so
-there it always pastes and the panel shows at the bottom of the screen; GNOME has none of it. With
-IBus or Fcitx running, they hold the input method, and the app pastes.
+there it always pastes; GNOME has none of it. With IBus or Fcitx running, they hold the input
+method, and the app pastes.
+
+While you dictate, a small circle below and to the right of the mouse pointer follows it: a red
+disc that grows with the microphone's level, a ring round it when hands-free, and a spinning ring
+while the speech is transcribed. It has no words and takes no clicks; Esc or the tray's menu
+cancels. When something needs your attention (nothing was heard, the text was left on the
+clipboard, the microphone stopped), a short message shows in a bubble beside it for a few seconds.
+The desktop says where the pointer is through cursor sessions (ext-image-copy-capture-v1), which
+report the pointer's position without capturing the screen, and only while the circle shows.
+Where the desktop has none, the circle sits at the bottom of the screen.
 
 ## Matching the Mac app
 
