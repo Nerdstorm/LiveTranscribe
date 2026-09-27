@@ -4,16 +4,17 @@ This branch turns Live Transcribe into a system-wide, on-device dictation tool: 
 speak, and cleaned text is inserted at the cursor in any app. The continuous transcript window
 stays as a second mode. It implements Phase 1 (F1–F7) of the *Dictation Features —
 Implementation Handoff*, plus following a newly connected microphone. Phase 2 (per-app tone,
-focus context, Command Mode, multilingual) is not started.
+focus context, Command Mode, multilingual) is not started, except multilingual speech
+recognition: 31 languages as of 0.3.0, with cleanup still written for English (D4).
 
 ## Decisions
 
 | # | Decision | Source |
 |---|---|---|
-| D1 | Developer ID distribution without the App Sandbox (rules out the Mac App Store). Hardened Runtime stays; builds stay ad-hoc signed ("Sign to Run Locally") until someone signs a release with their Developer ID. | Owner |
+| D1 | Developer ID distribution without the App Sandbox (rules out the Mac App Store). Hardened Runtime stays. Builds from source stay ad-hoc signed ("Sign to Run Locally"); since 0.1.0 every release is signed with Developer ID and notarized ([Releasing](releasing.md)). | Owner |
 | D2 | Push-to-talk is the primary mode; the continuous transcript window stays. | Handoff |
 | D3 | Default cleanup level: Medium. | Handoff |
-| D4 | English only in v1. From 0.3.0 the speech model also writes Sinhala, in Sinhala script with English words in English letters; cleanup stays English, and text with Sinhala in it skips the cleanup model, which drops Sinhala's vowel signs (`CleanupScripts`, ledger LiveTranscribe-0153). | Handoff, Owner |
+| D4 | English only in v1. From 0.2.0 the speech model also recognises 29 other languages, and from 0.3.0 Sinhala, in Sinhala script with English words in English letters ([Languages](../README.md#languages)). Cleanup stays English: text with Sinhala in it skips the cleanup model, which drops Sinhala's vowel signs (`CleanupScripts`, ledger LiveTranscribe-0153), and the other languages go through it untested. | Handoff, Owner |
 | D5 | Models: Qwen3-ASR 0.6B 8-bit + Qwen3-1.7B-4bit (+ Silero VAD). No 4B or larger model, now or for Command Mode. On 2026-09-25 Qwen3-ASR replaced Parakeet TDT 0.6B v3: it is one multilingual model that Sinhala can be added to by fine-tuning (ledger LiveTranscribe-0138). From 0.3.0 the default is that fine-tune, [Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit](https://huggingface.co/Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit) (Nerdstorm/LiveTranscribe-Sinhala). | Owner |
 | D6 | Local builds can be signed with a developer's own certificate through a gitignored `Config/Signing.local.xcconfig`, so macOS keeps the Accessibility and microphone grants across rebuilds. An ad-hoc build's designated requirement is its code hash (`cdhash`), which every build changes; a certificate's names the certificate. The committed default stays ad-hoc, so the public repository holds no team ID and builds anywhere. | Owner |
 | H1 | Default hotkey: Fn (🌐), changeable in Settings. Settings open from the menu bar. | Owner |
