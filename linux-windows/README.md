@@ -62,6 +62,9 @@ machine, the setup kit (not in the repository) installs both in an Ubuntu 24.04 
    `transformers==5.13.1` and CPU PyTorch. The app's default model is the Mac app's,
    [Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit](https://huggingface.co/Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit):
    Qwen3-ASR-0.6B fine-tuned for Sinhala, which transcribes English nearly as well as the original.
+   On the NPU of a Core Ultra 7 258V it gets 6.31% of characters wrong on OpenSLR 52's Sinhala test
+   set, as the Mac app does (6.36%), and 5.18% of words on FLEURS English, where the original gets
+   5.05%.
 
    ```bash
    python tools/export-qwen3-asr.py --model /path/to/Qwen3-ASR-0.6B-Sinhala-8bit \
