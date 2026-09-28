@@ -25,7 +25,7 @@ jobs:
       run:
         working-directory: linux-windows
     steps:
-      # Tauri's list for Ubuntu, and ALSA, which cpal records through.
+      # Tauri's list for Ubuntu, ALSA, which cpal records through, and what opens an rpm.
       - name: Install the build dependencies
         working-directory: /
         env:
@@ -34,7 +34,7 @@ jobs:
           apt-get update && apt-get install --yes --no-install-recommends
           ca-certificates curl git build-essential pkg-config file xdg-utils
           libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
-          libssl-dev libasound2-dev
+          libssl-dev libasound2-dev libarchive-tools
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -78,6 +78,9 @@ jobs:
             mv "$file" "../packages/${name/Live Transcribe/live-transcribe}"
           done
           ls -l ../packages
+      # Intel's licence allows shipping its libraries only unmodified.
+      - name: Check that each package carries Intel's libraries unmodified
+        run: packaging/linux/check-packages.sh target/release/packages
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: linux-packages

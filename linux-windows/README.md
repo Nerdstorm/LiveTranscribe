@@ -63,7 +63,8 @@ on a draft GitHub release. Each carries:
 - OpenVINO 2026.2.1's runtime in `/usr/lib/live-transcribe/openvino`: Intel's prebuilt libraries,
   unmodified, under Intel's licence, which allows redistributing them (`licenses/` beside them).
   `packaging/linux/fetch-openvino.sh` fetches them, one file each under its soname, since Tauri's
-  bundler would copy each symlink as another whole file. The app loads them from there
+  bundler would copy each symlink as another whole file, and `packaging/linux/check-packages.sh`
+  checks that each package has them byte for byte. The app loads them from there
   (`vendor/openvino`'s `load_from_folder`), since Intel's libraries don't say where to find each
   other. **The AppImage has them in `usr/share/live-transcribe/openvino`**: linuxdeploy, which
   makes it, sets the RUNPATH of every library in `usr/lib`, and the licence doesn't allow changing
