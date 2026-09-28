@@ -1,12 +1,19 @@
 # Builds the Linux app's packages (deb, rpm and AppImage) in Ubuntu 22.04, whose glibc (2.35) sets
 # the oldest distributions they run on, with the OpenVINO runtime they carry
 # (linux-windows/packaging/linux/fetch-openvino.sh). A tag linux-vX.Y.Z, naming the app's version,
-# also puts them on a draft GitHub release, for the owner to publish.
+# also puts them on a draft GitHub release, for the owner to publish. A pull request that changes
+# how they're made builds them too, to try from the run's artifacts before merging.
 name: Linux packages
 
 on:
   push:
     tags: ["linux-v*"]
+  pull_request:
+    paths:
+      - "linux-windows/packaging/**"
+      - "linux-windows/crates/app/tauri*.json"
+      - "linux-windows/vendor/openvino/**"
+      - ".github/workflows/linux-packages.yml"
   workflow_dispatch:
 
 permissions:

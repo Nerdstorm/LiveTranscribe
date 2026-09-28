@@ -56,7 +56,8 @@ same place in both apps:
 glibc (2.35) sets the oldest distributions they run on: Ubuntu 22.04, Debian 12, and any current
 Fedora, openSUSE or Arch: `live-transcribe_X.Y.Z_amd64.deb`, `live-transcribe-X.Y.Z-1.x86_64.rpm`
 and `live-transcribe_X.Y.Z_amd64.AppImage`. A tag `linux-vX.Y.Z` naming the app's version puts them
-on a draft GitHub release. Each carries:
+on a draft GitHub release; a pull request that changes how they're made builds them too, to try from
+the run's artifacts. Each carries:
 
 - the app, `/usr/bin/livetranscribe`, which runs dictation when started with no command, as the
   desktop's menu starts it;
