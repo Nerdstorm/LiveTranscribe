@@ -30,6 +30,8 @@ jobs:
     container: ubuntu:22.04
     defaults:
       run:
+        # A container job's steps run in sh unless told otherwise.
+        shell: bash
         working-directory: linux-windows
     steps:
       # Tauri's list for Ubuntu, ALSA, which cpal records through, and what opens an rpm.
