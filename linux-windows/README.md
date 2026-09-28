@@ -52,14 +52,13 @@ same place in both apps:
 
 ## Packages
 
-`.github/workflows/linux-packages.yml` builds a deb, an rpm and an AppImage in Ubuntu 22.04, whose
-glibc (2.35) sets the oldest distributions they run on: Ubuntu 22.04, Debian 12, and any current
-Fedora, openSUSE or Arch: `live-transcribe_X.Y.Z_amd64.deb`, `live-transcribe-X.Y.Z-1.x86_64.rpm`
-and `live-transcribe_X.Y.Z_amd64.AppImage`. A tag `linux-vX.Y.Z` naming the app's version puts them
-on a draft GitHub release, with `packaging/linux/release-notes.md` as its notes. **It is never marked
-the latest release**, since the Mac app's download links go to the latest release; untick "Set as
-the latest release" when publishing it. A pull request that changes how the packages are made
-builds them too, to try from the run's artifacts. Each carries:
+The release workflow (`.github/workflows/release.yml`) builds a deb, an rpm and an AppImage in
+Ubuntu 22.04, whose glibc (2.35) sets the oldest distributions they run on: Ubuntu 22.04, Debian 12,
+and any current Fedora, openSUSE or Arch: `live-transcribe_X.Y.Z_amd64.deb`,
+`live-transcribe-X.Y.Z-1.x86_64.rpm` and `live-transcribe_X.Y.Z_amd64.AppImage`. Each release tag
+`vX.Y.Z` puts them on the release with the Mac app, at the tag's version, which replaces the app
+crate's 0.0.0 ([Releasing](../docs/releasing.md)). A pull request that changes how the packages
+are made builds them too, to try from the run's artifacts. Each carries:
 
 - the app, `/usr/bin/livetranscribe`, which runs dictation when started with no command, as the
   desktop's menu starts it;
