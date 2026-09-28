@@ -34,7 +34,7 @@ check-version = @echo '$(VERSION)' | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$$' \
 	|| { echo 'Set VERSION to the release, for example: make $@ VERSION=0.1.0' >&2; exit 2; }
 
 .PHONY: help build run resolve test test-integration prompt-probe golden audio dictation-audio bench eval \
-	train doctor release-test changelog tag release appcast acknowledgements icons logs site clean
+	train doctor release-test changelog tag appcast acknowledgements icons logs site clean
 
 help: ## List the targets
 	@echo 'Usage: make <target> [VERSION=x.y.z] [ARGS="..."]'
@@ -64,6 +64,8 @@ resolve: ## Resolve the Swift packages, which also fetches Sparkle's release too
 test: ## Unit tests, which need no models
 	cd $(PACKAGE) && $(PACKAGE_TESTS) -skip-testing:IntegrationTests
 	scripts/tests/write-changelog-tests.sh
+	scripts/tests/release-notes-tests.sh
+	scripts/tests/fetch-release-tests.sh
 	scripts/tests/check-swift-runtime-tests.sh
 
 test-integration: audio ## End-to-end tests with the real models, which they download (about 2 GB)
@@ -110,7 +112,7 @@ doctor: ## Check the tools and credentials that building and releasing need
 	@printf '%-26s' 'Metal Toolchain'; xcrun metal -v >/dev/null 2>&1 && echo 'installed' \
 	  || echo 'missing: xcodebuild -downloadComponent MetalToolchain'
 	@printf '%-26s' 'Earlier macOS SDK'; scripts/check-swift-runtime.sh --sdk 2>/dev/null \
-	  || echo 'missing, and make release checks the app against one (docs/releasing.md)'
+	  || echo 'missing, and release builds check the app against one (docs/releasing.md)'
 	@printf '%-26s' 'Signing your own builds'; [ -f Config/Signing.local.xcconfig ] && echo 'Config/Signing.local.xcconfig' \
 	  || echo 'ad-hoc, so macOS asks for permissions after every build (docs/signing.md)'
 	@printf '%-26s' 'Developer ID certificate'; security find-identity -v -p codesigning \
@@ -118,8 +120,9 @@ doctor: ## Check the tools and credentials that building and releasing need
 	@printf '%-26s' 'Notary credentials'; xcrun notarytool history --keychain-profile '$(NOTARY_PROFILE)' >/dev/null 2>&1 \
 	  && echo '$(NOTARY_PROFILE)' || echo 'missing or not working (docs/releasing.md)'
 	@printf '%-26s' 'GitHub CLI'; gh auth status >/dev/null 2>&1 && echo 'signed in' \
-	  || echo 'missing or signed out, and make release uploads with it'
-	@echo 'make release checks the update signing key, since the keychain may ask before it is read.'
+	  || echo 'missing or signed out, and make appcast fetches with it'
+	@echo 'scripts/release.sh checks the update signing key, since the keychain may ask before it is read.'
+	@echo 'Releases are built by the release workflow, with its own keys (docs/releasing.md).'
 
 release-test: ## Build HEAD like a release, but ad-hoc signed and not notarized (VERSION=x.y.z)
 	$(check-version)
@@ -129,22 +132,18 @@ changelog: ## Summarise the pull requests since the last release into CHANGELOG.
 	$(check-version)
 	scripts/write-changelog.sh $(VERSION)
 
-tag: ## Tag main as vVERSION and push the tag, which starts a release (VERSION=x.y.z)
+tag: ## Tag main as vVERSION and push the tag, which starts the release workflow (VERSION=x.y.z)
 	$(check-version)
 	@[ "$$(git branch --show-current)" = main ] || { echo 'Switch to main first: releases are tagged there.' >&2; exit 1; }
 	@git fetch -q origin main && [ "$$(git rev-parse HEAD)" = "$$(git rev-parse origin/main)" ] \
 	  || { echo "Your main isn't origin's main: pull or push first." >&2; exit 1; }
+	@scripts/release-notes.sh $(VERSION) >/dev/null
 	git tag -a v$(VERSION) -m 'Live Transcribe $(VERSION)'
 	git push origin v$(VERSION)
 
-release: ## Build and notarize tag vVERSION, and upload it as a draft GitHub release (VERSION=x.y.z)
-	$(check-version)
-	scripts/release.sh $(VERSION) --draft
-
 appcast: ## Once release VERSION is published, offer it as an update by copying its appcast to site/
 	$(check-version)
-	@[ -f build/release/$(VERSION)/appcast.xml ] \
-	  || { echo 'There is no build/release/$(VERSION)/appcast.xml: make release VERSION=$(VERSION) writes it.' >&2; exit 1; }
+	@[ -f build/release/$(VERSION)/appcast.xml ] || scripts/fetch-release.sh $(VERSION)
 	@url=$$(xmllint --xpath "string(//item[*[local-name()='shortVersionString']='$(VERSION)']/enclosure/@url)" \
 	  build/release/$(VERSION)/appcast.xml); \
 	[ -n "$$url" ] || { echo 'The appcast has no entry for $(VERSION).' >&2; exit 1; }; \

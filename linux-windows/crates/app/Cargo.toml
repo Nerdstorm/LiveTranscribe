@@ -1,7 +1,8 @@
 [package]
 name = "lt-app"
 description = "The livetranscribe command: dictation with its panel and tray, and transcribing audio files."
-version = "0.1.0"
+# A release takes the version of its tag, as the Mac app does (.github/workflows/release.yml).
+version = "0.0.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

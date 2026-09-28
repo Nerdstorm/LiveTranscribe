@@ -3,27 +3,35 @@
 # notarized by Apple, stapled, and packed in a disk image with an Applications shortcut. It also
 # signs the disk image as a Sparkle update and adds it to the appcast, which updates installed copies.
 #
-#   scripts/release.sh 0.1.0           builds the tag v0.1.0 into build/release/0.1.0/
-#   scripts/release.sh 0.1.0 --draft   also uploads the disk image to a draft GitHub release
-#   scripts/release.sh 0.1.0 --test    builds HEAD ad-hoc signed and not notarized, to check the
-#                                      build and the packaging without Apple credentials
+#   scripts/release.sh 0.1.0              builds the tag v0.1.0 into build/release/0.1.0/
+#   scripts/release.sh 0.1.0 --rehearse   builds HEAD the same way, signed and notarized, to try the
+#                                         credentials without a tag
+#   scripts/release.sh 0.1.0 --test       builds HEAD ad-hoc signed and not notarized, to check the
+#                                         build and the packaging without Apple credentials
+#
+# The release workflow (.github/workflows/release.yml) runs it for each tag vX.Y.Z and puts the
+# disk image on the release with the other systems' downloads.
 #
 # The source is exported from the tag into a clean folder, so nothing uncommitted in this checkout
 # reaches a release. The one-time setup (the Developer ID certificate, the notary credentials and
 # the update signing key) and the steps around a release are in docs/releasing.md.
 #
 # Settings, from the environment:
-#   LT_TEAM_ID          the Developer ID certificate's team. Default: DEVELOPMENT_TEAM in
-#                       Config/Signing.local.xcconfig
-#   LT_NOTARY_PROFILE   the keychain profile saved with `xcrun notarytool store-credentials`.
-#                       Default: LiveTranscribe-notary
-#   LT_NOTARY_TIMEOUT   how long to wait for each notarization. Default: 1h
-#   LT_SPARKLE_ACCOUNT  the keychain account of the key that signs updates, made with Sparkle's
-#                       generate_keys. Default: LiveTranscribe
-#   LT_UPDATE_FEED_URL  the appcast the app checks for updates. Default:
-#                       https://nerdstorm.github.io/LiveTranscribe/appcast.xml
-#   LT_RELEASES_URL     the GitHub releases the appcast downloads from. Default:
-#                       https://github.com/Nerdstorm/LiveTranscribe/releases
+#   LT_TEAM_ID           the Developer ID certificate's team. Default: DEVELOPMENT_TEAM in
+#                        Config/Signing.local.xcconfig
+#   LT_NOTARY_PROFILE    the keychain profile saved with `xcrun notarytool store-credentials`.
+#                        Default: LiveTranscribe-notary
+#   LT_NOTARY_KEY_FILE   an App Store Connect API key (.p8) to notarize with instead, with
+#                        LT_NOTARY_KEY_ID and LT_NOTARY_ISSUER, as the release workflow does
+#   LT_NOTARY_TIMEOUT    how long to wait for each notarization. Default: 1h
+#   LT_SPARKLE_ACCOUNT   the keychain account of the key that signs updates, made with Sparkle's
+#                        generate_keys. Default: LiveTranscribe
+#   LT_SPARKLE_KEY_FILE  that key in a file instead, as generate_keys -x exports it, as the release
+#                        workflow has it
+#   LT_UPDATE_FEED_URL   the appcast the app checks for updates. Default:
+#                        https://nerdstorm.github.io/LiveTranscribe/appcast.xml
+#   LT_RELEASES_URL      the GitHub releases the appcast downloads from. Default:
+#                        https://github.com/Nerdstorm/LiveTranscribe/releases
 #
 # Every copy of the app keeps the feed and the key it was built with, so changing either strands
 # the copies already installed.
@@ -31,8 +39,10 @@ set -euo pipefail
 
 root="${0:A:h:h}"
 notary_profile="${LT_NOTARY_PROFILE:-LiveTranscribe-notary}"
+notary_key_file="${LT_NOTARY_KEY_FILE:-}"
 notary_timeout="${LT_NOTARY_TIMEOUT:-1h}"
 sparkle_account="${LT_SPARKLE_ACCOUNT:-LiveTranscribe}"
+sparkle_key_file="${LT_SPARKLE_KEY_FILE:-}"
 feed_url="${LT_UPDATE_FEED_URL:-https://nerdstorm.github.io/LiveTranscribe/appcast.xml}"
 releases_url="${LT_RELEASES_URL:-https://github.com/Nerdstorm/LiveTranscribe/releases}"
 app_name=LiveTranscribe
@@ -42,27 +52,29 @@ log() { print -u2 -r -- "[$(date +%H:%M:%S)] $*" }
 fail() { print -u2 -r -- "release: $*"; exit 1 }
 
 usage() {
-  print -u2 -r -- "usage: scripts/release.sh <x.y.z> [--draft | --test]"
+  print -u2 -r -- "usage: scripts/release.sh <x.y.z> [--rehearse | --test]"
   exit 2
 }
 
 version=""
 test_build=false
-draft=false
+rehearsal=false
 for arg in "$@"; do
   case $arg in
     --test) test_build=true ;;
-    --draft) draft=true ;;
+    --rehearse) rehearsal=true ;;
     -h|--help) usage ;;
     -*) print -u2 -r -- "release: unknown option $arg"; usage ;;
     *) [[ -z $version ]] || usage; version=$arg ;;
   esac
 done
 [[ $version == <->.<->.<-> ]] || usage
-if $test_build && $draft; then
-  fail "a --test build isn't notarized, so it can't be published with --draft"
+if $test_build && $rehearsal; then
+  fail "a rehearsal is signed and notarized, and a --test build isn't: choose one"
 fi
 
+# The release's tag, which its downloads are under, whatever commit the build is made from.
+tag="v$version"
 out="$root/build/release/$version"
 logs="$out/logs"
 archive="$out/$app_name.xcarchive"
@@ -97,13 +109,13 @@ developer_id_identity() {
 
 # Everything that can be checked before the long build.
 preflight() {
-  if $test_build; then ref=HEAD; else ref="v$version"; fi
+  if $test_build || $rehearsal; then ref=HEAD; else ref=$tag; fi
   commit="$(git -C "$root" rev-parse -q --verify "$ref^{commit}")" \
     || fail "there is no tag $ref. Tag the release commit and push the tag first (docs/releasing.md)."
   # macOS compares CFBundleVersion between copies of the app, so it must grow with every release.
   # The number of commits on main does.
   build_number="$(git -C "$root" rev-list --count "$commit")"
-  if $test_build && [[ -n "$(git -C "$root" status --porcelain)" ]]; then
+  if [[ $ref == HEAD && -n "$(git -C "$root" status --porcelain)" ]]; then
     log "Uncommitted changes in this checkout are not in the build: it is made from HEAD."
   fi
   # Sparkle refuses a feed over plain HTTP, and so does the app.
@@ -120,17 +132,24 @@ preflight() {
     identity="$(developer_id_identity "$team_id")"
     [[ -n $identity ]] \
       || fail "the keychain has no Developer ID Application certificate for team $team_id (docs/releasing.md says how to get one)"
-    xcrun notarytool history --keychain-profile "$notary_profile" >/dev/null 2>&1 \
-      || fail "notarytool can't sign in with the keychain profile \"$notary_profile\" (docs/releasing.md says how to save it)"
-  fi
-
-  if $draft; then
-    command -v gh >/dev/null || fail "--draft needs the GitHub CLI, gh"
-    gh auth status >/dev/null 2>&1 || fail "gh isn't signed in to GitHub: run gh auth login"
-    local ours theirs
-    ours="$(git -C "$root" rev-parse "refs/tags/$ref")"
-    theirs="$(git -C "$root" ls-remote --tags origin "refs/tags/$ref" | cut -f 1)"
-    [[ $theirs == "$ours" ]] || fail "origin doesn't have this tag $ref. Push it first: git push origin $ref"
+    local notary_credentials
+    if [[ -n $notary_key_file ]]; then
+      [[ -f $notary_key_file && -n ${LT_NOTARY_KEY_ID:-} && -n ${LT_NOTARY_ISSUER:-} ]] \
+        || fail "LT_NOTARY_KEY_FILE must name the API key's file, with its ID in LT_NOTARY_KEY_ID and its issuer in LT_NOTARY_ISSUER"
+      notary_auth=(--key "$notary_key_file" --key-id "$LT_NOTARY_KEY_ID" --issuer "$LT_NOTARY_ISSUER")
+      notary_credentials="the API key in LT_NOTARY_KEY_FILE"
+    else
+      notary_auth=(--keychain-profile "$notary_profile")
+      notary_credentials="the keychain profile \"$notary_profile\""
+    fi
+    xcrun notarytool history "${notary_auth[@]}" >/dev/null 2>&1 \
+      || fail "notarytool can't sign in with $notary_credentials (docs/releasing.md says how to set it up)"
+    if [[ -n $sparkle_key_file ]]; then
+      [[ -s $sparkle_key_file ]] || fail "LT_SPARKLE_KEY_FILE, $sparkle_key_file, is missing or empty"
+      update_signing=(--ed-key-file "$sparkle_key_file")
+    else
+      update_signing=(--account "$sparkle_account")
+    fi
   fi
 }
 
@@ -152,9 +171,22 @@ resolve_packages() {
   [[ -x $sparkle_bin/generate_appcast ]] || fail "Sparkle's tools aren't in ${sparkle_bin#$root/}"
 }
 
-# The keychain's update signing key must be the one the app trusts (SUPublicEDKey), or installed
-# copies would refuse the update. Checked before the long build; the keychain may ask first.
+# The update signing key must be the one the app trusts (SUPublicEDKey), or installed copies would
+# refuse the update. Checked before the long build. A key in a file must make a signature that the
+# trusted key verifies; the keychain's is compared by its public half, and the keychain may ask
+# before it's read.
 check_update_key() {
+  if [[ -n $sparkle_key_file ]]; then
+    local sample="$out/update-key-check" signature
+    print -r -- "Live Transcribe $version" > "$sample"
+    signature="$("$sparkle_bin/sign_update" --ed-key-file "$sparkle_key_file" -p "$sample" 2>> "$logs/update-key.log")" \
+      || fail "sign_update couldn't sign with the key in LT_SPARKLE_KEY_FILE. See ${logs#$root/}/update-key.log"
+    xcrun swift "$root/scripts/verify-update-signature.swift" "$update_key" "$sample" "$signature" \
+      >> "$logs/update-key.log" 2>&1 \
+      || fail "the key in LT_SPARKLE_KEY_FILE isn't the update signing key App/Info.plist trusts (SUPublicEDKey)"
+    rm "$sample"
+    return
+  fi
   local ours
   ours="$("$sparkle_bin/generate_keys" --account "$sparkle_account" -p 2>/dev/null)" \
     || fail "couldn't read the update signing key for the account \"$sparkle_account\": the keychain doesn't have it, or access was denied (docs/releasing.md says how to import it)"
@@ -238,13 +270,13 @@ notarize() {
   local file=$1 label=$2
   local result="$logs/notary-$label.json"
   log "Notarizing the $label. Apple usually takes a few minutes."
-  xcrun notarytool submit "$file" --keychain-profile "$notary_profile" --wait --timeout "$notary_timeout" \
+  xcrun notarytool submit "$file" "${notary_auth[@]}" --wait --timeout "$notary_timeout" \
     --output-format json > "$result" 2>> "$logs/notary-$label.log" || true
   local id notary_status
   id="$(plutil -extract id raw -o - "$result" 2>/dev/null || true)"
   notary_status="$(plutil -extract status raw -o - "$result" 2>/dev/null || true)"
   if [[ -n $id ]]; then
-    xcrun notarytool log "$id" --keychain-profile "$notary_profile" "$logs/notary-$label-findings.json" \
+    xcrun notarytool log "$id" "${notary_auth[@]}" "$logs/notary-$label-findings.json" \
       >> "$logs/notary-$label.log" 2>&1 || true
   fi
   [[ $notary_status == Accepted ]] \
@@ -308,23 +340,16 @@ make_appcast() {
     cp "$out/source/site/appcast.xml" "$dir/"
   fi
   cp -c "$dmg" "$dir/"
-  run appcast "$sparkle_bin/generate_appcast" --account "$sparkle_account" \
-    --download-url-prefix "$releases_url/download/$ref/" --link "$releases_url/tag/$ref" \
+  run appcast "$sparkle_bin/generate_appcast" "${update_signing[@]}" \
+    --download-url-prefix "$releases_url/download/$tag/" --link "$releases_url/tag/$tag" \
     --full-release-notes-url "$releases_url" --maximum-deltas 0 "$dir"
   mv "$dir/appcast.xml" "$out/appcast.xml"
   rm -rf "$dir"
   local item="//item[*[local-name()='version']='$build_number']/enclosure"
-  [[ "$(xmllint --xpath "string($item/@url)" "$out/appcast.xml")" == "$releases_url/download/$ref/${dmg:t}" ]] \
-    || fail "the appcast doesn't send build $build_number to $releases_url/download/$ref/${dmg:t}"
+  [[ "$(xmllint --xpath "string($item/@url)" "$out/appcast.xml")" == "$releases_url/download/$tag/${dmg:t}" ]] \
+    || fail "the appcast doesn't send build $build_number to $releases_url/download/$tag/${dmg:t}"
   [[ -n "$(xmllint --xpath "string($item/@*[local-name()='edSignature'])" "$out/appcast.xml")" ]] \
     || fail "the appcast's update isn't signed, and installed copies would refuse it. See ${logs#$root/}/appcast.log"
-}
-
-publish() {
-  log "Uploading to a draft GitHub release for $ref"
-  (cd "$root" && gh release create "$ref" "$dmg" --draft --verify-tag --title "Live Transcribe $version" \
-    --generate-notes) || fail "gh couldn't create the draft release"
-  log "Made the draft. Try its download on another Mac, then publish it on GitHub."
 }
 
 preflight
@@ -363,10 +388,8 @@ rm -rf "$out/source" "$out/DerivedData"
 log "Built ${dmg#$root/}, SHA-256 $(cut -d ' ' -f 1 "$dmg.sha256")"
 if $test_build; then
   log "This is a test build. It isn't notarized, so other Macs won't open it."
-fi
-if $draft; then
-  publish
-fi
-if ! $test_build; then
-  log "Once the release is published, put ${out#$root/}/appcast.xml in site/ to offer it as an update."
+elif $rehearsal; then
+  log "This was a rehearsal: signed and notarized, but made from HEAD, so it isn't for release."
+else
+  log "Once the release is published, make appcast VERSION=$version offers it as an update."
 fi
