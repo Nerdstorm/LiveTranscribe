@@ -50,7 +50,46 @@ same place in both apps:
 | `lt-wayland` | `Insertion`'s typing and the HUD's window, for Wayland | One connection for the desktop: the input method (input-method-v2), which reads the focused field and types straight into it; pasting where no field takes one (ext-data-control and a virtual keyboard); the panel by the mouse pointer (wlr-layer-shell, with ext-image-copy-capture's cursor sessions saying where the pointer is), or at the bottom of the screen |
 | `lt-app` | the app | The `livetranscribe` command: `run` (dictation, with the tray and the Settings window, Tauri's; `ui/` holds the window's page), `keys`, `transcribe`; the settings file |
 
-## Running it
+## Packages
+
+`.github/workflows/linux-packages.yml` builds a deb, an rpm and an AppImage in Ubuntu 22.04, whose
+glibc (2.35) sets the oldest distributions they run on: Ubuntu 22.04, Debian 12, and any current
+Fedora, openSUSE or Arch: `live-transcribe_X.Y.Z_amd64.deb`, `live-transcribe-X.Y.Z-1.x86_64.rpm`
+and `live-transcribe_X.Y.Z_amd64.AppImage`. A tag `linux-vX.Y.Z` naming the app's version puts them
+on a draft GitHub release. Each carries:
+
+- the app, `/usr/bin/livetranscribe`, which runs dictation when started with no command, as the
+  desktop's menu starts it;
+- OpenVINO 2026.2.1's runtime in `/usr/lib/live-transcribe/openvino`: Intel's prebuilt libraries,
+  unmodified, under Intel's licence, which allows redistributing them (`licenses/` beside them).
+  `packaging/linux/fetch-openvino.sh` fetches them, one file each under its soname, since Tauri's
+  bundler would copy each symlink as another whole file. The app loads them from there
+  (`vendor/openvino`'s `load_from_folder`), since Intel's libraries don't say where to find each
+  other. **The AppImage has them in `usr/share/live-transcribe/openvino`**: linuxdeploy, which
+  makes it, sets the RUNPATH of every library in `usr/lib`, and the licence doesn't allow changing
+  them;
+- in the deb and rpm, a udev rule that lets whoever is logged in at the machine read the keyboards,
+  which hold-to-talk needs. **Any program that user runs can then read what they type**, as any
+  X11 program always could. The AppImage can't install it; `packaging/linux/README.Linux` says how.
+
+The speech model isn't in the packages. The app downloads it the first time it starts:
+Nerdstorm/Qwen3-ASR-0.6B-Sinhala-OpenVINO at a pinned revision (1.1 GB), each file checked against
+its SHA-256, and the folder moved into place only when all are (`crates/app/src/model_download.rs`).
+The tray shows the progress. A download that stops carries on where it stopped at the next start;
+after that the app never goes online for it again. Intel's NPU driver isn't in the packages
+either: the rpm recommends Fedora's `intel-npu-driver`, and without one the model runs on the CPU.
+
+To build them by hand, in Ubuntu 22.04 with Tauri's build dependencies and the Tauri CLI 2.12:
+
+```bash
+packaging/linux/fetch-openvino.sh
+```
+
+```bash
+cd crates/app && cargo tauri build
+```
+
+## Running it from source
 
 The app needs OpenVINO 2026.2 and the speech model converted for it. On the owner's Fedora
 machine, the setup kit (not in the repository) installs both in an Ubuntu 24.04 toolbox. By hand:
@@ -58,7 +97,8 @@ machine, the setup kit (not in the repository) installs both in an Ubuntu 24.04 
 1. Install OpenVINO's runtime and point `INTEL_OPENVINO_DIR` at it, with its `runtime/lib/intel64`
    and `runtime/3rdparty/tbb/lib` on `LD_LIBRARY_PATH`. The app loads it when it starts, so it
    builds without it.
-2. Get the speech model. The app's default is the Mac app's,
+2. Get the speech model, or let the app download it when it first starts. The app's default is
+   the Mac app's,
    [Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit](https://huggingface.co/Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit):
    Qwen3-ASR-0.6B fine-tuned for Sinhala, which transcribes English nearly as well as the original.
    On the NPU of a Core Ultra 7 258V it gets 6.31% of characters wrong on OpenSLR 52's Sinhala test
@@ -117,9 +157,11 @@ are: password fields are refused, as on the Mac; terminals and fields for one va
 number) keep dictated text on one line, and other fields take line breaks, as the Mac app decides
 (most say nothing either way); and the character before the cursor decides the leading space.
 Elsewhere it pastes: the text goes on the clipboard, a virtual keyboard types Ctrl+V, and the
-clipboard is put back. COSMIC has everything this needs. KDE Plasma has no input-method-v2, so
-there it always pastes; GNOME has none of it. With IBus or Fcitx running, they hold the input
-method, and the app pastes.
+clipboard is put back. COSMIC has everything this needs, as do wlroots desktops such as Sway and
+Hyprland (untested). KDE Plasma has neither input-method-v2 nor a virtual keyboard, and GNOME has
+none of it, so dictation doesn't start there yet, nor on X11 desktops: the app starts anyway, and
+Settings says why (`desktop_blocker` in `crates/app/src/dictation.rs`). They get their own ways in
+later versions. With IBus or Fcitx running, they hold the input method, and the app pastes.
 
 While you dictate, a small circle below and to the right of the mouse pointer follows it: a red
 disc that grows with the microphone's level, a ring round it when hands-free, and a spinning ring

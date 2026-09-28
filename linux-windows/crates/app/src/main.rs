@@ -26,8 +26,9 @@ use tracing_subscriber::EnvFilter;
     about = "Dictation with the speech-to-text of Live Transcribe for Mac"
 )]
 struct Cli {
+    /// What to do; without one, dictation (`run`), as when the app starts from the desktop's menu
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 /// Which speech model to run, and where.
@@ -80,10 +81,14 @@ fn main() -> ExitCode {
 
     let result = match Cli::parse().command {
         #[cfg(target_os = "linux")]
-        Command::Run(options) => dictation::run(&options),
+        None => dictation::run(&dictation::Options::default()),
+        #[cfg(not(target_os = "linux"))]
+        None => Err(anyhow::anyhow!("dictation isn't here yet on this system; see --help")),
         #[cfg(target_os = "linux")]
-        Command::Keys => keys::run(),
-        Command::Transcribe { model, files, json } => transcribe::run(&model, &files, json),
+        Some(Command::Run(options)) => dictation::run(&options),
+        #[cfg(target_os = "linux")]
+        Some(Command::Keys) => keys::run(),
+        Some(Command::Transcribe { model, files, json }) => transcribe::run(&model, &files, json),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
