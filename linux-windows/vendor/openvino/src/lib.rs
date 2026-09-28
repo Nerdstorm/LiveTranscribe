@@ -39,6 +39,8 @@ mod property;
 mod rank;
 mod request;
 mod resize_algorithm;
+#[cfg(feature = "runtime-linking")]
+mod runtime_folder;
 mod shape;
 mod tensor;
 mod util;
@@ -59,6 +61,8 @@ pub use property::{PropertyKey, RwPropertyKey};
 pub use rank::Rank;
 pub use request::InferRequest;
 pub use resize_algorithm::ResizeAlgorithm;
+#[cfg(feature = "runtime-linking")]
+pub use runtime_folder::load_from_folder;
 pub use shape::Shape;
 pub use tensor::Tensor;
 pub use version::{version, Version};

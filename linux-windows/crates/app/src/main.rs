@@ -72,6 +72,11 @@ fn main() -> ExitCode {
         .with_writer(std::io::stderr)
         .init();
 
+    // An installed app runs on the OpenVINO it was installed with.
+    if let Some(folder) = paths::bundled_openvino() {
+        lt_transcription::qwen3_asr::use_openvino_in(folder);
+    }
+
     let result = match Cli::parse().command {
         #[cfg(target_os = "linux")]
         Command::Run(options) => dictation::run(&options),

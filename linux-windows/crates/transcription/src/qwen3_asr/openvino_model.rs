@@ -100,6 +100,8 @@ struct TextManifest {
 /// Why a model folder couldn't be used, or a pass failed.
 #[derive(Debug)]
 pub enum OpenVinoError {
+    /// The OpenVINO runtime the app was installed with couldn't be loaded from its `folder`.
+    Runtime { folder: PathBuf, problem: String },
     /// OpenVINO's library couldn't be found or started.
     Setup(SetupError),
     /// An OpenVINO call failed while `doing` something.
@@ -124,6 +126,11 @@ pub enum OpenVinoError {
 impl fmt::Display for OpenVinoError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Runtime { folder, problem } => write!(
+                f,
+                "the OpenVINO installed with the app, in {}, couldn't be loaded ({problem}); reinstalling the app puts it back",
+                folder.display()
+            ),
             Self::Setup(error) => write!(
                 f,
                 "OpenVINO couldn't start ({error}); install it and set INTEL_OPENVINO_DIR, or put its libraries on the library path"
@@ -327,6 +334,7 @@ impl TextRequest {
 impl OpenVinoModel {
     fn load(folder: &Path, choice: &DeviceChoice, cache: Option<&Path>) -> Result<(Self, Manifest), OpenVinoError> {
         let manifest = read_manifest(folder)?;
+        super::openvino_runtime::load()?;
         let mut core = Core::new().map_err(OpenVinoError::Setup)?;
         let first = match choice {
             DeviceChoice::Auto if has_npu(&core) => "NPU".to_owned(),

@@ -294,7 +294,11 @@ mod variadic {
     pub(super) fn compile_model() -> Result<CompileModel, InferenceError> {
         COMPILE_MODEL
             .get_or_init(|| {
-                let path = openvino_sys::library::find()
+                // The library openvino-sys loaded: the application's own copy, or the one
+                // openvino-finder finds, as it found it for openvino-sys.
+                let path = crate::runtime_folder::loaded_c_api()
+                    .map(std::path::Path::to_path_buf)
+                    .or_else(openvino_sys::library::find)
                     .ok_or("the `openvino_c` shared library was not found")?;
                 // The library is open already, as openvino-sys opened it for the `Core`, so
                 // opening it again runs nothing and gives the same library.

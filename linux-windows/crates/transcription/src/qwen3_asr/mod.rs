@@ -12,6 +12,7 @@ mod encoder_layout;
 pub mod generation;
 mod log_mel;
 mod openvino_model;
+mod openvino_runtime;
 mod prompt;
 mod tokenizer;
 mod transcript;
@@ -26,6 +27,7 @@ pub use log_mel::{HOP_LENGTH, LogMel, LogMelError, LogMelExtractor, MEL_BINS, N_
 pub use openvino_model::{
     DeviceChoice, ModelSummary, OpenError, OpenVinoError, OpenVinoModel, inspect_model, open_transcriber,
 };
+pub use openvino_runtime::use_openvino_in;
 pub use prompt::PromptFormat;
 pub use tokenizer::{Tokenizer, TokenizerError};
 pub use transcript::{Languages, Reply};
