@@ -58,13 +58,21 @@ machine, the setup kit (not in the repository) installs both in an Ubuntu 24.04 
 1. Install OpenVINO's runtime and point `INTEL_OPENVINO_DIR` at it, with its `runtime/lib/intel64`
    and `runtime/3rdparty/tbb/lib` on `LD_LIBRARY_PATH`. The app loads it when it starts, so it
    builds without it.
-2. Convert the model, in a Python environment with `openvino==2026.2.1`, `nncf==3.2.0`,
-   `transformers==5.13.1` and CPU PyTorch. The app's default model is the Mac app's,
+2. Get the speech model. The app's default is the Mac app's,
    [Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit](https://huggingface.co/Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit):
    Qwen3-ASR-0.6B fine-tuned for Sinhala, which transcribes English nearly as well as the original.
    On the NPU of a Core Ultra 7 258V it gets 6.31% of characters wrong on OpenSLR 52's Sinhala test
    set, as the Mac app does (6.36%), and 5.18% of words on FLEURS English, where the original gets
-   5.05%.
+   5.05%. It is on Hugging Face converted for OpenVINO,
+   [Nerdstorm/Qwen3-ASR-0.6B-Sinhala-OpenVINO](https://huggingface.co/Nerdstorm/Qwen3-ASR-0.6B-Sinhala-OpenVINO):
+
+   ```bash
+   hf download Nerdstorm/Qwen3-ASR-0.6B-Sinhala-OpenVINO --revision 8298d9b2d532965800b2c0c64b81965ededb03a3 \
+     --local-dir ~/.local/share/live-transcribe/models/qwen3-asr-0.6b-sinhala
+   ```
+
+   Or convert it yourself, in a Python environment with `openvino==2026.2.1`, `nncf==3.2.0`,
+   `transformers==5.13.1` and CPU PyTorch:
 
    ```bash
    python tools/export-qwen3-asr.py --model /path/to/Qwen3-ASR-0.6B-Sinhala-8bit \
