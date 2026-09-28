@@ -14,7 +14,7 @@
     "linux": {
       "deb": {
         "section": "utils",
-        "depends": ["libasound2"],
+        "depends": ["libasound2", "ca-certificates"],
         "recommends": ["intel-level-zero-npu", "libze1"],
         "files": {
           "/usr/lib/live-transcribe/openvino": "../../target/openvino-runtime",
@@ -25,7 +25,7 @@
         "postRemoveScript": "../../packaging/linux/postrm.sh"
       },
       "rpm": {
-        "depends": ["libasound.so.2()(64bit)"],
+        "depends": ["libasound.so.2()(64bit)", "ca-certificates"],
         "recommends": ["intel-npu-driver"],
         "files": {
           "/usr/lib/live-transcribe/openvino": "../../target/openvino-runtime",
