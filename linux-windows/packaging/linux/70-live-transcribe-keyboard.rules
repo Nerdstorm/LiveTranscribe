@@ -1,0 +1,6 @@
+# Live Transcribe: whoever is logged in at the machine may read the keyboards, which hold-to-talk
+# needs. It watches the hotkey through /dev/input, which otherwise only root and the input group
+# may read. This gives the seated user access, as logind does for sound cards and webcams; any
+# program that user runs can then read what they type, as any X11 program always could.
+# Numbered below 73, where systemd's rules turn the uaccess tag into access.
+SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_INPUT_KEYBOARD}=="1", TAG+="uaccess"

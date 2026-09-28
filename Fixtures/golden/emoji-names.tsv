@@ -1,0 +1,1765 @@
+# Every name an emoji command accepts, before the plural rule, and the emoji it inserts, from
+# the Mac app's EmojiNames: its common names, then each emoji's Unicode name that macOS resolves.
+# Columns: name, the emoji's scalars in hex, the emoji. Written by make golden; do not edit.
+100	1F4AF	💯
+abacus	1F9EE	🧮
+accordion	1FA97	🪗
+adhesive bandage	1FA79	🩹
+admission tickets	1F39F FE0F	🎟️
+adult	1F9D1	🧑
+aerial tramway	1F6A1	🚡
+aeroplane	2708 FE0F	✈️
+airplane	2708 FE0F	✈️
+airplane arriving	1F6EC	🛬
+airplane departure	1F6EB	🛫
+alarm	23F0	⏰
+alarm clock	23F0	⏰
+alembic	2697 FE0F	⚗️
+alien	1F47D	👽
+alien monster	1F47E	👾
+ambulance	1F691	🚑
+american football	1F3C8	🏈
+amphora	1F3FA	🏺
+anatomical heart	1FAC0	🫀
+anchor	2693	⚓
+angel	1F607	😇
+anger symbol	1F4A2	💢
+angry	1F620	😠
+angry face	1F620	😠
+anguished face	1F627	😧
+ant	1F41C	🐜
+antenna with bars	1F4F6	📶
+anticlockwise downwards and upwards open circle arrows	1F504	🔄
+applause	1F44F	👏
+apple	1F34E	🍎
+aquarius	2652	♒
+aries	2648	♈
+arrow down	2B07 FE0F	⬇️
+arrow left	2B05 FE0F	⬅️
+arrow pointing rightwards then curving downwards	2935 FE0F	⤵️
+arrow pointing rightwards then curving upwards	2934 FE0F	⤴️
+arrow right	27A1 FE0F	➡️
+arrow up	2B06 FE0F	⬆️
+articulated lorry	1F69B	🚛
+artist palette	1F3A8	🎨
+astonished face	1F632	😲
+athletic shoe	1F45F	👟
+atom symbol	269B FE0F	⚛️
+aubergine	1F346	🍆
+auto rickshaw	1F6FA	🛺
+automated teller machine	1F3E7	🏧
+automobile	1F697	🚗
+avocado	1F951	🥑
+awkward	1F62C	😬
+axe	1FA93	🪓
+baby	1F476	👶
+baby angel	1F47C	👼
+baby bottle	1F37C	🍼
+baby chick	1F424	🐤
+baby symbol	1F6BC	🚼
+back with leftwards arrow above	1F519	🔙
+bacon	1F953	🥓
+bactrian camel	1F42B	🐫
+badger	1F9A1	🦡
+badminton racquet and shuttlecock	1F3F8	🏸
+bagel	1F96F	🥯
+baggage claim	1F6C4	🛄
+baguette bread	1F956	🥖
+ball of yarn	1F9F6	🧶
+ballet shoes	1FA70	🩰
+balloon	1F388	🎈
+ballot box with ballot	1F5F3 FE0F	🗳️
+ballot box with check	2611 FE0F	☑️
+banana	1F34C	🍌
+banjo	1FA95	🪕
+bank	1F3E6	🏦
+banknote with dollar sign	1F4B5	💵
+banknote with euro sign	1F4B6	💶
+banknote with pound sign	1F4B7	💷
+banknote with yen sign	1F4B4	💴
+bar chart	1F4CA	📊
+bar of soap	1F9FC	🧼
+barber pole	1F488	💈
+baseball	26BE	⚾
+basket	1F9FA	🧺
+basketball	1F3C0	🏀
+basketball and hoop	1F3C0	🏀
+bat	1F987	🦇
+bath	1F6C0	🛀
+bathtub	1F6C1	🛁
+battery	1F50B	🔋
+bawling	1F62D	😭
+beach	1F3D6 FE0F	🏖️
+beach with umbrella	1F3D6 FE0F	🏖️
+beaming	1F601	😁
+beaming face	1F601	😁
+beaming face with smiling eyes	1F601	😁
+beans	1FAD8	🫘
+bear	1F43B	🐻
+bear face	1F43B	🐻
+bearded person	1F9D4	🧔
+beating heart	1F493	💓
+beaver	1F9AB	🦫
+bed	1F6CF FE0F	🛏️
+bee	1F41D	🐝
+beer	1F37A	🍺
+beer mug	1F37A	🍺
+beers	1F37B	🍻
+beetle	1FAB2	🪲
+bell	1F514	🔔
+bell pepper	1FAD1	🫑
+bell with cancellation stroke	1F515	🔕
+bellhop bell	1F6CE FE0F	🛎️
+bento box	1F371	🍱
+beverage box	1F9C3	🧃
+biceps	1F4AA	💪
+bicycle	1F6B2	🚲
+bicyclist	1F6B4	🚴
+big smile	1F600	😀
+bike	1F6B2	🚲
+bikini	1F459	👙
+billed cap	1F9E2	🧢
+billiards	1F3B1	🎱
+biohazard sign	2623 FE0F	☣️
+bird	1F426	🐦
+birthday cake	1F382	🎂
+bison	1F9AC	🦬
+biting lip	1FAE6	🫦
+black chess pawn	265F FE0F	♟️
+black circle for record	23FA FE0F	⏺️
+black club suit	2663 FE0F	♣️
+black diamond suit	2666 FE0F	♦️
+black heart	1F5A4	🖤
+black heart suit	2665 FE0F	♥️
+black large square	2B1B	⬛
+black medium small square	25FE	◾
+black medium square	25FC FE0F	◼️
+black nib	2712 FE0F	✒️
+black question mark ornament	2753	❓
+black rightwards arrow	27A1 FE0F	➡️
+black scissors	2702 FE0F	✂️
+black small square	25AA FE0F	▪️
+black spade suit	2660 FE0F	♠️
+black square button	1F532	🔲
+black square for stop	23F9 FE0F	⏹️
+black sun with rays	2600 FE0F	☀️
+black telephone	260E FE0F	☎️
+black universal recycling symbol	267B FE0F	♻️
+blossom	1F338	🌸
+blowfish	1F421	🐡
+blowing a kiss	1F618	😘
+blue book	1F4D8	📘
+blue heart	1F499	💙
+blueberries	1FAD0	🫐
+blush	1F60A	😊
+blushing	1F60A	😊
+boar	1F417	🐗
+boat	1F6A2	🚢
+bomb	1F4A3	💣
+bone	1F9B4	🦴
+book	1F4D6	📖
+bookmark	1F516	🔖
+bookmark tabs	1F4D1	📑
+books	1F4DA	📚
+boom	1F4A5	💥
+boomerang	1FA83	🪃
+bottle with popping cork	1F37E	🍾
+bouquet	1F490	💐
+bow and arrow	1F3F9	🏹
+bowl with spoon	1F963	🥣
+bowling	1F3B3	🎳
+boxing glove	1F94A	🥊
+boy	1F466	👦
+brain	1F9E0	🧠
+bread	1F35E	🍞
+brick	1F9F1	🧱
+bride with veil	1F470	👰
+bridge at night	1F309	🌉
+briefcase	1F4BC	💼
+briefs	1FA72	🩲
+broccoli	1F966	🥦
+broken heart	1F494	💔
+broom	1F9F9	🧹
+brown heart	1F90E	🤎
+bubble tea	1F9CB	🧋
+bubbles	1FAE7	🫧
+bucket	1FAA3	🪣
+bug	1F41B	🐛
+building construction	1F3D7 FE0F	🏗️
+bulb	1F4A1	💡
+bullseye	1F3AF	🎯
+bunny	1F430	🐰
+burger	1F354	🍔
+burrito	1F32F	🌯
+bus	1F68C	🚌
+bus stop	1F68F	🚏
+bust in silhouette	1F464	👤
+busts in silhouette	1F465	👥
+butter	1F9C8	🧈
+butterfly	1F98B	🦋
+cab	1F695	🚕
+cactus	1F335	🌵
+cake	1F382	🎂
+calendar	1F4C5	📅
+call me	1F919	🤙
+call me hand	1F919	🤙
+camera	1F4F7	📷
+camera with flash	1F4F8	📸
+camping	1F3D5 FE0F	🏕️
+cancer	264B	♋
+candle	1F56F FE0F	🕯️
+candy	1F36C	🍬
+canned food	1F96B	🥫
+canoe	1F6F6	🛶
+capricorn	2651	♑
+car	1F697	🚗
+card file box	1F5C3 FE0F	🗃️
+card index	1F4C7	📇
+card index dividers	1F5C2 FE0F	🗂️
+carousel horse	1F3A0	🎠
+carp streamer	1F38F	🎏
+carpentry saw	1FA9A	🪚
+carrot	1F955	🥕
+cash	1F4B5	💵
+cat	1F431	🐱
+cat face	1F431	🐱
+cat face with tears of joy	1F639	😹
+cat face with wry smile	1F63C	😼
+caterpillar	1F41B	🐛
+caution	26A0 FE0F	⚠️
+celebration	1F389	🎉
+cell phone	1F4F1	📱
+chains	26D3 FE0F	⛓️
+chair	1FA91	🪑
+champagne	1F37E	🍾
+chart	1F4C8	📈
+chart decreasing	1F4C9	📉
+chart down	1F4C9	📉
+chart increasing	1F4C8	📈
+chart up	1F4C8	📈
+chart with downwards trend	1F4C9	📉
+chart with upwards trend	1F4C8	📈
+chart with upwards trend and yen sign	1F4B9	💹
+check	2705	✅
+check mark	2705	✅
+checkered flag	1F3C1	🏁
+checkmark	2705	✅
+cheering megaphone	1F4E3	📣
+cheers	1F37B	🍻
+cheese	1F9C0	🧀
+cheese wedge	1F9C0	🧀
+chequered flag	1F3C1	🏁
+cherries	1F352	🍒
+cherry blossom	1F338	🌸
+chestnut	1F330	🌰
+chicken	1F414	🐔
+child	1F9D2	🧒
+children crossing	1F6B8	🚸
+chili	1F336 FE0F	🌶️
+chilli	1F336 FE0F	🌶️
+chipmunk	1F43F FE0F	🐿️
+chocolate	1F36B	🍫
+chocolate bar	1F36B	🍫
+chopsticks	1F962	🥢
+christmas tree	1F384	🎄
+church	26EA	⛪
+cinema	1F3A6	🎦
+circled ideograph accept	1F251	🉑
+circled ideograph advantage	1F250	🉐
+circled ideograph congratulation	3297 FE0F	㊗️
+circled ideograph secret	3299 FE0F	㊙️
+circled latin capital letter m	24C2 FE0F	Ⓜ️
+circus tent	1F3AA	🎪
+cityscape	1F3D9 FE0F	🏙️
+cityscape at dusk	1F306	🌆
+clap	1F44F	👏
+clapper board	1F3AC	🎬
+clapping	1F44F	👏
+clapping hands	1F44F	👏
+clapping hands sign	1F44F	👏
+classical building	1F3DB FE0F	🏛️
+clinking beer mugs	1F37B	🍻
+clinking glasses	1F942	🥂
+clipboard	1F4CB	📋
+clock face eight oclock	1F557	🕗
+clock face eleven oclock	1F55A	🕚
+clock face five oclock	1F554	🕔
+clock face four oclock	1F553	🕓
+clock face nine oclock	1F558	🕘
+clock face one oclock	1F550	🕐
+clock face seven oclock	1F556	🕖
+clock face six oclock	1F555	🕕
+clock face ten oclock	1F559	🕙
+clock face three oclock	1F552	🕒
+clock face twelve oclock	1F55B	🕛
+clock face two oclock	1F551	🕑
+clockwise downwards and upwards open circle arrows	1F503	🔃
+clockwise rightwards and leftwards open circle arrows	1F501	🔁
+clockwise rightwards and leftwards open circle arrows with circled one overlay	1F502	🔂
+closed book	1F4D5	📕
+closed lock with key	1F510	🔐
+closed mailbox with lowered flag	1F4EA	📪
+closed mailbox with raised flag	1F4EB	📫
+closed umbrella	1F302	🌂
+cloud	2601 FE0F	☁️
+cloud with lightning	1F329 FE0F	🌩️
+cloud with rain	1F327 FE0F	🌧️
+cloud with snow	1F328 FE0F	🌨️
+cloud with tornado	1F32A FE0F	🌪️
+cloudy	2601 FE0F	☁️
+clover	1F340	🍀
+clown	1F921	🤡
+clown face	1F921	🤡
+coat	1F9E5	🧥
+cockroach	1FAB3	🪳
+cocktail glass	1F378	🍸
+coconut	1F965	🥥
+coder	1F9D1 200D 1F4BB	🧑‍💻
+coffee	2615	☕
+coffin	26B0 FE0F	⚰️
+cog	2699 FE0F	⚙️
+coin	1FA99	🪙
+cold face	1F976	🥶
+collision	1F4A5	💥
+collision symbol	1F4A5	💥
+comet	2604 FE0F	☄️
+compass	1F9ED	🧭
+compression	1F5DC FE0F	🗜️
+computer	1F4BB	💻
+confetti	1F389	🎉
+confetti ball	1F38A	🎊
+confounded face	1F616	😖
+confused	1F615	😕
+confused face	1F615	😕
+construction	1F6A7	🚧
+construction sign	1F6A7	🚧
+construction worker	1F477	👷
+control knobs	1F39B FE0F	🎛️
+convenience store	1F3EA	🏪
+cooked rice	1F35A	🍚
+cookie	1F36A	🍪
+cooking	1F373	🍳
+cool	1F60E	😎
+coral	1FAB8	🪸
+couch and lamp	1F6CB FE0F	🛋️
+couple with heart	1F491	💑
+cow	1F42E	🐮
+cow face	1F42E	🐮
+crab	1F980	🦀
+crazy	1F92A	🤪
+crazy face	1F92A	🤪
+credit card	1F4B3	💳
+crescent moon	1F319	🌙
+cricket	1F3CF	🏏
+cricket bat	1F3CF	🏏
+cricket bat and ball	1F3CF	🏏
+crocodile	1F40A	🐊
+croissant	1F950	🥐
+cross	274C	❌
+cross mark	274C	❌
+crossed fingers	1F91E	🤞
+crossed flags	1F38C	🎌
+crossed swords	2694 FE0F	⚔️
+crown	1F451	👑
+crutch	1FA7C	🩼
+cry	1F622	😢
+crying	1F622	😢
+crying cat face	1F63F	😿
+crying face	1F622	😢
+crying laughing	1F602	😂
+crystal ball	1F52E	🔮
+cucumber	1F952	🥒
+cup with straw	1F964	🥤
+cupcake	1F9C1	🧁
+curling stone	1F94C	🥌
+curly loop	27B0	➰
+currency exchange	1F4B1	💱
+curry and rice	1F35B	🍛
+custard	1F36E	🍮
+customs	1F6C3	🛃
+cut of meat	1F969	🥩
+cyclone	1F300	🌀
+dagger knife	1F5E1 FE0F	🗡️
+dancer	1F483	💃
+dango	1F361	🍡
+dark sunglasses	1F576 FE0F	🕶️
+dart	1F3AF	🎯
+dash symbol	1F4A8	💨
+deaf person	1F9CF	🧏
+deciduous tree	1F333	🌳
+deer	1F98C	🦌
+delicious	1F60B	😋
+delivery truck	1F69A	🚚
+department store	1F3EC	🏬
+derelict house building	1F3DA FE0F	🏚️
+desert	1F3DC FE0F	🏜️
+desert island	1F3DD FE0F	🏝️
+desktop	1F5A5 FE0F	🖥️
+desktop computer	1F5A5 FE0F	🖥️
+developer	1F9D1 200D 1F4BB	🧑‍💻
+devil	1F608	😈
+diamond	1F48E	💎
+diamond shape with a dot inside	1F4A0	💠
+dice	1F3B2	🎲
+dinosaur	1F996	🦖
+direct hit	1F3AF	🎯
+disappointed but relieved face	1F625	😥
+disappointed face	1F61E	😞
+disguised face	1F978	🥸
+distorted face	1FAEA	🫪
+diving mask	1F93F	🤿
+diya lamp	1FA94	🪔
+dizzy face	1F635	😵
+dizzy symbol	1F4AB	💫
+dna double helix	1F9EC	🧬
+do not litter symbol	1F6AF	🚯
+dodo	1F9A4	🦤
+dog	1F436	🐶
+dog face	1F436	🐶
+dollar	1F4B5	💵
+dollar bill	1F4B5	💵
+dollars	1F4B5	💵
+dolphin	1F42C	🐬
+donkey	1FACF	🫏
+donut	1F369	🍩
+door	1F6AA	🚪
+dotted line face	1FAE5	🫥
+double curly loop	27BF	➿
+double exclamation mark	203C FE0F	‼️
+double vertical bar	23F8 FE0F	⏸️
+doughnut	1F369	🍩
+dove of peace	1F54A FE0F	🕊️
+down arrow	2B07 FE0F	⬇️
+downwards black arrow	2B07 FE0F	⬇️
+dragon	1F409	🐉
+dragon face	1F432	🐲
+dress	1F457	👗
+dromedary camel	1F42A	🐪
+drooling face	1F924	🤤
+drop of blood	1FA78	🩸
+droplet	1F4A7	💧
+drum with drumsticks	1F941	🥁
+duck	1F986	🦆
+dumpling	1F95F	🥟
+dvd	1F4C0	📀
+e mail	1F4E7	📧
+eagle	1F985	🦅
+ear	1F442	👂
+ear of maize	1F33D	🌽
+ear of rice	1F33E	🌾
+ear with hearing aid	1F9BB	🦻
+earth	1F30D	🌍
+earth globe americas	1F30E	🌎
+egg	1F95A	🥚
+eight pointed black star	2734 FE0F	✴️
+eight spoked asterisk	2733 FE0F	✳️
+eject symbol	23CF FE0F	⏏️
+electric light bulb	1F4A1	💡
+electric plug	1F50C	🔌
+electric torch	1F526	🔦
+elephant	1F418	🐘
+elevator	1F6D7	🛗
+elf	1F9DD	🧝
+email	1F4E7	📧
+emoji component bald	1F9B2	🦲
+emoji component curly hair	1F9B1	🦱
+emoji component red hair	1F9B0	🦰
+emoji component white hair	1F9B3	🦳
+empty nest	1FAB9	🪹
+end with leftwards arrow above	1F51A	🔚
+enraged face	1F621	😡
+envelope	2709 FE0F	✉️
+envelope with downwards arrow above	1F4E9	📩
+european castle	1F3F0	🏰
+european post office	1F3E4	🏤
+evergreen tree	1F332	🌲
+exclamation mark	2757	❗
+exclamation question mark	2049 FE0F	⁉️
+exploding head	1F92F	🤯
+explosion	1F4A5	💥
+expressionless	1F611	😑
+expressionless face	1F611	😑
+extraterrestrial alien	1F47D	👽
+eye	1F441 FE0F	👁️
+eye roll	1F644	🙄
+eyeglasses	1F453	👓
+eyeroll	1F644	🙄
+eyes	1F440	👀
+face blowing a kiss	1F618	😘
+face holding back tears	1F979	🥹
+face massage	1F486	💆
+face palm	1F926	🤦
+face savoring food	1F60B	😋
+face savouring delicious food	1F60B	😋
+face savouring food	1F60B	😋
+face screaming in fear	1F631	😱
+face throwing a kiss	1F618	😘
+face with bags under eyes	1FAE9	🫩
+face with cold sweat	1F613	😓
+face with cowboy hat	1F920	🤠
+face with diagonal mouth	1FAE4	🫤
+face with finger covering closed lips	1F92B	🤫
+face with look of triumph	1F624	😤
+face with medical mask	1F637	😷
+face with monocle	1F9D0	🧐
+face with no good gesture	1F645	🙅
+face with ok gesture	1F646	🙆
+face with one eyebrow raised	1F928	🤨
+face with open eyes and hand over mouth	1FAE2	🫢
+face with open mouth	1F62E	😮
+face with open mouth and cold sweat	1F630	😰
+face with open mouth vomiting	1F92E	🤮
+face with party horn and party hat	1F973	🥳
+face with peeking eye	1FAE3	🫣
+face with pleading eyes	1F97A	🥺
+face with rolling eyes	1F644	🙄
+face with tears of joy	1F602	😂
+face with thermometer	1F912	🤒
+face with tongue	1F61B	😛
+face with uneven eyes and wavy mouth	1F974	🥴
+face without mouth	1F636	😶
+facepalm	1F926	🤦
+factory	1F3ED	🏭
+fairy	1F9DA	🧚
+falafel	1F9C6	🧆
+fallen leaf	1F342	🍂
+family	1F46A	👪
+father christmas	1F385	🎅
+fax machine	1F4E0	📠
+fearful face	1F628	😨
+feather	1FAB6	🪶
+female sign	2640 FE0F	♀️
+fencer	1F93A	🤺
+ferris wheel	1F3A1	🎡
+ferry	26F4 FE0F	⛴️
+field hockey stick and ball	1F3D1	🏑
+fight cloud	1FAEF	🫯
+file cabinet	1F5C4 FE0F	🗄️
+file folder	1F4C1	📁
+film	1F3AC	🎬
+film frames	1F39E FE0F	🎞️
+film projector	1F4FD FE0F	📽️
+fingerprint	1FAC6	🫆
+fingers crossed	1F91E	🤞
+finish flag	1F3C1	🏁
+fire	1F525	🔥
+fire engine	1F692	🚒
+fire extinguisher	1F9EF	🧯
+firecracker	1F9E8	🧨
+firework	1F386	🎆
+firework sparkler	1F387	🎇
+fireworks	1F386	🎆
+first place	1F947	🥇
+first place medal	1F947	🥇
+first quarter moon symbol	1F313	🌓
+first quarter moon with face	1F31B	🌛
+fish	1F41F	🐟
+fish cake with swirl design	1F365	🍥
+fishing pole and fish	1F3A3	🎣
+fist	1F44A	👊
+fist bump	1F44A	👊
+fisted hand sign	1F44A	👊
+flag in hole	26F3	⛳
+flame	1F525	🔥
+flamingo	1F9A9	🦩
+flat shoe	1F97F	🥿
+flatbread	1FAD3	🫓
+flex	1F4AA	💪
+flexed biceps	1F4AA	💪
+floppy disk	1F4BE	💾
+flower	1F338	🌸
+flower playing cards	1F3B4	🎴
+flowers	1F490	💐
+flushed face	1F633	😳
+flute	1FA88	🪈
+fly	1FAB0	🪰
+flying disc	1F94F	🥏
+flying saucer	1F6F8	🛸
+fog	1F32B FE0F	🌫️
+foggy	1F301	🌁
+folded hands	1F64F	🙏
+folder	1F4C1	📁
+folding hand fan	1FAAD	🪭
+fondue	1FAD5	🫕
+foot	1F9B6	🦶
+football	26BD	⚽
+footprints	1F463	👣
+fork and knife	1F374	🍴
+fork and knife with plate	1F37D FE0F	🍽️
+fortune cookie	1F960	🥠
+fountain	26F2	⛲
+four leaf clover	1F340	🍀
+fox	1F98A	🦊
+fox face	1F98A	🦊
+frame with picture	1F5BC FE0F	🖼️
+freezing	1F976	🥶
+freezing face	1F976	🥶
+french fries	1F35F	🍟
+fried shrimp	1F364	🍤
+frog	1F438	🐸
+frog face	1F438	🐸
+frown	1F641	🙁
+frowning	1F641	🙁
+frowning face with open mouth	1F626	😦
+fuel pump	26FD	⛽
+full moon symbol	1F315	🌕
+full moon with face	1F31D	🌝
+funeral urn	26B1 FE0F	⚱️
+furious	1F621	😡
+game controller	1F3AE	🎮
+game die	1F3B2	🎲
+garlic	1F9C4	🧄
+gear	2699 FE0F	⚙️
+geek	1F913	🤓
+gem	1F48E	💎
+gem stone	1F48E	💎
+gemini	264A	♊
+genie	1F9DE	🧞
+ghost	1F47B	👻
+gift	1F381	🎁
+ginger root	1FADA	🫚
+giraffe face	1F992	🦒
+girl	1F467	👧
+glass of milk	1F95B	🥛
+globe	1F30D	🌍
+globe with meridians	1F310	🌐
+gloves	1F9E4	🧤
+glowing star	1F31F	🌟
+goal net	1F945	🥅
+goat	1F410	🐐
+goggles	1F97D	🥽
+gold medal	1F947	🥇
+golf	26F3	⛳
+golfer	1F3CC FE0F	🏌️
+goose	1FABF	🪿
+gorilla	1F98D	🦍
+graduation cap	1F393	🎓
+grapes	1F347	🍇
+graph	1F4CA	📊
+green apple	1F34F	🍏
+green book	1F4D7	📗
+green check	2705	✅
+green heart	1F49A	💚
+green salad	1F957	🥗
+green tick	2705	✅
+grey heart	1FA76	🩶
+grimace	1F62C	😬
+grimacing	1F62C	😬
+grimacing face	1F62C	😬
+grin	1F600	😀
+grinning	1F600	😀
+grinning cat face with smiling eyes	1F638	😸
+grinning face	1F600	😀
+grinning face with one large and one small eye	1F92A	🤪
+grinning face with smiling eyes	1F604	😄
+grinning face with star eyes	1F929	🤩
+grinning face with sweat	1F605	😅
+growing heart	1F497	💗
+guardsman	1F482	💂
+guide dog	1F9AE	🦮
+guitar	1F3B8	🎸
+hair pick	1FAAE	🪮
+haircut	1F487	💇
+hairy creature	1FAC8	🫈
+halo	1F607	😇
+hamburger	1F354	🍔
+hammer	1F528	🔨
+hammer and pick	2692 FE0F	⚒️
+hammer and wrench	1F6E0 FE0F	🛠️
+hamsa	1FAAC	🪬
+hamster face	1F439	🐹
+hand wave	1F44B	👋
+hand with index and middle fingers crossed	1F91E	🤞
+hand with index finger and thumb crossed	1FAF0	🫰
+handbag	1F45C	👜
+handball	1F93E	🤾
+hands up	1F64C	🙌
+handshake	1F91D	🤝
+happy	1F604	😄
+happy face	1F604	😄
+happy person raising one hand	1F64B	🙋
+harp	1FA89	🪉
+hatching chick	1F423	🐣
+headphone	1F3A7	🎧
+headphones	1F3A7	🎧
+headstone	1FAA6	🪦
+hear no evil	1F649	🙉
+hear no evil monkey	1F649	🙉
+heart	2764 FE0F	❤️
+heart decoration	1F49F	💟
+heart eyes	1F60D	😍
+heart hands	1FAF6	🫶
+heart with arrow	1F498	💘
+heart with ribbon	1F49D	💝
+heartbreak	1F494	💔
+heavy black heart	2764 FE0F	❤️
+heavy check mark	2714 FE0F	✔️
+heavy division sign	2797	➗
+heavy dollar sign	1F4B2	💲
+heavy equals sign	1F7F0	🟰
+heavy exclamation mark symbol	2757	❗
+heavy heart exclamation mark ornament	2763 FE0F	❣️
+heavy large circle	2B55	⭕
+heavy minus sign	2796	➖
+heavy multiplication x	2716 FE0F	✖️
+heavy plus sign	2795	➕
+hedgehog	1F994	🦔
+helicopter	1F681	🚁
+helmet with white cross	26D1 FE0F	⛑️
+herb	1F33F	🌿
+hibiscus	1F33A	🌺
+high brightness symbol	1F506	🔆
+high voltage	26A1	⚡
+high voltage sign	26A1	⚡
+hiking boot	1F97E	🥾
+hindu temple	1F6D5	🛕
+hippopotamus	1F99B	🦛
+hmm	1F914	🤔
+hocho	1F52A	🔪
+hole	1F573 FE0F	🕳️
+home	1F3E0	🏠
+honey pot	1F36F	🍯
+honeybee	1F41D	🐝
+hook	1FA9D	🪝
+hooray	1F64C	🙌
+horizontal traffic light	1F6A5	🚥
+horns	1F918	🤘
+horse	1F434	🐴
+horse face	1F434	🐴
+horse racing	1F3C7	🏇
+hospital	1F3E5	🏥
+hot beverage	2615	☕
+hot dog	1F32D	🌭
+hot face	1F975	🥵
+hot pepper	1F336 FE0F	🌶️
+hot springs	2668 FE0F	♨️
+hotel	1F3E8	🏨
+hourglass	23F3	⏳
+hourglass not done	23F3	⏳
+hourglass with flowing sand	23F3	⏳
+house	1F3E0	🏠
+house building	1F3E0	🏠
+house buildings	1F3D8 FE0F	🏘️
+house with garden	1F3E1	🏡
+hug	1F917	🤗
+hugging	1F917	🤗
+hugging face	1F917	🤗
+hugs	1F917	🤗
+hundred	1F4AF	💯
+hundred points	1F4AF	💯
+hundred points symbol	1F4AF	💯
+hushed face	1F62F	😯
+hut	1F6D6	🛖
+hyacinth	1FABB	🪻
+i love you hand sign	1F91F	🤟
+ice cream	1F366	🍦
+ice cube	1F9CA	🧊
+ice hockey stick and puck	1F3D2	🏒
+ice skate	26F8 FE0F	⛸️
+identification card	1FAAA	🪪
+imp	1F47F	👿
+in love	1F60D	😍
+inbox	1F4E5	📥
+inbox tray	1F4E5	📥
+incoming envelope	1F4E8	📨
+index pointing at the viewer	1FAF5	🫵
+infinity	267E FE0F	♾️
+information desk person	1F481	💁
+information source	2139 FE0F	ℹ️
+innocent	1F607	😇
+input symbol for latin capital letters	1F520	🔠
+input symbol for latin letters	1F524	🔤
+input symbol for latin small letters	1F521	🔡
+input symbol for numbers	1F522	🔢
+input symbol for symbols	1F523	🔣
+izakaya lantern	1F3EE	🏮
+jack o lantern	1F383	🎃
+japanese castle	1F3EF	🏯
+japanese dolls	1F38E	🎎
+japanese goblin	1F47A	👺
+japanese ogre	1F479	👹
+japanese post office	1F3E3	🏣
+japanese symbol for beginner	1F530	🔰
+jar	1FAD9	🫙
+jeans	1F456	👖
+jellyfish	1FABC	🪼
+jigsaw	1F9E9	🧩
+jigsaw puzzle piece	1F9E9	🧩
+joy	1F602	😂
+joystick	1F579 FE0F	🕹️
+juggling	1F939	🤹
+kaaba	1F54B	🕋
+kangaroo	1F998	🦘
+key	1F511	🔑
+keyboard	2328 FE0F	⌨️
+keycap ten	1F51F	🔟
+khanda	1FAAF	🪯
+kimono	1F458	👘
+kiss	1F618	😘
+kiss mark	1F48B	💋
+kissing cat face with closed eyes	1F63D	😽
+kissing face	1F617	😗
+kissing face with closed eyes	1F61A	😚
+kissing face with smiling eyes	1F619	😙
+kissy face	1F618	😘
+kite	1FA81	🪁
+kitten	1F431	🐱
+kitty	1F431	🐱
+kiwifruit	1F95D	🥝
+kneeling person	1F9CE	🧎
+knot	1FAA2	🪢
+koala	1F428	🐨
+lab coat	1F97C	🥼
+label	1F3F7 FE0F	🏷️
+lacrosse stick and ball	1F94D	🥍
+ladder	1FA9C	🪜
+lady beetle	1F41E	🐞
+landslide	1F6D8	🛘
+laptop	1F4BB	💻
+large blue circle	1F535	🔵
+large blue diamond	1F537	🔷
+large blue square	1F7E6	🟦
+large brown circle	1F7E4	🟤
+large brown square	1F7EB	🟫
+large green circle	1F7E2	🟢
+large green square	1F7E9	🟩
+large orange circle	1F7E0	🟠
+large orange diamond	1F536	🔶
+large orange square	1F7E7	🟧
+large purple circle	1F7E3	🟣
+large purple square	1F7EA	🟪
+large red circle	1F534	🔴
+large red square	1F7E5	🟥
+large yellow circle	1F7E1	🟡
+large yellow square	1F7E8	🟨
+last quarter moon symbol	1F317	🌗
+last quarter moon with face	1F31C	🌜
+latin cross	271D FE0F	✝️
+laugh	1F602	😂
+laugh cry	1F602	😂
+laughing	1F602	😂
+laughing crying	1F602	😂
+leaf fluttering in wind	1F343	🍃
+leafless tree	1FABE	🪾
+leafy green	1F96C	🥬
+ledger	1F4D2	📒
+left arrow	2B05 FE0F	⬅️
+left luggage	1F6C5	🛅
+left right arrow	2194 FE0F	↔️
+left speech bubble	1F5E8 FE0F	🗨️
+leftwards arrow with hook	21A9 FE0F	↩️
+leftwards black arrow	2B05 FE0F	⬅️
+leftwards hand	1FAF2	🫲
+leftwards pushing hand	1FAF7	🫷
+leg	1F9B5	🦵
+lemon	1F34B	🍋
+leo	264C	♌
+leopard	1F406	🐆
+level slider	1F39A FE0F	🎚️
+libra	264E	♎
+light blue heart	1FA75	🩵
+light bulb	1F4A1	💡
+light rail	1F688	🚈
+lightbulb	1F4A1	💡
+lightning	26A1	⚡
+lightning bolt	26A1	⚡
+link	1F517	🔗
+link symbol	1F517	🔗
+linked paperclips	1F587 FE0F	🖇️
+lion	1F981	🦁
+lion face	1F981	🦁
+lipstick	1F484	💄
+lit	1F525	🔥
+lizard	1F98E	🦎
+llama	1F999	🦙
+lobster	1F99E	🦞
+location pin	1F4CD	📍
+lock	1F512	🔒
+lock with ink pen	1F50F	🔏
+locked	1F512	🔒
+lol	1F602	😂
+lollipop	1F36D	🍭
+long drum	1FA98	🪘
+lotion bottle	1F9F4	🧴
+lotus	1FAB7	🪷
+loudly crying face	1F62D	😭
+love hotel	1F3E9	🏩
+love letter	1F48C	💌
+low battery	1FAAB	🪫
+low brightness symbol	1F505	🔅
+lower left ballpoint pen	1F58A FE0F	🖊️
+lower left crayon	1F58D FE0F	🖍️
+lower left fountain pen	1F58B FE0F	🖋️
+lower left paintbrush	1F58C FE0F	🖌️
+luggage	1F9F3	🧳
+lungs	1FAC1	🫁
+lying face	1F925	🤥
+mad	1F620	😠
+mage	1F9D9	🧙
+magic wand	1FA84	🪄
+magnet	1F9F2	🧲
+magnifying glass	1F50D	🔍
+mahjong tile red dragon	1F004	🀄
+mail	2709 FE0F	✉️
+male sign	2642 FE0F	♂️
+male with stroke and male and female sign	26A7 FE0F	⚧️
+mammoth	1F9A3	🦣
+man	1F468	👨
+man and woman holding hands	1F46B	👫
+man dancing	1F57A	🕺
+man in business suit levitating	1F574 FE0F	🕴️
+man in tuxedo	1F935	🤵
+man with gua pi mao	1F472	👲
+man with turban	1F473	👳
+mango	1F96D	🥭
+mans shoe	1F45E	👞
+mantelpiece clock	1F570 FE0F	🕰️
+manual wheelchair	1F9BD	🦽
+map	1F5FA FE0F	🗺️
+maple leaf	1F341	🍁
+maracas	1FA87	🪇
+martial arts uniform	1F94B	🥋
+mask	1F637	😷
+mate drink	1F9C9	🧉
+meat on bone	1F356	🍖
+mechanical arm	1F9BE	🦾
+mechanical leg	1F9BF	🦿
+medal	1F947	🥇
+medium black circle	26AB	⚫
+medium white circle	26AA	⚪
+melon	1F348	🍈
+melting	1FAE0	🫠
+melting face	1FAE0	🫠
+memo	1F4DD	📝
+menorah with nine branches	1F54E	🕎
+mens symbol	1F6B9	🚹
+merperson	1F9DC	🧜
+metro	1F687	🚇
+mic	1F3A4	🎤
+microbe	1F9A0	🦠
+microphone	1F3A4	🎤
+microscope	1F52C	🔬
+military helmet	1FA96	🪖
+military medal	1F396 FE0F	🎖️
+milky way	1F30C	🌌
+mind blown	1F92F	🤯
+minibus	1F690	🚐
+minidisc	1F4BD	💽
+mirror	1FA9E	🪞
+mirror ball	1FAA9	🪩
+mobile phone	1F4F1	📱
+mobile phone off	1F4F4	📴
+mobile phone with rightwards arrow at left	1F4F2	📲
+money	1F4B0	💰
+money bag	1F4B0	💰
+money mouth	1F911	🤑
+money mouth face	1F911	🤑
+money with wings	1F4B8	💸
+moneybag	1F4B0	💰
+monkey	1F435	🐵
+monkey face	1F435	🐵
+monorail	1F69D	🚝
+moon	1F319	🌙
+moon cake	1F96E	🥮
+moon viewing ceremony	1F391	🎑
+moose	1FACE	🫎
+mosque	1F54C	🕌
+mosquito	1F99F	🦟
+mother christmas	1F936	🤶
+motor boat	1F6E5 FE0F	🛥️
+motor scooter	1F6F5	🛵
+motorized wheelchair	1F9BC	🦼
+motorway	1F6E3 FE0F	🛣️
+mount fuji	1F5FB	🗻
+mountain	26F0 FE0F	⛰️
+mountain bicyclist	1F6B5	🚵
+mountain cableway	1F6A0	🚠
+mountain railway	1F69E	🚞
+mouse	1F42D	🐭
+mouse face	1F42D	🐭
+mouse trap	1FAA4	🪤
+mouth	1F444	👄
+movie	1F3AC	🎬
+movie camera	1F3A5	🎥
+moyai	1F5FF	🗿
+multiple musical notes	1F3B6	🎶
+muscle	1F4AA	💪
+mushroom	1F344	🍄
+music	1F3B5	🎵
+music note	1F3B5	🎵
+music notes	1F3B6	🎶
+musical keyboard	1F3B9	🎹
+musical note	1F3B5	🎵
+musical notes	1F3B6	🎶
+musical score	1F3BC	🎼
+nail polish	1F485	💅
+name badge	1F4DB	📛
+national park	1F3DE FE0F	🏞️
+nauseated	1F922	🤢
+nauseated face	1F922	🤢
+nazar amulet	1F9FF	🧿
+necktie	1F454	👔
+negative squared ab	1F18E	🆎
+negative squared cross mark	274E	❎
+negative squared latin capital letter a	1F170 FE0F	🅰️
+negative squared latin capital letter b	1F171 FE0F	🅱️
+negative squared latin capital letter o	1F17E FE0F	🅾️
+negative squared latin capital letter p	1F17F FE0F	🅿️
+nerd	1F913	🤓
+nerd face	1F913	🤓
+nervous laugh	1F605	😅
+nest with eggs	1FABA	🪺
+nesting dolls	1FA86	🪆
+neutral	1F610	😐
+neutral face	1F610	😐
+new moon symbol	1F311	🌑
+new moon with face	1F31A	🌚
+newspaper	1F4F0	📰
+night with stars	1F303	🌃
+ninja	1F977	🥷
+no bicycles	1F6B3	🚳
+no entry	26D4	⛔
+no entry sign	1F6AB	🚫
+no mobile phones	1F4F5	📵
+no one under eighteen symbol	1F51E	🔞
+no pedestrians	1F6B7	🚷
+no smoking symbol	1F6AD	🚭
+noodles	1F35C	🍜
+north east arrow	2197 FE0F	↗️
+north west arrow	2196 FE0F	↖️
+nose	1F443	👃
+note	1F4DD	📝
+notebook	1F4D3	📓
+notebook with decorative cover	1F4D4	📔
+nut and bolt	1F529	🔩
+ocean	1F30A	🌊
+octagonal sign	1F6D1	🛑
+octopus	1F419	🐙
+oden	1F362	🍢
+office	1F3E2	🏢
+office building	1F3E2	🏢
+oil drum	1F6E2 FE0F	🛢️
+ok	1F44C	👌
+ok hand	1F44C	👌
+ok hand sign	1F44C	👌
+okay	1F44C	👌
+okay hand	1F44C	👌
+old key	1F5DD FE0F	🗝️
+older adult	1F9D3	🧓
+older man	1F474	👴
+older woman	1F475	👵
+olive	1FAD2	🫒
+om symbol	1F549 FE0F	🕉️
+on with exclamation mark with left right arrow above	1F51B	🔛
+oncoming automobile	1F698	🚘
+oncoming bus	1F68D	🚍
+oncoming fist	1F44A	👊
+oncoming police car	1F694	🚔
+oncoming taxi	1F696	🚖
+one hundred	1F4AF	💯
+onion	1F9C5	🧅
+open book	1F4D6	📖
+open file folder	1F4C2	📂
+open hands sign	1F450	👐
+open lock	1F513	🔓
+open mailbox with lowered flag	1F4ED	📭
+open mailbox with raised flag	1F4EC	📬
+open mouth	1F62E	😮
+ophiuchus	26CE	⛎
+optical disc	1F4BF	💿
+orange book	1F4D9	📙
+orange heart	1F9E1	🧡
+orangutan	1F9A7	🦧
+orca	1FACD	🫍
+orthodox cross	2626 FE0F	☦️
+otter	1F9A6	🦦
+outbox	1F4E4	📤
+outbox tray	1F4E4	📤
+overheated face	1F975	🥵
+owl	1F989	🦉
+ox	1F402	🐂
+oyster	1F9AA	🦪
+package	1F4E6	📦
+page facing up	1F4C4	📄
+page with curl	1F4C3	📃
+pager	1F4DF	📟
+palm down hand	1FAF3	🫳
+palm tree	1F334	🌴
+palm up hand	1FAF4	🫴
+palms up together	1F932	🤲
+pancakes	1F95E	🥞
+panda	1F43C	🐼
+panda face	1F43C	🐼
+paper clip	1F4CE	📎
+paperclip	1F4CE	📎
+parachute	1FA82	🪂
+parcel	1F4E6	📦
+parrot	1F99C	🦜
+part alternation mark	303D FE0F	〽️
+party	1F973	🥳
+party face	1F973	🥳
+party popper	1F389	🎉
+partying face	1F973	🥳
+passenger ship	1F6F3 FE0F	🛳️
+passport control	1F6C2	🛂
+paw prints	1F43E	🐾
+pea pod	1FADB	🫛
+peace	270C FE0F	✌️
+peace sign	270C FE0F	✌️
+peace symbol	262E FE0F	☮️
+peach	1F351	🍑
+peacock	1F99A	🦚
+peanuts	1F95C	🥜
+pear	1F350	🍐
+pedestrian	1F6B6	🚶
+pencil	270F FE0F	✏️
+penguin	1F427	🐧
+pensive	1F614	😔
+pensive face	1F614	😔
+people hugging	1FAC2	🫂
+performing arts	1F3AD	🎭
+permanent paper sign	267E FE0F	♾️
+persevering face	1F623	😣
+person bowing deeply	1F647	🙇
+person climbing	1F9D7	🧗
+person doing cartwheel	1F938	🤸
+person facepalming	1F926	🤦
+person frowning	1F64D	🙍
+person in lotus position	1F9D8	🧘
+person in steamy room	1F9D6	🧖
+person raising both hands in celebration	1F64C	🙌
+person running	1F3C3	🏃
+person shrugging	1F937	🤷
+person with ball	26F9 FE0F	⛹️
+person with blond hair	1F471	👱
+person with crown	1FAC5	🫅
+person with folded hands	1F64F	🙏
+person with headscarf	1F9D5	🧕
+person with pouting face	1F64E	🙎
+personal computer	1F4BB	💻
+petri dish	1F9EB	🧫
+phone	1F4F1	📱
+pick	26CF FE0F	⛏️
+pickup truck	1F6FB	🛻
+pie	1F967	🥧
+pig	1F437	🐷
+pig face	1F437	🐷
+pig nose	1F43D	🐽
+pile of poo	1F4A9	💩
+pill	1F48A	💊
+pin	1F4CC	📌
+pinata	1FA85	🪅
+pinched fingers	1F90C	🤌
+pinching hand	1F90F	🤏
+pine decoration	1F38D	🎍
+pineapple	1F34D	🍍
+pink heart	1FA77	🩷
+pisces	2653	♓
+pistol	1F52B	🔫
+pizza	1F355	🍕
+placard	1FAA7	🪧
+place of worship	1F6D0	🛐
+plane	2708 FE0F	✈️
+playground slide	1F6DD	🛝
+playing card black joker	1F0CF	🃏
+pleading	1F97A	🥺
+pleading face	1F97A	🥺
+plug	1F50C	🔌
+plunger	1FAA0	🪠
+point down	1F447	👇
+point left	1F448	👈
+point right	1F449	👉
+point up	1F446	👆
+pointing down	1F447	👇
+pointing left	1F448	👈
+pointing right	1F449	👉
+pointing up	1F446	👆
+police car	1F693	🚓
+police cars revolving light	1F6A8	🚨
+police light	1F6A8	🚨
+police officer	1F46E	👮
+poo	1F4A9	💩
+poodle	1F429	🐩
+poop	1F4A9	💩
+popcorn	1F37F	🍿
+postal horn	1F4EF	📯
+postbox	1F4EE	📮
+pot of food	1F372	🍲
+potable water symbol	1F6B0	🚰
+potato	1F954	🥔
+potted plant	1FAB4	🪴
+pouch	1F45D	👝
+poultry leg	1F357	🍗
+pouring liquid	1FAD7	🫗
+pouting cat face	1F63E	😾
+pouting face	1F621	😡
+pray	1F64F	🙏
+prayer beads	1F4FF	📿
+praying	1F64F	🙏
+praying hands	1F64F	🙏
+pregnant man	1FAC3	🫃
+pregnant person	1FAC4	🫄
+pregnant woman	1F930	🤰
+pretzel	1F968	🥨
+prince	1F934	🤴
+princess	1F478	👸
+printer	1F5A8 FE0F	🖨️
+probing cane	1F9AF	🦯
+programmer	1F9D1 200D 1F4BB	🧑‍💻
+public address loudspeaker	1F4E2	📢
+pumpkin	1F383	🎃
+punch	1F44A	👊
+puppy	1F436	🐶
+puppy dog eyes	1F97A	🥺
+puppy eyes	1F97A	🥺
+purple heart	1F49C	💜
+purse	1F45B	👛
+pushpin	1F4CC	📌
+put litter in its place symbol	1F6AE	🚮
+puzzle	1F9E9	🧩
+puzzle piece	1F9E9	🧩
+question mark	2753	❓
+rabbit	1F430	🐰
+rabbit face	1F430	🐰
+raccoon	1F99D	🦝
+racing car	1F3CE FE0F	🏎️
+racing flag	1F3C1	🏁
+racing motorcycle	1F3CD FE0F	🏍️
+radio	1F4FB	📻
+radio button	1F518	🔘
+radioactive sign	2622 FE0F	☢️
+rage	1F621	😡
+railway car	1F683	🚃
+railway track	1F6E4 FE0F	🛤️
+rain	1F327 FE0F	🌧️
+rainbow	1F308	🌈
+rainy	1F327 FE0F	🌧️
+raised back of hand	1F91A	🤚
+raised fist	270A	✊
+raised hand	270B	✋
+raised hand with fingers splayed	1F590 FE0F	🖐️
+raised hand with part between middle and ring fingers	1F596	🖖
+raised hands	1F64C	🙌
+raising hands	1F64C	🙌
+ram	1F40F	🐏
+ramen	1F35C	🍜
+rat	1F400	🐀
+razor	1FA92	🪒
+receipt	1F9FE	🧾
+recreational vehicle	1F699	🚙
+recycle	267B FE0F	♻️
+recycling	267B FE0F	♻️
+red apple	1F34E	🍎
+red car	1F697	🚗
+red flag	1F6A9	🚩
+red gift envelope	1F9E7	🧧
+red heart	2764 FE0F	❤️
+red wine	1F377	🍷
+regional indicator symbol letter a	1F1E6	🇦
+regional indicator symbol letter b	1F1E7	🇧
+regional indicator symbol letter c	1F1E8	🇨
+regional indicator symbol letter d	1F1E9	🇩
+regional indicator symbol letter e	1F1EA	🇪
+regional indicator symbol letter f	1F1EB	🇫
+regional indicator symbol letter g	1F1EC	🇬
+regional indicator symbol letter h	1F1ED	🇭
+regional indicator symbol letter i	1F1EE	🇮
+regional indicator symbol letter j	1F1EF	🇯
+regional indicator symbol letter k	1F1F0	🇰
+regional indicator symbol letter l	1F1F1	🇱
+regional indicator symbol letter m	1F1F2	🇲
+regional indicator symbol letter n	1F1F3	🇳
+regional indicator symbol letter o	1F1F4	🇴
+regional indicator symbol letter p	1F1F5	🇵
+regional indicator symbol letter q	1F1F6	🇶
+regional indicator symbol letter r	1F1F7	🇷
+regional indicator symbol letter s	1F1F8	🇸
+regional indicator symbol letter t	1F1F9	🇹
+regional indicator symbol letter u	1F1FA	🇺
+regional indicator symbol letter v	1F1FB	🇻
+regional indicator symbol letter w	1F1FC	🇼
+regional indicator symbol letter x	1F1FD	🇽
+regional indicator symbol letter y	1F1FE	🇾
+regional indicator symbol letter z	1F1FF	🇿
+relieved	1F60C	😌
+relieved face	1F60C	😌
+reminder ribbon	1F397 FE0F	🎗️
+restroom	1F6BB	🚻
+reversed hand with middle finger extended	1F595	🖕
+revolving hearts	1F49E	💞
+rhinoceros	1F98F	🦏
+ribbon	1F380	🎀
+rice ball	1F359	🍙
+rice cracker	1F358	🍘
+right anger bubble	1F5EF FE0F	🗯️
+right arrow	27A1 FE0F	➡️
+rightwards arrow with hook	21AA FE0F	↪️
+rightwards hand	1FAF1	🫱
+rightwards pushing hand	1FAF8	🫸
+ring	1F48D	💍
+ring buoy	1F6DF	🛟
+ringed planet	1FA90	🪐
+roasted sweet potato	1F360	🍠
+robot	1F916	🤖
+robot face	1F916	🤖
+rock	1FAA8	🪨
+rock on	1F918	🤘
+rocket	1F680	🚀
+rofl	1F923	🤣
+roll of paper	1F9FB	🧻
+roller coaster	1F3A2	🎢
+roller skate	1F6FC	🛼
+rolling eyes	1F644	🙄
+rolling on the floor laughing	1F923	🤣
+rooster	1F413	🐓
+root vegetable	1FADC	🫜
+rose	1F339	🌹
+rosette	1F3F5 FE0F	🏵️
+rotating light	1F6A8	🚨
+round pushpin	1F4CD	📍
+rowboat	1F6A3	🚣
+rubbish bin	1F5D1 FE0F	🗑️
+rugby football	1F3C9	🏉
+runner	1F3C3	🏃
+running shirt with sash	1F3BD	🎽
+sad	1F641	🙁
+sad face	1F641	🙁
+safety pin	1F9F7	🧷
+safety vest	1F9BA	🦺
+sagittarius	2650	♐
+sailboat	26F5	⛵
+sake bottle and cup	1F376	🍶
+salt shaker	1F9C2	🧂
+salute	1FAE1	🫡
+saluting face	1FAE1	🫡
+sandwich	1F96A	🥪
+santa	1F385	🎅
+santa claus	1F385	🎅
+sari	1F97B	🥻
+satellite	1F6F0 FE0F	🛰️
+satellite antenna	1F4E1	📡
+sauropod	1F995	🦕
+saxophone	1F3B7	🎷
+scales	2696 FE0F	⚖️
+scarf	1F9E3	🧣
+school	1F3EB	🏫
+school satchel	1F392	🎒
+scissors	2702 FE0F	✂️
+scooter	1F6F4	🛴
+scorpion	1F982	🦂
+scorpius	264F	♏
+scream	1F631	😱
+screaming	1F631	😱
+screwdriver	1FA9B	🪛
+scroll	1F4DC	📜
+seal	1F9AD	🦭
+seat	1F4BA	💺
+second place medal	1F948	🥈
+see no evil	1F648	🙈
+see no evil monkey	1F648	🙈
+seedling	1F331	🌱
+selfie	1F933	🤳
+serious face with symbols covering mouth	1F92C	🤬
+sewing needle	1FAA1	🪡
+shake hands	1F91D	🤝
+shaking face	1FAE8	🫨
+shallow pan of food	1F958	🥘
+shamrock	2618 FE0F	☘️
+shark	1F988	🦈
+shaved ice	1F367	🍧
+sheep	1F411	🐑
+shield	1F6E1 FE0F	🛡️
+shinto shrine	26E9 FE0F	⛩️
+ship	1F6A2	🚢
+shocked	1F62E	😮
+shocked face with exploding head	1F92F	🤯
+shooting star	1F320	🌠
+shopping bags	1F6CD FE0F	🛍️
+shopping cart	1F6D2	🛒
+shopping trolley	1F6D2	🛒
+shortcake	1F370	🍰
+shorts	1FA73	🩳
+shovel	1FA8F	🪏
+shower	1F6BF	🚿
+shrimp	1F990	🦐
+shrug	1F937	🤷
+shrugging	1F937	🤷
+shush	1F92B	🤫
+shushing face	1F92B	🤫
+sick	1F922	🤢
+sign of the horns	1F918	🤘
+silhouette of japan	1F5FE	🗾
+siren	1F6A8	🚨
+six pointed star with middle dot	1F52F	🔯
+skateboard	1F6F9	🛹
+ski and ski boot	1F3BF	🎿
+skier	26F7 FE0F	⛷️
+skull	1F480	💀
+skull and crossbones	2620 FE0F	☠️
+skunk	1F9A8	🦨
+sled	1F6F7	🛷
+sleeping	1F634	😴
+sleeping accommodation	1F6CC	🛌
+sleeping face	1F634	😴
+sleeping symbol	1F4A4	💤
+sleepy	1F634	😴
+sleepy face	1F62A	😪
+sleuth or spy	1F575 FE0F	🕵️
+slice of pizza	1F355	🍕
+slight smile	1F642	🙂
+slightly frowning face	1F641	🙁
+slightly smiling face	1F642	🙂
+slot machine	1F3B0	🎰
+sloth	1F9A5	🦥
+small airplane	1F6E9 FE0F	🛩️
+small blue diamond	1F539	🔹
+small orange diamond	1F538	🔸
+smartphone	1F4F1	📱
+smile	1F60A	😊
+smiley	1F642	🙂
+smiley face	1F642	🙂
+smiling	1F60A	😊
+smiling cat face with open mouth	1F63A	😺
+smiling face	263A FE0F	☺️
+smiling face with halo	1F607	😇
+smiling face with heart eyes	1F60D	😍
+smiling face with horns	1F608	😈
+smiling face with open mouth	1F603	😃
+smiling face with open mouth and cold sweat	1F605	😅
+smiling face with open mouth and smiling eyes	1F604	😄
+smiling face with smiling eyes	1F60A	😊
+smiling face with smiling eyes and hand covering mouth	1F92D	🤭
+smiling face with smiling eyes and three hearts	1F970	🥰
+smiling face with sunglasses	1F60E	😎
+smiling face with tear	1F972	🥲
+smirking face	1F60F	😏
+smoking symbol	1F6AC	🚬
+snail	1F40C	🐌
+snake	1F40D	🐍
+sneezing face	1F927	🤧
+snow	2744 FE0F	❄️
+snow capped mountain	1F3D4 FE0F	🏔️
+snowboarder	1F3C2	🏂
+snowflake	2744 FE0F	❄️
+snowman	26C4	⛄
+snowman without snow	26C4	⛄
+sob	1F62D	😭
+sobbing	1F62D	😭
+soccer	26BD	⚽
+soccer ball	26BD	⚽
+socks	1F9E6	🧦
+soft ice cream	1F366	🍦
+softball	1F94E	🥎
+soon with rightwards arrow above	1F51C	🔜
+sos	1F198	🆘
+south east arrow	2198 FE0F	↘️
+south west arrow	2199 FE0F	↙️
+spaghetti	1F35D	🍝
+spanner	1F527	🔧
+sparkle	2728	✨
+sparkler	1F387	🎇
+sparkles	2728	✨
+sparkling heart	1F496	💖
+sparkly	2728	✨
+speak no evil	1F64A	🙊
+speak no evil monkey	1F64A	🙊
+speaker	1F508	🔈
+speaker with cancellation stroke	1F507	🔇
+speaker with one sound wave	1F509	🔉
+speaker with three sound waves	1F50A	🔊
+speaking head in silhouette	1F5E3 FE0F	🗣️
+speech balloon	1F4AC	💬
+speech bubble	1F4AC	💬
+speedboat	1F6A4	🚤
+spider	1F577 FE0F	🕷️
+spider web	1F578 FE0F	🕸️
+spiral calendar pad	1F5D3 FE0F	🗓️
+spiral note pad	1F5D2 FE0F	🗒️
+spiral shell	1F41A	🐚
+splashing sweat symbol	1F4A6	💦
+splatter	1FADF	🫟
+sponge	1F9FD	🧽
+spool of thread	1F9F5	🧵
+spoon	1F944	🥄
+sports medal	1F3C5	🏅
+spouting whale	1F433	🐳
+sprout	1F331	🌱
+squared cl	1F191	🆑
+squared cool	1F192	🆒
+squared free	1F193	🆓
+squared id	1F194	🆔
+squared katakana koko	1F201	🈁
+squared katakana sa	1F202 FE0F	🈂️
+squared new	1F195	🆕
+squared ng	1F196	🆖
+squared ok	1F197	🆗
+squared sos	1F198	🆘
+squared up with exclamation mark	1F199	🆙
+squared vs	1F19A	🆚
+squid	1F991	🦑
+stadium	1F3DF FE0F	🏟️
+staff of aesculapius	2695 FE0F	⚕️
+standing person	1F9CD	🧍
+star	2B50	⭐
+star and crescent	262A FE0F	☪️
+star of david	2721 FE0F	✡️
+star struck	1F929	🤩
+starstruck	1F929	🤩
+station	1F689	🚉
+statue of liberty	1F5FD	🗽
+steam locomotive	1F682	🚂
+steaming bowl	1F35C	🍜
+stethoscope	1FA7A	🩺
+stonks	1F4C8	📈
+stop sign	1F6D1	🛑
+stopwatch	23F1 FE0F	⏱️
+straight face	1F610	😐
+straight ruler	1F4CF	📏
+strawberry	1F353	🍓
+stuck out tongue	1F61B	😛
+studio microphone	1F399 FE0F	🎙️
+stuffed flatbread	1F959	🥙
+sun	2600 FE0F	☀️
+sun behind cloud	26C5	⛅
+sun with face	1F31E	🌞
+sunflower	1F33B	🌻
+sunglasses	1F60E	😎
+sunny	2600 FE0F	☀️
+sunrise	1F305	🌅
+sunrise over mountains	1F304	🌄
+sunset over buildings	1F307	🌇
+sunshine	2600 FE0F	☀️
+superhero	1F9B8	🦸
+supervillain	1F9B9	🦹
+surfer	1F3C4	🏄
+surprised	1F62E	😮
+sushi	1F363	🍣
+suspension railway	1F69F	🚟
+swan	1F9A2	🦢
+sweat smile	1F605	😅
+sweets	1F36C	🍬
+swimmer	1F3CA	🏊
+synagogue	1F54D	🕍
+syringe	1F489	💉
+t rex	1F996	🦖
+ta da	1F389	🎉
+table tennis paddle and ball	1F3D3	🏓
+taco	1F32E	🌮
+tada	1F389	🎉
+takeout box	1F961	🥡
+tamale	1FAD4	🫔
+tanabata tree	1F38B	🎋
+tangerine	1F34A	🍊
+target	1F3AF	🎯
+taurus	2649	♉
+taxi	1F695	🚕
+tea	1F375	🍵
+teacup	1F375	🍵
+teacup without handle	1F375	🍵
+teapot	1FAD6	🫖
+tear	1F622	😢
+tears of joy	1F602	😂
+technologist	1F9D1 200D 1F4BB	🧑‍💻
+teddy bear	1F9F8	🧸
+telephone	260E FE0F	☎️
+telephone receiver	1F4DE	📞
+telescope	1F52D	🔭
+television	1F4FA	📺
+tennis	1F3BE	🎾
+tennis racquet and ball	1F3BE	🎾
+tent	26FA	⛺
+test tube	1F9EA	🧪
+thermometer	1F321 FE0F	🌡️
+thinking	1F914	🤔
+thinking face	1F914	🤔
+third place medal	1F949	🥉
+thong sandal	1FA74	🩴
+thought balloon	1F4AD	💭
+thought bubble	1F4AD	💭
+three button mouse	1F5B1 FE0F	🖱️
+thumb down	1F44E	👎
+thumb up	1F44D	👍
+thumbs down	1F44E	👎
+thumbs down sign	1F44E	👎
+thumbs up	1F44D	👍
+thumbs up sign	1F44D	👍
+thunder	26C8 FE0F	⛈️
+thunder cloud and rain	26C8 FE0F	⛈️
+thunderstorm	26C8 FE0F	⛈️
+tick	2705	✅
+ticket	1F3AB	🎫
+tiger	1F42F	🐯
+tiger face	1F42F	🐯
+timer	23F1 FE0F	⏱️
+timer clock	23F2 FE0F	⏲️
+tired face	1F62B	😫
+toast	1F942	🥂
+toilet	1F6BD	🚽
+tokyo tower	1F5FC	🗼
+tomato	1F345	🍅
+tongue	1F61B	😛
+tongue out	1F61B	😛
+toolbox	1F9F0	🧰
+tools	1F6E0 FE0F	🛠️
+tooth	1F9B7	🦷
+toothbrush	1FAA5	🪥
+top hat	1F3A9	🎩
+top with upwards arrow above	1F51D	🔝
+tortoise	1F422	🐢
+trackball	1F5B2 FE0F	🖲️
+tractor	1F69C	🚜
+trade mark sign	2122 FE0F	™️
+train	1F686	🚆
+tram	1F68A	🚊
+tram car	1F68B	🚋
+trash can	1F5D1 FE0F	🗑️
+treasure chest	1FA8E	🪎
+tree	1F333	🌳
+trending down	1F4C9	📉
+trending up	1F4C8	📈
+triangular flag on post	1F6A9	🚩
+triangular ruler	1F4D0	📐
+trident emblem	1F531	🔱
+troll	1F9CC	🧌
+trolleybus	1F68E	🚎
+trombone	1FA8A	🪊
+trophy	1F3C6	🏆
+tropical drink	1F379	🍹
+tropical fish	1F420	🐠
+trumpet	1F3BA	🎺
+tulip	1F337	🌷
+tumbler glass	1F943	🥃
+turkey	1F983	🦃
+turtle	1F422	🐢
+tv	1F4FA	📺
+twisted rightwards arrows	1F500	🔀
+two hearts	1F495	💕
+two men holding hands	1F46C	👬
+two women holding hands	1F46D	👭
+umbrella	2602 FE0F	☂️
+umbrella on ground	26F1 FE0F	⛱️
+umbrella with rain drops	2614	☔
+unamused	1F612	😒
+unamused face	1F612	😒
+under construction	1F6A7	🚧
+unhappy	1F641	🙁
+unicorn	1F984	🦄
+unicorn face	1F984	🦄
+unlock	1F513	🔓
+unlocked	1F513	🔓
+up arrow	2B06 FE0F	⬆️
+up down arrow	2195 FE0F	↕️
+upside down	1F643	🙃
+upside down face	1F643	🙃
+upwards black arrow	2B06 FE0F	⬆️
+vampire	1F9DB	🧛
+vertical traffic light	1F6A6	🚦
+vibration mode	1F4F3	📳
+victory	270C FE0F	✌️
+victory hand	270C FE0F	✌️
+video camera	1F4F9	📹
+video game	1F3AE	🎮
+videocassette	1F4FC	📼
+violin	1F3BB	🎻
+virgo	264D	♍
+volcano	1F30B	🌋
+volleyball	1F3D0	🏐
+waffle	1F9C7	🧇
+waning crescent moon symbol	1F318	🌘
+waning gibbous moon symbol	1F316	🌖
+warning	26A0 FE0F	⚠️
+warning sign	26A0 FE0F	⚠️
+wastebasket	1F5D1 FE0F	🗑️
+watch	231A	⌚
+water buffalo	1F403	🐃
+water closet	1F6BE	🚾
+water drop	1F4A7	💧
+water polo	1F93D	🤽
+water wave	1F30A	🌊
+watermelon	1F349	🍉
+wave	1F44B	👋
+waving	1F44B	👋
+waving black flag	1F3F4	🏴
+waving hand	1F44B	👋
+waving hand sign	1F44B	👋
+waving white flag	1F3F3 FE0F	🏳️
+wavy dash	3030 FE0F	〰️
+waxing crescent moon symbol	1F312	🌒
+waxing gibbous moon symbol	1F314	🌔
+weary cat face	1F640	🙀
+weary face	1F629	😩
+wedding	1F492	💒
+weight lifter	1F3CB FE0F	🏋️
+whale	1F433	🐳
+wheel	1F6DE	🛞
+wheel of dharma	2638 FE0F	☸️
+wheelchair symbol	267F	♿
+white down pointing backhand index	1F447	👇
+white exclamation mark ornament	2755	❕
+white flag	1F3F3 FE0F	🏳️
+white flower	1F4AE	💮
+white frowning face	2639 FE0F	☹️
+white heart	1F90D	🤍
+white heavy check mark	2705	✅
+white large square	2B1C	⬜
+white left pointing backhand index	1F448	👈
+white medium small square	25FD	◽
+white medium square	25FB FE0F	◻️
+white medium star	2B50	⭐
+white question mark ornament	2754	❔
+white right pointing backhand index	1F449	👉
+white small square	25AB FE0F	▫️
+white smiling face	263A FE0F	☺️
+white square button	1F533	🔳
+white sun behind cloud	1F325 FE0F	🌥️
+white sun behind cloud with rain	1F326 FE0F	🌦️
+white sun with small cloud	1F324 FE0F	🌤️
+white up pointing backhand index	1F446	👆
+white up pointing index	261D FE0F	☝️
+wilted flower	1F940	🥀
+wind blowing face	1F32C FE0F	🌬️
+wind chime	1F390	🎐
+window	1FA9F	🪟
+wine	1F377	🍷
+wine glass	1F377	🍷
+wing	1FABD	🪽
+wink	1F609	😉
+winking	1F609	😉
+winking face	1F609	😉
+winky face	1F609	😉
+wireless	1F6DC	🛜
+wolf face	1F43A	🐺
+woman	1F469	👩
+woman dancing	1F483	💃
+woman with bunny ears	1F46F	👯
+womans boots	1F462	👢
+womans clothes	1F45A	👚
+womans hat	1F452	👒
+womans sandal	1F461	👡
+womens symbol	1F6BA	🚺
+wood	1FAB5	🪵
+world	1F30D	🌍
+world map	1F5FA FE0F	🗺️
+worm	1FAB1	🪱
+worried	1F61F	😟
+worried face	1F61F	😟
+wow	1F62E	😮
+wrapped gift	1F381	🎁
+wrapped present	1F381	🎁
+wrench	1F527	🔧
+wrestlers	1F93C	🤼
+writing hand	270D FE0F	✍️
+x	274C	❌
+yawning face	1F971	🥱
+yellow heart	1F49B	💛
+yikes	1F62C	😬
+yin yang	262F FE0F	☯️
+yum	1F60B	😋
+zany	1F92A	🤪
+zany face	1F92A	🤪
+zap	26A1	⚡
+zebra face	1F993	🦓
+zipper mouth	1F910	🤐
+zipper mouth face	1F910	🤐
+zombie	1F9DF	🧟
+zzz	1F4A4	💤

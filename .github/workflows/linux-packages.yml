@@ -1,0 +1,120 @@
+# Builds the Linux app's packages (deb, rpm and AppImage) in Ubuntu 22.04, whose glibc (2.35) sets
+# the oldest distributions they run on, with the OpenVINO runtime they carry
+# (linux-windows/packaging/linux/fetch-openvino.sh). A tag linux-vX.Y.Z, naming the app's version,
+# also puts them on a draft GitHub release, for the owner to publish. A pull request that changes
+# how they're made builds them too, to try from the run's artifacts before merging.
+name: Linux packages
+
+on:
+  push:
+    tags: ["linux-v*"]
+  pull_request:
+    paths:
+      - "linux-windows/packaging/**"
+      - "linux-windows/crates/app/tauri*.json"
+      - "linux-windows/vendor/openvino/**"
+      - ".github/workflows/linux-packages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-packages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build the packages
+    runs-on: ubuntu-24.04
+    container: ubuntu:22.04
+    defaults:
+      run:
+        working-directory: linux-windows
+    steps:
+      # Tauri's list for Ubuntu, ALSA, which cpal records through, and what opens an rpm.
+      - name: Install the build dependencies
+        working-directory: /
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: >-
+          apt-get update && apt-get install --yes --no-install-recommends
+          ca-certificates curl git build-essential pkg-config file xdg-utils
+          libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
+          libssl-dev libasound2-dev libarchive-tools
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install rustup
+        run: |
+          curl --proto '=https' --tlsv1.2 --silent --show-error --fail https://sh.rustup.rs |
+            sh -s -- -y --profile minimal --default-toolchain none
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: linux-windows
+      - name: Install the Tauri CLI
+        run: cargo install tauri-cli --version 2.12.0 --locked
+      - name: Check that the tag names the app's version
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(grep -m1 '^version' crates/app/Cargo.toml | cut -d '"' -f 2)
+          if [ "$TAG" != "linux-v$version" ]; then
+            echo "The tag $TAG doesn't name the app's version, $version (crates/app/Cargo.toml)" >&2
+            exit 1
+          fi
+      - name: Fetch the OpenVINO runtime
+        run: packaging/linux/fetch-openvino.sh
+      - name: Build the packages
+        working-directory: linux-windows/crates/app
+        env:
+          # linuxdeploy is an AppImage itself, and the container has no FUSE.
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: cargo tauri build --bundles deb,rpm,appimage
+      # Tauri names them after the product, "Live Transcribe", space and all.
+      - name: Name the files as the packages are named
+        working-directory: linux-windows/target/release/bundle
+        run: |
+          mkdir -p ../packages
+          for file in deb/*.deb rpm/*.rpm appimage/*.AppImage; do
+            name=$(basename "$file")
+            mv "$file" "../packages/${name/Live Transcribe/live-transcribe}"
+          done
+          ls -l ../packages
+      # Intel's licence allows shipping its libraries only unmodified.
+      - name: Check that each package carries Intel's libraries unmodified
+        run: packaging/linux/check-packages.sh target/release/packages
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: linux-packages
+          path: linux-windows/target/release/packages/*
+          if-no-files-found: error
+
+  release:
+    name: Draft the release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: linux-packages
+          path: packages
+      - name: Draft a release with the packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          mapfile -t files < <(find packages -type f | sort)
+          (cd packages && find . -type f -printf '%P\n' | sort | xargs -d '\n' sha256sum |
+            sed 's|  .*/|  |') > SHA256SUMS
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft \
+            --title "Live Transcribe for Linux ${TAG#linux-v}" \
+            --notes "The Linux packages for ${TAG#linux-v}: a deb (Ubuntu 22.04+, Debian 12+), an rpm (Fedora, openSUSE) and an AppImage (any distribution with glibc 2.35+). See SHA256SUMS." \
+            "${files[@]}" SHA256SUMS

@@ -1,0 +1,22 @@
+[package]
+name = "lt-capture"
+description = "Recording the microphone as the models' 16 kHz mono audio."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+cpal.workspace = true
+lt-shared.workspace = true
+rubato.workspace = true
+tracing.workspace = true
+
+# Microphones by the sound server's names (PulseAudio's protocol, which PipeWire serves too),
+# rather than ALSA's devices.
+[target.'cfg(target_os = "linux")'.dependencies]
+cpal = { workspace = true, features = ["pulseaudio"] }
+
+[lints]
+workspace = true

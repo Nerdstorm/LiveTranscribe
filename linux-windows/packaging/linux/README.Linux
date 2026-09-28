@@ -1,0 +1,53 @@
+Live Transcribe for Linux
+=========================
+
+Hold the hotkey (Right Ctrl at first), speak, and let go: the text is typed into the app you're
+using. The tray's Settings… changes the hotkey and the rest.
+
+What the package installs
+-------------------------
+
+/usr/bin/livetranscribe
+    The app. Started with no command (from the desktop's menu), it runs dictation; `livetranscribe
+    --help` lists the rest.
+
+/usr/lib/live-transcribe/openvino (in the AppImage, usr/share/live-transcribe/openvino)
+    The OpenVINO 2026.2.1 runtime the app runs speech to text on: Intel's prebuilt libraries for
+    Ubuntu 22.04, unmodified, each under the name its archive links to it (its soname). They are
+    Intel's, under the Intel OpenVINO Distribution License in licenses/EULA.txt, which allows
+    redistributing the files listed in licenses/redist.txt; TBB and the other components are under
+    the licences in licenses/.
+
+/usr/lib/udev/rules.d/70-live-transcribe-keyboard.rules (the deb and rpm)
+    Lets whoever is logged in at the machine read the keyboards, which hold-to-talk needs: it
+    watches the hotkey in /dev/input. Any program that user runs can then read what they type,
+    as any X11 program always could. Removing the package removes the rule.
+    The AppImage can't install it. To add it by hand:
+        sudo install -m 644 <the rule> /etc/udev/rules.d/70-live-transcribe-keyboard.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --subsystem-match=input --action=change
+    (The AppImage carries the rule in usr/share/live-transcribe.)
+
+What the app downloads
+----------------------
+
+On first start, the speech model, Nerdstorm/Qwen3-ASR-0.6B-Sinhala-OpenVINO from Hugging Face
+(about 1.1 GB, CC BY-SA 4.0), into ~/.local/share/live-transcribe/models. It keeps its settings
+in ~/.config/live-transcribe and OpenVINO's compiled models in ~/.cache/live-transcribe.
+
+The NPU
+-------
+
+On an Intel Core Ultra the speech model runs on the NPU when Intel's NPU driver is installed:
+intel-npu-driver on Fedora, Arch and openSUSE, or Intel's packages from
+https://github.com/intel/linux-npu-driver/releases on Ubuntu and Debian. Without it the model runs
+on the CPU, more slowly.
+
+Desktops
+--------
+
+Dictation types into apps on COSMIC, and on Sway, Hyprland and other wlroots desktops. GNOME,
+KDE Plasma and X11 desktops come in later versions; there the app starts, and its Settings window
+says why dictation can't.
+
+https://github.com/Nerdstorm/LiveTranscribe

@@ -1,0 +1,17 @@
+[package]
+name = "lt-shared"
+description = "What the slices share: Swift-compatible text semantics, phrase protection and placeholders, cleanup levels."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+tracing.workspace = true
+unicode-normalization.workspace = true
+unicode-properties.workspace = true
+unicode-segmentation.workspace = true
+
+[lints]
+workspace = true

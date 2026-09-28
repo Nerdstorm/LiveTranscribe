@@ -1,0 +1,15 @@
+[package]
+name = "lt-vocabulary"
+description = "The user's vocabulary: spoken variants rewritten to their canonical spelling."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lt-shared.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

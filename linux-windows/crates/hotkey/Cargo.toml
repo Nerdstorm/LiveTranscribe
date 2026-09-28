@@ -1,0 +1,17 @@
+[package]
+name = "lt-hotkey"
+description = "The dictation hotkey: the hold, tap and double-tap gesture, and watching the keyboard for it."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+tracing.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+evdev.workspace = true
+
+[lints]
+workspace = true

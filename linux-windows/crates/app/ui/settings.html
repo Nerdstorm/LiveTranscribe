@@ -1,0 +1,177 @@
+<!doctype html>
+<!-- Settings, as the Mac app's Settings window has them, a tab at a time: General and Advanced
+     for now; Snippets, Vocabulary, History and Setup follow. Every control changes its setting
+     at once (settings.js); there is no Save. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Live Transcribe Settings</title>
+    <link rel="stylesheet" href="settings.css">
+    <script src="settings.js" defer></script>
+  </head>
+  <body>
+    <header class="bar">
+      <nav class="tabs" role="tablist" aria-label="Settings">
+        <button class="tab" role="tab" id="tab-general" aria-controls="general" aria-selected="true">General</button>
+        <button class="tab" role="tab" id="tab-advanced" aria-controls="advanced" aria-selected="false" tabindex="-1">Advanced</button>
+      </nav>
+    </header>
+
+    <main>
+      <section class="page" id="general" role="tabpanel" aria-labelledby="tab-general">
+        <div class="blocker" id="blocker" role="alert" hidden>
+          <span class="light" aria-hidden="true"></span>
+          <span class="text">
+            <span class="title" id="blocker-title"></span>
+            <span class="subtitle" id="blocker-detail"></span>
+          </span>
+        </div>
+        <div class="group">
+          <h2>Dictation</h2>
+          <div class="list">
+            <label class="row">
+              <span class="text">
+                <span class="title">Dictate with the hotkey</span>
+                <span class="subtitle">Off, the tray’s <em>Start Dictation</em> still works.</span>
+                <span class="override" data-override="dictationEnabled" hidden></span>
+              </span>
+              <input type="checkbox" class="switch" data-setting="dictationEnabled">
+            </label>
+            <div class="row">
+              <span class="text">
+                <span class="title" id="hotkey-title">Hotkey</span>
+                <span class="subtitle" id="hotkey-help">Hold it and speak; release to type what you said. Esc cancels.</span>
+                <span class="override" data-override="dictationHotkey" hidden></span>
+                <span class="problem" id="hotkey-problem" role="alert" hidden></span>
+              </span>
+              <button class="keycap" id="hotkey" aria-labelledby="hotkey-title hotkey" aria-describedby="hotkey-help">Right Ctrl</button>
+            </div>
+            <label class="row">
+              <span class="text">
+                <span class="title">Double-tap for hands-free</span>
+                <span class="subtitle">Tap the hotkey twice to keep listening until you press it again.</span>
+                <span class="override" data-override="handsFreeEnabled" hidden></span>
+              </span>
+              <input type="checkbox" class="switch" data-setting="handsFreeEnabled">
+            </label>
+          </div>
+        </div>
+
+        <div class="group">
+          <h2 id="cleanup-title">Cleanup</h2>
+          <div class="list" role="radiogroup" aria-labelledby="cleanup-title" id="cleanup">
+            <!-- A row per level, from the app's own names and summaries. -->
+          </div>
+          <p class="footnote">
+            Light and High need the cleanup model, which the Linux app doesn’t have yet: for now Light
+            works as None, and High as Medium.
+          </p>
+          <span class="override" data-override="cleanupLevel" hidden></span>
+        </div>
+
+        <div class="group">
+          <h2>Microphone</h2>
+          <div class="list">
+            <label class="row">
+              <span class="text">
+                <span class="title">Record from</span>
+                <span class="subtitle" id="microphone-help"></span>
+              </span>
+              <select id="microphone" data-setting="inputDeviceId" aria-describedby="microphone-help"></select>
+            </label>
+          </div>
+        </div>
+
+        <details class="group" id="timing">
+          <summary><h2>Timing</h2></summary>
+          <div class="list">
+            <label class="row">
+              <span class="text">
+                <span class="title">Longest tap</span>
+                <span class="subtitle">A press shorter than this is a tap, not hold-to-talk.</span>
+              </span>
+              <span class="number"><input type="number" data-setting="hotkeyTapMaxMs" min="100" max="1000" step="50"><span class="unit">ms</span></span>
+            </label>
+            <label class="row">
+              <span class="text">
+                <span class="title">Double-tap window</span>
+                <span class="subtitle">How soon a second tap must follow the first to start hands-free dictation.</span>
+              </span>
+              <span class="number"><input type="number" data-setting="hotkeyDoubleTapWindowMs" min="100" max="1000" step="50"><span class="unit">ms</span></span>
+            </label>
+            <label class="row">
+              <span class="text">
+                <span class="title">Shortest recording</span>
+                <span class="subtitle">Shorter recordings are discarded as too short to be speech.</span>
+              </span>
+              <span class="number"><input type="number" data-setting="dictationMinUtteranceMs" min="0" max="2000" step="50"><span class="unit">ms</span></span>
+            </label>
+            <label class="row">
+              <span class="text">
+                <span class="title">Longest recording</span>
+                <span class="subtitle">A recording stops growing at this length.</span>
+              </span>
+              <span class="number"><input type="number" data-setting="dictationMaxRecordingSeconds" min="10" max="1800" step="10"><span class="unit">s</span></span>
+            </label>
+            <label class="row">
+              <span class="text">
+                <span class="title">Message duration</span>
+                <span class="subtitle">How long a message stays up by the pointer.</span>
+              </span>
+              <span class="number"><input type="number" data-setting="dictationNoticeSeconds" min="0.5" max="10" step="0.5"><span class="unit">s</span></span>
+            </label>
+            <label class="row">
+              <span class="text">
+                <span class="title">Clipboard restore delay</span>
+                <span class="subtitle">Wait after pasting before the clipboard is put back.</span>
+              </span>
+              <span class="number"><input type="number" data-setting="pasteRestoreDelayMs" min="50" max="5000" step="50"><span class="unit">ms</span></span>
+            </label>
+          </div>
+        </details>
+      </section>
+
+      <section class="page" id="advanced" role="tabpanel" aria-labelledby="tab-advanced" hidden>
+        <div class="group">
+          <h2>Speech to text</h2>
+          <div class="list">
+            <label class="row">
+              <span class="text">
+                <span class="title">Model</span>
+                <span class="subtitle" id="model-source"></span>
+                <span class="override" data-override="sttModel" hidden></span>
+              </span>
+              <select id="model" data-setting="sttModel"></select>
+            </label>
+            <label class="row">
+              <span class="text">
+                <span class="title">Runs on</span>
+                <span class="subtitle" id="device-help"></span>
+                <span class="override" data-override="sttDevice" hidden></span>
+              </span>
+              <select id="device" data-setting="sttDevice"></select>
+            </label>
+            <div class="row status" id="model-status" aria-live="polite">
+              <span class="light" aria-hidden="true"></span>
+              <span class="text">
+                <span class="title" id="model-state">Loading the speech model…</span>
+                <span class="subtitle" id="model-detail"></span>
+              </span>
+              <button class="plain" id="reload-model" hidden>Try Again</button>
+            </div>
+          </div>
+          <p class="footnote" id="models-folder">
+            The setup kit converts models into the app’s models folder (<code>07-export-model.sh</code>).
+            A change loads the model once no dictation is under way.
+          </p>
+        </div>
+        <div class="actions">
+          <button class="plain" id="restore-advanced">Restore Defaults</button>
+        </div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="alert" hidden></div>
+  </body>
+</html>

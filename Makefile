@@ -33,7 +33,7 @@ build-tool = cd $(PACKAGE) && xcodebuild build -scheme $(1) -configuration Relea
 check-version = @echo '$(VERSION)' | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$$' \
 	|| { echo 'Set VERSION to the release, for example: make $@ VERSION=0.1.0' >&2; exit 2; }
 
-.PHONY: help build run resolve test test-integration prompt-probe audio dictation-audio bench eval \
+.PHONY: help build run resolve test test-integration prompt-probe golden audio dictation-audio bench eval \
 	train doctor release-test changelog tag release appcast acknowledgements icons logs site clean
 
 help: ## List the targets
@@ -71,6 +71,11 @@ test-integration: audio ## End-to-end tests with the real models, which they dow
 
 prompt-probe: ## Print the cleanup model's output for hard prompt cases, when changing the prompt
 	cd $(PACKAGE) && TEST_RUNNER_LT_PROMPT_PROBE=1 $(PACKAGE_TESTS) -only-testing:IntegrationTests
+
+golden: ## Rewrite the golden cases in Fixtures/golden after an intended change to the text rules or speech front end
+	cd $(PACKAGE) && TEST_RUNNER_LT_UPDATE_GOLDEN=1 $(PACKAGE_TESTS) \
+		-only-testing:DictationTests/GoldenDictationFixtureTests \
+		-only-testing:TranscriptionTests/GoldenSpeechFeatureTests
 
 audio: ## Make the test and bench clips with macOS text-to-speech, if any are missing
 	@missing=$$(for text in $(AUDIO_DIR)/*.txt; do [ -f "$${text%.txt}.wav" ] || echo "$$text"; done); \

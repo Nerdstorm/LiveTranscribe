@@ -1,0 +1,48 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "rpm", "appimage"],
+    "publisher": "Nerdstorm",
+    "homepage": "https://github.com/Nerdstorm/LiveTranscribe",
+    "category": "Utility",
+    "license": "MIT",
+    "licenseFile": "../../../LICENSE",
+    "copyright": "Copyright (c) 2026 Nerdstorm",
+    "shortDescription": "Dictation: hold a key, speak, and the text is typed where you are",
+    "longDescription": "Live Transcribe types what you say into the app you're using: hold a key, speak, and let go. Speech to text runs on your computer, on the NPU of an Intel Core Ultra or on the CPU, with a model that knows Sinhala and English. The speech model (1.1 GB) is downloaded on first start.",
+    "linux": {
+      "deb": {
+        "section": "utils",
+        "depends": ["libasound2"],
+        "recommends": ["intel-level-zero-npu", "libze1"],
+        "files": {
+          "/usr/lib/live-transcribe/openvino": "../../target/openvino-runtime",
+          "/usr/lib/udev/rules.d/70-live-transcribe-keyboard.rules": "../../packaging/linux/70-live-transcribe-keyboard.rules",
+          "/usr/share/doc/live-transcribe/README.Linux": "../../packaging/linux/README.Linux"
+        },
+        "postInstallScript": "../../packaging/linux/postinst.sh",
+        "postRemoveScript": "../../packaging/linux/postrm.sh"
+      },
+      "rpm": {
+        "depends": ["libasound.so.2()(64bit)"],
+        "recommends": ["intel-npu-driver"],
+        "files": {
+          "/usr/lib/live-transcribe/openvino": "../../target/openvino-runtime",
+          "/usr/lib/udev/rules.d/70-live-transcribe-keyboard.rules": "../../packaging/linux/70-live-transcribe-keyboard.rules",
+          "/usr/share/doc/live-transcribe/README.Linux": "../../packaging/linux/README.Linux"
+        },
+        "postInstallScript": "../../packaging/linux/postinst.sh",
+        "postRemoveScript": "../../packaging/linux/postrm.sh"
+      },
+      "appimage": {
+        "bundleMediaFramework": false,
+        "files": {
+          "/usr/share/live-transcribe/openvino": "../../target/openvino-runtime",
+          "/usr/share/live-transcribe/70-live-transcribe-keyboard.rules": "../../packaging/linux/70-live-transcribe-keyboard.rules",
+          "/usr/share/doc/live-transcribe/README.Linux": "../../packaging/linux/README.Linux"
+        }
+      }
+    }
+  }
+}
