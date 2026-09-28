@@ -1,6 +1,7 @@
-//! The speech model, on a thread of its own: it loads and warms up, says so to the engine
-//! ([`Message::ModelLoaded`]), then transcribes jobs one at a time and sends each result back.
-//! The thread ends, and the model is let go, when the engine drops the [`Jobs`] sender.
+//! The speech model, on a thread of its own: it downloads the default model if it isn't there yet
+//! (saying how far it has got, [`Message::ModelDownload`]), loads and warms up, says so to the
+//! engine ([`Message::ModelLoaded`]), then transcribes jobs one at a time and sends each result
+//! back. The thread ends, and the model is let go, when the engine drops the [`Jobs`] sender.
 
 use std::sync::mpsc::{self, Sender};
 use std::thread::{self, JoinHandle};
@@ -13,7 +14,7 @@ use lt_transcription::qwen3_asr::open_transcriber;
 
 use super::configuration::ModelChoice;
 use super::engine::Message;
-use crate::paths;
+use crate::{model_download, paths};
 
 /// Where the engine sends what to transcribe.
 pub(crate) type Jobs = Sender<(Job, Vec<f32>)>;
@@ -31,6 +32,14 @@ impl Transcriber {
         let thread = thread::Builder::new()
             .name("transcriber".to_owned())
             .spawn(move || {
+                if model.downloadable && !model_download::is_in_place(&model.folder) {
+                    let downloaded = download(&model, generation, &messages);
+                    if let Err(error) = downloaded {
+                        let result = Err(format!("{error:#}"));
+                        let _ = messages.send(Message::ModelLoaded { generation, result });
+                        return;
+                    }
+                }
                 eprintln!("Loading the speech model from {}", model.folder.display());
                 let started = Instant::now();
                 let mut transcriber =
@@ -91,4 +100,26 @@ impl Transcriber {
             tracing::error!("The speech model's thread panicked");
         }
     }
+}
+
+/// Downloads the default model into its folder, telling the engine how far it has got. It stops
+/// when the engine has gone; what was downloaded stays for the next start.
+fn download(model: &ModelChoice, generation: u64, messages: &Sender<Message>) -> anyhow::Result<()> {
+    let default = &model_download::DEFAULT_MODEL;
+    eprintln!(
+        "Downloading the speech model, {} ({:.1} GB), from Hugging Face into {}",
+        default.repository,
+        default.size() as f64 / 1e9,
+        model.folder.display()
+    );
+    let started = Instant::now();
+    model_download::download(default, &model.folder, &mut |progress| {
+        messages.send(Message::ModelDownload { generation, progress }).is_ok()
+    })
+    .with_context(|| format!("couldn't download the speech model into {}", model.folder.display()))?;
+    eprintln!(
+        "Downloaded the speech model in {:.0} s",
+        started.elapsed().as_secs_f32()
+    );
+    Ok(())
 }

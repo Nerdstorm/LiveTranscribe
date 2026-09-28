@@ -59,15 +59,19 @@ pub(crate) fn notice_ms(settings: &Settings) -> u64 {
 pub(crate) struct ModelChoice {
     pub(crate) folder: PathBuf,
     pub(crate) device: DeviceChoice,
+    /// It's the default model, which is downloaded when it isn't in its folder yet.
+    pub(crate) downloadable: bool,
 }
 
 impl ModelChoice {
     pub(crate) fn from_settings(settings: &Settings) -> anyhow::Result<Self> {
+        let default = paths::default_model()?;
         let folder = match settings.stt_model.as_deref() {
-            None => paths::default_model()?,
+            None => default.clone(),
             Some(model) => model_folder(model, &paths::models_folder()?),
         };
         Ok(Self {
+            downloadable: folder == default,
             folder,
             device: settings.stt_device.parse().unwrap_or(DeviceChoice::Auto),
         })

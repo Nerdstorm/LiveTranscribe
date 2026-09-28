@@ -8,13 +8,16 @@ use anyhow::Context;
 use lt_shared::audio_format::SAMPLE_RATE;
 use lt_transcription::qwen3_asr::open_transcriber;
 
-use crate::{ModelOptions, paths, wav};
+use crate::{ModelOptions, model_download, paths, wav};
 
 pub fn run(options: &ModelOptions, files: &[PathBuf], json: bool) -> anyhow::Result<()> {
     let folder = match &options.model {
         Some(folder) => folder.clone(),
         None => paths::default_model()?,
     };
+    if options.model.is_none() && !model_download::is_in_place(&folder) {
+        download(&folder)?;
+    }
     let started = Instant::now();
     let mut transcriber = open_transcriber(&folder, &options.device, paths::openvino_cache().as_deref())
         .with_context(|| format!("couldn't load the speech model from {}", folder.display()))?;
@@ -55,4 +58,26 @@ pub fn run(options: &ModelOptions, files: &[PathBuf], json: bool) -> anyhow::Res
         }
     }
     Ok(())
+}
+
+/// Downloads the default model into `folder`, as dictation does the first time, saying on standard
+/// error how far it has got.
+fn download(folder: &std::path::Path) -> anyhow::Result<()> {
+    let model = &model_download::DEFAULT_MODEL;
+    eprintln!(
+        "Downloading the speech model, {} ({:.1} GB), from Hugging Face into {}",
+        model.repository,
+        model.size() as f64 / 1e9,
+        folder.display()
+    );
+    let mut shown = None;
+    model_download::download(model, folder, &mut |progress| {
+        let percent = progress.percent();
+        if shown.is_none_or(|shown| percent >= shown + 5) {
+            eprintln!("  {percent}%");
+            shown = Some(percent);
+        }
+        true
+    })
+    .with_context(|| format!("couldn't download the speech model into {}", folder.display()))
 }

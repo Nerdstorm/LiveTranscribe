@@ -5,6 +5,7 @@
 mod dictation;
 #[cfg(target_os = "linux")]
 mod keys;
+mod model_download;
 mod paths;
 #[cfg(target_os = "linux")]
 mod settings;

@@ -53,9 +53,9 @@ impl WindowState {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct StatusView {
-    /// `loading`, `ready` or `failed`.
+    /// `downloading`, `loading`, `ready` or `failed`.
     pub(crate) model: &'static str,
-    /// Where the model's passes run, or why it couldn't load.
+    /// How far the download has got, where the model's passes run, or why it couldn't load.
     pub(crate) detail: Option<String>,
 }
 

@@ -14,7 +14,10 @@ const DETAIL_LIMIT: usize = 80;
 /// Where the speech model stands.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ModelState {
-    Loading,
+    /// Loading, or first downloading, which is `percent` done.
+    Loading {
+        percent: Option<u8>,
+    },
     Ready,
     Failed(String),
 }
@@ -32,7 +35,10 @@ pub enum MenuBarIndicator {
     Processing,
     /// The speech model failed to load.
     ModelsFailed(String),
-    ModelsLoading,
+    /// The speech model is loading, or first downloading, which is `percent` done.
+    ModelsLoading {
+        percent: Option<u8>,
+    },
     /// The dictation hotkey is turned off in Settings.
     Off,
 }
@@ -81,7 +87,7 @@ impl MenuBarIndicator {
             return Self::Off;
         };
         match model {
-            ModelState::Loading => Self::ModelsLoading,
+            ModelState::Loading { percent } => Self::ModelsLoading { percent: *percent },
             ModelState::Failed(detail) => Self::ModelsFailed(detail.clone()),
             ModelState::Ready => Self::Ready {
                 hotkey: hotkey.to_owned(),
@@ -97,7 +103,8 @@ impl MenuBarIndicator {
             Self::Recording { hands_free: false } => "Listening…".to_owned(),
             Self::Processing => "Transcribing…".to_owned(),
             Self::ModelsFailed(detail) => format!("Speech-to-text isn't available: {}", shortened(detail)),
-            Self::ModelsLoading => "Loading speech models…".to_owned(),
+            Self::ModelsLoading { percent: Some(percent) } => format!("Downloading speech models… {percent}%"),
+            Self::ModelsLoading { percent: None } => "Loading speech models…".to_owned(),
             Self::Off => "Dictation is off".to_owned(),
         }
     }
@@ -108,7 +115,7 @@ impl MenuBarIndicator {
             Self::Recording { .. } => MenuBarIcon::Microphone,
             Self::Processing => MenuBarIcon::Ellipsis,
             Self::ModelsFailed(_) => MenuBarIcon::Warning,
-            Self::ModelsLoading => MenuBarIcon::Loading,
+            Self::ModelsLoading { .. } => MenuBarIcon::Loading,
             Self::Off => MenuBarIcon::MicrophoneOff,
         }
     }
@@ -120,7 +127,7 @@ impl MenuBarIndicator {
             Self::Recording { .. } => "listening",
             Self::Processing => "transcribing",
             Self::ModelsFailed(_) => "needs attention",
-            Self::ModelsLoading => "loading speech models",
+            Self::ModelsLoading { .. } => "loading speech models",
             Self::Off => "dictation off",
         };
         format!("Live Transcribe, {state}")
@@ -206,17 +213,32 @@ mod tests {
                 .status_text(),
             "Listening…"
         );
-        let processing = status(Phase::Processing { audio_ms: 900 }, &ModelState::Loading);
+        let processing = status(
+            Phase::Processing { audio_ms: 900 },
+            &ModelState::Loading { percent: None },
+        );
         assert_eq!(processing.indicator.status_text(), "Transcribing…");
         assert_eq!(processing.indicator.icon(), MenuBarIcon::Ellipsis);
     }
 
     #[test]
     fn the_model_comes_before_the_hotkey() {
-        let loading = status(Phase::Idle, &ModelState::Loading);
+        let loading = status(Phase::Idle, &ModelState::Loading { percent: None });
         assert_eq!(loading.indicator.status_text(), "Loading speech models…");
         assert_eq!(loading.indicator.icon(), MenuBarIcon::Loading);
         assert!(!loading.can_toggle_dictation, "nothing to dictate with yet");
+
+        let downloading = status(Phase::Idle, &ModelState::Loading { percent: Some(42) });
+        assert_eq!(downloading.indicator.status_text(), "Downloading speech models… 42%");
+        assert_eq!(
+            downloading.indicator.icon(),
+            MenuBarIcon::Loading,
+            "progress changes the text only"
+        );
+        assert_eq!(
+            downloading.indicator.accessibility_label(),
+            "Live Transcribe, loading speech models"
+        );
 
         let failed = status(Phase::Idle, &ModelState::Failed("no such folder".to_owned()));
         assert_eq!(
@@ -263,7 +285,8 @@ mod tests {
     fn dictation_turned_off_outranks_the_model_but_not_a_dictation_from_the_menu() {
         for model in [
             ModelState::Ready,
-            ModelState::Loading,
+            ModelState::Loading { percent: None },
+            ModelState::Loading { percent: Some(5) },
             ModelState::Failed("x".to_owned()),
         ] {
             let off = MenuBarStatus::new(Phase::Idle, &model, None, false);
@@ -288,7 +311,7 @@ mod tests {
             MenuBarIndicator::Recording { hands_free: false },
             MenuBarIndicator::Processing,
             MenuBarIndicator::ModelsFailed("x".to_owned()),
-            MenuBarIndicator::ModelsLoading,
+            MenuBarIndicator::ModelsLoading { percent: None },
             MenuBarIndicator::Off,
         ]
         .map(|indicator| indicator.icon());

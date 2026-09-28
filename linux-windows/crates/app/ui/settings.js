@@ -285,6 +285,7 @@ function renderStatus(next) {
   const state = next?.model ?? "loading";
   row.dataset.state = state;
   $("#model-state").textContent = {
+    downloading: "Downloading the speech model…",
     loading: "Loading the speech model…",
     ready: "The speech model is ready",
     failed: "The speech model couldn’t load",

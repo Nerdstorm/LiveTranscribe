@@ -19,6 +19,7 @@ use lt_wayland::WaylandSession;
 use super::configuration::{self, ModelChoice};
 use super::platform::{Clock, Platform};
 use super::transcriber::{Jobs, Transcriber};
+use crate::model_download::Progress;
 use crate::settings::Settings;
 
 pub(crate) enum Message {
@@ -30,6 +31,11 @@ pub(crate) enum Message {
     PauseHotkey(bool),
     /// Settings asks for the speech model to be loaded again, after it failed.
     ReloadModel,
+    /// How far downloading the speech model has got, before it loads.
+    ModelDownload {
+        generation: u64,
+        progress: Progress,
+    },
     /// The speech model loaded (where its passes run), or couldn't.
     ModelLoaded {
         generation: u64,
@@ -127,6 +133,8 @@ enum Model {
         choice: ModelChoice,
         /// Tells this load's answer from an earlier one's.
         generation: u64,
+        /// How far downloading the model has got, while it downloads.
+        download: Option<Progress>,
         transcriber: Transcriber,
         jobs: Jobs,
     },
@@ -152,7 +160,12 @@ impl Model {
 
     fn state(&self) -> ModelState {
         match self {
-            Self::Loading { .. } => ModelState::Loading,
+            Self::Loading { download, .. } => ModelState::Loading {
+                // A finished download leaves the model loading.
+                percent: download
+                    .filter(|progress| progress.done < progress.total)
+                    .map(Progress::percent),
+            },
             Self::Ready { .. } => ModelState::Ready,
             Self::Failed { error, .. } => ModelState::Failed(error.clone()),
         }
@@ -251,6 +264,17 @@ impl Running {
                     self.reload = true;
                 }
             }
+            Message::ModelDownload { generation, progress } => {
+                if let Model::Loading {
+                    generation: loading,
+                    download,
+                    ..
+                } = &mut self.model
+                    && *loading == generation
+                {
+                    *download = Some(progress);
+                }
+            }
             Message::ModelLoaded { generation, result } => self.model_loaded(generation, result),
             Message::Transcribed { job, result } => self.controller.transcribed(job, result),
             Message::Inserted { job, result } => self.controller.inserted(job, result, now),
@@ -308,6 +332,7 @@ impl Running {
                 Ok((transcriber, jobs)) => Model::Loading {
                     choice,
                     generation: self.generation,
+                    download: None,
                     transcriber,
                     jobs,
                 },

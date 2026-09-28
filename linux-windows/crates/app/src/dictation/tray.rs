@@ -18,6 +18,7 @@ use tauri::tray::{TrayIcon, TrayIconBuilder};
 use tauri::{AppHandle, RunEvent, Wry};
 
 use super::engine::{DictationStatus, MenuCommand, Message, StatusSink};
+use crate::model_download;
 use crate::settings::{self, AppControl, SettingsService, StatusView, WindowState};
 
 /// Pixels on a side of the tray icon; the tray scales it to fit.
@@ -58,7 +59,14 @@ pub(crate) fn run(
 /// How dictation stands, for the Settings window.
 fn status_view(status: &DictationStatus) -> StatusView {
     match &status.model {
-        ModelState::Loading => StatusView {
+        ModelState::Loading { percent: Some(percent) } => StatusView {
+            model: "downloading",
+            detail: Some(format!(
+                "{percent}% of {:.1} GB, from Hugging Face",
+                model_download::DEFAULT_MODEL.size() as f64 / 1e9
+            )),
+        },
+        ModelState::Loading { percent: None } => StatusView {
             model: "loading",
             detail: None,
         },
