@@ -92,7 +92,8 @@ keychain may ask before the key is read.
 5. Download the draft's disk image on a Mac that has never run a build of Live Transcribe, or in
    another user account. Open it, drag the app to Applications and open it. macOS should only
    say that it was downloaded from the internet.
-6. Publish the draft on GitHub. The website's Download button goes to the latest release.
+6. Publish the draft on GitHub. The website's Download button goes to the latest release. (Linux
+   releases, tagged `linux-vX.Y.Z`, are never made the latest: see `linux-windows/README.md`.)
 7. Offer it as an update: put the new appcast in `site/` and merge it into main through a pull
    request. The website workflow publishes it, and installed copies find the update at their
    next daily check or at **Check for Updates…**.
