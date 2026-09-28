@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::sync::mpsc::Sender;
 
 use anyhow::Context;
-use lt_dictation_ui::{MenuBarIcon, MenuBarStatus, ModelState, Theme, draw_icon};
+use lt_dictation_ui::{Blocker, MenuBarIcon, MenuBarStatus, ModelState, Theme, draw_icon};
 use lt_shared::CleanupLevel;
 use serde_json::{Map, Value};
 use tauri::image::Image;
@@ -19,17 +19,21 @@ use tauri::{AppHandle, RunEvent, Wry};
 
 use super::engine::{DictationStatus, MenuCommand, Message, StatusSink};
 use crate::model_download;
-use crate::settings::{self, AppControl, SettingsService, StatusView, WindowState};
+use crate::settings::{self, AppControl, BlockerView, SettingsService, StatusView, WindowState};
 
 /// Pixels on a side of the tray icon; the tray scales it to fit.
 const ICON_SIZE: u32 = 64;
 
 /// Runs the app's main loop with the tray in it, calling `start` once the tray is up. Returns
 /// only if the tray can't start: quitting ends the process.
+///
+/// `blocked`: dictation can't start, so Settings opens at once to say why, and closing it quits,
+/// since there's nothing to leave running (and GNOME shows no tray to quit from).
 pub(crate) fn run(
     messages: Sender<Message>,
     settings: Arc<SettingsService>,
     control: Box<dyn AppControl>,
+    blocked: bool,
     start: impl FnOnce(StatusSink) + Send + 'static,
 ) -> anyhow::Result<()> {
     let app = tauri::Builder::default()
@@ -43,13 +47,18 @@ pub(crate) fn run(
                 tray.show(status);
                 settings::show_status(&handle, status_view(status));
             }));
+            if blocked && let Err(error) = settings::open_window(app.handle()) {
+                tracing::error!("Couldn't open the Settings window: {error}");
+            }
             Ok(())
         })
         .build(tauri::generate_context!())
         .context("couldn't start the tray")?;
-    app.run(|_, event| {
+    app.run(move |_, event| {
         // Closing the Settings window leaves the app running in the tray.
-        if let RunEvent::ExitRequested { code: None, api, .. } = event {
+        if let RunEvent::ExitRequested { code: None, api, .. } = event
+            && !blocked
+        {
             api.prevent_exit();
         }
     });
@@ -58,6 +67,24 @@ pub(crate) fn run(
 
 /// How dictation stands, for the Settings window.
 fn status_view(status: &DictationStatus) -> StatusView {
+    let blocker = status.blocker.as_ref().map(|blocker| match blocker {
+        Blocker::Hotkey(detail) => BlockerView {
+            title: "The dictation shortcut couldn’t start",
+            detail: detail.clone(),
+        },
+        Blocker::Desktop(detail) => BlockerView {
+            title: "Dictation can’t type on this desktop yet",
+            detail: detail.clone(),
+        },
+    });
+    if blocker.is_some() {
+        // The model isn't loaded while dictation can't start.
+        return StatusView {
+            model: "idle",
+            detail: None,
+            blocker,
+        };
+    }
     match &status.model {
         ModelState::Loading { percent: Some(percent) } => StatusView {
             model: "downloading",
@@ -65,18 +92,22 @@ fn status_view(status: &DictationStatus) -> StatusView {
                 "{percent}% of {:.1} GB, from Hugging Face",
                 model_download::DEFAULT_MODEL.size() as f64 / 1e9
             )),
+            blocker: None,
         },
         ModelState::Loading { percent: None } => StatusView {
             model: "loading",
             detail: None,
+            blocker: None,
         },
         ModelState::Ready => StatusView {
             model: "ready",
             detail: status.placement.clone(),
+            blocker: None,
         },
         ModelState::Failed(error) => StatusView {
             model: "failed",
             detail: Some(error.clone()),
+            blocker: None,
         },
     }
 }
@@ -184,6 +215,7 @@ impl Tray {
             &status.model,
             status.hotkey.as_deref(),
             status.has_last_dictation,
+            status.blocker.as_ref(),
         );
         let indicator = &menu.indicator;
         let mut results = vec![

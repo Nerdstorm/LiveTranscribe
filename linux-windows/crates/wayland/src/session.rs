@@ -193,8 +193,7 @@ impl std::fmt::Display for SessionError {
             ),
             Self::Unsupported { protocol } => write!(
                 formatter,
-                "this desktop doesn't let apps {protocol}, which typing dictated text needs; \
-                 COSMIC, KDE Plasma, Sway and Hyprland do, GNOME doesn't"
+                "this desktop doesn't let apps {protocol}, which typing dictated text needs"
             ),
             Self::Connection(detail) => write!(formatter, "the Wayland connection failed: {detail}"),
             Self::Stopped => formatter.write_str("the Wayland session has stopped after an earlier error"),

@@ -11,6 +11,16 @@ use lt_dictation::Phase;
 /// would stretch the whole menu.
 const DETAIL_LIMIT: usize = 80;
 
+/// Why dictation can't start at all, whatever the model does: something the user can fix, or
+/// should know.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Blocker {
+    /// The hotkey can't be watched, such as the keyboard not being readable.
+    Hotkey(String),
+    /// The desktop can't take typed text from the app.
+    Desktop(String),
+}
+
 /// Where the speech model stands.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ModelState {
@@ -33,6 +43,10 @@ pub enum MenuBarIndicator {
         hands_free: bool,
     },
     Processing,
+    /// The hotkey couldn't start. Settings says why: too much for a menu item.
+    HotkeyFailed,
+    /// The desktop can't take typed text from the app. Settings says why.
+    DesktopUnsupported,
     /// The speech model failed to load.
     ModelsFailed(String),
     /// The speech model is loading, or first downloading, which is `percent` done.
@@ -73,11 +87,12 @@ impl MenuBarIcon {
 
 impl MenuBarIndicator {
     /// A dictation in progress comes first (one started from the menu runs with the hotkey off),
-    /// then the hotkey turned off, then the speech model, then the hotkey. `hotkey` is its name,
-    /// or `None` when dictation is turned off in Settings.
+    /// then the hotkey turned off, then what stops dictation starting, then the speech model, then
+    /// the hotkey. `hotkey` is its name, or `None` when dictation is turned off in Settings.
     ///
-    /// Turned off outranks the model, as on the Mac: a model that loads wouldn't turn it back on.
-    pub fn new(phase: Phase, model: &ModelState, hotkey: Option<&str>) -> Self {
+    /// Turned off outranks the rest, as on the Mac: fixing a problem or loading the model wouldn't
+    /// turn it back on.
+    pub fn new(phase: Phase, model: &ModelState, hotkey: Option<&str>, blocker: Option<&Blocker>) -> Self {
         match phase {
             Phase::Recording { hands_free } => return Self::Recording { hands_free },
             Phase::Processing { .. } => return Self::Processing,
@@ -86,6 +101,11 @@ impl MenuBarIndicator {
         let Some(hotkey) = hotkey else {
             return Self::Off;
         };
+        match blocker {
+            Some(Blocker::Hotkey(_)) => return Self::HotkeyFailed,
+            Some(Blocker::Desktop(_)) => return Self::DesktopUnsupported,
+            None => {}
+        }
         match model {
             ModelState::Loading { percent } => Self::ModelsLoading { percent: *percent },
             ModelState::Failed(detail) => Self::ModelsFailed(detail.clone()),
@@ -102,6 +122,8 @@ impl MenuBarIndicator {
             Self::Recording { hands_free: true } => "Listening, hands-free…".to_owned(),
             Self::Recording { hands_free: false } => "Listening…".to_owned(),
             Self::Processing => "Transcribing…".to_owned(),
+            Self::HotkeyFailed => "The dictation shortcut couldn't start: see Settings".to_owned(),
+            Self::DesktopUnsupported => "Dictation can't type on this desktop yet: see Settings".to_owned(),
             Self::ModelsFailed(detail) => format!("Speech-to-text isn't available: {}", shortened(detail)),
             Self::ModelsLoading { percent: Some(percent) } => format!("Downloading speech models… {percent}%"),
             Self::ModelsLoading { percent: None } => "Loading speech models…".to_owned(),
@@ -114,7 +136,7 @@ impl MenuBarIndicator {
             Self::Ready { .. } => MenuBarIcon::Waveform,
             Self::Recording { .. } => MenuBarIcon::Microphone,
             Self::Processing => MenuBarIcon::Ellipsis,
-            Self::ModelsFailed(_) => MenuBarIcon::Warning,
+            Self::HotkeyFailed | Self::DesktopUnsupported | Self::ModelsFailed(_) => MenuBarIcon::Warning,
             Self::ModelsLoading { .. } => MenuBarIcon::Loading,
             Self::Off => MenuBarIcon::MicrophoneOff,
         }
@@ -126,7 +148,7 @@ impl MenuBarIndicator {
             Self::Ready { .. } => "ready",
             Self::Recording { .. } => "listening",
             Self::Processing => "transcribing",
-            Self::ModelsFailed(_) => "needs attention",
+            Self::HotkeyFailed | Self::DesktopUnsupported | Self::ModelsFailed(_) => "needs attention",
             Self::ModelsLoading { .. } => "loading speech models",
             Self::Off => "dictation off",
         };
@@ -135,7 +157,10 @@ impl MenuBarIndicator {
 
     /// Something is wrong that the user can fix.
     pub fn needs_attention(&self) -> bool {
-        matches!(self, Self::ModelsFailed(_))
+        matches!(
+            self,
+            Self::HotkeyFailed | Self::DesktopUnsupported | Self::ModelsFailed(_)
+        )
     }
 }
 
@@ -155,16 +180,26 @@ pub struct MenuBarStatus {
 impl MenuBarStatus {
     /// `hotkey`: its name, or `None` when dictation is turned off in Settings, which leaves the
     /// menu's *Start Dictation* working. `has_last_dictation`: the controller has a last dictation
-    /// to copy.
-    pub fn new(phase: Phase, model: &ModelState, hotkey: Option<&str>, has_last_dictation: bool) -> Self {
+    /// to copy. `blocker`: why dictation can't start at all, if it can't.
+    pub fn new(
+        phase: Phase,
+        model: &ModelState,
+        hotkey: Option<&str>,
+        has_last_dictation: bool,
+        blocker: Option<&Blocker>,
+    ) -> Self {
         let (toggle_title, can_toggle_dictation, can_cancel) = match phase {
             // Without the model the controller would refuse; disabling says so before the click.
-            Phase::Idle => ("Start Dictation", *model == ModelState::Ready, false),
+            Phase::Idle => (
+                "Start Dictation",
+                *model == ModelState::Ready && blocker.is_none(),
+                false,
+            ),
             Phase::Recording { .. } => ("Stop Dictation", true, true),
             Phase::Processing { .. } => ("Stop Dictation", false, true),
         };
         Self {
-            indicator: MenuBarIndicator::new(phase, model, hotkey),
+            indicator: MenuBarIndicator::new(phase, model, hotkey, blocker),
             toggle_title,
             can_toggle_dictation,
             can_cancel,
@@ -190,7 +225,7 @@ mod tests {
     const HOTKEY: &str = "Right Ctrl";
 
     fn status(phase: Phase, model: &ModelState) -> MenuBarStatus {
-        MenuBarStatus::new(phase, model, Some(HOTKEY), true)
+        MenuBarStatus::new(phase, model, Some(HOTKEY), true, None)
     }
 
     #[test]
@@ -254,6 +289,36 @@ mod tests {
     }
 
     #[test]
+    fn what_stops_dictation_outranks_the_model_but_not_dictation_turned_off() {
+        let keyboard = Blocker::Hotkey("the keyboard can't be read".to_owned());
+        let blocked = MenuBarStatus::new(
+            Phase::Idle,
+            &ModelState::Loading { percent: Some(3) },
+            Some(HOTKEY),
+            false,
+            Some(&keyboard),
+        );
+        assert_eq!(
+            blocked.indicator.status_text(),
+            "The dictation shortcut couldn't start: see Settings"
+        );
+        assert_eq!(blocked.indicator.icon(), MenuBarIcon::Warning);
+        assert!(blocked.indicator.needs_attention());
+        assert!(!blocked.can_toggle_dictation, "there's nothing to dictate with");
+
+        let desktop = Blocker::Desktop("KDE Plasma has no virtual keyboard".to_owned());
+        let unsupported = MenuBarStatus::new(Phase::Idle, &ModelState::Ready, Some(HOTKEY), false, Some(&desktop));
+        assert_eq!(
+            unsupported.indicator.status_text(),
+            "Dictation can't type on this desktop yet: see Settings"
+        );
+        assert!(!unsupported.can_toggle_dictation);
+
+        let off = MenuBarStatus::new(Phase::Idle, &ModelState::Ready, None, false, Some(&desktop));
+        assert_eq!(off.indicator, MenuBarIndicator::Off);
+    }
+
+    #[test]
     fn the_menu_follows_the_phase() {
         let idle = status(Phase::Idle, &ModelState::Ready);
         assert_eq!(
@@ -278,7 +343,9 @@ mod tests {
             ),
             ("Stop Dictation", false, true)
         );
-        assert!(!MenuBarStatus::new(Phase::Idle, &ModelState::Ready, Some(HOTKEY), false).can_copy_last_dictation);
+        assert!(
+            !MenuBarStatus::new(Phase::Idle, &ModelState::Ready, Some(HOTKEY), false, None).can_copy_last_dictation
+        );
     }
 
     #[test]
@@ -289,16 +356,22 @@ mod tests {
             ModelState::Loading { percent: Some(5) },
             ModelState::Failed("x".to_owned()),
         ] {
-            let off = MenuBarStatus::new(Phase::Idle, &model, None, false);
+            let off = MenuBarStatus::new(Phase::Idle, &model, None, false, None);
             assert_eq!(off.indicator, MenuBarIndicator::Off, "{model:?}");
         }
-        let off = MenuBarStatus::new(Phase::Idle, &ModelState::Ready, None, false);
+        let off = MenuBarStatus::new(Phase::Idle, &ModelState::Ready, None, false, None);
         assert_eq!(off.indicator.status_text(), "Dictation is off");
         assert_eq!(off.indicator.icon(), MenuBarIcon::MicrophoneOff);
         assert_eq!(off.indicator.accessibility_label(), "Live Transcribe, dictation off");
         assert!(!off.indicator.needs_attention());
         assert!(off.can_toggle_dictation, "the menu still starts a dictation");
-        let recording = MenuBarStatus::new(Phase::Recording { hands_free: true }, &ModelState::Ready, None, false);
+        let recording = MenuBarStatus::new(
+            Phase::Recording { hands_free: true },
+            &ModelState::Ready,
+            None,
+            false,
+            None,
+        );
         assert_eq!(recording.indicator, MenuBarIndicator::Recording { hands_free: true });
     }
 

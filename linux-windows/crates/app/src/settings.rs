@@ -9,4 +9,6 @@ mod window;
 pub(crate) use model::Settings;
 pub(crate) use service::SettingsService;
 pub(crate) use store::SettingsStore;
-pub(crate) use window::{AppControl, StatusView, WindowState, commands, follow_changes, open_window, show_status};
+pub(crate) use window::{
+    AppControl, BlockerView, StatusView, WindowState, commands, follow_changes, open_window, show_status,
+};

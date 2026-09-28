@@ -6,12 +6,14 @@ use std::time::Duration;
 
 use lt_hotkey::{KeyState, KeyboardEvent, key_name, watch_keyboards};
 
+use crate::dictation::hotkey_problem;
+
 const LISTEN_FOR: Duration = Duration::from_secs(30);
 /// Every key code; mouse and gamepad buttons come after.
 const KEY_CODES: std::ops::Range<u16> = 1..0x100;
 
 pub fn run() -> anyhow::Result<()> {
-    let keyboards = watch_keyboards(KEY_CODES.collect(), |event| {
+    let watching = watch_keyboards(KEY_CODES.collect(), |event| {
         if let KeyboardEvent::Key {
             keyboard,
             code,
@@ -20,7 +22,9 @@ pub fn run() -> anyhow::Result<()> {
         {
             println!("{} ({code}) on {}", key_name(code), keyboard.name);
         }
-    })?;
+    });
+    let keyboards =
+        watching.map_err(|error| anyhow::anyhow!(hotkey_problem(&error, std::env::var_os("APPIMAGE").is_some())))?;
     let names: Vec<_> = keyboards.iter().map(|keyboard| keyboard.name.as_str()).collect();
     eprintln!(
         "Press the key you want to hold for dictation; its name is what `run --key` takes. \

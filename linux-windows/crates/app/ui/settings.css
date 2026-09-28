@@ -353,6 +353,32 @@ select {
   accent-color: var(--accent);
 }
 
+/* Why dictation can't start, above everything else */
+
+.blocker {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow), inset 3px 0 0 var(--problem);
+}
+
+.blocker .light {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--problem);
+}
+
+.blocker .subtitle {
+  max-width: 62ch;
+  overflow-wrap: anywhere;
+}
+
 /* The model's status */
 
 .status .light {
@@ -371,6 +397,11 @@ select {
 
 .status[data-state="failed"] .light {
   background: var(--problem);
+  animation: none;
+}
+
+.status[data-state="idle"] .light {
+  background: var(--muted);
   animation: none;
 }
 

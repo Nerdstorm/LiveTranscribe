@@ -53,10 +53,19 @@ impl WindowState {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct StatusView {
-    /// `downloading`, `loading`, `ready` or `failed`.
+    /// `downloading`, `loading`, `ready` or `failed`; `idle` while dictation can't start.
     pub(crate) model: &'static str,
     /// How far the download has got, where the model's passes run, or why it couldn't load.
     pub(crate) detail: Option<String>,
+    /// Why dictation can't start at all, if it can't.
+    pub(crate) blocker: Option<BlockerView>,
+}
+
+/// Why dictation can't start, as the top of the window says it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub(crate) struct BlockerView {
+    pub(crate) title: &'static str,
+    pub(crate) detail: String,
 }
 
 /// Tells an open window, and one opened later, how dictation stands.

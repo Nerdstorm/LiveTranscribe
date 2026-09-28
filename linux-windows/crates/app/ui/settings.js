@@ -285,6 +285,7 @@ function renderStatus(next) {
   const state = next?.model ?? "loading";
   row.dataset.state = state;
   $("#model-state").textContent = {
+    idle: "The speech model loads once dictation can start",
     downloading: "Downloading the speech model…",
     loading: "Loading the speech model…",
     ready: "The speech model is ready",
@@ -292,6 +293,10 @@ function renderStatus(next) {
   }[state];
   $("#model-detail").textContent = next?.detail ? capitalise(next.detail) : "";
   $("#reload-model").hidden = state !== "failed";
+  const blocker = next?.blocker;
+  $("#blocker").hidden = !blocker;
+  $("#blocker-title").textContent = blocker?.title ?? "";
+  $("#blocker-detail").textContent = blocker?.detail ?? "";
 }
 
 function capitalise(text) {

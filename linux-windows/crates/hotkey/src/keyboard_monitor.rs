@@ -3,8 +3,9 @@
 //! keyboards plugged in later.
 //!
 //! Reading a keyboard needs read access to its device node, which belongs to root and the `input`
-//! group. The setup kit's udev rule grants it to the user logged in at the machine
-//! (`TAG+="uaccess"`), which also reaches a toolbox container, where the `input` group doesn't.
+//! group. The deb and rpm packages' udev rule, like the setup kit's, grants it to the user logged in
+//! at the machine (`TAG+="uaccess"`), which also reaches a toolbox container, where the `input`
+//! group doesn't.
 //! Whoever can read a keyboard can read everything typed on it: key codes stay in this process,
 //! and only the hotkey's meaning leaves it.
 
@@ -70,8 +71,7 @@ impl std::fmt::Display for MonitorError {
                 let paths: Vec<_> = paths.iter().map(|path| path.display().to_string()).collect();
                 write!(
                     formatter,
-                    "the keyboard can't be read ({} denied read access). The setup kit's udev rule \
-                     grants it to the user at the machine; see the kit's README, \"Hold to talk\"",
+                    "the keyboard can't be read: this user isn't allowed to read {}",
                     paths.join(", ")
                 )
             }

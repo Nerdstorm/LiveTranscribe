@@ -21,7 +21,7 @@ mod theme;
 mod tray_icon;
 
 pub use fonts::{FontError, load_interface_font};
-pub use menu_bar_status::{MenuBarIcon, MenuBarIndicator, MenuBarStatus, ModelState, shortened};
+pub use menu_bar_status::{Blocker, MenuBarIcon, MenuBarIndicator, MenuBarStatus, ModelState, shortened};
 pub use panel_model::{Indicator, PanelContent, PanelModel};
 pub use panel_placement::PanelPlacement;
 pub use panel_view::{Animation, BubbleSide, CIRCLE_SQUARE, PanelView, Rendered};

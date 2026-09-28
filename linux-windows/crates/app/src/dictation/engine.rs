@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use lt_capture::Recorder;
 use lt_dictation::{DictationController, Job, Phase};
-use lt_dictation_ui::{ModelState, PanelModel};
+use lt_dictation_ui::{Blocker, ModelState, PanelModel};
 use lt_hotkey::{HotkeyEvent, HotkeyWatch, display_name, key_code};
 use lt_insertion::Inserted;
 use lt_shared::CleanupLevel;
@@ -71,6 +71,8 @@ pub(crate) struct DictationStatus {
     pub(crate) hotkey: Option<String>,
     pub(crate) has_last_dictation: bool,
     pub(crate) cleanup: CleanupLevel,
+    /// Why dictation can't start at all; the engine never runs then.
+    pub(crate) blocker: Option<Blocker>,
 }
 
 /// Where the engine tells how things stand.
@@ -430,6 +432,7 @@ impl Running {
             hotkey: self.settings.dictation_enabled.then(|| self.hotkey_name.clone()),
             has_last_dictation: self.controller.last_text().is_some(),
             cleanup: self.controller.cleanup_level(),
+            blocker: None,
         };
         if self.shown.as_ref() != Some(&status) {
             (self.status)(&status);
