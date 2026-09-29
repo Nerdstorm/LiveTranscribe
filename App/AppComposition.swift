@@ -151,6 +151,7 @@ final class AppComposition {
             history: history,
             microphonePermission: microphonePermission,
             accessibility: accessibility,
+            speechModels: SpeechModelLibrary(),
             settingsAtLaunch: settings,
             updates: Self.makeUpdater()
         )
