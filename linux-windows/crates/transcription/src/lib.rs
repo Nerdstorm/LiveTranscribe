@@ -9,11 +9,16 @@
 //! - [`qwen3_asr`] mirrors mlx-audio-swift's Qwen3ASR.swift at the revision the Mac app pins. The
 //!   golden files in `Fixtures/golden` (`speech-features/`, `speech-layout.tsv`) pin its front end,
 //!   which the Sinhala model was trained on and so must not drift.
-//! - [`sherpa`] runs the catalog's other models (Moonshine, Parakeet, Whisper and more) through
+//! - [`sherpa`] runs the catalog's other models (Parakeet and Cohere Transcribe) through
 //!   sherpa-onnx, on the CPU.
+//! - [`catalog`] mirrors SpeechModelCatalog.swift: the models the app offers to download, read
+//!   from the catalog the Mac app has too, and the check of a model's files before it opens.
+//! - [`speech_to_text`] opens a model with whichever of the two runs it.
 //!
 //! Transcripts are never logged: log lines carry counts only.
 
+pub mod catalog;
 pub mod output_limit;
 pub mod qwen3_asr;
 pub mod sherpa;
+pub mod speech_to_text;
