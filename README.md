@@ -237,7 +237,7 @@ Packages/LiveTranscribeKit/   all feature code, as vertical slices
     Shared/          value types, AppSettings, logging, deadline, edit distance, atomic file writes
     Capture/         AVCaptureSession microphone capture → 16 kHz mono; microphone list and choice
     Segmentation/    Silero VAD + segmentation state machine (pre-roll, hysteresis, max length)
-    Transcription/   Qwen3-ASR via mlx-audio-swift
+    Transcription/   Qwen3-ASR via mlx-audio-swift; the speech models it can run, by kind
     Cleanup/         Qwen3 via mlx-swift-lm, prompt, OutputGuard fallbacks, fine-tuned adapter
     Persistence/     JSONL session files and dictation history
     Session/         SessionCoordinator (lifecycle) + SessionPipeline (3 concurrent stages)
@@ -287,7 +287,12 @@ this repository.
 
 Other models can be tried in **Settings › Advanced** (a Hugging Face repository ID for each role;
 it is downloaded on the next launch). They must be models mlx-audio-swift or mlx-swift-lm can
-load, and the self-correction adapter is used only with mlx-community/Qwen3-1.7B-4bit.
+load, and the self-correction adapter is used only with mlx-community/Qwen3-1.7B-4bit. The
+speech-to-text model can also be a folder on your Mac with the files such a repository has
+(config.json and the .safetensors weights), such as a fine-tune you haven't uploaded: enter its
+path. The app finds the kind of model (Qwen3-ASR, Parakeet, Whisper and the rest of
+mlx-audio-swift's) from its config.json, listed in
+[`SpeechModelKind.swift`](Packages/LiveTranscribeKit/Sources/Transcription/SpeechModelKind.swift).
 
 Built with [mlx-swift](https://github.com/ml-explore/mlx-swift),
 [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm),

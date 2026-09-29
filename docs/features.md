@@ -162,9 +162,9 @@
   a day, if you let it, without interrupting what you're doing. Updates are signed and checked
   before they install.
 - **Bring your own models.** Point **Settings › Advanced** at another Hugging Face
-  speech-to-text, cleanup or voice-activity model that the MLX libraries can load. Or turn the
-  language model off, and dictation still removes fillers and lays out spoken lists and letters
-  at Medium and High.
+  speech-to-text, cleanup or voice-activity model that the MLX libraries can load, or at a
+  speech-to-text model in a folder on your Mac. Or turn the language model off, and dictation
+  still removes fillers and lays out spoken lists and letters at Medium and High.
 
 ## Coming next
 
