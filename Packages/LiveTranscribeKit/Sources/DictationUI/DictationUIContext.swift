@@ -5,13 +5,14 @@ import Permissions
 import Persistence
 import Shared
 import Snippets
+import Transcription
 import TranscriptUI
 import Updates
 import Vocabulary
 
 /// The Settings tabs, in display order.
 public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
-    case general, snippets, vocabulary, apps, history, permissions, advanced
+    case general, snippets, vocabulary, apps, history, permissions, models, advanced
 
     public var id: String { rawValue }
 
@@ -23,6 +24,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .apps: "Apps"
         case .history: "History"
         case .permissions: "Permissions"
+        case .models: "Models"
         case .advanced: "Advanced"
         }
     }
@@ -35,6 +37,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .apps: "app.badge"
         case .history: "clock.arrow.circlepath"
         case .permissions: "lock.shield"
+        case .models: "waveform"
         case .advanced: "slider.horizontal.3"
         }
     }
@@ -68,9 +71,12 @@ public final class DictationUIContext {
     public let history: any DictationHistory
     public let microphonePermission: any MicrophonePermissionProviding
     public let accessibility: any AccessibilityPermissionProviding
-    /// The settings as read at launch. The models and the rest of Settings › Advanced keep
-    /// these values until Live Transcribe restarts (dictation settings are read at each use), so
-    /// Settings can tell what is in effect from a change still waiting for a restart.
+    /// The speech models to download and choose from, for Settings › Models.
+    public let speechModels: SpeechModelLibrary
+    /// The settings as read at launch. The cleanup and voice activity models and the rest of
+    /// Settings › Advanced keep these values until Live Transcribe restarts (dictation settings are
+    /// read at each use, and the speech model loads when it's chosen), so Settings can tell what
+    /// is in effect from a change still waiting for a restart.
     public let settingsAtLaunch: AppSettings
     /// New releases, in a release build; `nil` in a build from source, which never updates.
     public let updates: (any SoftwareUpdating)?
@@ -86,6 +92,7 @@ public final class DictationUIContext {
         history: any DictationHistory,
         microphonePermission: any MicrophonePermissionProviding,
         accessibility: any AccessibilityPermissionProviding,
+        speechModels: SpeechModelLibrary,
         settingsAtLaunch: AppSettings,
         updates: (any SoftwareUpdating)? = nil
     ) {
@@ -98,6 +105,7 @@ public final class DictationUIContext {
         self.history = history
         self.microphonePermission = microphonePermission
         self.accessibility = accessibility
+        self.speechModels = speechModels
         self.settingsAtLaunch = settingsAtLaunch
         self.updates = updates
     }

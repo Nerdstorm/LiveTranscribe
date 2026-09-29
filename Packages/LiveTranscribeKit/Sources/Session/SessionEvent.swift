@@ -33,6 +33,9 @@ public enum CleanupAvailability: Sendable, Equatable {
 public enum SessionEvent: Sendable, Equatable {
     case phase(SessionPhase)
     case modelProgress(ModelLoadProgress)
+    /// The speech model loaded, by the Speech-to-text setting it came from; `nil` when none is,
+    /// because the last one failed to load.
+    case speechModel(String?)
     case cleanupAvailability(CleanupAvailability)
     case sessionStarted(sessionID: UUID, transcriptFile: URL?)
     /// Live text for a segment still being spoken. Never cleaned.

@@ -49,7 +49,7 @@ It builds the `Bench` tool and runs it. Give it options with `ARGS`, for example
   meaningless.
 - `--stt-model <repo or folder>`: measure another speech-to-text model instead of the default,
   such as `mlx-community/parakeet-tdt-0.6b-v3` or a model folder on this Mac, to compare models
-  on the same clips.
+  on the same clips. A model in the catalog is downloaded at its pinned commit.
 
 The bench prints the word error rate (WER) of the raw and cleaned text, p50 and p95 latency per
 stage, and four checks:

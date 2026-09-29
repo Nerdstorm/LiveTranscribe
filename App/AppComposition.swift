@@ -32,6 +32,11 @@ final class AppComposition {
     private var captureNotices = CaptureNoticeFilter()
     private var settingsObserver: NSObjectProtocol?
     private var pendingSettings: Task<Void, Never>?
+    /// The Speech-to-text setting last handed to the session, which loads it in place of the
+    /// speech model in use.
+    private var speechModel: String
+    /// Hands each newly chosen speech model to the session, in the order they were chosen.
+    private var speechModelChange: Task<Void, Never>?
     private var deviceTask: Task<Void, Never>?
 
     init() {
@@ -40,6 +45,7 @@ final class AppComposition {
         store.migrate()
         self.store = store
         let settings = store.load()
+        speechModel = settings.sttModel
         MLXRuntime.configure(gpuCacheLimitMB: settings.gpuCacheLimitMB)
 
         let applicationSupport = Self.applicationSupport()
@@ -145,6 +151,7 @@ final class AppComposition {
             history: history,
             microphonePermission: microphonePermission,
             accessibility: accessibility,
+            speechModels: SpeechModelLibrary(),
             settingsAtLaunch: settings,
             updates: Self.makeUpdater()
         )
@@ -211,6 +218,21 @@ final class AppComposition {
             try? await Task.sleep(for: .milliseconds(delay))
             guard !Task.isCancelled else { return }
             self?.dictation.applySettings()
+            self?.applySpeechModel()
+        }
+    }
+
+    /// A speech model chosen in Settings loads in place of the one in use, once nothing uses it
+    /// (``SessionCoordinator/useSpeechModel(_:)``). The other models load only at launch.
+    private func applySpeechModel() {
+        let chosen = store.load().sttModel
+        guard chosen != speechModel else { return }
+        speechModel = chosen
+        let previous = speechModelChange
+        let coordinator = self.coordinator
+        speechModelChange = Task {
+            await previous?.value
+            await coordinator.useSpeechModel(chosen)
         }
     }
 
@@ -219,6 +241,7 @@ final class AppComposition {
             NotificationCenter.default.removeObserver(settingsObserver)
         }
         pendingSettings?.cancel()
+        speechModelChange?.cancel()
         deviceTask?.cancel()
         dictation.stop()
         await coordinator.shutdown()

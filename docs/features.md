@@ -161,10 +161,14 @@
 - **Keeps itself up to date.** A downloaded release checks GitHub for a new version about once
   a day, if you let it, without interrupting what you're doing. Updates are signed and checked
   before they install.
-- **Bring your own models.** Point **Settings › Advanced** at another Hugging Face
-  speech-to-text, cleanup or voice-activity model that the MLX libraries can load, or at a
-  speech-to-text model in a folder on your Mac. Or turn the language model off, and dictation
-  still removes fillers and lays out spoken lists and letters at Medium and High.
+- **Pick your speech model.** **Settings › Models** lists speech-to-text models worth trying,
+  from the most accurate (Qwen3-ASR 1.7B) to the fastest (Parakeet), with their languages, sizes
+  and licences. Download one and switch to it without a restart, and remove what you no longer
+  use.
+- **Bring your own models.** Settings also takes any other Hugging Face speech-to-text model that
+  mlx-audio-swift can load, or one in a folder on your Mac, and in **Advanced**, another cleanup
+  or voice-activity model. Or turn the language model off, and dictation still removes fillers
+  and lays out spoken lists and letters at Medium and High.
 
 ## Coming next
 

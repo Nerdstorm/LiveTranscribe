@@ -54,12 +54,12 @@ struct AppSettingsTests {
     }
 
     /// Settings › Advanced resets only what it shows; the dictation settings, both shortcuts, the
-    /// cleanup level and history are set on other tabs and must survive its Restore Defaults.
+    /// cleanup level, the speech model and history are set on other tabs and must survive its
+    /// Restore Defaults.
     @Test func restoringTheAdvancedTabResetsOnlyItsOwnSettings() {
         let (store, suite) = makeStore()
         defer { UserDefaults().removePersistentDomain(forName: suite) }
         var advanced = AppSettings.defaults
-        advanced.sttModel = "example/stt"
         advanced.llmModel = "example/llm"
         advanced.vadModel = "example/vad"
         advanced.cleanupEnabled = false
@@ -79,6 +79,7 @@ struct AppSettingsTests {
         advanced.captureMaxRestartsPerMinute = 12
         var elsewhere = AppSettings.defaults
         elsewhere.cleanupLevel = .high
+        elsewhere.sttModel = "example/stt"
         elsewhere.dictation.enabled = false
         elsewhere.dictation.hotkey = "modifier:rightOption"
         elsewhere.dictation.undoHotkey = "combo:7:control,option"
@@ -90,6 +91,7 @@ struct AppSettingsTests {
         elsewhere.dictation.historyPruneIntervalMinutes = 15
         var both = advanced
         both.cleanupLevel = elsewhere.cleanupLevel
+        both.sttModel = elsewhere.sttModel
         both.dictation = elsewhere.dictation
         store.save(both)
         store.setInputDeviceUID("00-11-22:input")
@@ -116,12 +118,12 @@ struct AppSettingsTests {
     }
 
     /// Settings › Advanced shows every top-level ``AppSettings`` value but the cleanup level
-    /// (chosen in General and the menu); the dictation settings live on other tabs. A new
-    /// top-level setting fails this until it is added to the tab and its key set, or excluded
-    /// here on purpose.
-    @Test func theAdvancedTabIsEveryTopLevelSettingButTheCleanupLevel() {
+    /// (chosen in General and the menu) and the speech model (chosen in Models); the dictation
+    /// settings live on other tabs. A new top-level setting fails this until it is added to the
+    /// tab and its key set, or excluded here on purpose.
+    @Test func theAdvancedTabIsEveryTopLevelSettingButTheCleanupLevelAndTheSpeechModel() {
         let topLevel = Set(Mirror(reflecting: AppSettings.defaults).children.compactMap(\.label))
-        #expect(Set(AppSettingsKey.advancedTab.map(\.rawValue)) == topLevel.subtracting(["cleanupLevel", "dictation"]))
+        #expect(Set(AppSettingsKey.advancedTab.map(\.rawValue)) == topLevel.subtracting(["cleanupLevel", "sttModel", "dictation"]))
     }
 
     @Test func sanitizedClampsOutOfRangeValues() {

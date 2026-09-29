@@ -3,7 +3,12 @@ import Shared
 
 /// Speech-to-text over one segment of 16 kHz mono audio.
 public protocol Transcriber: Actor {
+    /// Loads the model, unless it's loaded already.
     func load(progress: @escaping ModelLoadProgressHandler) async throws
+    /// Loads the model the Speech-to-text setting `modelID` names in place of the one loaded now.
+    /// If it fails to load, no model is loaded; ``load(progress:)`` tries it again.
+    func switchModel(to modelID: String, progress: @escaping ModelLoadProgressHandler) async throws
+    /// Waits while a model is being replaced.
     func transcribe(_ samples: [Float], sampleRate: Int) async throws -> String
 }
 

@@ -142,7 +142,7 @@ of the open-source packages the app is built with.
 
 ## Settings
 
-**Settings** (⌘, or the menu bar) has seven tabs, along the top of its window:
+**Settings** (⌘, or the menu bar) has eight tabs, along the top of its window:
 
 | Tab | What it holds |
 |---|---|
@@ -152,9 +152,12 @@ of the open-source packages the app is built with.
 | **Apps** | per app, how text goes in (Accessibility or paste) and whether it takes line breaks |
 | **History** | dictation history on or off, retention, clearing |
 | **Permissions** | microphone and Accessibility status, with buttons that open the right System Settings pane, and **Reopen Live Transcribe** when macOS won't let it paste until it reopens |
-| **Advanced** | for dictation and the live transcript: the speech-to-text and cleanup models, **Clean up transcripts with the LLM**, **Resolve spoken self-corrections**, the cleanup **Timeout**, the GPU cache and capture restarts; for the live transcript only: the voice-activity model, silence, speech threshold, pre-roll and minimum speech, maximum segment length, live partials, context segments and queue capacity |
+| **Models** | the speech-to-text model: models to download, switch to and remove, each with its languages, size and licence, and **Another model**, for any Hugging Face repository or a model folder on your Mac |
+| **Advanced** | for dictation and the live transcript: the cleanup model, **Clean up transcripts with the LLM**, **Resolve spoken self-corrections**, the cleanup **Timeout**, the GPU cache and capture restarts; for the live transcript only: the voice-activity model, silence, speech threshold, pre-roll and minimum speech, maximum segment length, live partials, context segments and queue capacity |
 
-Settings on every tab but **Advanced** apply immediately, to the next dictation. **Settings on
-the Advanced tab apply the next time the app starts.** Its **Restore Defaults** resets only that
+Settings on every tab but **Advanced** apply immediately, to the next dictation. A speech model
+chosen in **Models** loads straight away; dictation waits the few seconds it takes, and a live
+transcript keeps the model it started with until you stop it. **Settings on the Advanced tab
+apply the next time the app starts.** Its **Restore Defaults** resets only that
 tab: dictation settings, shortcuts, cleanup level, history and microphone stay as they are. A
 model you haven't changed follows the default, including a new default in a later version.

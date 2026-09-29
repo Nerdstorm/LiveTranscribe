@@ -92,12 +92,26 @@ struct SpeechModelKind: Sendable {
         throw .unsupportedModel(name: name, modelType: nil)
     }
 
-    /// Whether the folder has a .safetensors file with something in it, as mlx-audio-swift requires
-    /// of a downloaded model.
+    /// Whether the folder has its weights: every file that model.safetensors.index.json lists, or
+    /// without an index, a .safetensors file, each with something in it, as mlx-audio-swift
+    /// requires of a downloaded model.
+    ///
+    /// Files in a Hugging Face snapshot are links to the cache's blobs, so a link is measured by
+    /// what it points to, and a link to a blob that isn't there counts as missing.
     private static func hasWeights(_ folder: URL) -> Bool {
-        let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.fileSizeKey])) ?? []
-        return files.contains { file in
-            file.pathExtension == "safetensors" && ((try? file.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0) > 0
+        if let data = try? Data(contentsOf: folder.appendingPathComponent("model.safetensors.index.json")) {
+            guard let index = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  let weightMap = index["weight_map"] as? [String: String], !weightMap.isEmpty
+            else { return false }
+            return Set(weightMap.values).allSatisfy { hasContent(folder.appendingPathComponent($0)) }
         }
+        let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+        return files.contains { $0.pathExtension == "safetensors" && hasContent($0) }
+    }
+
+    /// stat(2) follows links, and fails for a link to nothing.
+    private static func hasContent(_ file: URL) -> Bool {
+        var info = stat()
+        return stat(file.path, &info) == 0 && info.st_size > 0
     }
 }

@@ -20,6 +20,7 @@ struct SettingsPane: View {
         case .apps: AppOverridesSettingsView(context: context)
         case .history: HistorySettingsView(context: context)
         case .permissions: PermissionsSettingsView(context: context)
+        case .models: SpeechModelsSettingsView(context: context)
         case .advanced: SettingsView()
         }
     }
@@ -50,7 +51,7 @@ private extension SettingsTab {
     var showsList: Bool {
         switch self {
         case .snippets, .vocabulary, .apps: true
-        case .general, .history, .permissions, .advanced: false
+        case .general, .history, .permissions, .models, .advanced: false
         }
     }
 }
