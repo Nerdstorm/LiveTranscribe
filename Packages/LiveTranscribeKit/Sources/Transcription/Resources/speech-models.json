@@ -13,6 +13,46 @@
         "revision": "047217cb611ad5f51cb2284e4a3617a5eaa9b688",
         "bytes": 1015528575,
         "kind": "qwen3_asr"
+      },
+      "linux": {
+        "engine": "openvino",
+        "repository": "Nerdstorm/Qwen3-ASR-0.6B-Sinhala-OpenVINO",
+        "revision": "8298d9b2d532965800b2c0c64b81965ededb03a3",
+        "files": [
+          {"name": "audio-conv.bin", "bytes": 24756552, "sha256": "c2d7685599c5aac77254a235a40e9d700c791ed60f2f4aa3b6065d024edd8571"},
+          {"name": "audio-conv.xml", "bytes": 20822, "sha256": "e7bb6cabc32771250112a6b10cc15859284425f71334e190c7c1f6b8af1b2710"},
+          {"name": "audio-encoder.bin", "bytes": 350684002, "sha256": "b46d7aaf22574ec88eca688fbfc042359440841ea7dc87e27f4cb91faf0abcf0"},
+          {"name": "audio-encoder.xml", "bytes": 686210, "sha256": "e388b2506792ff28a4519227a0f6a2165f406eef15c3c4a6cf6ec6e5e63b1bcc"},
+          {"name": "config.json", "bytes": 7206, "sha256": "4d1d1418760461ac810d0abff04e7181c98dc1639b446dc501b33f8473e748b7"},
+          {"name": "merges.txt", "bytes": 1671853, "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"},
+          {"name": "text-embeddings.bin", "bytes": 155886340, "sha256": "452fa0052ce24db7c73c198ed96c05a6c24aaea46aa6f91cb5a28123f4fe460b"},
+          {"name": "text-embeddings.xml", "bytes": 5695, "sha256": "259ea5813bd03e4b0828049c5f259a4f80d4f9111335974b5cf0287ad3460ec1"},
+          {"name": "text.bin", "bytes": 597239024, "sha256": "dad4bfca2c4a9410aeb4b8c7687277df2babcc684ccc7f8b2b75f4221505ee49"},
+          {"name": "text.xml", "bytes": 2568513, "sha256": "f318dac79d95c755704d8951f126b704b8079e1d1f156ed79fba2b4fe41b7ba5"},
+          {"name": "tokenizer_config.json", "bytes": 12487, "sha256": "4942d005604266809309cabc9f4e9cb89ce855d59b14681fdc0e1cc62ea26c4c"},
+          {"name": "vocab.json", "bytes": 2776833, "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"},
+          {"name": "manifest.json", "bytes": 526, "sha256": "23a02176b5fec5b60aeab88778431a5b1bede5f1d19d856486f939543b26639d"}
+        ]
+      },
+      "windows": {
+        "engine": "openvino",
+        "repository": "Nerdstorm/Qwen3-ASR-0.6B-Sinhala-OpenVINO",
+        "revision": "8298d9b2d532965800b2c0c64b81965ededb03a3",
+        "files": [
+          {"name": "audio-conv.bin", "bytes": 24756552, "sha256": "c2d7685599c5aac77254a235a40e9d700c791ed60f2f4aa3b6065d024edd8571"},
+          {"name": "audio-conv.xml", "bytes": 20822, "sha256": "e7bb6cabc32771250112a6b10cc15859284425f71334e190c7c1f6b8af1b2710"},
+          {"name": "audio-encoder.bin", "bytes": 350684002, "sha256": "b46d7aaf22574ec88eca688fbfc042359440841ea7dc87e27f4cb91faf0abcf0"},
+          {"name": "audio-encoder.xml", "bytes": 686210, "sha256": "e388b2506792ff28a4519227a0f6a2165f406eef15c3c4a6cf6ec6e5e63b1bcc"},
+          {"name": "config.json", "bytes": 7206, "sha256": "4d1d1418760461ac810d0abff04e7181c98dc1639b446dc501b33f8473e748b7"},
+          {"name": "merges.txt", "bytes": 1671853, "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"},
+          {"name": "text-embeddings.bin", "bytes": 155886340, "sha256": "452fa0052ce24db7c73c198ed96c05a6c24aaea46aa6f91cb5a28123f4fe460b"},
+          {"name": "text-embeddings.xml", "bytes": 5695, "sha256": "259ea5813bd03e4b0828049c5f259a4f80d4f9111335974b5cf0287ad3460ec1"},
+          {"name": "text.bin", "bytes": 597239024, "sha256": "dad4bfca2c4a9410aeb4b8c7687277df2babcc684ccc7f8b2b75f4221505ee49"},
+          {"name": "text.xml", "bytes": 2568513, "sha256": "f318dac79d95c755704d8951f126b704b8079e1d1f156ed79fba2b4fe41b7ba5"},
+          {"name": "tokenizer_config.json", "bytes": 12487, "sha256": "4942d005604266809309cabc9f4e9cb89ce855d59b14681fdc0e1cc62ea26c4c"},
+          {"name": "vocab.json", "bytes": 2776833, "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"},
+          {"name": "manifest.json", "bytes": 526, "sha256": "23a02176b5fec5b60aeab88778431a5b1bede5f1d19d856486f939543b26639d"}
+        ]
       }
     },
     {
@@ -55,6 +95,38 @@
         "revision": "8ae155301e23d820d82aa60d24817c900e69e487",
         "bytes": 2471862935,
         "kind": "parakeet"
+      },
+      "linux": {
+        "engine": "sherpa-onnx",
+        "family": "nemo-transducer",
+        "archive": {
+          "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8.tar.bz2",
+          "bytes": 482468385,
+          "sha256": "157c157bc51155e03e37d2466522a3a737dd9c72bb25f36eb18912964161e1ad"
+        },
+        "files": [
+          {"name": "encoder.int8.onnx", "bytes": 652184296, "sha256": "a32b12d17bbbc309d0686fbbcc2987b5e9b8333a7da83fa6b089f0a2acd651ab", "role": "encoder"},
+          {"name": "decoder.int8.onnx", "bytes": 7257753, "sha256": "b6bb64963457237b900e496ee9994b59294526439fbcc1fecf705b31a15c6b4e", "role": "decoder"},
+          {"name": "joiner.int8.onnx", "bytes": 1739080, "sha256": "7946164367946e7f9f29a122407c3252b680dbae9a51343eb2488d057c3c43d2", "role": "joiner"},
+          {"name": "tokens.txt", "bytes": 9384, "sha256": "ec182b70dd42113aff6c5372c75cac58c952443eb22322f57bbd7f53977d497d", "role": "tokens"}
+        ],
+        "credit": "Parakeet TDT 0.6B v2 by NVIDIA, quantised to 8 bits for ONNX by the sherpa-onnx project (k2-fsa)"
+      },
+      "windows": {
+        "engine": "sherpa-onnx",
+        "family": "nemo-transducer",
+        "archive": {
+          "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8.tar.bz2",
+          "bytes": 482468385,
+          "sha256": "157c157bc51155e03e37d2466522a3a737dd9c72bb25f36eb18912964161e1ad"
+        },
+        "files": [
+          {"name": "encoder.int8.onnx", "bytes": 652184296, "sha256": "a32b12d17bbbc309d0686fbbcc2987b5e9b8333a7da83fa6b089f0a2acd651ab", "role": "encoder"},
+          {"name": "decoder.int8.onnx", "bytes": 7257753, "sha256": "b6bb64963457237b900e496ee9994b59294526439fbcc1fecf705b31a15c6b4e", "role": "decoder"},
+          {"name": "joiner.int8.onnx", "bytes": 1739080, "sha256": "7946164367946e7f9f29a122407c3252b680dbae9a51343eb2488d057c3c43d2", "role": "joiner"},
+          {"name": "tokens.txt", "bytes": 9384, "sha256": "ec182b70dd42113aff6c5372c75cac58c952443eb22322f57bbd7f53977d497d", "role": "tokens"}
+        ],
+        "credit": "Parakeet TDT 0.6B v2 by NVIDIA, quantised to 8 bits for ONNX by the sherpa-onnx project (k2-fsa)"
       }
     },
     {
@@ -69,6 +141,38 @@
         "revision": "ed2b7e8c15f9aaa0b5772e2efb986255eaef7e15",
         "bytes": 2509041541,
         "kind": "parakeet"
+      },
+      "linux": {
+        "engine": "sherpa-onnx",
+        "family": "nemo-transducer",
+        "archive": {
+          "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+          "bytes": 487170055,
+          "sha256": "5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf"
+        },
+        "files": [
+          {"name": "encoder.int8.onnx", "bytes": 652184281, "sha256": "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247", "role": "encoder"},
+          {"name": "decoder.int8.onnx", "bytes": 11845275, "sha256": "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e", "role": "decoder"},
+          {"name": "joiner.int8.onnx", "bytes": 6355277, "sha256": "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3", "role": "joiner"},
+          {"name": "tokens.txt", "bytes": 93939, "sha256": "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d", "role": "tokens"}
+        ],
+        "credit": "Parakeet TDT 0.6B v3 by NVIDIA, quantised to 8 bits for ONNX by the sherpa-onnx project (k2-fsa)"
+      },
+      "windows": {
+        "engine": "sherpa-onnx",
+        "family": "nemo-transducer",
+        "archive": {
+          "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+          "bytes": 487170055,
+          "sha256": "5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf"
+        },
+        "files": [
+          {"name": "encoder.int8.onnx", "bytes": 652184281, "sha256": "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247", "role": "encoder"},
+          {"name": "decoder.int8.onnx", "bytes": 11845275, "sha256": "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e", "role": "decoder"},
+          {"name": "joiner.int8.onnx", "bytes": 6355277, "sha256": "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3", "role": "joiner"},
+          {"name": "tokens.txt", "bytes": 93939, "sha256": "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d", "role": "tokens"}
+        ],
+        "credit": "Parakeet TDT 0.6B v3 by NVIDIA, quantised to 8 bits for ONNX by the sherpa-onnx project (k2-fsa)"
       }
     },
     {
@@ -97,6 +201,38 @@
         "revision": "d1f843476f84846e6fe7aa58a6033f17882f0ec9",
         "bytes": 2418766535,
         "kind": "cohere_asr"
+      },
+      "linux": {
+        "engine": "sherpa-onnx",
+        "family": "cohere-transcribe",
+        "archive": {
+          "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-cohere-transcribe-14-lang-int8-2026-04-01.tar.bz2",
+          "bytes": 1699791751,
+          "sha256": "bd582588d50685a795dcd2807ab77e11361b8312d96c53884682def45ab4206d"
+        },
+        "files": [
+          {"name": "encoder.int8.onnx", "bytes": 3090822, "sha256": "cf704f8cfa90e3f0a76f9ffc05998bdf00ba9ae983192c14a85a3a5eb008b367", "role": "encoder"},
+          {"name": "encoder.int8.onnx.data", "bytes": 2731503072, "sha256": "bcf1b7148c8518ae52df1ad2d2fc2b4e89261ea23e6c874eef1d9f55bcbaa4a3"},
+          {"name": "decoder.int8.onnx", "bytes": 153250705, "sha256": "8372ca6c8ff4db8b916ca3592f5c757a715e691b9edec751ba19b29fc854baf9", "role": "decoder"},
+          {"name": "tokens.txt", "bytes": 207437, "sha256": "013ede043ae2480e3a9205cc34550d9686100cc682bacc90f702facdfbb93035", "role": "tokens"}
+        ],
+        "credit": "Cohere Transcribe by Cohere Labs, quantised to 8 bits for ONNX by the sherpa-onnx project (k2-fsa)"
+      },
+      "windows": {
+        "engine": "sherpa-onnx",
+        "family": "cohere-transcribe",
+        "archive": {
+          "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-cohere-transcribe-14-lang-int8-2026-04-01.tar.bz2",
+          "bytes": 1699791751,
+          "sha256": "bd582588d50685a795dcd2807ab77e11361b8312d96c53884682def45ab4206d"
+        },
+        "files": [
+          {"name": "encoder.int8.onnx", "bytes": 3090822, "sha256": "cf704f8cfa90e3f0a76f9ffc05998bdf00ba9ae983192c14a85a3a5eb008b367", "role": "encoder"},
+          {"name": "encoder.int8.onnx.data", "bytes": 2731503072, "sha256": "bcf1b7148c8518ae52df1ad2d2fc2b4e89261ea23e6c874eef1d9f55bcbaa4a3"},
+          {"name": "decoder.int8.onnx", "bytes": 153250705, "sha256": "8372ca6c8ff4db8b916ca3592f5c757a715e691b9edec751ba19b29fc854baf9", "role": "decoder"},
+          {"name": "tokens.txt", "bytes": 207437, "sha256": "013ede043ae2480e3a9205cc34550d9686100cc682bacc90f702facdfbb93035", "role": "tokens"}
+        ],
+        "credit": "Cohere Transcribe by Cohere Labs, quantised to 8 bits for ONNX by the sherpa-onnx project (k2-fsa)"
       }
     }
   ]
