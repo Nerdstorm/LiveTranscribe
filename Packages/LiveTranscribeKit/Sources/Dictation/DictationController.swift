@@ -1,4 +1,3 @@
-import CoreGraphics
 import Foundation
 import Hotkey
 import Insertion
@@ -40,17 +39,13 @@ public final class DictationController {
     /// Settings. At the end of a dictation several can follow one another, each for that time.
     public private(set) var notice: DictationNotice?
     /// A message about the dictation in progress, such as a change of microphone, which the HUD
-    /// shows under *Listening* or *Transcribing…* for the notice time. It is shown again as
-    /// ``notice`` once the dictation ends, after the dictation's own notices: that is when
-    /// VoiceOver can announce it without being dictated, and when a user looking at their text
-    /// rather than the HUD sees it.
+    /// shows beside its circle for the notice time while recording or transcribing. It is shown
+    /// again as ``notice`` once the dictation ends, after the dictation's own notices: that is
+    /// when VoiceOver can announce it without being dictated, and when a user looking at their
+    /// text rather than the HUD sees it.
     public private(set) var progressNotice: DictationNotice?
     /// Microphone level while recording, 0...1.
     public private(set) var inputLevel: Float = 0
-    /// The caret in the field the HUD is about (the one being dictated into, or undone in), for
-    /// placing it. `nil` when unknown or when no field is concerned: from the start of each
-    /// attempt until its field has been read, and for a notice between dictations.
-    public private(set) var caretRect: CGRect?
     /// The last dictated text, for the menu's *Copy Last Dictation*.
     public private(set) var lastText: String?
 
@@ -200,7 +195,6 @@ public final class DictationController {
         case .idle:
             guard !hotkeysSuspended else {
                 // A shortcut is being recorded in Settings; a dictation now would type into it.
-                setCaret(nil)
                 return show(.recordingShortcut)
             }
             gesture.reset()
@@ -231,14 +225,13 @@ public final class DictationController {
     }
 
     /// Shows a microphone change reported by capture, such as a fallback to the system default.
-    /// Between dictations it concerns no field, so it is not placed at the last one's caret.
     ///
     /// It is always shown, so the caller can count it as seen: between dictations at once, and
-    /// during one under *Listening* and again once the dictation ends (see ``progressNotice``).
+    /// during one beside the HUD's circle and again once the dictation ends (see
+    /// ``progressNotice``).
     public func showMicrophoneNotice(_ message: String) {
         let notice = DictationNotice.microphone(message)
         guard phase == .idle else { return showProgress(notice) }
-        setCaret(nil)
         show(notice)
     }
 
@@ -327,7 +320,6 @@ public final class DictationController {
         }
     }
 
-    func setCaret(_ rect: CGRect?) { caretRect = rect }
     func setLastText(_ text: String) { lastText = text }
 
     func elapsedMs() -> Int {

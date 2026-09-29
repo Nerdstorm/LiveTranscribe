@@ -24,6 +24,7 @@ recognition: 31 languages as of 0.3.0, with cleanup still written for English (D
 | L2 | List items keep the speaker's words: layout moves and punctuates, never rewords. | Owner |
 | L4 | Line breaks (lists, letters, list markers, "new line") are decided per app: every app is multi-line unless the user, or the built-in list (terminals), sets it single-line. In a multi-line app a field that is certainly single-line stays single-line: a text field or combo box of the app's own interface, never one in a web page. This replaced laying out only in fields that report `AXTextArea`, which missed chat apps' message boxes such as Slack's. | Owner |
 | L3 | At High, a dictation with a correction cue is cleaned in two passes: Medium's prompt, which the adapter was trained on, resolves the correction, then High's rewords the result within the same deadline. A rejected rewording keeps the first pass, which is not a fallback. D5 stands. | Owner |
+| U1 | The HUD is a small circle that follows the mouse pointer (*The HUD*, below). It used to sit at the text caret, whose position, read through Accessibility, was unreliable and put it in seemingly random places. Ordinary dictation is wordless; only a notice that needs attention is put in words, in a bubble beside the circle (ledger LiveTranscribe-0180). | Owner |
 
 ### Assumptions made without the owner (review these)
 
@@ -111,7 +112,7 @@ recognition: 31 languages as of 0.3.0, with cleanup still written for English (D
 - **One dictation at a time.** Pressing the shortcut while the last dictation is still being
   transcribed or inserted records nothing, rather than opening the microphone late and losing the
   first words. The HUD says *Press again to dictate: the last dictation was still being inserted*
-  under *Transcribing…* and again once that dictation is in, so the message is seen however
+  beside its spinner and again once that dictation is in, so the message is seen however
   quickly it finishes; it is worded to be true at both times.
 - **A dictation started from the menu** is hands-free: the shortcut stops it and Esc cancels it.
 - **Undo AI edit** works only between dictations, never during one.
@@ -137,15 +138,15 @@ recognition: 31 languages as of 0.3.0, with cleanup still written for English (D
   microphone on every press. A chosen microphone that reconnects is switched back to
   automatically. When the macOS default input is a virtual device, a physical microphone is used
   unless none is connected.
-- **Notices about the dictation in progress show under *Listening*.** With the microphone
-  opening on key-down, capture reports a fallback while the dictation is already recording. The
-  notice takes the hint's line (*Listening* / *Transcribing…*) for `dictationNoticeSeconds`, then
-  the hint comes back, and it is shown again once the dictation ends. That second showing is when
-  VoiceOver announces it (nothing is announced while the microphone is open, or it would be
-  dictated) and when someone watching their text rather than the HUD sees it. Only the latest
-  microphone notice of a dictation is repeated: an earlier one no longer describes the
-  microphone in use. Every notice capture reports is therefore shown, so counting it as shown
-  when it arrives (`CaptureNoticeFilter`) is correct.
+- **Notices about the dictation in progress show during it.** With the microphone opening on
+  key-down, capture reports a fallback while the dictation is already recording. The notice shows
+  in the HUD's bubble for `dictationNoticeSeconds`, beside the level or the spinner, and again
+  once the dictation ends. That second showing is when VoiceOver announces it (nothing is
+  announced while the microphone is open, or it would be dictated) and when someone watching
+  their text rather than the HUD sees it. Only the latest microphone notice of a dictation is
+  repeated: an earlier one no longer describes the microphone in use. Every notice capture
+  reports is therefore shown, so counting it as shown when it arrives (`CaptureNoticeFilter`) is
+  correct.
 - **Notices at the end of a dictation follow one another** instead of the most recent hiding
   the rest, each for `dictationNoticeSeconds`: first where the text went, if it needs attention
   (on the clipboard, not inserted, a password field); then what the recording missed (the
@@ -159,10 +160,11 @@ recognition: 31 languages as of 0.3.0, with cleanup still written for English (D
   transcribe, the HUD says *The microphone stopped:* and the reason instead of *Didn't catch that*.
 - **Durations in messages are written out in English** ("30 s", "1 min 30 s"), not formatted for
   the locale, like every other message (D4).
-- **The HUD mentions Esc only when Esc works.** Esc is caught by the shortcut's keyboard tap, which
-  does not run when dictation is off in Settings, Accessibility is missing, or the tap failed. A
-  dictation started from the menu in those states shows *Finish from the menu bar · × to cancel*,
-  and the × button's tooltip says *Cancel* without *(esc)*.
+- **VoiceOver still announces what the HUD leaves unsaid.** The HUD shows no words for
+  *Cancelled* and *Restored what you said* (U1), but someone who can't see the circle go away or
+  the text change back needs to hear it, so every notice between dictations is announced, as
+  before. The circle's content is labelled for VoiceOver too (*Listening*, *Listening,
+  hands-free*, *Transcribing*).
 - **Settings apply after a short settle** (`settingsApplyDelayMs`, 300 ms), and the hotkey
   monitor restarts only when a shortcut changes, so editing other settings never interrupts a
   dictation. New timing takes effect once the current gesture ends.
@@ -287,10 +289,10 @@ Hotkey up ───▶ discard if < 300 ms
              ─▶ history (raw + cleaned), undo buffer
 ```
 
-Esc cancels at any point before insertion, while the shortcut's keyboard tap runs; the HUD's ×
-button and the menu always can. Nothing is inserted into secure (password) fields, including one
-focused while the dictation was processed, and nothing is recorded in history for a cancelled
-dictation.
+Esc cancels at any point before insertion, while the shortcut's keyboard tap runs; *Cancel
+Dictation* in the menu bar always can. Nothing is inserted into secure (password) fields,
+including one focused while the dictation was processed, and nothing is recorded in history for
+a cancelled dictation.
 
 ### Hotkey gestures
 
@@ -313,6 +315,31 @@ dictation.
 - While Settings records a new shortcut, the shortcuts are paused so every key reaches the
   recorder. A dictation being recorded then is dropped silently, and the menu's *Start
   Dictation* says to finish recording first. They resume however recording ends.
+
+### The HUD
+
+A small circle follows the mouse pointer while a dictation runs (U1): 40 points across, just
+below and to the right of the pointer (16 points right, 18 below), and on the pointer's display.
+Near the right edge of the display it moves to the pointer's left, and near the bottom above it,
+so it always stays next to the pointer (`HUDPlacement`). It checks where the pointer is 60 times
+a second, and never takes focus or clicks: they go to the app under it.
+
+- While recording, it holds a red disc that grows with the microphone level, on a log scale from
+  0.005 to 0.12, the thresholds of the five-bar meter it replaced. A hands-free recording adds a
+  ring inside the circle's edge, because it ends only when the shortcut is pressed again.
+- While transcribing, it holds three quarters of a ring, turning once a second.
+- Between dictations, a notice shows an orange warning in the circle for a problem, and an
+  information glyph otherwise.
+
+Words appear only in a bubble beside the circle, and only for a notice that needs attention
+(`DictationNotice.needsAttention`): every notice except *Cancelled* and *Restored what you
+said*, which show for themselves as the circle going away and the text changing back. Between
+dictations that is the controller's notice; during one, a progress notice such as a change of
+microphone. The bubble holds two lines of up to 260 points and goes on the circle's far side
+from the pointer.
+
+The HUD no longer needs to know where the caret is, so reading the focused field takes two
+Accessibility calls fewer, each a possible wait on a busy app.
 
 ### Insertion
 

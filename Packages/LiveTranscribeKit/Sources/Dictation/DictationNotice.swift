@@ -81,6 +81,17 @@ public enum DictationNotice: Sendable, Equatable {
         }
     }
 
+    /// Worth words on screen. The HUD shows only these: a cancel, or an undo that worked, is
+    /// visible without them, as the HUD going away or the text changing back.
+    public var needsAttention: Bool {
+        switch self {
+        case .cancelled, .undone:
+            false
+        default:
+            true
+        }
+    }
+
     /// A length in whole seconds as the HUD says it: "30 s", "1 min", "1 min 30 s".
     ///
     /// Written out rather than formatted for the locale, like every other message, since

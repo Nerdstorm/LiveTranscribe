@@ -47,9 +47,8 @@
   one ("milk" → "cream", "three" → "4") unless it is a name. Words that only hold a sentence
   together ("the", "of", "really") may still be dropped. Names are recognised by the capital
   letter speech-to-text gives them.
-- The floating panel sits next to the cursor, and a leading space is added, only in apps that
-  report their text through Accessibility. Elsewhere the panel appears near the bottom of the
-  screen and no space is added.
+- A leading space is added only in apps that report their text through Accessibility.
+  Elsewhere no space is added.
 - After a pasted dictation, **Undo AI Edit** can't tell whether you typed more in the same field;
   ⌘Z then undoes that typing first.
 - The microphone opens while the focused field is read, so in a password field the microphone

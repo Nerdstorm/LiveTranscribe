@@ -29,52 +29,21 @@ public struct InsertionTarget: Sendable {
     public let element: (any AccessibilityElement)?
     /// A password field, or secure event input is on (a password prompt somewhere has the keyboard).
     public let isSecure: Bool
-    /// Screen rectangle of the caret or selection, for placing the HUD near it; `nil` if unknown.
-    ///
-    /// In Accessibility (Quartz) global coordinates: the origin is the top-left corner of the
-    /// primary display and y grows downwards. AppKit window frames use a bottom-left origin, so
-    /// flip y against the primary screen's height before positioning a window with it.
-    public let caretRect: CGRect?
 
-    public init(
-        app: AppInfo?,
-        element: (any AccessibilityElement)?,
-        isSecure: Bool,
-        caretRect: CGRect?
-    ) {
+    public init(app: AppInfo?, element: (any AccessibilityElement)?, isSecure: Bool) {
         self.app = app
         self.element = element
         self.isSecure = isSecure
-        self.caretRect = caretRect
     }
 
-    /// Derives the flags and caret from the element itself.
+    /// Derives the flags from the element itself.
     ///
     /// Kept apart from ``SystemFocusedTargetProvider`` so the rules are tested with a fake element.
     /// - Parameter secureEventInputEnabled: `IsSecureEventInputEnabled()`: some app (a password
     ///   prompt, a terminal's secure keyboard entry) has asked that keystrokes not be observable.
     public init(app: AppInfo?, element: (any AccessibilityElement)?, secureEventInputEnabled: Bool) {
         let isSecureField = element?.subrole == kAXSecureTextFieldSubrole
-        let isSecure = secureEventInputEnabled || isSecureField
-        // No caret lookup for a secure field: nothing will be inserted there, and it saves a
-        // round trip to a possibly slow app.
-        let caretRect = isSecure ? nil : element.flatMap(Self.caretRect(of:))
-        self.init(
-            app: app,
-            element: element,
-            isSecure: isSecure,
-            caretRect: caretRect
-        )
-    }
-
-    /// The bounds of the selection, ignoring the empty or null rectangles some apps return
-    /// instead of an error.
-    private static func caretRect(of element: any AccessibilityElement) -> CGRect? {
-        guard let selection = element.range(kAXSelectedTextRangeAttribute),
-              let rect = element.bounds(for: selection),
-              !rect.isNull, rect != .zero
-        else { return nil }
-        return rect
+        self.init(app: app, element: element, isSecure: secureEventInputEnabled || isSecureField)
     }
 }
 

@@ -26,8 +26,6 @@ public protocol AccessibilityElement: Sendable {
     func setString(_ value: String, for attribute: String) -> Bool
     /// Sets a range attribute. `true` only means the app accepted the call, not that it acted on it.
     func setRange(_ range: NSRange, for attribute: String) -> Bool
-    /// Screen rectangle of the text in `range` (`kAXBoundsForRangeParameterizedAttribute`).
-    func bounds(for range: NSRange) -> CGRect?
     /// The text in `range` alone (`kAXStringForRangeParameterizedAttribute`), without copying the
     /// whole value; `nil` if the app does not provide it.
     func string(forRange range: NSRange) -> String?
@@ -95,16 +93,6 @@ public struct AXElement: AccessibilityElement, @unchecked Sendable {
         return report(error, setting: attribute)
     }
 
-    public func bounds(for range: NSRange) -> CGRect? {
-        guard let result = copyValue(kAXBoundsForRangeParameterizedAttribute, for: range),
-              CFGetTypeID(result) == AXValueGetTypeID()
-        else { return nil }
-        let axValue = unsafeDowncast(result, to: AXValue.self)
-        var rect = CGRect.zero
-        guard AXValueGetType(axValue) == .cgRect, AXValueGetValue(axValue, .cgRect, &rect) else { return nil }
-        return rect
-    }
-
     public func string(forRange range: NSRange) -> String? {
         copyValue(kAXStringForRangeParameterizedAttribute, for: range) as? String
     }
@@ -125,7 +113,7 @@ public struct AXElement: AccessibilityElement, @unchecked Sendable {
         return value
     }
 
-    /// A parameterized attribute that takes a range, such as the bounds or the text in it.
+    /// A parameterized attribute that takes a range, such as the text in it.
     private func copyValue(_ attribute: String, for range: NSRange) -> CFTypeRef? {
         var cfRange = CFRange(location: range.location, length: range.length)
         guard let parameter = AXValueCreate(.cfRange, &cfRange) else { return nil }

@@ -71,7 +71,7 @@ sentence, a sentence the speech model broke at a hesitation, and a spoken "comma
   punctuation and line breaks at any level. Every edit is checked against what you said, and
   ⌃⌥Z puts your own words back.
 - **Dictate from any app.** Hold **fn (🌐)** or a shortcut of your own, or double-tap it for
-  hands-free. A small panel by your cursor shows what is happening, and Esc cancels.
+  hands-free. A small circle by the mouse pointer shows what is happening, and Esc cancels.
 - **Make it yours.** Snippets insert saved text when you say their phrase, and vocabulary spells
   your names and jargon your way. Choose how much it edits: **None**, **Light**, **Medium** or
   **High**.

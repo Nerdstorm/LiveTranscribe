@@ -96,18 +96,15 @@ struct DictationControllerSuspensionTests {
 
     @Test func theMenuCannotStartADictationWhileSuspended() async {
         let h = Harness()
-        h.focus.set(FakeFocus.field(caret: CGRect(x: 10, y: 20, width: 2, height: 16)))
         h.controller.start()
         await h.hold(milliseconds: 500)
         await h.release()
-        #expect(h.controller.caretRect != nil)
 
         let suspension = h.controller.suspendHotkeys()
         h.controller.toggleDictation()
         await h.controller.settle()
         #expect(h.controller.phase == .idle)
         #expect(h.controller.notice == .recordingShortcut)
-        #expect(h.controller.caretRect == nil, "the notice is not placed at the last dictation's caret")
         #expect(await h.source.starts == 1, "only the first dictation opened the microphone")
         suspension.end()
     }
