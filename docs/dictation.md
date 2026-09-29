@@ -396,8 +396,9 @@ Files in `~/Library/Application Support/org.nerdstorm.LiveTranscribe/`, owner-on
 `snippets.json`, `vocabulary.json`, `insertion-overrides.json` (the user's per-app insertion
 methods and line settings; the bundled ones are in code) and `History/dictations.jsonl`.
 
-Dictation settings apply immediately; model and segmentation settings (Settings › Advanced)
-still apply at the next launch. Advanced's Restore Defaults resets only the settings on that tab
+Dictation settings apply immediately, and so does the speech model (Settings › Models), which
+loads in place of the one in use; the other models and segmentation settings (Settings ›
+Advanced) still apply at the next launch. Advanced's Restore Defaults resets only the settings on that tab
 (`AppSettingsKey.advancedTab`): the dictation settings, shortcuts, cleanup level, history and
 microphone stay as they are.
 
