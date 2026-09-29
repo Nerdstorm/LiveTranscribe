@@ -506,7 +506,11 @@ mod tests {
             ),
             (
                 "qwen3-asr-0.6b-v2",
-                Some(r#"{"format": 2, "model": "qwen3-asr", "source": "Qwen/Qwen3-ASR-0.6B@5eb1"}"#),
+                Some(concat!(
+                    r#"{"format": 2, "model": "qwen3-asr", "source": "Qwen/Qwen3-ASR-0.6B@5eb1","#,
+                    r#" "audio": {"mel_bins": 128, "width": 896, "output_width": 1024},"#,
+                    r#" "text": {"width": 1024, "vocab_size": 151936, "audio_token_id": 151676}}"#
+                )),
             ),
         ] {
             fs::create_dir_all(folder.join(name)).unwrap();
@@ -519,7 +523,7 @@ mod tests {
         assert_eq!(names, ["qwen3-asr-0.6b", "qwen3-asr-0.6b-v2"]);
         assert_eq!(models[0].source, "Qwen/Qwen3-ASR-0.6B");
         assert!(models[0].problem.is_some(), "an old format");
-        assert!(models[1].problem.is_none());
+        assert_eq!(models[1].problem, None);
         let _ = fs::remove_dir_all(folder);
     }
 }
