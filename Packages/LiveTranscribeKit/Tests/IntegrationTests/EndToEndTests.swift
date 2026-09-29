@@ -1,6 +1,7 @@
 import Capture
 import Cleanup
 import Foundation
+import HuggingFace
 import MLXSupport
 import Persistence
 import Segmentation
@@ -86,6 +87,32 @@ struct EndToEndTests {
             #expect(rawWER < 0.25, "\(name): raw WER \(rawWER)")
             #expect(cleanedWER <= rawWER + 0.02, "\(name): cleanup made it worse (\(rawWER) → \(cleanedWER))")
         }
+    }
+
+    /// The default speech model, entered as the folder mlx-audio-swift downloaded it to, transcribes
+    /// a clip exactly as it does entered as its repository.
+    @Test(.timeLimit(.minutes(10)))
+    func theSpeechModelTranscribesTheSameFromAFolder() async throws {
+        let settings = AppSettings.defaults
+        MLXRuntime.configure(gpuCacheLimitMB: settings.gpuCacheLimitMB)
+        let clip = try #require(Bundle.module.url(forResource: "Fixtures", withExtension: nil))
+            .appendingPathComponent("Audio/clip01_meeting.wav")
+        let samples = try FileAudioSource.readSamples(from: clip)
+
+        let fromRepository = MLXTranscriber(modelID: settings.sttModel)
+        try await fromRepository.load { _ in }
+        let expected = try await fromRepository.transcribe(samples, sampleRate: AudioFormat.sampleRate)
+
+        // mlx-audio-swift keeps a repository's files in mlx-audio/<owner>_<name> in the Hub cache.
+        let folder = HubCache.default.cacheDirectory
+            .appendingPathComponent("mlx-audio")
+            .appendingPathComponent(settings.sttModel.replacingOccurrences(of: "/", with: "_"))
+        let fromFolder = MLXTranscriber(modelID: folder.path)
+        try await fromFolder.load { _ in }
+        let text = try await fromFolder.transcribe(samples, sampleRate: AudioFormat.sampleRate)
+
+        #expect(!expected.isEmpty)
+        #expect(text == expected)
     }
 
     /// Collects events until the listening session has fully finished.

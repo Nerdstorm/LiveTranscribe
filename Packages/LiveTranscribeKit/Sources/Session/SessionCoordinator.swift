@@ -53,7 +53,14 @@ public actor SessionCoordinator: SessionControlling {
     private let dependencies: Dependencies
     private var phase: SessionPhase = .notLoaded
     private var cleanupAvailability: CleanupAvailability
+    /// Loading the models, or switching the speech model.
     private var loadTask: Task<Void, Never>?
+    /// The Speech-to-text setting the transcriber loads: the one at launch, or the latest
+    /// ``useSpeechModel(_:)`` named.
+    private var speechModel: String
+    /// ``useSpeechModel(_:)`` named a model while something used the speech model; it switches
+    /// once nothing does.
+    private var speechModelPending = false
     private var activeRun: ActiveRun?
     /// A ``start()`` is under way: it awaits permission, the session file and the microphone
     /// before `activeRun` is set, so without this a second Start would open a second capture
@@ -65,6 +72,7 @@ public actor SessionCoordinator: SessionControlling {
         self.settings = settings
         self.dependencies = dependencies
         self.cleanupAvailability = settings.cleanupEnabled ? .pending : .disabled
+        self.speechModel = settings.sttModel
     }
 
     // MARK: - Model loading
@@ -80,6 +88,8 @@ public actor SessionCoordinator: SessionControlling {
         loadTask = task
         await task.value
         loadTask = nil
+        // Another model was chosen while these loaded.
+        await switchSpeechModelIfIdle()?.value
     }
 
     public func cancelPreparation() {
@@ -93,9 +103,11 @@ public actor SessionCoordinator: SessionControlling {
 
     private func loadModels() async {
         let progress = progressHandler()
+        let speechModel = self.speechModel
+        speechModelPending = false
         do {
             try await load(model: settings.vadModel) { try await self.dependencies.segmenter.load(progress: progress) }
-            try await load(model: settings.sttModel) { try await self.dependencies.transcriber.load(progress: progress) }
+            try await loadSpeechModel(speechModel, progress: progress)
         } catch let failure as ModelLoadFailure {
             if Task.isCancelled {
                 Log.session.notice("Model loading cancelled")
@@ -105,7 +117,7 @@ public actor SessionCoordinator: SessionControlling {
             }
             return
         } catch {
-            setPhase(.failed(.modelLoadFailed(model: settings.sttModel, message: error.localizedDescription)))
+            setPhase(.failed(.modelLoadFailed(model: speechModel, message: error.localizedDescription)))
             return
         }
 
@@ -134,6 +146,75 @@ public actor SessionCoordinator: SessionControlling {
         } catch {
             Log.session.error("Loading \(model, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
             throw ModelLoadFailure(model: model, message: error.localizedDescription)
+        }
+    }
+
+    // MARK: - Switching the speech model
+
+    /// Loads `modelID`, a Speech-to-text setting, in place of the speech model in use.
+    ///
+    /// It switches as soon as nothing uses the speech model: at once when the models are ready,
+    /// or once the live transcript, or the loading under way, ends. Before the models are first
+    /// loaded, ``prepare()`` loads it instead. The phase is ``SessionPhase/loading`` while it
+    /// loads, so that neither a live transcript nor dictation starts, and
+    /// ``SessionFailure/modelLoadFailed`` if it fails.
+    public func useSpeechModel(_ modelID: String) async {
+        guard modelID != speechModel else { return }
+        speechModel = modelID
+        speechModelPending = true
+        Log.session.info("Speech model chosen: \(modelID, privacy: .public)")
+        await switchSpeechModelIfIdle()?.value
+    }
+
+    /// Starts switching the speech model if a new one is waiting and nothing uses the model.
+    private func switchSpeechModelIfIdle() -> Task<Void, Never>? {
+        guard speechModelPending, loadTask == nil, !isStarting, activeRun == nil else { return nil }
+        switch phase {
+        case .failed(.modelLoadFailed):
+            // Another model may have failed too, so this loads every model that isn't loaded.
+            speechModelPending = false
+            return Task { await self.prepare() }
+        case .ready, .failed:
+            let task = Task { await self.switchSpeechModel() }
+            loadTask = task
+            return task
+        case .notLoaded:
+            // prepare() loads the model chosen last.
+            speechModelPending = false
+            return nil
+        case .loading, .listening, .stopping:
+            return nil
+        }
+    }
+
+    /// Loads the model chosen last, and again if another is chosen meanwhile.
+    private func switchSpeechModel() async {
+        defer { loadTask = nil }
+        while speechModelPending, !Task.isCancelled {
+            speechModelPending = false
+            let modelID = speechModel
+            setPhase(.loading)
+            do {
+                try await loadSpeechModel(modelID, progress: progressHandler())
+                setPhase(Task.isCancelled ? .notLoaded : .ready)
+            } catch let failure as ModelLoadFailure {
+                setPhase(Task.isCancelled ? .notLoaded : .failed(.modelLoadFailed(model: failure.model, message: failure.message)))
+            } catch {
+                setPhase(.failed(.modelLoadFailed(model: modelID, message: error.localizedDescription)))
+            }
+        }
+    }
+
+    /// Loads `modelID` in place of the speech model loaded now, and says which is loaded.
+    private func loadSpeechModel(_ modelID: String, progress: @escaping ModelLoadProgressHandler) async throws {
+        do {
+            try await load(model: modelID) {
+                try await self.dependencies.transcriber.switchModel(to: modelID, progress: progress)
+            }
+            publish(.speechModel(modelID))
+        } catch {
+            publish(.speechModel(nil))
+            throw error
         }
     }
 
@@ -237,6 +318,8 @@ public actor SessionCoordinator: SessionControlling {
             setPhase(.ready)
         }
         Log.session.info("Session finished")
+        // A model chosen during the session. Not awaited: stop() waits for this method.
+        _ = switchSpeechModelIfIdle()
     }
 
     // MARK: - State publishing

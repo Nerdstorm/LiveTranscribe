@@ -110,6 +110,8 @@ let package = Package(
                 .product(name: "MLX", package: "mlx-swift"),
                 .product(name: "HuggingFace", package: "swift-huggingface"),
             ],
+            // The speech model catalog, which the Linux and Windows app reads too.
+            resources: [.copy("Resources/speech-models.json")],
             swiftSettings: strictSwift
         ),
 
@@ -143,7 +145,7 @@ let package = Package(
             name: "DictationUI",
             dependencies: [
                 "Shared", "Capture", "Dictation", "Hotkey", "Insertion", "Permissions", "Persistence",
-                "Snippets", "Vocabulary", "Styles", "Session", "TranscriptUI", "Updates",
+                "Snippets", "Vocabulary", "Styles", "Session", "Transcription", "TranscriptUI", "Updates",
             ],
             swiftSettings: strictSwift
         ),
@@ -251,7 +253,7 @@ let package = Package(
             name: "DictationUITests",
             dependencies: [
                 "DictationUI", "Dictation", "Shared", "Capture", "Hotkey", "Insertion", "Permissions",
-                "Persistence", "Snippets", "Vocabulary", "Styles", "Session", "Updates",
+                "Persistence", "Snippets", "Vocabulary", "Styles", "Session", "Transcription", "Updates",
             ],
             swiftSettings: strictSwift
         ),

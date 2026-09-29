@@ -43,5 +43,24 @@ in the README's [Architecture](../README.md#architecture).
   `swift-transformers` direct dependencies; both were already indirect ones.
 - **`mlx-audio-swift` is pinned by revision** (the commit of tag v0.1.3), not by version. It uses
   `unsafeFlags`, which SwiftPM accepts only from packages pinned by revision or by local path.
+- **Speech models are loaded by kind** (`Transcription/SpeechModelKind.swift`): the app reads
+  `model_type` from a model's config.json and loads it from its folder, downloaded or local, with
+  mlx-audio-swift's loader for that kind. The list mirrors mlx-audio-swift's own `STT.loadModel`,
+  aliases included, so an update that adds or renames a model needs the same change there.
+- **The speech model catalog is a file both apps read**
+  (`Transcription/Resources/speech-models.json`), built in and never fetched. Each model has a
+  download per platform, and the Mac's is a Hugging Face repository pinned to a commit, so a
+  release downloads what was tested with it; `scripts/pin-speech-model.sh` prints a repository's
+  commit and download size. A catalog model is downloaded into the Hugging Face cache and loaded
+  from its snapshot there (`SpeechModelDownloads`), not copied into `mlx-audio/` as mlx-audio-swift
+  copies any other repository, and falls back to such a copy, made by an earlier version, when
+  its commit can't be downloaded. Only licences that allow commercial use are listed
+  (`SpeechModelCatalogTests`).
+- **The speech model switches without a restart.** A new Speech-to-text setting reaches
+  `SessionCoordinator.useSpeechModel`, which loads it once nothing uses the model: at once, or
+  when the live transcript or the loading under way ends. `MLXTranscriber` downloads first, while
+  the old model keeps transcribing, then drops it before loading the new one, so the two are never
+  in memory together; a transcription asked for meanwhile waits. The Linux and Windows app does
+  the same.
 
 More decisions, and the assumptions behind them, are in [dictation.md](dictation.md).

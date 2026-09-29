@@ -1,8 +1,8 @@
 // Bench: runs fixture clips through the real pipeline and reports WER (raw vs cleaned) and
 // per-stage latency. Build with xcodebuild (MLX needs its Metal library); see docs/development.md.
 //
-//   Bench [--fixtures <dir>] [--level none|light|medium|high] [--no-cleanup] [--no-adapter] [--fast] [--stt-model <repo>]
-//   Bench --dictation [--clips <dir>] [--level <level>]... [--multiline] [--p95-target-ms <ms>] [--verbose] [--no-adapter] [--stt-model <repo>]
+//   Bench [--fixtures <dir>] [--level none|light|medium|high] [--no-cleanup] [--no-adapter] [--fast] [--stt-model <repo or folder>]
+//   Bench --dictation [--clips <dir>] [--level <level>]... [--multiline] [--p95-target-ms <ms>] [--verbose] [--no-adapter] [--stt-model <repo or folder>]
 
 import Capture
 import Cleanup
@@ -69,8 +69,8 @@ struct BenchOptions {
             case "--verbose":
                 options.verbose = true
             case "--stt-model":
-                guard let repo = iterator.next(), !repo.isEmpty else { throw BenchError.usage("--stt-model needs a model repository") }
-                options.sttModel = repo
+                guard let model = iterator.next(), !model.isEmpty else { throw BenchError.usage("--stt-model needs a model repository or folder") }
+                options.sttModel = model
             default:
                 throw BenchError.usage("unknown argument \(argument)")
             }
@@ -89,8 +89,8 @@ enum BenchError: LocalizedError {
         case .usage(let detail):
             """
             \(detail)
-            usage: Bench [--fixtures <dir>] [--level none|light|medium|high] [--no-cleanup] [--no-adapter] [--fast] [--stt-model <repo>]
-                   Bench --dictation [--clips <dir>] [--level <level>]... [--multiline] [--p95-target-ms <ms>] [--verbose] [--no-adapter] [--stt-model <repo>]
+            usage: Bench [--fixtures <dir>] [--level none|light|medium|high] [--no-cleanup] [--no-adapter] [--fast] [--stt-model <repo or folder>]
+                   Bench --dictation [--clips <dir>] [--level <level>]... [--multiline] [--p95-target-ms <ms>] [--verbose] [--no-adapter] [--stt-model <repo or folder>]
             """
         case .noFixtures(let path):
             "No .wav files with matching .txt references in \(path). Run scripts/generate-test-audio.sh first."

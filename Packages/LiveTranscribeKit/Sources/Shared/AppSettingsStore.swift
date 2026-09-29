@@ -51,12 +51,13 @@ public enum AppSettingsKey: String, CaseIterable, Sendable {
 }
 
 extension AppSettingsKey {
-    /// What Settings › Advanced shows: the models, segmentation, cleanup tuning and capture
-    /// recovery. Its Restore Defaults resets exactly these (``AppSettingsStore/resetToDefaults(_:)``),
-    /// so the settings other tabs and windows own (dictation, both shortcuts, the cleanup level,
-    /// history, the chosen microphone) are left alone. A setting added to that tab belongs here.
+    /// What Settings › Advanced shows: the cleanup and voice activity models, segmentation,
+    /// cleanup tuning and capture recovery. Its Restore Defaults resets exactly these
+    /// (``AppSettingsStore/resetToDefaults(_:)``), so the settings other tabs and windows own
+    /// (dictation, both shortcuts, the cleanup level, the speech model, history, the chosen
+    /// microphone) are left alone. A setting added to that tab belongs here.
     public static let advancedTab: Set<AppSettingsKey> = [
-        .sttModel, .llmModel, .vadModel, .cleanupEnabled, .cleanupAdapterEnabled,
+        .llmModel, .vadModel, .cleanupEnabled, .cleanupAdapterEnabled,
         .vadSilenceMs, .vadSpeechThreshold, .vadPreRollMs, .vadMinSpeechMs, .maxSegmentSeconds,
         .partialIntervalMs,
         .contextSegments, .cleanupTimeoutSeconds, .cleanupQueueCapacity,

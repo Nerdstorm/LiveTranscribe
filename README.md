@@ -237,7 +237,7 @@ Packages/LiveTranscribeKit/   all feature code, as vertical slices
     Shared/          value types, AppSettings, logging, deadline, edit distance, atomic file writes
     Capture/         AVCaptureSession microphone capture → 16 kHz mono; microphone list and choice
     Segmentation/    Silero VAD + segmentation state machine (pre-roll, hysteresis, max length)
-    Transcription/   Qwen3-ASR via mlx-audio-swift
+    Transcription/   Qwen3-ASR via mlx-audio-swift; the speech models it can run, by kind, and the catalog
     Cleanup/         Qwen3 via mlx-swift-lm, prompt, OutputGuard fallbacks, fine-tuned adapter
     Persistence/     JSONL session files and dictation history
     Session/         SessionCoordinator (lifecycle) + SessionPipeline (3 concurrent stages)
@@ -285,9 +285,21 @@ this repository.
 | Self-correction adapter | bundled (`Sources/Cleanup/Adapter`) | trained on synthetic data in this repository ([`Training/`](Packages/LiveTranscribeKit/Training/README.md)) | MIT |
 | Voice activity detection | [mlx-community/silero-vad](https://huggingface.co/mlx-community/silero-vad) | [Silero VAD](https://github.com/snakers4/silero-vad) by the Silero team | MIT |
 
-Other models can be tried in **Settings › Advanced** (a Hugging Face repository ID for each role;
-it is downloaded on the next launch). They must be models mlx-audio-swift or mlx-swift-lm can
-load, and the self-correction adapter is used only with mlx-community/Qwen3-1.7B-4bit.
+**Settings › Models** offers other speech-to-text models to download and switch to, without a
+restart: Qwen3-ASR 0.6B and 1.7B, Parakeet TDT v2 (English) and v3 (European languages), Whisper
+large-v3-turbo and Cohere Transcribe, each credited there with its licence. They are listed in
+[`speech-models.json`](Packages/LiveTranscribeKit/Sources/Transcription/Resources/speech-models.json),
+each pinned to the commit of its repository that was tested, and the Linux and Windows app
+reads the same list. **Another model** there takes any Hugging Face repository that
+mlx-audio-swift can load, at its latest version, or a folder on your Mac with the files such a
+repository has (config.json and the .safetensors weights), such as a fine-tune you haven't
+uploaded. The app finds the kind of model from its config.json, listed in
+[`SpeechModelKind.swift`](Packages/LiveTranscribeKit/Sources/Transcription/SpeechModelKind.swift).
+
+The cleanup and voice activity models can be changed in **Settings › Advanced** (a Hugging Face
+repository ID for each; it is downloaded on the next launch). They must be models mlx-swift-lm or
+mlx-audio-swift can load, and the self-correction adapter is used only with
+mlx-community/Qwen3-1.7B-4bit.
 
 Built with [mlx-swift](https://github.com/ml-explore/mlx-swift),
 [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm),

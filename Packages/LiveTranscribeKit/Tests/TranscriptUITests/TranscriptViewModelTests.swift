@@ -106,6 +106,15 @@ struct TranscriptViewModelTests {
         #expect(model.modelProgress.first?.stage == .ready)
     }
 
+    @Test func theSpeechModelLoadedIsKnownUntilOneFailsToLoad() {
+        let model = self.model
+        #expect(model.speechModel == nil)
+        model.apply(.speechModel("owner/model"))
+        #expect(model.speechModel == "owner/model")
+        model.apply(.speechModel(nil))
+        #expect(model.speechModel == nil)
+    }
+
     @Test func partialThenRawThenCleanedReplaceOneLine() {
         let model = self.model
         let id = UUID()

@@ -47,8 +47,9 @@ It builds the `Bench` tool and runs it. Give it options with `ARGS`, for example
 - `--no-adapter`: clean up without the fine-tuned self-correction adapter.
 - `--fast`: feed audio as fast as possible instead of in real time. Latency numbers are then
   meaningless.
-- `--stt-model <repo>`: measure another speech-to-text model instead of the default, such as
-  `mlx-community/parakeet-tdt-0.6b-v3`, to compare models on the same clips.
+- `--stt-model <repo or folder>`: measure another speech-to-text model instead of the default,
+  such as `mlx-community/parakeet-tdt-0.6b-v3` or a model folder on this Mac, to compare models
+  on the same clips. A model in the catalog is downloaded at its pinned commit.
 
 The bench prints the word error rate (WER) of the raw and cleaned text, p50 and p95 latency per
 stage, and four checks:
@@ -95,8 +96,8 @@ stopping the recorder and inserting the text are not included. `--multiline` dic
 multi-line field, where line breaks, lists and letters are laid out, and adds how many clips came
 out with the intended lines. `--level <none|light|medium|high>` (repeatable) limits the levels,
 `--clips <dir>` reads other clips, `--p95-target-ms <n>` changes the target, `--no-adapter`
-cleans up without the adapter, `--stt-model <repo>` measures another speech-to-text model and
-`--verbose` prints every output, with the reason for each fallback. Give them with `ARGS`, as for the bench: `make eval ARGS="--multiline --verbose"`.
+cleans up without the adapter, `--stt-model <repo or folder>` measures another speech-to-text
+model and `--verbose` prints every output, with the reason for each fallback. Give them with `ARGS`, as for the bench: `make eval ARGS="--multiline --verbose"`.
 
 Last run, on an M4 Pro with macOS 27 and synthetic speech, with the default speech model and
 `--multiline` ([Eval results](dictation.md#eval-results) compares the base Qwen3-ASR and the

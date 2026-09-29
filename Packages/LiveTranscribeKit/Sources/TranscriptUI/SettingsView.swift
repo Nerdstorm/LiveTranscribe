@@ -9,7 +9,6 @@ import SwiftUI
 public struct SettingsView: View {
     private static let d = AppSettings.defaults
 
-    @AppStorage(AppSettingsKey.sttModel.rawValue) private var sttModel = d.sttModel
     @AppStorage(AppSettingsKey.llmModel.rawValue) private var llmModel = d.llmModel
     @AppStorage(AppSettingsKey.vadModel.rawValue) private var vadModel = d.vadModel
     @AppStorage(AppSettingsKey.cleanupEnabled.rawValue) private var cleanupEnabled = d.cleanupEnabled
@@ -32,11 +31,15 @@ public struct SettingsView: View {
 
     public var body: some View {
         Form {
-            Section("Models (Hugging Face repositories)") {
-                TextField("Speech-to-text", text: modelField(.sttModel, $sttModel))
+            Section {
                 TextField("Cleanup LLM", text: modelField(.llmModel, $llmModel))
                 TextField("Voice activity", text: modelField(.vadModel, $vadModel))
                 Toggle("Clean up transcripts with the LLM", isOn: $cleanupEnabled)
+            } header: {
+                Text("Models (Hugging Face repositories)")
+            } footer: {
+                Text("The speech-to-text model is chosen in Models, and loads without a restart.")
+                    .foregroundStyle(.secondary)
             }
             Section("Segmentation") {
                 Stepper("Silence that ends a segment: \(vadSilenceMs) ms", value: $vadSilenceMs, in: 100...5_000, step: 50)
