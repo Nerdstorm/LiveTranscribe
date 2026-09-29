@@ -6,10 +6,12 @@
 //! opens Settings, whose changes apply without a restart.
 //!
 //! The flow is lt_dictation's DictationController, as on the Mac, on a thread of its own
-//! ([`engine`]); the tray (Tauri) has the main thread. What was said is never printed or logged:
-//! only counts.
+//! ([`engine`]); the tray (Tauri) has the main thread. What differs between systems is the
+//! desktop ([`desktop`]): all the rest is the same everywhere. What was said is never printed or
+//! logged: only counts.
 
 mod configuration;
+mod desktop;
 mod engine;
 mod platform;
 mod single_instance;
@@ -23,15 +25,16 @@ use anyhow::Context;
 use lt_capture::Recorder;
 use lt_dictation::Phase;
 use lt_dictation_ui::{Blocker, ModelState, PanelView, load_interface_font};
-use lt_hotkey::{MonitorError, display_name, key_code, key_name, watch_hotkey};
+use lt_hotkey::{display_name, key_code, key_name, watch_hotkey};
 use lt_shared::CleanupLevel;
 use lt_transcription::catalog::SpeechModelCatalog;
-use lt_wayland::{PanelConfiguration, SessionConfiguration, SessionError, WaylandSession};
 use serde_json::{Map, Value};
 
 use crate::paths;
 use crate::settings::{AppControl, Settings, SettingsService, SettingsStore};
 use crate::speech_models::{SpeechModelDownloads, SpeechModelLibrary};
+use desktop::PanelConfiguration;
+pub(crate) use desktop::hotkey_problem;
 use engine::{DictationStatus, Engine, Message, StatusSink};
 
 /// Settings for this run only, over the ones Settings keeps (the tray's *Settings…*), which
@@ -140,19 +143,16 @@ pub fn run(options: &Options) -> anyhow::Result<()> {
         }
     };
     let (messages, received) = mpsc::channel();
-    let session = WaylandSession::connect(SessionConfiguration {
-        insertion: configuration::insertion(&current),
-        panel,
-    });
+    let desktop = desktop::connect(configuration::insertion(&current), panel);
     let hotkey_messages = messages.clone();
     let watch = watch_hotkey(hotkey, move |event| {
         let _ = hotkey_messages.send(Message::Hotkey(event));
     });
-    let (session, (hotkey_watch, keyboards)) = match (session, watch) {
-        (Ok(session), Ok(watch)) => (session, watch),
+    let (desktop, (hotkey_watch, keyboards)) = match (desktop, watch) {
+        (Ok(desktop), Ok(watch)) => (desktop, watch),
         // The desktop first: a readable keyboard is no use where the text can't go.
-        (Err(error), _) => return run_blocked(desktop_blocker(&error), messages, settings, library),
-        (_, Err(error)) => return run_blocked(hotkey_blocker(&error), messages, settings, library),
+        (Err(blocker), _) => return run_blocked(blocker, messages, settings, library),
+        (_, Err(error)) => return run_blocked(desktop::hotkey_blocker(&error), messages, settings, library),
     };
     for keyboard in &keyboards {
         eprintln!("Listening for {} on {}", key_name(hotkey), keyboard.name);
@@ -168,7 +168,7 @@ pub fn run(options: &Options) -> anyhow::Result<()> {
         library: Arc::clone(&library),
         hotkey: hotkey_watch,
         recorder,
-        session,
+        desktop,
         messages: messages.clone(),
         received,
     };
@@ -215,75 +215,6 @@ fn blocked_status(settings: &Settings, blocker: &Blocker) -> DictationStatus {
     }
 }
 
-/// Why the desktop can't take dictated text, and where it can, as Settings says it.
-fn desktop_blocker(error: &SessionError) -> Blocker {
-    const WHERE: &str = "For now dictation types on COSMIC, Sway and Hyprland; GNOME, KDE Plasma and X11 \
-                         desktops come in a later version.";
-    let desktop = desktop_name(&std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default());
-    Blocker::Desktop(match error {
-        SessionError::NoDisplay(_) => {
-            format!("{desktop} isn't running on Wayland, which Live Transcribe types through. {WHERE}")
-        }
-        SessionError::Unsupported { protocol } => {
-            format!("{desktop} doesn't let apps {protocol}, which Live Transcribe types with. {WHERE}")
-        }
-        other => format!("Live Transcribe couldn't connect to the desktop: {other}."),
-    })
-}
-
-/// Why the hotkey can't be watched, and what to do about it, as Settings says it.
-fn hotkey_blocker(error: &MonitorError) -> Blocker {
-    Blocker::Hotkey(hotkey_problem(error, std::env::var_os("APPIMAGE").is_some()))
-}
-
-/// What's wrong with watching the hotkey, and for a keyboard that can't be read, what allows it:
-/// the deb's and rpm's udev rule, which the AppImage (`in_appimage`) carries but can't install.
-pub(crate) fn hotkey_problem(error: &MonitorError, in_appimage: bool) -> String {
-    let problem = capitalised(&error.to_string());
-    if !matches!(error, MonitorError::PermissionDenied { .. }) {
-        return format!("{problem}.");
-    }
-    let remedy = if in_appimage {
-        "The AppImage can't allow that itself: README.Linux, in linux-windows/packaging/linux on the \
-         project's GitHub, gives the udev rule that does and the commands that add it. Then start \
-         Live Transcribe again."
-    } else {
-        "The deb and rpm packages install a udev rule that allows whoever is logged in at the \
-         machine to; with one installed, restart the computer."
-    };
-    format!("{problem}, which hold-to-talk needs to watch for the hotkey. {remedy}")
-}
-
-fn capitalised(text: &str) -> String {
-    let mut characters = text.chars();
-    characters
-        .next()
-        .map(|first| first.to_uppercase().chain(characters).collect())
-        .unwrap_or_default()
-}
-
-/// The desktop as people call it, from `XDG_CURRENT_DESKTOP` (such as `ubuntu:GNOME`, `KDE` or
-/// `X-Cinnamon`).
-fn desktop_name(current_desktop: &str) -> String {
-    let names: Vec<&str> = current_desktop
-        .split(':')
-        .map(|name| name.strip_prefix("X-").unwrap_or(name))
-        .filter(|name| !name.is_empty())
-        .collect();
-    let is = |wanted: &str| names.iter().any(|name| name.eq_ignore_ascii_case(wanted));
-    if is("KDE") {
-        "KDE Plasma".to_owned()
-    } else if is("GNOME") {
-        "GNOME".to_owned()
-    } else if is("COSMIC") {
-        "COSMIC".to_owned()
-    } else {
-        names
-            .last()
-            .map_or_else(|| "This desktop".to_owned(), |name| (*name).to_owned())
-    }
-}
-
 /// The Settings window's way to the engine.
 struct EngineControl(Sender<Message>);
 
@@ -314,45 +245,6 @@ mod tests {
     fn overrides(arguments: &[&str]) -> Map<String, Value> {
         let command = Command::try_parse_from(std::iter::once("run").chain(arguments.iter().copied())).unwrap();
         command.options.overrides().unwrap()
-    }
-
-    #[test]
-    fn desktops_are_named_as_people_know_them() {
-        assert_eq!(desktop_name("KDE"), "KDE Plasma");
-        assert_eq!(desktop_name("ubuntu:GNOME"), "GNOME");
-        assert_eq!(desktop_name("COSMIC"), "COSMIC");
-        assert_eq!(desktop_name("X-Cinnamon"), "Cinnamon");
-        assert_eq!(desktop_name(""), "This desktop");
-    }
-
-    #[test]
-    fn an_unsupported_desktop_says_what_it_lacks_and_where_the_app_works() {
-        let Blocker::Desktop(detail) = desktop_blocker(&SessionError::Unsupported {
-            protocol: "type keys (zwp-virtual-keyboard-v1)",
-        }) else {
-            panic!("a desktop problem");
-        };
-        assert!(
-            detail.contains("doesn't let apps type keys (zwp-virtual-keyboard-v1)"),
-            "{detail}"
-        );
-        assert!(detail.contains("COSMIC, Sway and Hyprland"), "{detail}");
-    }
-
-    #[test]
-    fn an_unreadable_keyboard_says_what_allows_reading_it() {
-        let denied = MonitorError::PermissionDenied {
-            paths: vec![PathBuf::from("/dev/input/event3")],
-        };
-        let packaged = hotkey_problem(&denied, false);
-        assert!(packaged.starts_with("The keyboard can't be read"), "{packaged}");
-        assert!(packaged.contains("/dev/input/event3"), "{packaged}");
-        assert!(
-            packaged.contains("deb and rpm packages install a udev rule"),
-            "{packaged}"
-        );
-        let appimage = hotkey_problem(&denied, true);
-        assert!(appimage.contains("README.Linux"), "{appimage}");
     }
 
     #[test]

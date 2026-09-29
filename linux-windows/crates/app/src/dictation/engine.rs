@@ -16,9 +16,9 @@ use lt_dictation_ui::{Blocker, ModelState, PanelModel};
 use lt_hotkey::{HotkeyEvent, HotkeyWatch, display_name, key_code};
 use lt_insertion::Inserted;
 use lt_shared::CleanupLevel;
-use lt_wayland::WaylandSession;
 
 use super::configuration::{self, ModelChoice};
+use super::desktop::Desktop;
 use super::platform::{Clock, Platform};
 use super::transcriber::{Jobs, Transcriber};
 use crate::settings::Settings;
@@ -91,7 +91,7 @@ pub(crate) struct Engine {
     pub(crate) library: Arc<SpeechModelLibrary>,
     pub(crate) hotkey: HotkeyWatch,
     pub(crate) recorder: Recorder,
-    pub(crate) session: WaylandSession,
+    pub(crate) desktop: Box<dyn Desktop>,
     pub(crate) messages: Sender<Message>,
     pub(crate) received: Receiver<Message>,
 }
@@ -111,7 +111,7 @@ impl Engine {
         let clock = Clock::start();
         let platform = Platform::new(
             self.recorder,
-            self.session,
+            self.desktop,
             self.messages.clone(),
             PanelModel::new(configuration::notice_ms(&self.settings)),
             configuration::language(&self.settings),

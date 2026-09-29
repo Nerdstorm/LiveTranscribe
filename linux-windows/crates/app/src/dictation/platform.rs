@@ -1,6 +1,6 @@
 //! The controller's view of this machine: the microphone, the speech model's thread, and the
-//! Wayland session, which types the text and shows the panel. What happens is printed to
-//! standard error as it happens; what was said never is.
+//! desktop, which types the text and shows the panel. What happens is printed to standard error as
+//! it happens; what was said never is.
 
 use std::sync::mpsc::Sender;
 use std::time::Instant;
@@ -9,9 +9,9 @@ use lt_capture::Recorder;
 use lt_dictation::{Dependencies, Job, Notice, Phase, Recording};
 use lt_dictation_ui::{PanelContent, PanelModel};
 use lt_insertion::InsertionTarget;
-use lt_wayland::WaylandSession;
 
 use super::configuration;
+use super::desktop::Desktop;
 use super::engine::Message;
 use super::transcriber::{Clip, Jobs};
 use crate::settings::Settings;
@@ -36,7 +36,7 @@ pub(crate) struct Platform {
     transcriber: Option<Jobs>,
     /// The Language setting each recording goes to the model with.
     language: Option<String>,
-    session: WaylandSession,
+    desktop: Box<dyn Desktop>,
     messages: Sender<Message>,
     panel: PanelModel,
     /// What the panel shows now.
@@ -47,7 +47,7 @@ pub(crate) struct Platform {
 impl Platform {
     pub(crate) fn new(
         recorder: Recorder,
-        session: WaylandSession,
+        desktop: Box<dyn Desktop>,
         messages: Sender<Message>,
         panel: PanelModel,
         language: Option<String>,
@@ -57,7 +57,7 @@ impl Platform {
             recorder,
             transcriber: None,
             language,
-            session,
+            desktop,
             messages,
             panel,
             shown: None,
@@ -76,7 +76,7 @@ impl Platform {
         self.recorder.configure(configuration::recorder(settings));
         self.language = configuration::language(settings);
         self.panel.set_notice_ms(configuration::notice_ms(settings));
-        self.session.set_insertion(configuration::insertion(settings));
+        self.desktop.set_insertion(configuration::insertion(settings));
     }
 
     /// When the panel's message runs out: call [`Self::advance_panel`] then.
@@ -91,13 +91,13 @@ impl Platform {
 
     /// Puts `text` on the clipboard, for *Copy Last Dictation*.
     pub(crate) fn copy(&self, text: String) {
-        self.session.copy(text);
+        self.desktop.copy(text);
     }
 
     fn refresh_panel(&mut self) {
         let content = self.panel.content();
         if content != self.shown {
-            self.session.show_panel(content.clone());
+            self.desktop.show_panel(content.clone());
             self.shown = content;
         }
     }
@@ -135,7 +135,7 @@ impl Dependencies for Platform {
     }
 
     fn target(&mut self) -> InsertionTarget {
-        self.session.target()
+        self.desktop.target()
     }
 
     fn transcribe(&mut self, job: Job, samples: Vec<f32>) {
@@ -155,15 +155,17 @@ impl Dependencies for Platform {
     }
 
     fn prepare_insertion(&mut self) {
-        self.session.prepare();
+        self.desktop.prepare();
     }
 
     fn insert(&mut self, job: Job, text: String) {
         let messages = self.messages.clone();
-        self.session.insert(text, move |result| {
-            let result = result.map_err(|error| error.to_string());
-            let _ = messages.send(Message::Inserted { job, result });
-        });
+        self.desktop.insert(
+            text,
+            Box::new(move |result| {
+                let _ = messages.send(Message::Inserted { job, result });
+            }),
+        );
     }
 
     fn phase_changed(&mut self, phase: Phase) {
