@@ -11,7 +11,7 @@ use lt_capture::input_devices;
 use lt_dictation_ui::Theme;
 use lt_hotkey::{KeyTracker, display_name, key_code, key_name};
 use lt_shared::CleanupLevel;
-use lt_transcription::catalog::{Engine, SpeechModel};
+use lt_transcription::catalog::{Engine, LanguageChoice, SpeechModel};
 use lt_transcription::qwen3_asr::inspect_model;
 use serde::Serialize;
 use serde_json::{Map, Value};
@@ -283,6 +283,9 @@ struct CatalogModelView {
     source: &'static str,
     /// Whether it runs on the CPU whatever the device setting says.
     cpu_only: bool,
+    /// The languages it can be told to write, its default first; empty for a model that finds
+    /// the language itself.
+    language_choices: Vec<LanguageChoice>,
     download: DownloadView,
     /// Some of its files are here and it isn't downloading.
     can_remove: bool,
@@ -300,6 +303,7 @@ impl CatalogModelView {
             bytes: model.download_bytes(),
             source: model.source(),
             cpu_only: !matches!(model.engine, Engine::OpenVino { .. }),
+            language_choices: model.language_choices.clone(),
             download: DownloadView::new(state),
             can_remove: library.can_remove(model),
         }

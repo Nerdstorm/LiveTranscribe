@@ -15,6 +15,7 @@ const OPTION_FOR = {
   handsFreeEnabled: "--no-hands-free",
   cleanupLevel: "--cleanup",
   sttModel: "--model",
+  sttLanguage: "--language",
   sttDevice: "--device",
 };
 
@@ -89,6 +90,8 @@ let microphones = null;
 let speechModels = null;
 /** The catalog model whose removal is being confirmed, by id. */
 let confirmingRemoval = null;
+/** The catalog wasn't drawn again while a language menu was in use, and should be. */
+let catalogStale = false;
 let status = null;
 /**
  * The shortcut being recorded: the modifier pressed first, if any, and whether a key has been
@@ -358,7 +361,14 @@ function renderSpeechModels() {
   renderOther();
 }
 
-function renderCatalog() {
+function renderCatalog({ force = false } = {}) {
+  // A download's progress would otherwise draw the rows again under a language menu in use,
+  // and close it.
+  if (!force && document.activeElement?.closest("#catalog .language")) {
+    catalogStale = true;
+    return;
+  }
+  catalogStale = false;
   const list = $("#catalog");
   const models = speechModels?.models ?? [];
   const chosen = snapshot.settings.sttModel ?? snapshot.defaultModel;
@@ -386,6 +396,9 @@ function renderCatalog() {
         note(meta.join(" · "), "meta"),
         note(model.credit, "credit"),
       );
+      if (model.languageChoices.length) {
+        text.append(languageMenu(model));
+      }
 
       const side = document.createElement("span");
       side.className = "model-status";
@@ -418,6 +431,40 @@ function renderCatalog() {
   if (speechModels) {
     $("#catalog-note").textContent = `Downloaded into ${speechModels.folder}. A model you choose loads once no dictation is under way, and dictation waits for it.`;
   }
+}
+
+/**
+ * The language a model told one writes: the Language setting's, if the model has it, and
+ * otherwise its first. The setting is one for every such model.
+ */
+function languageMenu(model) {
+  const choices = model.languageChoices;
+  const setting = snapshot.settings.sttLanguage;
+  const select = document.createElement("select");
+  select.dataset.model = model.id;
+  select.setAttribute("aria-label", `${model.name}’s language`);
+  select.replaceChildren(...choices.map((choice) => option(choice.code, choice.name)));
+  select.value = choices.some((choice) => choice.code === setting) ? setting : choices[0].code;
+  select.addEventListener("change", async () => {
+    await change({ sttLanguage: select.value });
+    // The menu has closed, so the rows can be drawn again, keeping the focus on it.
+    if (catalogStale) {
+      renderCatalog({ force: true });
+      $(`#catalog select[data-model="${CSS.escape(model.id)}"]`)?.focus();
+    }
+  });
+  select.addEventListener("blur", () => {
+    // Once the focus has moved on: while this runs, it's still here.
+    setTimeout(() => {
+      if (catalogStale) {
+        renderCatalog();
+      }
+    });
+  });
+  const label = document.createElement("label");
+  label.className = "language";
+  label.append(note("Language", "meta"), select);
+  return label;
 }
 
 function renderOther() {

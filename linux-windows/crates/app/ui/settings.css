@@ -432,6 +432,19 @@ select {
   opacity: 0.75;
 }
 
+/* The language a model told one writes, under its credit */
+
+.model .language {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.model .language select {
+  max-width: 100%;
+}
+
 .badge {
   padding: 0 7px;
   border-radius: 999px;
