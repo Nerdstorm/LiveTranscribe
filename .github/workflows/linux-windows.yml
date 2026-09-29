@@ -9,11 +9,15 @@ on:
     paths:
       - "linux-windows/**"
       - "Fixtures/golden/**"
+      # The speech model catalog, which the app embeds and checks.
+      - "Packages/LiveTranscribeKit/Sources/Transcription/Resources/speech-models.json"
       - ".github/workflows/linux-windows.yml"
   pull_request:
     paths:
       - "linux-windows/**"
       - "Fixtures/golden/**"
+      # The speech model catalog, which the app embeds and checks.
+      - "Packages/LiveTranscribeKit/Sources/Transcription/Resources/speech-models.json"
       - ".github/workflows/linux-windows.yml"
   workflow_dispatch:
 
