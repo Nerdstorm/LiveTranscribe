@@ -13,7 +13,7 @@ use lt_wayland::WaylandSession;
 
 use super::configuration;
 use super::engine::Message;
-use super::transcriber::Jobs;
+use super::transcriber::{Clip, Jobs};
 use crate::settings::Settings;
 
 /// Milliseconds since the engine started: the one clock the controller and the panel share.
@@ -34,6 +34,8 @@ pub(crate) struct Platform {
     recorder: Recorder,
     /// The speech model's jobs, while it is loaded.
     transcriber: Option<Jobs>,
+    /// The Language setting each recording goes to the model with.
+    language: Option<String>,
     session: WaylandSession,
     messages: Sender<Message>,
     panel: PanelModel,
@@ -48,11 +50,13 @@ impl Platform {
         session: WaylandSession,
         messages: Sender<Message>,
         panel: PanelModel,
+        language: Option<String>,
         clock: Clock,
     ) -> Self {
         Self {
             recorder,
             transcriber: None,
+            language,
             session,
             messages,
             panel,
@@ -66,9 +70,11 @@ impl Platform {
         self.transcriber = transcriber;
     }
 
-    /// Records, shows messages and pastes with `settings` from the next time each happens.
+    /// Records, transcribes, shows messages and pastes with `settings` from the next time each
+    /// happens.
     pub(crate) fn configure(&mut self, settings: &Settings) {
         self.recorder.configure(configuration::recorder(settings));
+        self.language = configuration::language(settings);
         self.panel.set_notice_ms(configuration::notice_ms(settings));
         self.session.set_insertion(configuration::insertion(settings));
     }
@@ -134,7 +140,10 @@ impl Dependencies for Platform {
 
     fn transcribe(&mut self, job: Job, samples: Vec<f32>) {
         let sent = match &self.transcriber {
-            Some(transcriber) => transcriber.send((job, samples)).is_ok(),
+            Some(transcriber) => {
+                let language = self.language.clone();
+                transcriber.send(Clip { job, samples, language }).is_ok()
+            }
             None => false,
         };
         if !sent {

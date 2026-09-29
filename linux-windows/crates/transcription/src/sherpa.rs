@@ -20,7 +20,7 @@ use sherpa_onnx::{
     OfflineTransducerModelConfig,
 };
 
-use crate::catalog::{ModelFile, Role};
+use crate::catalog::{LanguageChoice, ModelFile, Role, chosen_language};
 use crate::qwen3_asr::MAX_CLIP_SAMPLES;
 
 /// A model's family, which says which of its files are which and how sherpa-onnx runs it.
@@ -42,8 +42,15 @@ impl Family {
         }
     }
 
-    /// Points `config` at the files, whose paths `path` gives by role.
-    fn configure(self, config: &mut OfflineModelConfig, path: impl Fn(Role) -> String) {
+    /// Whether its models are told which language to write: Cohere Transcribe can't find it, and
+    /// writes nothing at all without one. NeMo transducers find it themselves.
+    pub fn takes_language(self) -> bool {
+        matches!(self, Self::CohereTranscribe)
+    }
+
+    /// Points `config` at the files, whose paths `path` gives by role. `language` is the one a
+    /// family that takes a language writes unless a clip is told another.
+    fn configure(self, config: &mut OfflineModelConfig, path: impl Fn(Role) -> String, language: Option<&str>) {
         match self {
             Self::NemoTransducer => {
                 config.transducer = OfflineTransducerModelConfig {
@@ -58,9 +65,7 @@ impl Family {
                 config.cohere_transcribe = OfflineCohereTranscribeModelConfig {
                     encoder: Some(path(Role::Encoder)),
                     decoder: Some(path(Role::Decoder)),
-                    // The model can't tell the language; the Mac's mlx-audio-swift asks for
-                    // English too.
-                    language: Some(COHERE_LANGUAGE.to_owned()),
+                    language: language.map(str::to_owned),
                     use_punct: true,
                     use_itn: true,
                 };
@@ -69,9 +74,6 @@ impl Family {
         config.tokens = Some(path(Role::Tokens));
     }
 }
-
-/// The language Cohere Transcribe is asked to write.
-const COHERE_LANGUAGE: &str = "en";
 
 /// Clips shorter than 100 ms hold no word, so they give no text without running the model, as
 /// with [`crate::qwen3_asr`].
@@ -133,6 +135,8 @@ impl std::error::Error for TranscribeError {}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SherpaTranscript {
     pub text: String,
+    /// The language the model was told to write, by its name; `None` for a model that finds it.
+    pub language: Option<String>,
     pub tokens: usize,
 }
 
@@ -142,12 +146,22 @@ pub struct SherpaTranscriber {
     recognizer: OfflineRecognizer,
     family: Family,
     threads: usize,
+    /// The languages the model can be told, its default first; empty for a model that finds it.
+    languages: Vec<LanguageChoice>,
 }
 
 impl SherpaTranscriber {
     /// Opens the model of `family` whose `files` are in `folder`, to run on `threads` of the CPU's
-    /// threads. Each file must have been checked first (see the module's documentation).
-    pub(crate) fn open(folder: &Path, family: Family, files: &[ModelFile], threads: usize) -> Result<Self, OpenError> {
+    /// threads. Each file must have been checked first (see the module's documentation). A family
+    /// that takes a language is told one of `languages` for each clip, the first unless the clip
+    /// asks for another; the catalog gives it at least one.
+    pub(crate) fn open(
+        folder: &Path,
+        family: Family,
+        files: &[ModelFile],
+        languages: &[LanguageChoice],
+        threads: usize,
+    ) -> Result<Self, OpenError> {
         let mut paths = Vec::with_capacity(family.roles().len());
         for &role in family.roles() {
             let file = files
@@ -166,8 +180,15 @@ impl SherpaTranscriber {
                 .unwrap_or_default()
         };
 
+        // Only a family that takes a language keeps them.
+        let languages = if family.takes_language() {
+            languages.to_vec()
+        } else {
+            Vec::new()
+        };
         let mut config = OfflineRecognizerConfig::default();
-        family.configure(&mut config.model_config, path);
+        let default_language = languages.first().map(|choice| choice.code.as_str());
+        family.configure(&mut config.model_config, path, default_language);
         let threads = threads.max(1);
         config.model_config.num_threads = i32::try_from(threads).unwrap_or(i32::MAX);
         config.model_config.provider = Some("cpu".to_owned());
@@ -185,6 +206,7 @@ impl SherpaTranscriber {
             recognizer,
             family,
             threads,
+            languages,
         })
     }
 
@@ -198,11 +220,14 @@ impl SherpaTranscriber {
         self.threads
     }
 
-    /// The transcript of `samples`, 16 kHz mono.
-    pub fn transcribe(&self, samples: &[f32]) -> Result<SherpaTranscript, TranscribeError> {
+    /// The transcript of `samples`, 16 kHz mono. A model told which language to write writes
+    /// `language` (the Language setting, a code) if it's one of its languages, and otherwise its
+    /// first ([`chosen_language`]).
+    pub fn transcribe(&self, samples: &[f32], language: Option<&str>) -> Result<SherpaTranscript, TranscribeError> {
         if samples.len() < MINIMUM_SAMPLES {
             return Ok(SherpaTranscript {
                 text: String::new(),
+                language: None,
                 tokens: 0,
             });
         }
@@ -211,6 +236,12 @@ impl SherpaTranscriber {
         }
         let started = Instant::now();
         let stream = self.recognizer.create_stream();
+        // Read for each clip, over the one the model was opened with: a change of language
+        // doesn't load the model again.
+        let told = chosen_language(&self.languages, language);
+        if let Some(choice) = told {
+            stream.set_option("language", &choice.code);
+        }
         stream.accept_waveform(SAMPLE_RATE as i32, samples);
         self.recognizer.decode(&stream);
         let result = stream.get_result().ok_or(TranscribeError::NoResult)?;
@@ -222,6 +253,7 @@ impl SherpaTranscriber {
         );
         Ok(SherpaTranscript {
             text: result.text.trim().to_owned(),
+            language: told.map(|choice| choice.name.clone()),
             tokens: result.tokens.len(),
         })
     }

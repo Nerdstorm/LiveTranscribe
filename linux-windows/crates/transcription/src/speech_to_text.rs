@@ -12,7 +12,7 @@ use crate::sherpa::{self, SherpaTranscriber};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Transcript {
     pub text: String,
-    /// The language the model named, where it names one.
+    /// The language the model named, or was told to write, where there is one.
     pub language: Option<String>,
     /// Tokens in the transcript.
     pub tokens: usize,
@@ -66,11 +66,15 @@ impl SpeechToText {
     pub fn open(model: &VerifiedModel<'_>, device: &DeviceChoice, cache: Option<&Path>) -> Result<Self, OpenError> {
         match &model.model().engine {
             Engine::OpenVino { .. } => Self::open_converted(model.folder(), device, cache),
-            Engine::SherpaOnnx { family, .. } => {
-                SherpaTranscriber::open(model.folder(), *family, &model.model().files, sherpa::default_threads())
-                    .map(Self::SherpaOnnx)
-                    .map_err(OpenError::SherpaOnnx)
-            }
+            Engine::SherpaOnnx { family, .. } => SherpaTranscriber::open(
+                model.folder(),
+                *family,
+                &model.model().files,
+                &model.model().language_choices,
+                sherpa::default_threads(),
+            )
+            .map(Self::SherpaOnnx)
+            .map_err(OpenError::SherpaOnnx),
         }
     }
 
@@ -81,8 +85,10 @@ impl SpeechToText {
             .map_err(OpenError::Qwen3Asr)
     }
 
-    /// The transcript of `samples`, 16 kHz mono.
-    pub fn transcribe(&mut self, samples: &[f32]) -> Result<Transcript, TranscribeError> {
+    /// The transcript of `samples`, 16 kHz mono. `language` is the Language setting
+    /// (`sttLanguage`, a code): a model told which language to write, Cohere Transcribe, writes
+    /// it if it's one of its languages, and otherwise its first; the others find the language.
+    pub fn transcribe(&mut self, samples: &[f32], language: Option<&str>) -> Result<Transcript, TranscribeError> {
         match self {
             Self::Qwen3Asr(transcriber) => transcriber
                 .transcribe(samples)
@@ -93,10 +99,10 @@ impl SpeechToText {
                 })
                 .map_err(TranscribeError::Qwen3Asr),
             Self::SherpaOnnx(transcriber) => transcriber
-                .transcribe(samples)
+                .transcribe(samples, language)
                 .map(|transcript| Transcript {
                     text: transcript.text,
-                    language: None,
+                    language: transcript.language,
                     tokens: transcript.tokens,
                 })
                 .map_err(TranscribeError::SherpaOnnx),

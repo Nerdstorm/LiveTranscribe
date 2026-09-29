@@ -55,6 +55,12 @@ pub(crate) fn notice_ms(settings: &Settings) -> u64 {
     (settings.dictation_notice_seconds * 1_000.0).round() as u64
 }
 
+/// The Language setting each dictation is transcribed with. It goes with the recording to the
+/// model, which is told it for that clip: a change doesn't load the model again.
+pub(crate) fn language(settings: &Settings) -> Option<String> {
+    settings.stt_language.clone()
+}
+
 /// The speech model to load, and where it runs.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ModelChoice {
@@ -95,6 +101,7 @@ mod tests {
             dictation_notice_seconds: 1.5,
             paste_restore_delay_ms: 500,
             input_device_id: Some("pulseaudio:alsa_input.usb".to_owned()),
+            stt_language: Some("de".to_owned()),
             ..Settings::default()
         };
         let controller = controller(&settings);
@@ -111,6 +118,7 @@ mod tests {
         assert_eq!(recorder.device.as_deref(), Some("pulseaudio:alsa_input.usb"));
         assert_eq!(insertion(&settings).restore_delay, Duration::from_millis(500));
         assert_eq!(notice_ms(&settings), 1_500);
+        assert_eq!(language(&settings).as_deref(), Some("de"));
     }
 
     #[test]
@@ -143,5 +151,20 @@ mod tests {
             ModelChoice::from_settings(&settings, catalog, models)
         };
         assert_eq!(on("NPU"), on("CPU"), "no reload for a change of device");
+    }
+
+    #[test]
+    fn a_change_of_language_doesnt_load_the_model_again() {
+        let catalog = SpeechModelCatalog::bundled();
+        let models = Path::new("/models");
+        let on = |language: Option<&str>| {
+            let settings = Settings {
+                stt_model: Some("cohere-transcribe".to_owned()),
+                stt_language: language.map(str::to_owned),
+                ..Settings::default()
+            };
+            ModelChoice::from_settings(&settings, catalog, models)
+        };
+        assert_eq!(on(Some("de")), on(None), "each clip is told its language instead");
     }
 }

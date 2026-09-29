@@ -26,6 +26,7 @@ pub fn run(options: &ModelOptions, files: &[PathBuf], json: bool) -> anyhow::Res
             chosen.name()
         );
     }
+    let language = told_language(&chosen, options.language.as_deref())?;
     let cache = paths::openvino_cache();
     let started;
     let opened = match &chosen {
@@ -57,7 +58,7 @@ pub fn run(options: &ModelOptions, files: &[PathBuf], json: bool) -> anyhow::Res
         let samples = wav::read_mono(file)?;
         let started = Instant::now();
         let transcript = speech
-            .transcribe(&samples)
+            .transcribe(&samples, language)
             .with_context(|| format!("couldn't transcribe {}", file.display()))?;
         let elapsed = started.elapsed().as_secs_f32();
         let seconds = samples.len() as f32 / SAMPLE_RATE as f32;
@@ -112,6 +113,38 @@ fn chosen(option: Option<&str>, library: &SpeechModelLibrary) -> anyhow::Result<
         );
     }
     Ok(chosen)
+}
+
+/// The code of the language `--language` names, for the model chosen: `None` without the option,
+/// and for a model that finds the language itself, which is said on standard error. A language
+/// the model can't be told is refused.
+fn told_language<'a>(chosen: &'a ChosenModel, option: Option<&str>) -> anyhow::Result<Option<&'a str>> {
+    let Some(text) = option else { return Ok(None) };
+    let choices = match chosen {
+        ChosenModel::Catalog(model) => model.language_choices.as_slice(),
+        ChosenModel::Converted(_) => &[],
+    };
+    if choices.is_empty() {
+        eprintln!(
+            "⚠ {} finds the language itself: --language is for Cohere Transcribe",
+            chosen.name()
+        );
+        return Ok(None);
+    }
+    match choices.iter().find(|choice| choice.is_named(text)) {
+        Some(choice) => Ok(Some(choice.code.as_str())),
+        None => {
+            let known: Vec<String> = choices
+                .iter()
+                .map(|choice| format!("{} ({})", choice.code, choice.name))
+                .collect();
+            anyhow::bail!(
+                "{} can't be told to write {text}: it writes {}",
+                chosen.name(),
+                known.join(", ")
+            )
+        }
+    }
 }
 
 /// Says on standard error how far a download has got, every 5%, and when each stage finishes.
@@ -180,6 +213,24 @@ mod tests {
             done,
             total: 100,
         }
+    }
+
+    #[test]
+    fn a_language_is_named_by_its_code_or_name_and_told_only_to_a_model_that_takes_one() {
+        let catalog = SpeechModelCatalog::bundled();
+        let cohere = ChosenModel::Catalog(catalog.model("cohere-transcribe").unwrap());
+        assert_eq!(told_language(&cohere, Some("German")).unwrap(), Some("de"));
+        assert_eq!(told_language(&cohere, Some("ja")).unwrap(), Some("ja"));
+        assert_eq!(told_language(&cohere, None).unwrap(), None, "the model's first");
+        let error = told_language(&cohere, Some("Sinhala")).unwrap_err().to_string();
+        assert!(error.contains("de (German)"), "{error}");
+
+        let parakeet = ChosenModel::Catalog(catalog.model("parakeet-tdt-0.6b-v3").unwrap());
+        assert_eq!(
+            told_language(&parakeet, Some("de")).unwrap(),
+            None,
+            "it finds the language"
+        );
     }
 
     #[test]

@@ -5,7 +5,9 @@
 //! A model has a section for each platform it runs on (`mac`, `linux`, `windows`); this build
 //! reads its own platform's and leaves out a model without one, so each app has its own list, and
 //! a model is named, described and credited alike everywhere. Every file is pinned: to a Hugging
-//! Face commit and each file's SHA-256, or to an archive's SHA-256 and each file's in it.
+//! Face commit and each file's SHA-256, or to an archive's SHA-256 and each file's in it. A model
+//! that is told which language to write, where others find it, lists the languages it can be told
+//! (`language_choices`), for the Language setting.
 //!
 //! [`SpeechModel::verify`] checks a model's folder against those before the model is opened:
 //! sherpa-onnx aborts the process on a file ONNX Runtime can't read ([`crate::sherpa`]), so only
@@ -72,9 +74,39 @@ pub struct SpeechModel {
     pub licence: String,
     /// Who made it, and converted it for this platform, credited as its licence asks.
     pub credit: String,
+    /// The languages it can be told to write, its default first; empty for a model that finds
+    /// the language itself, or that this platform's engine can't tell one.
+    pub language_choices: Vec<LanguageChoice>,
     pub engine: Engine,
     /// Its files, as they are in its folder.
     pub files: Vec<ModelFile>,
+}
+
+/// A language a model can be told to write.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct LanguageChoice {
+    /// Its ISO 639-1 code, as the model is told it: `en`, `de`.
+    pub code: String,
+    /// Its name in English, as Settings shows it.
+    pub name: String,
+}
+
+impl LanguageChoice {
+    /// Whether `text` names it: its code or its name, in any case.
+    pub fn is_named(&self, text: &str) -> bool {
+        let text = text.trim();
+        self.code.eq_ignore_ascii_case(text) || self.name.eq_ignore_ascii_case(text)
+    }
+}
+
+/// The language of `choices` to tell a model, for the Language setting (`sttLanguage`, a code):
+/// the setting's, if it's one of them, and otherwise the first, the default. `None` when there
+/// are no choices.
+pub fn chosen_language<'a>(choices: &'a [LanguageChoice], setting: Option<&str>) -> Option<&'a LanguageChoice> {
+    setting
+        .and_then(|code| choices.iter().find(|choice| choice.code == code))
+        .or_else(|| choices.first())
 }
 
 /// What runs a model on this platform, and where its files come from.
@@ -86,6 +118,14 @@ pub enum Engine {
     /// sherpa-onnx ([`crate::sherpa`]), on the CPU: some of the files of an archive sherpa-onnx
     /// publishes.
     SherpaOnnx { family: Family, archive: Archive },
+}
+
+impl Engine {
+    /// Whether it tells the model which language to write. Our Qwen3-ASR runtime lets the model
+    /// find it.
+    pub fn takes_language(&self) -> bool {
+        matches!(self, Self::SherpaOnnx { family, .. } if family.takes_language())
+    }
 }
 
 /// An archive a model's files are unpacked from: a `.tar.bz2` with a folder at its top.
@@ -122,6 +162,12 @@ pub enum Role {
 }
 
 impl SpeechModel {
+    /// The language to tell it to write, for the Language setting ([`chosen_language`]); `None`
+    /// for a model that isn't told one.
+    pub fn language(&self, setting: Option<&str>) -> Option<&LanguageChoice> {
+        chosen_language(&self.language_choices, setting)
+    }
+
     /// How much a download fetches.
     pub fn download_bytes(&self) -> u64 {
         match &self.engine {
@@ -417,17 +463,22 @@ impl SpeechModelCatalog {
                     credit,
                 } => (Engine::SherpaOnnx { family, archive }, files, credit),
             };
-            let model = SpeechModel {
+            let mut model = SpeechModel {
                 credit: credit.unwrap_or(entry.credit),
                 id: entry.id,
                 name: entry.name,
                 summary: entry.summary,
                 languages: entry.languages,
                 licence: entry.licence,
+                language_choices: entry.language_choices,
                 engine,
                 files,
             };
             check(&model).map_err(|problem| invalid(&model.id, problem))?;
+            // Another platform's engine may tell the model; this one lets it find the language.
+            if !model.engine.takes_language() {
+                model.language_choices.clear();
+            }
             models.push(model);
         }
         Ok(Self { models })
@@ -440,6 +491,15 @@ impl SpeechModelCatalog {
     /// The model with `id`, if this platform has it.
     pub fn model(&self, id: &str) -> Option<&SpeechModel> {
         self.models.iter().find(|model| model.id == id)
+    }
+
+    /// The language `text` names, by its code or its name, of those this platform's models can
+    /// be told.
+    pub fn language_named(&self, text: &str) -> Option<&LanguageChoice> {
+        self.models
+            .iter()
+            .flat_map(|model| &model.language_choices)
+            .find(|choice| choice.is_named(text))
     }
 }
 
@@ -479,6 +539,27 @@ fn check(model: &SpeechModel) -> Result<(), String> {
         if !is_sha256(&file.sha256) {
             return Err(format!("{}'s SHA-256 isn't 64 lowercase hex digits", file.name));
         }
+    }
+    let mut codes = HashSet::new();
+    for choice in &model.language_choices {
+        // Codes go into a prompt token (`<|de|>`) and a C string, so they're only ever letters.
+        let is_code =
+            (2..=3).contains(&choice.code.len()) && choice.code.chars().all(|letter| letter.is_ascii_lowercase());
+        if !is_code {
+            return Err(format!(
+                "{:?} isn't a language code of 2 or 3 lowercase letters",
+                choice.code
+            ));
+        }
+        if choice.name.trim().is_empty() {
+            return Err(format!("the language {} has no name", choice.code));
+        }
+        if !codes.insert(choice.code.as_str()) {
+            return Err(format!("the language {} is listed twice", choice.code));
+        }
+    }
+    if model.engine.takes_language() && model.language_choices.is_empty() {
+        return Err("it's told which language to write, and has no language_choices".to_owned());
     }
     match &model.engine {
         Engine::OpenVino { repository, revision } => {
@@ -539,6 +620,8 @@ struct Entry {
     languages: String,
     licence: String,
     credit: String,
+    #[serde(default)]
+    language_choices: Vec<LanguageChoice>,
     linux: Option<Section>,
     windows: Option<Section>,
 }
@@ -566,7 +649,7 @@ enum Section {
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
+    use serde_json::{Value, json};
 
     use super::*;
 
@@ -603,10 +686,36 @@ mod tests {
             "format": 1,
             "models": [{
                 "id": "test-model", "name": "Test", "summary": "For tests.", "languages": "English",
-                "licence": "MIT", "credit": "Us", "linux": section, "windows": section,
+                "licence": "MIT", "credit": "Us", "language_choices": [{"code": "en", "name": "English"}],
+                "linux": section, "windows": section,
             }],
         });
         SpeechModelCatalog::parse(&text.to_string(), Platform::Linux).unwrap()
+    }
+
+    /// A catalog of one model with `language_choices` and the section `linux`.
+    fn parse_with_languages(language_choices: Value, linux: Value) -> Result<SpeechModelCatalog, CatalogError> {
+        let text = json!({
+            "format": 1,
+            "models": [{
+                "id": "told", "name": "Told", "summary": "", "languages": "", "licence": "MIT", "credit": "",
+                "language_choices": language_choices, "linux": linux,
+            }],
+        });
+        SpeechModelCatalog::parse(&text.to_string(), Platform::Linux)
+    }
+
+    fn cohere_section() -> Value {
+        json!({
+            "engine": "sherpa-onnx",
+            "family": "cohere-transcribe",
+            "archive": {"url": "https://example.com/c.tar.bz2", "bytes": 1, "sha256": sha256(b"c")},
+            "files": [
+                {"name": "encoder.onnx", "bytes": 1, "sha256": sha256(b"e"), "role": "encoder"},
+                {"name": "decoder.onnx", "bytes": 1, "sha256": sha256(b"d"), "role": "decoder"},
+                {"name": "tokens.txt", "bytes": 1, "sha256": sha256(b"t"), "role": "tokens"},
+            ],
+        })
     }
 
     fn cohere_files() -> Vec<(&'static str, &'static [u8], Option<&'static str>)> {
@@ -670,6 +779,85 @@ mod tests {
         assert!(model.installed_bytes() > archive.bytes, "unpacked, it's bigger");
         assert!(model.credit.contains("sherpa-onnx"), "{}", model.credit);
         assert!(!model.credit.contains("MLX"), "the Mac's credit is the Mac's");
+    }
+
+    #[test]
+    fn cohere_transcribe_is_told_the_languages_sherpa_onnx_takes() {
+        let catalog = SpeechModelCatalog::parse(BUNDLED, Platform::Linux).unwrap();
+        let cohere = catalog.model("cohere-transcribe").unwrap();
+        let mut codes: Vec<_> = cohere
+            .language_choices
+            .iter()
+            .map(|choice| choice.code.as_str())
+            .collect();
+        assert_eq!(codes[0], "en", "English is the default");
+        codes.sort_unstable();
+        // IsValidCohereTranscribeLanguage, in sherpa-onnx's offline-recognizer-cohere-transcribe-impl.h:
+        // with any other, it decodes nothing.
+        assert_eq!(
+            codes,
+            [
+                "ar", "de", "el", "en", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "vi", "zh"
+            ]
+        );
+        for id in ["qwen3-asr-0.6b-sinhala", "parakeet-tdt-0.6b-v2", "parakeet-tdt-0.6b-v3"] {
+            let model = catalog.model(id).unwrap();
+            assert!(model.language_choices.is_empty(), "{id} finds the language itself");
+        }
+    }
+
+    #[test]
+    fn the_language_told_is_the_settings_if_the_model_has_it_and_else_its_first() {
+        let catalog = SpeechModelCatalog::parse(BUNDLED, Platform::Linux).unwrap();
+        let cohere = catalog.model("cohere-transcribe").unwrap();
+        let told = |setting| cohere.language(setting).map(|choice| choice.code.as_str());
+        assert_eq!(told(Some("de")), Some("de"));
+        assert_eq!(told(None), Some("en"));
+        assert_eq!(told(Some("si")), Some("en"), "Sinhala isn't one of its languages");
+        assert_eq!(
+            catalog.model("parakeet-tdt-0.6b-v3").unwrap().language(Some("de")),
+            None
+        );
+    }
+
+    #[test]
+    fn a_language_is_named_by_its_code_or_its_name() {
+        let catalog = SpeechModelCatalog::parse(BUNDLED, Platform::Linux).unwrap();
+        let named = |text| catalog.language_named(text).map(|choice| choice.code.as_str());
+        assert_eq!(named("de"), Some("de"));
+        assert_eq!(named(" German "), Some("de"));
+        assert_eq!(named("JA"), Some("ja"));
+        assert_eq!(named("Sinhala"), None);
+    }
+
+    #[test]
+    fn language_choices_that_arent_codes_or_are_missing_are_refused() {
+        for (choices, problem) in [
+            (json!([{"code": "EN", "name": "English"}]), "isn't a language code"),
+            (json!([{"code": "en-us", "name": "English"}]), "isn't a language code"),
+            (json!([{"code": "en", "name": " "}]), "has no name"),
+            (
+                json!([{"code": "en", "name": "English"}, {"code": "en", "name": "Also English"}]),
+                "listed twice",
+            ),
+            (json!([]), "has no language_choices"),
+        ] {
+            let error = parse_with_languages(choices, cohere_section()).unwrap_err();
+            assert!(error.to_string().contains(problem), "{error}");
+        }
+    }
+
+    #[test]
+    fn a_model_this_platform_cant_tell_keeps_no_language_choices() {
+        let openvino = json!({
+            "engine": "openvino",
+            "repository": "a/b",
+            "revision": "8298d9b2d532965800b2c0c64b81965ededb03a3",
+            "files": [{"name": "model.bin", "bytes": 1, "sha256": sha256(b"x")}],
+        });
+        let catalog = parse_with_languages(json!([{"code": "en", "name": "English"}]), openvino).unwrap();
+        assert!(catalog.models()[0].language_choices.is_empty());
+        assert_eq!(catalog.language_named("English"), None);
     }
 
     #[test]

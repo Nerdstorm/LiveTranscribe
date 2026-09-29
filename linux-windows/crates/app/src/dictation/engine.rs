@@ -114,6 +114,7 @@ impl Engine {
             self.session,
             self.messages.clone(),
             PanelModel::new(configuration::notice_ms(&self.settings)),
+            configuration::language(&self.settings),
             clock,
         );
         let mut running = Running {
@@ -334,6 +335,17 @@ impl Running {
         }
         if before.cleanup_level != after.cleanup_level {
             eprintln!("Cleanup: {}", after.cleanup_level.display_name());
+        }
+        if before.stt_language != after.stt_language {
+            let catalog = self.library.catalog();
+            match after
+                .stt_language
+                .as_deref()
+                .and_then(|code| catalog.language_named(code))
+            {
+                Some(choice) => eprintln!("Language: {}", choice.name),
+                None => eprintln!("Language: the speech model's default"),
+            }
         }
         if cancel && self.controller.is_recording() {
             self.controller.cancel();

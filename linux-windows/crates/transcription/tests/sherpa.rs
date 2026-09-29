@@ -44,8 +44,9 @@ fn parakeet_transcribes_its_test_clip() {
     let clip = folder.join("test_wavs").join("0.wav");
     let wave = sherpa_onnx::Wave::read(clip.to_str().unwrap()).expect("the model's test clip reads");
     assert_eq!(wave.sample_rate(), 16_000, "the rate the app records at");
-    let transcript = speech.transcribe(wave.samples()).unwrap();
+    let transcript = speech.transcribe(wave.samples(), Some("de")).unwrap();
     assert_eq!(transcript.text, EXPECTED);
+    assert_eq!(transcript.language, None, "Parakeet finds the language: it's told none");
     assert!(speech.placement().starts_with("CPU"), "{}", speech.placement());
 }
 

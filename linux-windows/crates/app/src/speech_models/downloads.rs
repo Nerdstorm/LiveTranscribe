@@ -167,7 +167,7 @@ pub(crate) mod tests {
     use std::sync::{Arc, Mutex};
     use std::thread;
 
-    use lt_transcription::catalog::{Archive, ModelFile, Platform, Role, SpeechModelCatalog, hex};
+    use lt_transcription::catalog::{Archive, LanguageChoice, ModelFile, Platform, Role, SpeechModelCatalog, hex};
     use lt_transcription::sherpa::Family;
     use serde_json::json;
     use sha2::{Digest, Sha256};
@@ -337,6 +337,10 @@ pub(crate) mod tests {
             languages: "English".to_owned(),
             licence: "MIT".to_owned(),
             credit: "Us".to_owned(),
+            language_choices: vec![LanguageChoice {
+                code: "en".to_owned(),
+                name: "English".to_owned(),
+            }],
             engine: Engine::SherpaOnnx {
                 family: Family::CohereTranscribe,
                 archive: Archive {

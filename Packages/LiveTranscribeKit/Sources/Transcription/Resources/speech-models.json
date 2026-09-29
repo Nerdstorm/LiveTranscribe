@@ -192,10 +192,26 @@
     {
       "id": "cohere-transcribe",
       "name": "Cohere Transcribe",
-      "summary": "Accurate in European and Asian languages.",
+      "summary": "Accurate in European and Asian languages: it writes the one you choose.",
       "languages": "14 languages",
       "licence": "Apache-2.0",
       "credit": "Cohere Transcribe by Cohere Labs, converted to MLX by beshkenadze on Hugging Face",
+      "language_choices": [
+        {"code": "en", "name": "English"},
+        {"code": "ar", "name": "Arabic"},
+        {"code": "zh", "name": "Chinese"},
+        {"code": "nl", "name": "Dutch"},
+        {"code": "fr", "name": "French"},
+        {"code": "de", "name": "German"},
+        {"code": "el", "name": "Greek"},
+        {"code": "it", "name": "Italian"},
+        {"code": "ja", "name": "Japanese"},
+        {"code": "ko", "name": "Korean"},
+        {"code": "pl", "name": "Polish"},
+        {"code": "pt", "name": "Portuguese"},
+        {"code": "es", "name": "Spanish"},
+        {"code": "vi", "name": "Vietnamese"}
+      ],
       "mac": {
         "repository": "beshkenadze/cohere-transcribe-03-2026-mlx-8bit",
         "revision": "d1f843476f84846e6fe7aa58a6033f17882f0ec9",

@@ -21,7 +21,16 @@ use crate::paths;
 use crate::speech_models::{ChosenModel, EnsureError, SpeechModelLibrary};
 
 /// Where the engine sends what to transcribe.
-pub(crate) type Jobs = Sender<(Job, Vec<f32>)>;
+pub(crate) type Jobs = Sender<Clip>;
+
+/// A recording to transcribe.
+pub(crate) struct Clip {
+    pub(crate) job: Job,
+    pub(crate) samples: Vec<f32>,
+    /// The Language setting when it was recorded, which a model told the language to write is
+    /// told for this clip.
+    pub(crate) language: Option<String>,
+}
 
 /// The model's thread, while it lives.
 pub(crate) struct Transcriber {
@@ -39,7 +48,7 @@ impl Transcriber {
         messages: Sender<Message>,
         library: Arc<SpeechModelLibrary>,
     ) -> anyhow::Result<(Self, Jobs)> {
-        let (jobs, received) = mpsc::channel::<(Job, Vec<f32>)>();
+        let (jobs, received) = mpsc::channel::<Clip>();
         let abandon = Arc::new(AtomicBool::new(false));
         let abandoned = Arc::clone(&abandon);
         let thread = thread::Builder::new()
@@ -57,7 +66,7 @@ impl Transcriber {
                     }
                 };
                 // The first run of a compiled model is slow; better now than on the first dictation.
-                if let Err(error) = speech.transcribe(&vec![0.0; SAMPLE_RATE]) {
+                if let Err(error) = speech.transcribe(&vec![0.0; SAMPLE_RATE], None) {
                     tracing::warn!("Warming up the speech model failed: {error}");
                 }
                 let placement = speech.placement();
@@ -72,10 +81,10 @@ impl Transcriber {
                 if messages.send(loaded).is_err() {
                     return;
                 }
-                for (job, samples) in received {
+                for Clip { job, samples, language } in received {
                     let started = Instant::now();
                     let result = speech
-                        .transcribe(&samples)
+                        .transcribe(&samples, language.as_deref())
                         .map(|transcript| transcript.text)
                         .map_err(|error| error.to_string());
                     tracing::info!(

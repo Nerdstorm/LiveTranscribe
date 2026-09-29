@@ -46,6 +46,10 @@ pub struct Options {
     /// can't run), or only on one OpenVINO device: CPU, GPU or NPU [default: Settings']
     #[arg(long, value_name = "DEVICE")]
     device: Option<String>,
+    /// The language Cohere Transcribe writes, by its code or name, such as de or German; the
+    /// other models find the language themselves [default: Settings', at first English]
+    #[arg(long, value_name = "LANGUAGE")]
+    language: Option<String>,
     /// The key to hold, as linux/input-event-codes.h names it (`livetranscribe keys` shows the
     /// name of each key you press) [default: Settings', at first KEY_RIGHTCTRL]
     #[arg(long, value_name = "KEY")]
@@ -68,6 +72,9 @@ impl Options {
         }
         if let Some(device) = &self.device {
             overrides.insert("sttDevice".to_owned(), Value::from(device.as_str()));
+        }
+        if let Some(language) = &self.language {
+            overrides.insert("sttLanguage".to_owned(), Value::from(language.as_str()));
         }
         if let Some(key) = &self.key {
             overrides.insert("dictationHotkey".to_owned(), Value::from(key.as_str()));
@@ -365,12 +372,16 @@ mod tests {
             "CPU",
             "--model",
             "/srv/models/mine",
+            "--language",
+            "German",
         ]);
         assert_eq!(given["dictationHotkey"], "KEY_F23");
         assert_eq!(given["handsFreeEnabled"], false);
         assert_eq!(given["cleanupLevel"], "light");
         assert_eq!(given["sttDevice"], "CPU");
         assert_eq!(given["sttModel"], "/srv/models/mine");
+        // The settings keep it by its code (Settings::changed).
+        assert_eq!(given["sttLanguage"], "German");
     }
 
     #[test]

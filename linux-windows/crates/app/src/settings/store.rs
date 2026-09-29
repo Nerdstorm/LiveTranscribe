@@ -236,6 +236,14 @@ mod tests {
     }
 
     #[test]
+    fn a_language_from_the_command_line_is_kept_by_its_code() {
+        let folder = Folder::new("language");
+        let (store, problems) = SettingsStore::open(folder.settings(), map(json!({"sttLanguage": "German"})));
+        assert!(problems.is_empty(), "{problems:?}");
+        assert_eq!(store.settings().stt_language.as_deref(), Some("de"));
+    }
+
+    #[test]
     fn invalid_command_line_settings_are_reported_and_left_out() {
         let folder = Folder::new("bad-overrides");
         let (store, problems) = SettingsStore::open(folder.settings(), map(json!({"dictationHotkey": "KEY_NOPE"})));
