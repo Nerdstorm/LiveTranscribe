@@ -287,7 +287,9 @@ this repository.
 
 **Settings › Models** offers other speech-to-text models to download and switch to, without a
 restart: Qwen3-ASR 0.6B and 1.7B, Parakeet TDT v2 (English) and v3 (European languages), Whisper
-large-v3-turbo and Cohere Transcribe, each credited there with its licence. They are listed in
+large-v3-turbo and Cohere Transcribe, each credited there with its licence. Cohere Transcribe
+can't tell which language it hears, so its row also chooses which of its 14 it writes (English at
+first); the others find the language themselves. They are listed in
 [`speech-models.json`](Packages/LiveTranscribeKit/Sources/Transcription/Resources/speech-models.json),
 each pinned to the commit of its repository that was tested, and the Linux and Windows app
 reads the same list. **Another model** there takes any Hugging Face repository that

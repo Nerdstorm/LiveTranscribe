@@ -15,8 +15,8 @@ opens Settings, whose General, Models and Advanced tabs change dictation without
 Settings › Models chooses the speech model from the catalog the Mac app reads too, and downloads
 and removes them: by default the Mac app's Sinhala fine-tune of Qwen3-ASR, which runs on the NPU of
 an Intel Core Ultra or on the CPU, and NVIDIA's Parakeet TDT 0.6B v2 (English) and v3 (25 European
-languages) and Cohere Transcribe, which run on the CPU with sherpa-onnx. Settings' other tabs, the
-history window, and Windows come later.
+languages) and Cohere Transcribe (the one of its 14 languages chosen on its row), which run on the
+CPU with sherpa-onnx. Settings' other tabs, the history window, and Windows come later.
 
 ## Building and testing
 
@@ -109,7 +109,7 @@ later starts hash only the files that changed. The tray and Settings show the pr
 that stops carries on where it stopped the next time; after that the app never goes online for the
 model again. `livetranscribe models` lists the catalog, and
 `livetranscribe transcribe --model parakeet-tdt-0.6b-v2 clip.wav` transcribes with one of its
-models, downloading it first. Intel's NPU driver isn't in the packages either: the rpm recommends
+models, downloading it first; `--language de` tells Cohere Transcribe which language to write. Intel's NPU driver isn't in the packages either: the rpm recommends
 Fedora's `intel-npu-driver`, and without one the Qwen3-ASR models run on the CPU.
 
 To build them by hand, in Ubuntu 22.04 with Tauri's build dependencies and the Tauri CLI 2.12:
@@ -234,6 +234,15 @@ There, a first use downloaded, unpacked and checked a model in 30 to 40 s (Parak
 (Qwen3-ASR, 1.1 GB) or 2.5 minutes (Cohere Transcribe, 1.7 GB). Later starts check only the files
 that changed, and load in 0.5 s (Qwen3-ASR, from OpenVINO's cache), 1.5 s (Parakeet) or 4 s
 (Cohere Transcribe).
+
+Cohere Transcribe can't tell which language it hears, so each clip is told the one chosen on its
+row in Settings › Models (English at first, as above), and choosing another applies from the next
+dictation without loading the model again. With a development build on a Mac: told their
+languages, it wrote the sample clips sherpa-onnx publishes with it in Chinese, Korean, Vietnamese,
+Arabic, French, Spanish and German, where told English it wrote made-up English for the Chinese
+and Korean ones (5 and 7 s long). On longer recordings, English mostly follows the audio anyway: on
+30 of FLEURS German's, 5.29% WER told English and 5.15% told German, and on 15 of FLEURS Mandarin's,
+23.4% and 22.2% character error rate.
 
 ## Matching the Mac app
 

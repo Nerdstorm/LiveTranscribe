@@ -45,8 +45,8 @@ On first start, the speech model, Nerdstorm/Qwen3-ASR-0.6B-Sinhala-OpenVINO from
 (about 1.1 GB, CC BY-SA 4.0), into ~/.local/share/live-transcribe/models, checking the connection
 with the system's CA certificates (the deb and rpm depend on ca-certificates). Settings › Models
 downloads the others when you choose one: NVIDIA's Parakeet TDT 0.6B v2 and v3 (0.5 GB each,
-CC BY 4.0) and Cohere Transcribe (1.7 GB, Apache 2.0), which the sherpa-onnx project publishes on
-GitHub. Each file is checked against the size and SHA-256 the app was built with. It keeps its
+CC BY 4.0) and Cohere Transcribe (1.7 GB, Apache 2.0; it writes the one of its 14 languages chosen
+there), which the sherpa-onnx project publishes on GitHub. Each file is checked against the size and SHA-256 the app was built with. It keeps its
 settings in ~/.config/live-transcribe and OpenVINO's compiled models in ~/.cache/live-transcribe.
 
 The NPU
