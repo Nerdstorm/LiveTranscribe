@@ -2367,6 +2367,7 @@ version = "0.1.0"
 dependencies = [
  "lt-shared",
  "lt-styles",
+ "tracing",
 ]
 
 [[package]]
