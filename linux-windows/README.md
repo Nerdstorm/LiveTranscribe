@@ -54,7 +54,7 @@ same place in both apps:
 | `lt-spoken-commands` | `SpokenCommands` | Emoji, dictated punctuation, line breaks, email and web addresses |
 | `lt-snippets` | `Snippets` | The user's snippets |
 | `lt-vocabulary` | `Vocabulary` | The user's vocabulary |
-| `lt-cleanup` | `Cleanup` | Cleanup at each level; for now the rules that need no language model |
+| `lt-cleanup` | `Cleanup` | Cleanup at each level: the rules that need no language model, the prompt, the output guard, and the executor that runs a model behind the `CleanupModel` trait under a deadline. `Fixtures/cleanup` checks it against the Mac app |
 | `lt-dictation` | `Dictation` | The dictation flow from hotkey to typed text, and a transcript to the text it types |
 | `lt-transcription` | `Transcription`, and mlx-audio-swift's Qwen3-ASR | Speech to text: the log-mel features, the encoder's chunks and windows, the prompt, greedy decoding and its limits. The model's forward passes are behind the `SpeechModel` trait; `OpenVinoModel` runs them on OpenVINO. `sherpa` runs the catalog's other models through sherpa-onnx, on the CPU. `catalog` reads the speech model catalog and checks a model's files before it's opened; `speech_to_text` opens a model with its engine |
 | `lt-hotkey` | `Hotkey` | The hold, tap and double-tap gesture; what each key means for it; on Linux, reading the keyboards (evdev) |

@@ -11,7 +11,8 @@
 //! - [`OutputGuard`] decides whether the model's output may replace the text, with the checks
 //!   for self-corrections, dropped words, names and content words.
 //!
-//! Dictated text is never logged.
+//! The fixtures in `Fixtures/cleanup` hold the Mac app's prompts, verdicts and executor traces;
+//! the tests check this port against them. Dictated text is never logged.
 
 mod cleanup_executor;
 mod cleanup_model;
@@ -30,6 +31,8 @@ mod spoken_names;
 mod word_alignment;
 mod words;
 
+#[cfg(test)]
+mod fixtures;
 #[cfg(test)]
 mod test_support;
 
