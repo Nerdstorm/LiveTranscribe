@@ -33,10 +33,10 @@ pub struct Settings {
     pub dictation_max_recording_seconds: u32,
     pub dictation_notice_seconds: f64,
     pub paste_restore_delay_ms: u64,
-    /// The speech model: a folder in the app's models folder, or a path to one; `None` for the
-    /// default model.
+    /// The speech model: a catalog model's id, or a folder the setup kit converted a model into,
+    /// in the app's models folder or a path; `None` for the default model.
     pub stt_model: Option<String>,
-    /// Where the speech model runs: one of [`DEVICES`].
+    /// Where a Qwen3-ASR model runs: one of [`DEVICES`]. The catalog's other models run on the CPU.
     pub stt_device: String,
     /// Keys this version doesn't know, kept for the version that wrote them.
     #[serde(flatten)]
@@ -65,8 +65,9 @@ impl Default for Settings {
     }
 }
 
-/// The settings on the Advanced tab, which its Restore Defaults resets, as the Mac's does.
-pub const ADVANCED_KEYS: [&str; 2] = ["sttModel", "sttDevice"];
+/// The settings on the Advanced tab, which its Restore Defaults resets, as the Mac's does. The
+/// model is chosen in the Models tab.
+pub const ADVANCED_KEYS: [&str; 1] = ["sttDevice"];
 
 impl Settings {
     /// Every key the settings have.

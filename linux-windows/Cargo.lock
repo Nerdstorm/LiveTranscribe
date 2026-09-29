@@ -2327,6 +2327,7 @@ name = "lt-app"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "bzip2 0.5.2",
  "clap",
  "dirs 6.0.0",
  "hound",
@@ -2343,6 +2344,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "tar",
  "tauri",
  "tauri-build",
  "tracing",
@@ -2454,6 +2456,7 @@ dependencies = [
  "realfft",
  "serde",
  "serde_json",
+ "sha2",
  "sherpa-onnx",
  "tracing",
 ]

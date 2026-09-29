@@ -1,37 +1,62 @@
 //! `livetranscribe transcribe`: each file's transcript on standard output, one line per file (or
-//! with `--json`, one JSON object per file), and how long it took on standard error.
+//! with `--json`, one JSON object per file), and how long it took on standard error. And
+//! `livetranscribe models`, the speech models it can download.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::Context;
 use lt_shared::audio_format::SAMPLE_RATE;
-use lt_transcription::qwen3_asr::open_transcriber;
+use lt_transcription::catalog::SpeechModelCatalog;
+use lt_transcription::qwen3_asr::DeviceChoice;
+use lt_transcription::speech_to_text::SpeechToText;
 
-use crate::{ModelOptions, model_download, paths, wav};
+use crate::speech_models::{
+    ChosenModel, DEFAULT_MODEL, DownloadState, Progress, SpeechModelDownloads, SpeechModelLibrary, Stage,
+};
+use crate::{ModelOptions, paths, wav};
 
 pub fn run(options: &ModelOptions, files: &[PathBuf], json: bool) -> anyhow::Result<()> {
-    let folder = match &options.model {
-        Some(folder) => folder.clone(),
-        None => paths::default_model()?,
-    };
-    if options.model.is_none() && !model_download::is_in_place(&folder) {
-        download(&folder)?;
+    let library = library()?;
+    let chosen = chosen(options.model.as_deref(), &library)?;
+    if !chosen.runs_on_openvino() && options.device != DeviceChoice::Auto {
+        eprintln!(
+            "⚠ {} runs on the CPU: --device is for the Qwen3-ASR models",
+            chosen.name()
+        );
     }
-    let started = Instant::now();
-    let mut transcriber = open_transcriber(&folder, &options.device, paths::openvino_cache().as_deref())
-        .with_context(|| format!("couldn't load the speech model from {}", folder.display()))?;
+    let cache = paths::openvino_cache();
+    let started;
+    let opened = match &chosen {
+        ChosenModel::Catalog(model) => {
+            let mut shown = None;
+            let verified = library
+                .ensure(model, &mut |progress| {
+                    show(progress, &mut shown);
+                    true
+                })
+                .with_context(|| format!("couldn't download {}", model.name))?;
+            started = Instant::now();
+            SpeechToText::open(&verified, &options.device, cache.as_deref())
+        }
+        ChosenModel::Converted(folder) => {
+            started = Instant::now();
+            SpeechToText::open_converted(folder, &options.device, cache.as_deref())
+        }
+    };
+    let mut speech = opened.with_context(|| format!("couldn't load {}", chosen.name()))?;
     eprintln!(
         "Loaded {} in {:.1} s: {}",
-        folder.display(),
+        chosen.name(),
         started.elapsed().as_secs_f32(),
-        transcriber.model().placement()
+        speech.placement()
     );
 
     for file in files {
         let samples = wav::read_mono(file)?;
         let started = Instant::now();
-        let transcription = transcriber
+        let transcript = speech
             .transcribe(&samples)
             .with_context(|| format!("couldn't transcribe {}", file.display()))?;
         let elapsed = started.elapsed().as_secs_f32();
@@ -40,44 +65,100 @@ pub fn run(options: &ModelOptions, files: &[PathBuf], json: bool) -> anyhow::Res
             "{}: {seconds:.1} s of audio in {elapsed:.2} s ({:.2} of real time), {}, {} tokens",
             file.display(),
             elapsed / seconds.max(f32::EPSILON),
-            transcription.language.as_deref().unwrap_or("no language"),
-            transcription.tokens
+            transcript.language.as_deref().unwrap_or("no language"),
+            transcript.tokens
         );
         if json {
             let line = serde_json::json!({
                 "file": file,
-                "text": transcription.text,
-                "language": transcription.language,
-                "tokens": transcription.tokens,
+                "text": transcript.text,
+                "language": transcript.language,
+                "tokens": transcript.tokens,
                 "seconds": seconds,
                 "elapsed": elapsed,
             });
             println!("{line}");
         } else {
-            println!("{}", transcription.text);
+            println!("{}", transcript.text);
         }
     }
     Ok(())
 }
 
-/// Downloads the default model into `folder`, as dictation does the first time, saying on standard
-/// error how far it has got.
-fn download(folder: &std::path::Path) -> anyhow::Result<()> {
-    let model = &model_download::DEFAULT_MODEL;
-    eprintln!(
-        "Downloading the speech model, {} ({:.1} GB), from Hugging Face into {}",
-        model.repository,
-        model.size() as f64 / 1e9,
-        folder.display()
-    );
-    let mut shown = None;
-    model_download::download(model, folder, &mut |progress| {
-        let percent = progress.percent();
-        if shown.is_none_or(|shown| percent >= shown + 5) {
-            eprintln!("  {percent}%");
-            shown = Some(percent);
+/// The catalog's models, in the models folder.
+fn library() -> anyhow::Result<Arc<SpeechModelLibrary>> {
+    Ok(SpeechModelLibrary::new(
+        SpeechModelCatalog::bundled(),
+        SpeechModelDownloads::new(paths::models_folder()?),
+    ))
+}
+
+/// The model `--model` names: a catalog model's id, or a folder, given from where the command
+/// runs or in the models folder.
+fn chosen(option: Option<&str>, library: &SpeechModelLibrary) -> anyhow::Result<ChosenModel> {
+    let setting = option.unwrap_or(DEFAULT_MODEL);
+    let catalog = library.catalog();
+    if catalog.model(setting).is_none() && Path::new(setting).is_dir() {
+        let folder = std::path::absolute(setting).with_context(|| format!("{setting} isn't a path"))?;
+        return Ok(ChosenModel::Converted(folder));
+    }
+    let chosen = ChosenModel::named(setting, catalog, library.downloads().folder());
+    if let ChosenModel::Converted(folder) = &chosen
+        && !folder.is_dir()
+    {
+        anyhow::bail!(
+            "{setting} is neither a model `livetranscribe models` lists nor a folder ({} isn't one)",
+            folder.display()
+        );
+    }
+    Ok(chosen)
+}
+
+/// Says on standard error how far a download has got, every 5%.
+fn show(progress: Progress, shown: &mut Option<(Stage, u8)>) {
+    let percent = progress.percent();
+    let due = match *shown {
+        Some((stage, last)) => stage != progress.stage || percent >= last + 5,
+        None => true,
+    };
+    if due {
+        let stage = match progress.stage {
+            Stage::Downloading => "Downloading",
+            Stage::Unpacking => "Unpacking",
+            Stage::Checking => "Checking",
+        };
+        eprintln!("  {stage}: {percent}%");
+        *shown = Some((progress.stage, percent));
+    }
+}
+
+/// `livetranscribe models`: each model this app can download, its size, and whether it's here.
+pub fn list_models() -> anyhow::Result<()> {
+    let library = library()?;
+    for model in library.catalog().models() {
+        let mut notes = Vec::new();
+        if model.id == DEFAULT_MODEL {
+            notes.push("default");
         }
-        true
-    })
-    .with_context(|| format!("couldn't download the speech model into {}", folder.display()))
+        if library.state(model) == DownloadState::Downloaded {
+            notes.push("downloaded");
+        }
+        println!(
+            "{:<24} {:<24} {:>5.1} GB  {}{}",
+            model.id,
+            model.name,
+            model.download_bytes() as f64 / 1e9,
+            model.languages,
+            if notes.is_empty() {
+                String::new()
+            } else {
+                format!(" ({})", notes.join(", "))
+            }
+        );
+    }
+    eprintln!(
+        "Models are downloaded into {} the first time they're used: pass --model and a model's id.",
+        library.downloads().folder().display()
+    );
+    Ok(())
 }

@@ -33,6 +33,9 @@ lt-wayland = { path = "crates/wayland" }
 
 ab_glyph = "0.2"
 anyhow = "1"
+# Unpacking the speech models sherpa-onnx publishes, .tar.bz2 archives, with the versions the build
+# already has (zip's bzip2, and sherpa-onnx-sys's tar).
+bzip2 = "0.5"
 clap = { version = "4", features = ["derive"] }
 cpal = "0.18"
 dirs = "6"
@@ -53,6 +56,7 @@ sha2 = "0.10"
 # that packaging/fetch-sherpa-onnx.sh fetches (see .cargo/config.toml). Pinned exactly: the crate's
 # C structs must be the libraries' own, and the script fetches this version's.
 sherpa-onnx = { version = "=1.13.8", default-features = false, features = ["shared"] }
+tar = { version = "0.4", default-features = false }
 tauri = { version = "2.12", features = ["tray-icon"] }
 tauri-build = "2.7"
 tiny-skia = "0.12"
