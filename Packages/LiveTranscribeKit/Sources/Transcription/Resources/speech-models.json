@@ -1,0 +1,103 @@
+{
+  "format": 1,
+  "models": [
+    {
+      "id": "qwen3-asr-0.6b-sinhala",
+      "name": "Qwen3-ASR 0.6B Sinhala",
+      "summary": "The default: accurate and quick, and the only one here that knows Sinhala.",
+      "languages": "30 languages and Sinhala",
+      "licence": "CC-BY-SA-4.0",
+      "credit": "Qwen3-ASR-0.6B by the Qwen team, Alibaba Cloud, fine-tuned for Sinhala by Nerdstorm on OpenSLR 52 (Google, CC BY-SA 4.0)",
+      "mac": {
+        "repository": "Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit",
+        "revision": "047217cb611ad5f51cb2284e4a3617a5eaa9b688",
+        "bytes": 1015528575,
+        "kind": "qwen3_asr"
+      }
+    },
+    {
+      "id": "qwen3-asr-0.6b",
+      "name": "Qwen3-ASR 0.6B",
+      "summary": "The model the default is trained from, without Sinhala.",
+      "languages": "30 languages",
+      "licence": "Apache-2.0",
+      "credit": "Qwen3-ASR-0.6B by the Qwen team, Alibaba Cloud",
+      "mac": {
+        "repository": "mlx-community/Qwen3-ASR-0.6B-8bit",
+        "revision": "89e96d92ba34aca20b3e29fb10cc284097d1219f",
+        "bytes": 1010771234,
+        "kind": "qwen3_asr"
+      }
+    },
+    {
+      "id": "qwen3-asr-1.7b",
+      "name": "Qwen3-ASR 1.7B",
+      "summary": "The most accurate, and slower.",
+      "languages": "30 languages",
+      "licence": "Apache-2.0",
+      "credit": "Qwen3-ASR-1.7B by the Qwen team, Alibaba Cloud",
+      "mac": {
+        "repository": "mlx-community/Qwen3-ASR-1.7B-8bit",
+        "revision": "a8379a2e2f9e313c9292cdf1af4055ab56d50d55",
+        "bytes": 2467856503,
+        "kind": "qwen3_asr"
+      }
+    },
+    {
+      "id": "parakeet-tdt-0.6b-v2",
+      "name": "Parakeet TDT 0.6B v2",
+      "summary": "The fastest, for English only.",
+      "languages": "English",
+      "licence": "CC-BY-4.0",
+      "credit": "Parakeet TDT 0.6B v2 by NVIDIA",
+      "mac": {
+        "repository": "mlx-community/parakeet-tdt-0.6b-v2",
+        "revision": "8ae155301e23d820d82aa60d24817c900e69e487",
+        "bytes": 2471862935,
+        "kind": "parakeet"
+      }
+    },
+    {
+      "id": "parakeet-tdt-0.6b-v3",
+      "name": "Parakeet TDT 0.6B v3",
+      "summary": "Nearly as fast, in European languages.",
+      "languages": "25 European languages",
+      "licence": "CC-BY-4.0",
+      "credit": "Parakeet TDT 0.6B v3 by NVIDIA",
+      "mac": {
+        "repository": "mlx-community/parakeet-tdt-0.6b-v3",
+        "revision": "ed2b7e8c15f9aaa0b5772e2efb986255eaef7e15",
+        "bytes": 2509041541,
+        "kind": "parakeet"
+      }
+    },
+    {
+      "id": "whisper-large-v3-turbo",
+      "name": "Whisper large-v3-turbo",
+      "summary": "The most languages.",
+      "languages": "99 languages",
+      "licence": "MIT",
+      "credit": "Whisper large-v3-turbo by OpenAI",
+      "mac": {
+        "repository": "mlx-community/whisper-large-v3-turbo-8bit",
+        "revision": "62103fc276a35fdc76e318f314d8ff47987fba89",
+        "bytes": 863659497,
+        "kind": "whisper"
+      }
+    },
+    {
+      "id": "cohere-transcribe",
+      "name": "Cohere Transcribe",
+      "summary": "Accurate in European and Asian languages.",
+      "languages": "14 languages",
+      "licence": "Apache-2.0",
+      "credit": "Cohere Transcribe by Cohere Labs, converted to MLX by beshkenadze on Hugging Face",
+      "mac": {
+        "repository": "beshkenadze/cohere-transcribe-03-2026-mlx-8bit",
+        "revision": "d1f843476f84846e6fe7aa58a6033f17882f0ec9",
+        "bytes": 2418766535,
+        "kind": "cohere_asr"
+      }
+    }
+  ]
+}

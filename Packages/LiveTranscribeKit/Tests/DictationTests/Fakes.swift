@@ -22,6 +22,8 @@ actor FakeTranscriber: Transcriber {
 
     func load(progress: @escaping ModelLoadProgressHandler) async throws {}
 
+    func switchModel(to modelID: String, progress: @escaping ModelLoadProgressHandler) async throws {}
+
     func transcribe(_ samples: [Float], sampleRate: Int) async throws -> String {
         calls += 1
         callWaiters.forEach { $0.resume() }

@@ -95,6 +95,19 @@ actor FakeTranscriber: Transcriber {
         if let loadError { throw loadError }
     }
 
+    /// The models switched to, in order; loading the models switches to the chosen one.
+    private(set) var switches: [String] = []
+    /// Holds each switch until it opens.
+    private var switchGate: Gate?
+
+    func holdSwitches(at gate: Gate?) { switchGate = gate }
+
+    func switchModel(to modelID: String, progress: @escaping ModelLoadProgressHandler) async throws {
+        switches.append(modelID)
+        if let switchGate { await switchGate.wait() }
+        try load(progress: progress)
+    }
+
     func transcribe(_ samples: [Float], sampleRate: Int) async throws -> String {
         let marker = Int(samples.first ?? 0)
         if marker < 0 {
