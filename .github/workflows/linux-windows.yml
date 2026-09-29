@@ -63,20 +63,30 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Tests
         run: cargo test --workspace --locked
-      # A catalog model through sherpa-onnx: Moonshine tiny (English, 30 MB), checked against its
-      # SHA-256, transcribes its own test clip. The test gets the model's folder as the system spells
-      # paths (cygpath, in Windows' Git Bash).
+      # A catalog model through sherpa-onnx, as the app opens it: Parakeet TDT 0.6B v2 (English,
+      # 480 MB to download) is checked against the catalog and transcribes its own test clip. The
+      # unpacked model is kept between runs, by its archive's SHA-256. The test gets the model's
+      # folder as the system spells paths (cygpath, in Windows' Git Bash).
+      - name: Restore the Parakeet model
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/lt-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8
+          key: parakeet-tdt-0.6b-v2-int8-157c157bc51155e03e37d2466522a3a737dd9c72bb25f36eb18912964161e1ad
       - name: Transcribe with sherpa-onnx
         shell: bash
         env:
-          MODEL: sherpa-onnx-moonshine-tiny-en-quantized-2026-02-27
-          SHA256: 9ec31b342d8fa3240c3b81b8f82e1cf7e3ac467c93ca5a999b741d5887164f8d
+          MODEL: sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8
+          SHA256: 157c157bc51155e03e37d2466522a3a737dd9c72bb25f36eb18912964161e1ad
         run: |
-          mkdir -p target/models
-          curl --fail --location --retry 3 --silent --show-error --output "target/models/$MODEL.tar.bz2" \
-            "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/$MODEL.tar.bz2"
-          echo "$SHA256  target/models/$MODEL.tar.bz2" | sha256sum --check
-          tar -xjf "target/models/$MODEL.tar.bz2" -C target/models
-          folder=$PWD/target/models/$MODEL
+          models=$HOME/lt-models
+          if [ ! -f "$models/$MODEL/encoder.int8.onnx" ]; then
+            mkdir -p "$models"
+            curl --fail --location --retry 3 --silent --show-error --output "$models/$MODEL.tar.bz2" \
+              "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/$MODEL.tar.bz2"
+            echo "$SHA256  $models/$MODEL.tar.bz2" | sha256sum --check
+            tar -xjf "$models/$MODEL.tar.bz2" -C "$models"
+            rm "$models/$MODEL.tar.bz2"
+          fi
+          folder=$models/$MODEL
           if command -v cygpath >/dev/null; then folder=$(cygpath --windows "$folder"); fi
-          LT_SHERPA_MOONSHINE_DIR=$folder cargo test -p lt-transcription --locked --test sherpa -- --ignored
+          LT_SHERPA_PARAKEET_DIR=$folder cargo test -p lt-transcription --locked --test sherpa -- --ignored
