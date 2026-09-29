@@ -7,13 +7,26 @@
 # Only what speech to text needs is kept: sherpa-onnx's C API and ONNX Runtime (on Windows, their
 # DLLs, the import libraries the linker reads, and ONNX Runtime's loader for execution providers).
 # On Linux x64, on Windows x64 in Git Bash, and on Apple silicon Macs for development.
+#
+# Their licences, which the packages carry, go in FOLDER/../licenses: sherpa-onnx's (Apache-2.0),
+# and ONNX Runtime's (MIT) with its third-party notices, at the versions these libraries are.
 #   packaging/fetch-sherpa-onnx.sh [FOLDER]
-# The archive is kept in target/downloads (or $SHERPA_ONNX_DOWNLOADS) for the next run.
+# The archive and the licences are kept in target/downloads (or $SHERPA_ONNX_DOWNLOADS) for the
+# next run.
 
 set -euo pipefail
 
 # The sherpa-onnx crate's version in Cargo.toml: the crate's C structs must be these libraries'.
 VERSION=1.13.8
+# The ONNX Runtime these libraries were built with (sherpa-onnx's cmake/onnxruntime-*.cmake).
+ONNXRUNTIME=1.28.2
+
+# Each licence: its name in the licences folder, where it's published, and its SHA-256.
+LICENCES=(
+    "sherpa-onnx-LICENSE https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v$VERSION/LICENSE cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    "onnxruntime-LICENSE https://raw.githubusercontent.com/microsoft/onnxruntime/v$ONNXRUNTIME/LICENSE 2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+    "onnxruntime-ThirdPartyNotices.txt https://raw.githubusercontent.com/microsoft/onnxruntime/v$ONNXRUNTIME/ThirdPartyNotices.txt 0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffcee2"
+)
 
 fail() {
     echo "fetch-sherpa-onnx: $*" >&2
@@ -43,7 +56,8 @@ esac
 ARCHIVE=sherpa-onnx-v$VERSION-$PLATFORM.tar.bz2
 URL=https://github.com/k2-fsa/sherpa-onnx/releases/download/v$VERSION/$ARCHIVE
 
-# Whether FILE has the archive's SHA-256: sha256sum on Linux and in Git Bash, shasum on macOS.
+# Whether FILE has the SHA-256 given, or the archive's: sha256sum on Linux and in Git Bash, shasum
+# on macOS.
 has_checksum() {
     local sum
     if command -v sha256sum >/dev/null; then
@@ -51,7 +65,18 @@ has_checksum() {
     else
         sum=$(shasum -a 256 "$1")
     fi
-    [ "${sum%% *}" = "$SHA256" ]
+    [ "${sum%% *}" = "${2:-$SHA256}" ]
+}
+
+# Downloads URL into FILE, unless it's there with SHA256 already, and checks it.
+fetch() {
+    local file=$1 url=$2 sha256=$3
+    if [ ! -f "$file" ] || ! has_checksum "$file" "$sha256"; then
+        echo "Downloading $url" >&2
+        curl --fail --location --retry 3 --silent --show-error --output "$file.part" "$url"
+        has_checksum "$file.part" "$sha256" || fail "$url doesn't have the SHA-256 it should; it was left in $file.part"
+        mv "$file.part" "$file"
+    fi
 }
 
 here=$(cd "$(dirname "$0")/.." && pwd)
@@ -60,12 +85,7 @@ downloads=${SHERPA_ONNX_DOWNLOADS:-$here/target/downloads}
 archive=$downloads/$ARCHIVE
 
 mkdir -p "$downloads"
-if [ ! -f "$archive" ] || ! has_checksum "$archive"; then
-    echo "Downloading $ARCHIVE" >&2
-    curl --fail --location --retry 3 --silent --show-error --output "$archive.part" "$URL"
-    has_checksum "$archive.part" || fail "$ARCHIVE doesn't have the SHA-256 it should; it was left in $archive.part"
-    mv "$archive.part" "$archive"
-fi
+fetch "$archive" "$URL" "$SHA256"
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -78,4 +98,13 @@ for library in "${LIBRARIES[@]}"; do
     cp "$work/sherpa-onnx-v$VERSION-$PLATFORM/lib/$library" "$out/"
 done
 
-echo "sherpa-onnx $VERSION's speech-only libraries are in $out ($(du -sh "$out" | cut -f1))" >&2
+licences=$(dirname "$out")/licenses
+rm -rf "$licences"
+mkdir -p "$licences"
+for licence in "${LICENCES[@]}"; do
+    read -r name url sha256 <<<"$licence"
+    fetch "$downloads/$name-$VERSION" "$url" "$sha256"
+    cp "$downloads/$name-$VERSION" "$licences/$name"
+done
+
+echo "sherpa-onnx $VERSION's speech-only libraries are in $out ($(du -sh "$out" | cut -f1)), their licences in $licences" >&2
