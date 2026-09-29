@@ -49,6 +49,10 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
+# Speech to text for the catalog's other models, linked to the speech-only sherpa-onnx libraries
+# that packaging/fetch-sherpa-onnx.sh fetches (see .cargo/config.toml). Pinned exactly: the crate's
+# C structs must be the libraries' own, and the script fetches this version's.
+sherpa-onnx = { version = "=1.13.8", default-features = false, features = ["shared"] }
 tauri = { version = "2.12", features = ["tray-icon"] }
 tauri-build = "2.7"
 tiny-skia = "0.12"

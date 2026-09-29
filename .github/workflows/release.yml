@@ -243,6 +243,9 @@ jobs:
           grep -qx "version = \"$VERSION\"" crates/app/Cargo.toml
       - name: Fetch the OpenVINO runtime
         run: packaging/linux/fetch-openvino.sh
+      # The speech-only sherpa-onnx libraries, which the sherpa-onnx crate links (.cargo/config.toml).
+      - name: Fetch the sherpa-onnx libraries
+        run: packaging/fetch-sherpa-onnx.sh
       - name: Build the packages
         working-directory: linux-windows/crates/app
         env:

@@ -18,12 +18,23 @@ the CPU. Settings' other tabs, the history window, and Windows come later.
 ## Building and testing
 
 ```bash
+packaging/fetch-sherpa-onnx.sh
+```
+
+```bash
 cargo test
 ```
 
 `rust-toolchain.toml` pins the Rust version, and rustup installs it on the first build. The tests
 include the golden cases (`crates/dictation/tests/golden.rs`). CI runs formatting, clippy and the
 tests on Linux and Windows (`.github/workflows/linux-windows.yml`).
+
+The first command puts sherpa-onnx's speech-only libraries in `target/sherpa-onnx/lib`, checked
+against their SHA-256: sherpa-onnx (k2-fsa, Apache-2.0) runs the catalog's other speech models,
+with ONNX Runtime (Microsoft, MIT). `.cargo/config.toml` points the `sherpa-onnx` crate at them,
+and without them the build stops rather than let the crate download sherpa-onnx's default
+libraries, which link espeak-ng (GPL-3.0) for text to speech. The script runs on Linux x64, on
+Windows x64 in Git Bash, and on Apple silicon Macs.
 
 The workspace builds its own copy of the `openvino` crate, which can pass properties to a model's
 compilation, as the NPU's LLM mode needs: see [`vendor/openvino/VENDORED.md`](vendor/openvino/VENDORED.md).

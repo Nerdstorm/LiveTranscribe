@@ -53,6 +53,10 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: linux-windows
+      # The speech-only sherpa-onnx libraries, which the sherpa-onnx crate links (.cargo/config.toml).
+      - name: Fetch the sherpa-onnx libraries
+        shell: bash
+        run: packaging/fetch-sherpa-onnx.sh
       - name: Formatting
         run: cargo fmt --all --check
       - name: Lints
