@@ -220,47 +220,6 @@ pub fn key_name(code: u16) -> String {
     }
 }
 
-/// A key's name as people say it, for the panel and the menu: `KEY_RIGHTCTRL` is "Right Ctrl".
-pub fn display_name(code: u16) -> String {
-    let name = key_name(code);
-    let Some(bare) = name.strip_prefix("KEY_") else {
-        return name;
-    };
-    // KEY_LEFT and KEY_RIGHT are arrow keys; KEY_LEFTCTRL and the like are one side's modifier.
-    let (side, key) = match bare {
-        "LEFT" | "RIGHT" | "UP" | "DOWN" => return format!("{} Arrow", title_case(bare)),
-        _ => match (bare.strip_prefix("LEFT"), bare.strip_prefix("RIGHT")) {
-            (Some(key), _) => ("Left ", key),
-            (_, Some(key)) => ("Right ", key),
-            _ => ("", bare),
-        },
-    };
-    let key = match key {
-        "CTRL" => "Ctrl".to_owned(),
-        "META" => "Super".to_owned(),
-        "CAPSLOCK" => "Caps Lock".to_owned(),
-        "NUMLOCK" => "Num Lock".to_owned(),
-        "SCROLLLOCK" => "Scroll Lock".to_owned(),
-        "PAGEUP" => "Page Up".to_owned(),
-        "PAGEDOWN" => "Page Down".to_owned(),
-        "SYSRQ" => "Print Screen".to_owned(),
-        "COMPOSE" => "Menu".to_owned(),
-        "ESC" => "Esc".to_owned(),
-        _ if key.starts_with('F') && key[1..].chars().all(|character| character.is_ascii_digit()) => key.to_owned(),
-        _ => title_case(key),
-    };
-    format!("{side}{key}")
-}
-
-fn title_case(word: &str) -> String {
-    let lower = word.to_ascii_lowercase();
-    let mut characters = lower.chars();
-    characters
-        .next()
-        .map(|first| first.to_ascii_uppercase().to_string() + characters.as_str())
-        .unwrap_or_default()
-}
-
 type EventHandler = Box<dyn Fn(KeyboardEvent<'_>) + Send + Sync>;
 
 struct Watcher {
@@ -417,19 +376,6 @@ mod tests {
 
     /// A laptop's built-in keyboard (AT Translated Set 2 keyboard), from sysfs.
     const LAPTOP_KEYS: &str = "402000007 ff803078f800d001 feffffdfffcfffff fffffffffffffffe\n";
-
-    #[test]
-    fn keys_are_named_as_people_say_them() {
-        let name = |key: &str| display_name(key_code(key).expect("a key"));
-        assert_eq!(name("KEY_RIGHTCTRL"), "Right Ctrl");
-        assert_eq!(name("KEY_LEFTALT"), "Left Alt");
-        assert_eq!(name("KEY_RIGHTMETA"), "Right Super");
-        assert_eq!(name("KEY_CAPSLOCK"), "Caps Lock");
-        assert_eq!(name("KEY_F13"), "F13");
-        assert_eq!(name("KEY_LEFT"), "Left Arrow");
-        assert_eq!(name("KEY_COMPOSE"), "Menu");
-        assert_eq!(name("KEY_MUTE"), "Mute");
-    }
 
     #[test]
     fn reads_capability_bitmaps_as_sysfs_prints_them() {

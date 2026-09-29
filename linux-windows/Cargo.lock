@@ -2405,6 +2405,7 @@ version = "0.1.0"
 dependencies = [
  "evdev",
  "tracing",
+ "willhook",
 ]
 
 [[package]]
@@ -5427,6 +5428,16 @@ dependencies = [
  "thiserror 2.0.21",
  "windows",
  "windows-core",
+]
+
+[[package]]
+name = "willhook"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "984cc87572ddeee205caab3372ca4d84596c363e6c809294dc4514ef43f5e83e"
+dependencies = [
+ "once_cell",
+ "winapi",
 ]
 
 [[package]]

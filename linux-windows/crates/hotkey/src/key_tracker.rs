@@ -32,6 +32,8 @@ pub mod codes {
     pub const KEY_RIGHTALT: u16 = 100;
     pub const KEY_LEFTMETA: u16 = 125;
     pub const KEY_RIGHTMETA: u16 = 126;
+    /// A key without a code of its own.
+    pub const KEY_UNKNOWN: u16 = 240;
     pub const KEY_FN: u16 = 0x1d0;
 }
 
@@ -88,6 +90,9 @@ pub enum UnusableHotkey {
     Escape,
     /// A mouse, joystick or gamepad button, not a key.
     Button,
+    /// A key this system doesn't report on its own: Windows reports the keypad's Enter as Enter,
+    /// and never sees Fn.
+    Unwatchable,
 }
 
 impl std::fmt::Display for UnusableHotkey {
@@ -95,6 +100,7 @@ impl std::fmt::Display for UnusableHotkey {
         formatter.write_str(match self {
             Self::Escape => "Esc cancels dictation, so it can't also start it",
             Self::Button => "that is a mouse or gamepad button, not a key",
+            Self::Unwatchable => "this system doesn't report that key on its own",
         })
     }
 }
@@ -195,6 +201,10 @@ fn check(hotkey: u16) -> Result<(), UnusableHotkey> {
     }
     if is_button(hotkey) {
         return Err(UnusableHotkey::Button);
+    }
+    #[cfg(windows)]
+    if crate::key_names::virtual_key(hotkey).is_none() {
+        return Err(UnusableHotkey::Unwatchable);
     }
     Ok(())
 }
@@ -323,6 +333,15 @@ mod tests {
     fn escape_and_buttons_cant_be_the_hotkey() {
         assert_eq!(KeyTracker::new(KEY_ESC).unwrap_err(), UnusableHotkey::Escape);
         assert_eq!(KeyTracker::new(BTN_LEFT).unwrap_err(), UnusableHotkey::Button);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_key_windows_doesnt_report_on_its_own_cant_be_the_hotkey() {
+        const KEY_KPENTER: u16 = 96;
+        assert_eq!(KeyTracker::new(KEY_KPENTER).unwrap_err(), UnusableHotkey::Unwatchable);
+        assert_eq!(KeyTracker::new(KEY_FN).unwrap_err(), UnusableHotkey::Unwatchable);
+        assert!(KeyTracker::new(KEY_RIGHTCTRL).is_ok());
     }
 
     #[test]
