@@ -238,4 +238,84 @@ struct SessionCoordinatorTests {
         let latePartial = events[finalIndex...].contains { if case .partial = $0 { true } else { false } }
         #expect(!latePartial)
     }
+
+    // MARK: - Switching the speech model
+
+    @Test func anotherSpeechModelLoadsInPlaceOfTheOneInUse() async throws {
+        let h = Harness()
+        await h.coordinator.prepare()
+        await h.coordinator.useSpeechModel("owner/chosen")
+
+        #expect(await h.transcriber.switches == [AppSettings.defaults.sttModel, "owner/chosen"])
+        try await h.recorder.waitUntil { $0.phases.count >= 4 }
+        #expect(await h.recorder.events.phases == [.loading, .ready, .loading, .ready])
+    }
+
+    @Test func theModelInUseIsNotLoadedAgain() async throws {
+        let h = Harness()
+        await h.coordinator.prepare()
+        await h.coordinator.useSpeechModel(AppSettings.defaults.sttModel)
+        #expect(await h.transcriber.switches == [AppSettings.defaults.sttModel])
+    }
+
+    @Test func aModelChosenBeforeTheModelsLoadIsTheOneTheyLoad() async throws {
+        let h = Harness()
+        await h.coordinator.useSpeechModel("owner/chosen")
+        #expect(await h.transcriber.switches.isEmpty)
+        await h.coordinator.prepare()
+        #expect(await h.transcriber.switches == ["owner/chosen"])
+    }
+
+    @Test func aModelChosenWhileTheModelsLoadLoadsNext() async throws {
+        let h = Harness()
+        let gate = Gate()
+        await h.transcriber.holdSwitches(at: gate)
+        let preparing = Task { await h.coordinator.prepare() }
+        try await Self.waitUntil { await gate.hasWaiters }
+
+        await h.coordinator.useSpeechModel("owner/chosen")
+        #expect(await h.transcriber.switches == [AppSettings.defaults.sttModel])
+        await gate.open()
+        await preparing.value
+
+        #expect(await h.transcriber.switches == [AppSettings.defaults.sttModel, "owner/chosen"])
+        try await h.recorder.waitUntil { $0.phases == [.loading, .ready, .loading, .ready] }
+    }
+
+    /// The live transcript keeps the model it started with; the new one loads once it stops.
+    @Test func aModelChosenDuringALiveTranscriptLoadsWhenItEnds() async throws {
+        let h = Harness()
+        try await h.startListening()
+        await h.coordinator.useSpeechModel("owner/chosen")
+        #expect(await h.transcriber.switches == [AppSettings.defaults.sttModel])
+
+        await h.coordinator.stop()
+        try await h.recorder.waitUntil { $0.phases.suffix(4) == [.stopping, .ready, .loading, .ready] }
+        #expect(await h.transcriber.switches == [AppSettings.defaults.sttModel, "owner/chosen"])
+    }
+
+    @Test func aModelThatFailsToLoadCanBeReplacedByAnother() async throws {
+        let h = Harness()
+        await h.coordinator.prepare()
+        await h.transcriber.configure(loadError: FakeError(message: "no such model"))
+        await h.coordinator.useSpeechModel("owner/missing")
+        try await h.recorder.waitUntil { $0.phases.last == .failed(.modelLoadFailed(model: "owner/missing", message: "no such model")) }
+        await h.coordinator.start()
+        #expect(await h.source.startCount == 0, "cannot listen without a speech model")
+
+        await h.transcriber.configure(loadError: nil)
+        await h.coordinator.useSpeechModel("owner/chosen")
+        try await h.recorder.waitUntil { $0.phases.last == .ready }
+        #expect(await h.transcriber.switches.last == "owner/chosen")
+        await h.coordinator.start()
+        #expect(await h.source.startCount == 1)
+    }
+
+    private static func waitUntil(_ condition: @Sendable () async -> Bool) async throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while await !condition() {
+            guard ContinuousClock.now < deadline else { throw FakeError(message: "timed out") }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+    }
 }

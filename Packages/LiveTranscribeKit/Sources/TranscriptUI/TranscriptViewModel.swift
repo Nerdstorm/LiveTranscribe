@@ -12,6 +12,9 @@ public final class TranscriptViewModel {
     public private(set) var cleanup: CleanupAvailability = .pending
     /// Latest progress per model, in the order the models started loading.
     public private(set) var modelProgress: [ModelLoadProgress] = []
+    /// The speech model loaded, by the Speech-to-text setting it came from; `nil` until one loads
+    /// and when the last one failed to.
+    public private(set) var speechModel: String?
     public private(set) var lines: [TranscriptLine] = []
     public private(set) var warning: String?
     public private(set) var transcriptFile: URL?
@@ -180,6 +183,8 @@ public final class TranscriptViewModel {
             } else {
                 modelProgress.append(progress)
             }
+        case .speechModel(let modelID):
+            speechModel = modelID
         case .cleanupAvailability(let availability):
             cleanup = availability
         case .sessionStarted(_, let file):
