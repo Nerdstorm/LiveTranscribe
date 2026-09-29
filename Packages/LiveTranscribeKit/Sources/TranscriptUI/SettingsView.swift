@@ -32,11 +32,16 @@ public struct SettingsView: View {
 
     public var body: some View {
         Form {
-            Section("Models (Hugging Face repositories)") {
+            Section {
                 TextField("Speech-to-text", text: modelField(.sttModel, $sttModel))
                 TextField("Cleanup LLM", text: modelField(.llmModel, $llmModel))
                 TextField("Voice activity", text: modelField(.vadModel, $vadModel))
                 Toggle("Clean up transcripts with the LLM", isOn: $cleanupEnabled)
+            } header: {
+                Text("Models (Hugging Face repositories)")
+            } footer: {
+                Text("Speech-to-text also takes a model folder on this Mac: a path starting with / or ~.")
+                    .foregroundStyle(.secondary)
             }
             Section("Segmentation") {
                 Stepper("Silence that ends a segment: \(vadSilenceMs) ms", value: $vadSilenceMs, in: 100...5_000, step: 50)

@@ -43,5 +43,9 @@ in the README's [Architecture](../README.md#architecture).
   `swift-transformers` direct dependencies; both were already indirect ones.
 - **`mlx-audio-swift` is pinned by revision** (the commit of tag v0.1.3), not by version. It uses
   `unsafeFlags`, which SwiftPM accepts only from packages pinned by revision or by local path.
+- **Speech models are loaded by kind** (`Transcription/SpeechModelKind.swift`): the app reads
+  `model_type` from a model's config.json and loads it from its folder, downloaded or local, with
+  mlx-audio-swift's loader for that kind. The list mirrors mlx-audio-swift's own `STT.loadModel`,
+  aliases included, so an update that adds or renames a model needs the same change there.
 
 More decisions, and the assumptions behind them, are in [dictation.md](dictation.md).
