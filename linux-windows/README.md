@@ -212,6 +212,29 @@ The desktop says where the pointer is through cursor sessions (ext-image-copy-ca
 report the pointer's position without capturing the screen, and only while the circle shows.
 Where the desktop has none, the circle sits at the bottom of the screen.
 
+## Speech models on Linux
+
+Each catalog model, measured on 2026-09-29 through a test build's deb in Ubuntu 22.04, on the CPU
+of an Intel Core i5-11500 (6 cores): FLEURS English's test set (647 recordings, 106 minutes),
+scored as the Mac app's bench scores (NFKC, case folded, punctuation ignored, numbers left as
+written), and the Mac app's 65 dictation clips and 4 bench clips, one at a time with the model
+loaded, as dictation runs them. Memory is the peak over the FLEURS run.
+
+| Model | FLEURS English WER | Time per second of speech | Dictation clips WER | Per clip, p50 / p95 | Memory |
+|---|---:|---:|---:|---:|---:|
+| Qwen3-ASR 0.6B Sinhala (OpenVINO) | 5.25% | 0.093 s | 3.2% | 388 / 950 ms | 5.3 GB |
+| Parakeet TDT 0.6B v2 | 5.77% | 0.043 s | 2.3% | 163 / 373 ms | 1.3 GB |
+| Parakeet TDT 0.6B v3 | 9.67% | 0.044 s | 2.5% | 236 / 514 ms | 1.3 GB |
+| Cohere Transcribe (English) | 5.83% | 0.131 s | 3.9% | 430 / 1,123 ms | 3.8 GB |
+
+Qwen3-ASR's 5.25% matches the Mac app's 5.24%. Parakeet v3 is for other European languages
+(6.86% on FLEURS German's 862 recordings): in English it writes numbers as words ("eight zero two
+point one one"), which this scoring counts as wrong, and it left 2 of the 647 recordings empty.
+There, a first use downloaded, unpacked and checked a model in 30 to 40 s (Parakeet), 80 s
+(Qwen3-ASR, 1.1 GB) or 2.5 minutes (Cohere Transcribe, 1.7 GB). Later starts check only the files
+that changed, and load in 0.5 s (Qwen3-ASR, from OpenVINO's cache), 1.5 s (Parakeet) or 4 s
+(Cohere Transcribe).
+
 ## Matching the Mac app
 
 The rules are written against Swift's `String`, whose characters are grapheme clusters and whose
