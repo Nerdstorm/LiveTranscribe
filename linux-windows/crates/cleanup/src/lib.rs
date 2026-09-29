@@ -1,15 +1,28 @@
 //! Cleanup at the chosen level. Mirrors the Mac app's `Cleanup` module
 //! (Packages/LiveTranscribeKit/Sources/Cleanup), one module per Swift file: the rules that need no
-//! language model, and what the model is asked ([`PromptBuilder`], [`prompt`]).
+//! language model, what the model is asked ([`PromptBuilder`], [`prompt`]), and whether its output
+//! may replace the text ([`OutputGuard`], with the checks for self-corrections, dropped words,
+//! names and content words).
 
 mod cleanup_options;
+mod content_words;
+mod dropped_words;
+mod guard_policy;
+mod output_guard;
 pub mod prompt;
 mod prompt_builder;
+mod self_correction;
+mod spoken_names;
+mod word_alignment;
+mod words;
 
 use lt_shared::CleanupLevel;
 use lt_styles::FillerRemover;
 
 pub use cleanup_options::CleanupOptions;
+pub use content_words::STANDARD_FUNCTION_WORDS;
+pub use guard_policy::GuardPolicy;
+pub use output_guard::{FallbackReason, GenerationOutcome, GuardVerdict, OutputGuard};
 pub use prompt::{CleanupRequest, Example, Message, PromptTemplate, Role, Sampling};
 pub use prompt_builder::PromptBuilder;
 
