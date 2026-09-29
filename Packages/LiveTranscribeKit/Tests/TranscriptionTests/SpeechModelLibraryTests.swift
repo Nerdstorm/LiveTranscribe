@@ -100,6 +100,7 @@ struct SpeechModelLibraryTests {
 private func model(_ repository: Repo.ID) -> SpeechModelCatalog.Model {
     SpeechModelCatalog.Model(
         id: repository.name, name: repository.name, summary: "", languages: "", licence: "MIT", credit: "",
+        languageChoices: [],
         mac: .init(repository: repository, revision: String(repeating: "c", count: 40), bytes: 1, kind: "whisper")
     )
 }

@@ -1,8 +1,8 @@
 // Bench: runs fixture clips through the real pipeline and reports WER (raw vs cleaned) and
 // per-stage latency. Build with xcodebuild (MLX needs its Metal library); see docs/development.md.
 //
-//   Bench [--fixtures <dir>] [--level none|light|medium|high] [--no-cleanup] [--no-adapter] [--fast] [--stt-model <repo or folder>]
-//   Bench --dictation [--clips <dir>] [--level <level>]... [--multiline] [--p95-target-ms <ms>] [--verbose] [--no-adapter] [--stt-model <repo or folder>]
+//   Bench [--fixtures <dir>] [--level none|light|medium|high] [--no-cleanup] [--no-adapter] [--fast] [--stt-model <repo or folder>] [--stt-language <code>]
+//   Bench --dictation [--clips <dir>] [--level <level>]... [--multiline] [--p95-target-ms <ms>] [--verbose] [--no-adapter] [--stt-model <repo or folder>] [--stt-language <code>]
 
 import Capture
 import Cleanup
@@ -33,6 +33,9 @@ struct BenchOptions {
     var verbose = false
     /// A speech-to-text model to measure instead of the default, to compare models on the same clips.
     var sttModel: String?
+    /// The Language setting, for a model that is told the language to write (Cohere Transcribe): a
+    /// code, such as `de`.
+    var sttLanguage: String?
 
     static func parse(_ arguments: [String]) throws -> BenchOptions {
         var options = BenchOptions()
@@ -71,6 +74,9 @@ struct BenchOptions {
             case "--stt-model":
                 guard let model = iterator.next(), !model.isEmpty else { throw BenchError.usage("--stt-model needs a model repository or folder") }
                 options.sttModel = model
+            case "--stt-language":
+                guard let code = iterator.next(), !code.isEmpty else { throw BenchError.usage("--stt-language needs a language's code, such as de") }
+                options.sttLanguage = code
             default:
                 throw BenchError.usage("unknown argument \(argument)")
             }
@@ -89,8 +95,8 @@ enum BenchError: LocalizedError {
         case .usage(let detail):
             """
             \(detail)
-            usage: Bench [--fixtures <dir>] [--level none|light|medium|high] [--no-cleanup] [--no-adapter] [--fast] [--stt-model <repo or folder>]
-                   Bench --dictation [--clips <dir>] [--level <level>]... [--multiline] [--p95-target-ms <ms>] [--verbose] [--no-adapter] [--stt-model <repo or folder>]
+            usage: Bench [--fixtures <dir>] [--level none|light|medium|high] [--no-cleanup] [--no-adapter] [--fast] [--stt-model <repo or folder>] [--stt-language <code>]
+                   Bench --dictation [--clips <dir>] [--level <level>]... [--multiline] [--p95-target-ms <ms>] [--verbose] [--no-adapter] [--stt-model <repo or folder>] [--stt-language <code>]
             """
         case .noFixtures(let path):
             "No .wav files with matching .txt references in \(path). Run scripts/generate-test-audio.sh first."
@@ -140,7 +146,8 @@ guard !fixtures.isEmpty else { throw BenchError.noFixtures(options.fixturesDirec
 
 // Models are shared across fixtures, so they load (and warm up) once.
 let segmenter = SileroSegmenter(modelID: settings.vadModel, config: SegmentationConfig(settings: settings))
-let transcriber = MLXTranscriber(modelID: settings.sttModel)
+let language = options.sttLanguage
+let transcriber = MLXTranscriber(modelID: settings.sttModel, language: { language })
 let cleaner = MLXCleaner(configuration: .init(settings: settings))
 
 var results: [FixtureResult] = []

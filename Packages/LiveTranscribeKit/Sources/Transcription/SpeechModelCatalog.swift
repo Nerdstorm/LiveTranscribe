@@ -8,7 +8,9 @@ import Shared
 /// of its Hugging Face repository: every copy of a release downloads the files it was tested
 /// with, and moving a pin is a change like any other. The Linux and Windows app reads the same
 /// file, so a model is named, described and credited alike everywhere; each platform has its own
-/// download in it, and a model without the Mac's is left out here.
+/// download in it, and a model without the Mac's is left out here. A model that is told which
+/// language to write, where others find it, lists the languages it can be told
+/// (`language_choices`), for the Language setting.
 public struct SpeechModelCatalog: Sendable {
     /// One model: what Settings shows about it, and where the Mac downloads it from.
     public struct Model: Decodable, Identifiable, Equatable, Sendable {
@@ -22,8 +24,28 @@ public struct SpeechModelCatalog: Sendable {
         public let licence: String
         /// Who made it, credited as its licence asks.
         public let credit: String
+        /// The languages it can be told to write, its default first; empty for a model that
+        /// finds the language itself.
+        public let languageChoices: [LanguageChoice]
         /// The Mac's download.
         public let mac: Download
+
+        /// The language to tell it to write, for the Language setting (a code): the setting's,
+        /// if it's one of the model's, and otherwise its first. `nil` for a model that isn't
+        /// told one.
+        public func language(forSetting setting: String?) -> LanguageChoice? {
+            languageChoices.first { $0.code == setting } ?? languageChoices.first
+        }
+    }
+
+    /// A language a model can be told to write.
+    public struct LanguageChoice: Decodable, Hashable, Identifiable, Sendable {
+        /// Its ISO 639-1 code, as the model is told it: `en`, `de`.
+        public let code: String
+        /// Its name in English, as Settings shows it.
+        public let name: String
+
+        public var id: String { code }
     }
 
     /// A model's files for the Mac: a Hugging Face repository at one commit.
@@ -107,10 +129,21 @@ public struct SpeechModelCatalog: Sendable {
         let languages: String
         let licence: String
         let credit: String
+        let languageChoices: [LanguageChoice]?
         let mac: Download?
 
+        private enum CodingKeys: String, CodingKey {
+            case id, name, summary, languages, licence, credit, mac
+            case languageChoices = "language_choices"
+        }
+
         var model: Model? {
-            mac.map { Model(id: id, name: name, summary: summary, languages: languages, licence: licence, credit: credit, mac: $0) }
+            mac.map {
+                Model(
+                    id: id, name: name, summary: summary, languages: languages, licence: licence, credit: credit,
+                    languageChoices: languageChoices ?? [], mac: $0
+                )
+            }
         }
     }
 }

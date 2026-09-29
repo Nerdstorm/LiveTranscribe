@@ -109,6 +109,7 @@ struct AppSettingsTests {
         defer { UserDefaults().removePersistentDomain(forName: suite) }
         store.save(AppSettings.defaults)
         store.setInputDeviceUID("00-11-22:input")
+        store.setSpeechLanguage("de")
 
         store.resetToDefaults(AppSettingsKey.advancedTab)
 
@@ -216,6 +217,18 @@ struct AppSettingsTests {
         #expect(store.inputDeviceUID == "BuiltInMicrophoneDevice")
         store.setInputDeviceUID("")
         #expect(store.inputDeviceUID == nil)
+    }
+
+    @Test func speechLanguageChoiceRoundTrips() {
+        let (store, suite) = makeStore()
+        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        #expect(store.speechLanguage == nil, "unset means each model's first")
+        store.setSpeechLanguage("de")
+        #expect(store.speechLanguage == "de")
+        store.resetToDefaults(AppSettingsKey.advancedTab)
+        #expect(store.speechLanguage == "de", "it's chosen in Settings › Models, not Advanced")
+        store.setSpeechLanguage(nil)
+        #expect(store.speechLanguage == nil)
     }
 
     @Test func restoringDefaultsKeepsTheChosenMicrophone() {

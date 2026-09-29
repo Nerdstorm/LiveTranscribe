@@ -48,14 +48,18 @@ public enum AppSettingsKey: String, CaseIterable, Sendable {
     /// The chosen microphone's Core Audio UID; absent means the system default input.
     /// Not part of ``AppSettings``: it is read at every Start rather than once at launch.
     case inputDeviceUID
+    /// The Language setting: the code of the language a speech model that is told one (Cohere
+    /// Transcribe) writes; absent means the model's first, English. The other models find the
+    /// language themselves. Not part of ``AppSettings``: it is read at every transcription.
+    case sttLanguage
 }
 
 extension AppSettingsKey {
     /// What Settings › Advanced shows: the cleanup and voice activity models, segmentation,
     /// cleanup tuning and capture recovery. Its Restore Defaults resets exactly these
     /// (``AppSettingsStore/resetToDefaults(_:)``), so the settings other tabs and windows own
-    /// (dictation, both shortcuts, the cleanup level, the speech model, history, the chosen
-    /// microphone) are left alone. A setting added to that tab belongs here.
+    /// (dictation, both shortcuts, the cleanup level, the speech model and its language, history,
+    /// the chosen microphone) are left alone. A setting added to that tab belongs here.
     public static let advancedTab: Set<AppSettingsKey> = [
         .llmModel, .vadModel, .cleanupEnabled, .cleanupAdapterEnabled,
         .vadSilenceMs, .vadSpeechThreshold, .vadPreRollMs, .vadMinSpeechMs, .maxSegmentSeconds,
@@ -198,6 +202,25 @@ public struct AppSettingsStore: Sendable {
             defaults.set(uid, forKey: AppSettingsKey.inputDeviceUID.rawValue)
         } else {
             defaults.removeObject(forKey: AppSettingsKey.inputDeviceUID.rawValue)
+        }
+    }
+
+    /// The Language setting's code, or `nil` for each model's first
+    /// (``AppSettingsKey/sttLanguage``).
+    public var speechLanguage: String? {
+        guard let code = defaults.string(forKey: AppSettingsKey.sttLanguage.rawValue), !code.isEmpty else {
+            return nil
+        }
+        return code
+    }
+
+    /// Stores the language a speech model that is told one writes, by its code; `nil` goes back
+    /// to each model's first.
+    public func setSpeechLanguage(_ code: String?) {
+        if let code, !code.isEmpty {
+            defaults.set(code, forKey: AppSettingsKey.sttLanguage.rawValue)
+        } else {
+            defaults.removeObject(forKey: AppSettingsKey.sttLanguage.rawValue)
         }
     }
 

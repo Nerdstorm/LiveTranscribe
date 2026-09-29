@@ -73,7 +73,8 @@ enum DictationBench {
         guard !clips.isEmpty else { throw BenchError.noFixtures(options.clipsDirectory.path) }
         let levels = options.levels ?? CleanupLevel.allCases
 
-        let transcriber = MLXTranscriber(modelID: settings.sttModel)
+        let language = options.sttLanguage
+        let transcriber = MLXTranscriber(modelID: settings.sttModel, language: { language })
         let cleaner = MLXCleaner(configuration: .init(settings: settings))
         print("Loading \(settings.sttModel) and \(settings.llmModel)")
         try await transcriber.load { _ in }
