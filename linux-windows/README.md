@@ -53,7 +53,7 @@ same place in both apps:
 | `lt-vocabulary` | `Vocabulary` | The user's vocabulary |
 | `lt-cleanup` | `Cleanup` | Cleanup at each level; for now the rules that need no language model |
 | `lt-dictation` | `Dictation` | The dictation flow from hotkey to typed text, and a transcript to the text it types |
-| `lt-transcription` | `Transcription`, and mlx-audio-swift's Qwen3-ASR | Speech to text: the log-mel features, the encoder's chunks and windows, the prompt, greedy decoding and its limits. The model's forward passes are behind the `SpeechModel` trait; `OpenVinoModel` runs them on OpenVINO |
+| `lt-transcription` | `Transcription`, and mlx-audio-swift's Qwen3-ASR | Speech to text: the log-mel features, the encoder's chunks and windows, the prompt, greedy decoding and its limits. The model's forward passes are behind the `SpeechModel` trait; `OpenVinoModel` runs them on OpenVINO. `sherpa` runs the catalog's other models through sherpa-onnx, on the CPU |
 | `lt-hotkey` | `Hotkey` | The hold, tap and double-tap gesture; what each key means for it; on Linux, reading the keyboards (evdev) |
 | `lt-capture` | `Capture` | Recording the microphone chosen in Settings, or the default one (cpal; on Linux, the sound server's), as 16 kHz mono, and its level for the meter |
 | `lt-insertion` | `Insertion` | What is known about the focused field, what the clipboard holds while text is pasted, and what an insertion did |
@@ -221,6 +221,12 @@ that need a real model folder are ignored by default:
 
 ```bash
 LT_QWEN3_ASR_DIR=/path/to/Qwen3-ASR-0.6B cargo test -p lt-transcription -- --ignored
+```
+
+CI runs the sherpa-onnx one with Moonshine tiny, which it downloads:
+
+```bash
+LT_SHERPA_MOONSHINE_DIR=/path/to/sherpa-onnx-moonshine-tiny-en-quantized-2026-02-27 cargo test -p lt-transcription --test sherpa -- --ignored
 ```
 
 Dictated text is never logged: log lines carry counts only.

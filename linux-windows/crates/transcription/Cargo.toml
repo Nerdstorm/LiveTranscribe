@@ -1,6 +1,6 @@
 [package]
 name = "lt-transcription"
-description = "Speech to text: Qwen3-ASR's audio front end, prompt and decoding, as the Mac app runs them."
+description = "Speech to text: Qwen3-ASR's audio front end, prompt and decoding, as the Mac app runs them, and the catalog's other models through sherpa-onnx."
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true

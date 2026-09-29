@@ -9,8 +9,11 @@
 //! - [`qwen3_asr`] mirrors mlx-audio-swift's Qwen3ASR.swift at the revision the Mac app pins. The
 //!   golden files in `Fixtures/golden` (`speech-features/`, `speech-layout.tsv`) pin its front end,
 //!   which the Sinhala model was trained on and so must not drift.
+//! - [`sherpa`] runs the catalog's other models (Moonshine, Parakeet, Whisper and more) through
+//!   sherpa-onnx, on the CPU.
 //!
 //! Transcripts are never logged: log lines carry counts only.
 
 pub mod output_limit;
 pub mod qwen3_asr;
+pub mod sherpa;
