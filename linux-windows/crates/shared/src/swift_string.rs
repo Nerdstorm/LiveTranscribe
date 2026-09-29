@@ -25,7 +25,10 @@ use unicode_normalization::{IsNormalized, UnicodeNormalization, is_nfc_quick};
 use unicode_properties::{EmojiStatus, GeneralCategory, GeneralCategoryGroup, UnicodeEmoji, UnicodeGeneralCategory};
 use unicode_segmentation::UnicodeSegmentation;
 
+mod search;
 mod tables;
+
+pub use search::{ranges_of, replacing_occurrences};
 
 // MARK: - Characters
 
@@ -333,7 +336,9 @@ pub fn split_on<'a>(text: &'a str, separator: &str, max_splits: usize, omitting_
     })
 }
 
-fn split_where(
+/// `text` split at each character that passes `is_separator`, as
+/// `split(maxSplits:omittingEmptySubsequences:whereSeparator:)`.
+pub fn split_where(
     text: &str,
     max_splits: usize,
     omitting_empty: bool,

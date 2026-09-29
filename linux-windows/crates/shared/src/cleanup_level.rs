@@ -1,3 +1,5 @@
+use std::ops::RangeInclusive;
+
 /// How much the cleanup step may change what was said.
 ///
 /// Dictation applies the user's snippets, vocabulary and spoken commands at every level, before
@@ -58,9 +60,65 @@ impl CleanupLevel {
         matches!(self, Self::Medium | Self::High)
     }
 
+    /// The model is asked to keep only the correction when the speaker corrects themselves.
+    pub fn resolves_self_corrections(self) -> bool {
+        matches!(self, Self::Medium | Self::High)
+    }
+
     /// Spoken lists become numbered or bulleted lines, and a letter's greeting and sign-off go on
     /// lines of their own, in multi-line fields.
     pub fn formats_layout(self) -> bool {
         matches!(self, Self::Medium | Self::High)
+    }
+
+    /// The model may reword for grammar and clarity, not only correct.
+    pub fn allows_rewording(self) -> bool {
+        self == Self::High
+    }
+
+    /// Allowed ratio of the cleaned text's word count to the input's. Rewording needs more room;
+    /// Light must keep every word.
+    pub fn word_ratio_bounds(self) -> RangeInclusive<f64> {
+        match self {
+            Self::None | Self::Light => 0.8..=1.2,
+            Self::Medium => 0.5..=1.2,
+            Self::High => 0.4..=1.3,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_none_skips_the_language_model() {
+        let skipping: Vec<_> = CleanupLevel::ALL
+            .into_iter()
+            .filter(|level| !level.uses_language_model())
+            .collect();
+        assert_eq!(skipping, [CleanupLevel::None]);
+    }
+
+    #[test]
+    fn medium_and_high_remove_fillers_resolve_corrections_and_lay_out_text() {
+        for level in CleanupLevel::ALL {
+            let expected = matches!(level, CleanupLevel::Medium | CleanupLevel::High);
+            assert_eq!(level.removes_fillers(), expected);
+            assert_eq!(level.resolves_self_corrections(), expected);
+            assert_eq!(level.formats_layout(), expected);
+        }
+        let rewording: Vec<_> = CleanupLevel::ALL
+            .into_iter()
+            .filter(|level| level.allows_rewording())
+            .collect();
+        assert_eq!(rewording, [CleanupLevel::High]);
+    }
+
+    #[test]
+    fn word_ratio_bounds_widen_with_the_level() {
+        assert_eq!(CleanupLevel::Light.word_ratio_bounds(), 0.8..=1.2);
+        assert_eq!(CleanupLevel::Medium.word_ratio_bounds(), 0.5..=1.2);
+        assert_eq!(CleanupLevel::High.word_ratio_bounds(), 0.4..=1.3);
     }
 }
