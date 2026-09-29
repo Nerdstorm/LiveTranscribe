@@ -13,6 +13,7 @@ struct SpeechModelsSettingsView: View {
     let context: DictationUIContext
 
     @AppStorage(AppSettingsKey.sttModel.rawValue) private var chosen = AppSettings.defaults.sttModel
+    @AppStorage(AppSettingsKey.sttLanguage.rawValue) private var language: String?
     @State private var otherModel = ""
     @State private var confirmingRemoval: SpeechModelCatalog.Model?
 
@@ -28,6 +29,7 @@ struct SpeechModelsSettingsView: View {
                         isDefault: SpeechModelRowStatus.same(model.mac.repository.rawValue, AppSettings.defaults.sttModel),
                         status: status(of: model.mac.repository.rawValue, download: library.state(of: model)),
                         canRemove: canRemove(model),
+                        language: languageChoice(for: model),
                         actions: actions(for: model)
                     )
                 }
@@ -113,6 +115,19 @@ struct SpeechModelsSettingsView: View {
         )
     }
 
+    /// The language a model that is told one writes: the Language setting's, if the model has
+    /// it, and otherwise its first. `nil` for a model that finds the language itself.
+    private func languageChoice(for model: SpeechModelCatalog.Model) -> Binding<String>? {
+        guard let first = model.languageChoices.first else { return nil }
+        return Binding(
+            get: { model.language(forSetting: language)?.code ?? first.code },
+            set: { code in
+                context.settingsStore.setSpeechLanguage(code)
+                Log.ui.info("Speech language chosen in Settings: \(code, privacy: .public)")
+            }
+        )
+    }
+
     /// For the chosen model outside the catalog: loading it again is all there is to do.
     private var statusActions: SpeechModelStatusView.Actions {
         SpeechModelStatusView.Actions(load: { context.transcript.retryLoading() })
@@ -130,38 +145,54 @@ struct SpeechModelsSettingsView: View {
     }
 }
 
-/// One catalog model: what it is for, and its status or what can be done with it.
+/// One catalog model: what it is for, the language it writes if it's told one, and its status or
+/// what can be done with it.
 private struct SpeechModelRow: View {
     let model: SpeechModelCatalog.Model
     let isDefault: Bool
     let status: SpeechModelRowStatus
     let canRemove: Bool
+    /// The Language setting, for a model that is told one.
+    let language: Binding<String>?
     let actions: SpeechModelStatusView.Actions
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(model.name).fontWeight(.medium)
-                    if isDefault {
-                        Text("Default")
-                            .font(.caption2)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(.quaternary, in: Capsule())
+            VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(model.name).fontWeight(.medium)
+                        if isDefault {
+                            Text("Default")
+                                .font(.caption2)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(.quaternary, in: Capsule())
+                        }
                     }
+                    Text(model.summary)
+                        .foregroundStyle(.secondary)
+                    Text("\(model.languages) · \(ByteCountFormatter.string(fromByteCount: model.mac.bytes, countStyle: .file)) · \(model.licence)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(model.credit)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
                 }
-                Text(model.summary)
-                    .foregroundStyle(.secondary)
-                Text("\(model.languages) · \(ByteCountFormatter.string(fromByteCount: model.mac.bytes, countStyle: .file)) · \(model.licence)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(model.credit)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityElement(children: .combine)
+                if let language {
+                    Picker("Language", selection: language) {
+                        ForEach(model.languageChoices) { choice in
+                            Text(choice.name).tag(choice.code)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .controlSize(.small)
+                    .fixedSize()
+                    .accessibilityLabel("\(model.name)'s language")
+                }
             }
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityElement(children: .combine)
             Spacer(minLength: 8)
             HStack(spacing: 8) {
                 SpeechModelStatusView(status: status, modelName: model.name, actions: actions)

@@ -1,9 +1,11 @@
 //! The dictation engine, on a thread of its own. It feeds the controller what happens (the
 //! hotkey, the menu, changed settings, the workers' results) in the order it happens, with times
 //! from one clock, and runs the gesture's and the panel's timers. It loads the speech model, and
-//! loads another when Settings chooses one, once no dictation is under way.
+//! loads another when Settings chooses one, once no dictation is under way: at once if the model
+//! it was loading is still downloading, which carries on in Settings › Models.
 //! After each, the tray and the Settings window hear how things stand, when that has changed.
 
+use std::sync::Arc;
 use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender};
 use std::thread;
 use std::time::Duration;
@@ -19,8 +21,8 @@ use lt_wayland::WaylandSession;
 use super::configuration::{self, ModelChoice};
 use super::platform::{Clock, Platform};
 use super::transcriber::{Jobs, Transcriber};
-use crate::model_download::Progress;
 use crate::settings::Settings;
+use crate::speech_models::{ChosenModel, Progress, SpeechModelLibrary, Stage};
 
 pub(crate) enum Message {
     Hotkey(HotkeyEvent),
@@ -31,7 +33,7 @@ pub(crate) enum Message {
     PauseHotkey(bool),
     /// Settings asks for the speech model to be loaded again, after it failed.
     ReloadModel,
-    /// How far downloading the speech model has got, before it loads.
+    /// How far downloading the speech model (or unpacking or checking it) has got, before it loads.
     ModelDownload {
         generation: u64,
         progress: Progress,
@@ -65,6 +67,11 @@ pub(crate) enum MenuCommand {
 pub(crate) struct DictationStatus {
     pub(crate) phase: Phase,
     pub(crate) model: ModelState,
+    /// The model loading, loaded or that failed: its catalog id, if it has one, and its name.
+    pub(crate) model_id: Option<String>,
+    pub(crate) model_name: Option<String>,
+    /// How far its download (or unpacking or checking) has got, while that's under way.
+    pub(crate) download: Option<Progress>,
     /// Where the loaded model's passes run.
     pub(crate) placement: Option<String>,
     /// The hotkey's name as people say it, or `None` while dictation is turned off.
@@ -80,6 +87,8 @@ pub(crate) type StatusSink = Box<dyn Fn(&DictationStatus) + Send>;
 
 pub(crate) struct Engine {
     pub(crate) settings: Settings,
+    /// The catalog's models, which Settings › Models shares.
+    pub(crate) library: Arc<SpeechModelLibrary>,
     pub(crate) hotkey: HotkeyWatch,
     pub(crate) recorder: Recorder,
     pub(crate) session: WaylandSession,
@@ -105,12 +114,14 @@ impl Engine {
             self.session,
             self.messages.clone(),
             PanelModel::new(configuration::notice_ms(&self.settings)),
+            configuration::language(&self.settings),
             clock,
         );
         let mut running = Running {
             controller: DictationController::new(configuration::controller(&self.settings), platform),
             hotkey_name: hotkey_name(&self.settings),
             settings: self.settings,
+            library: self.library,
             hotkey: self.hotkey,
             hotkey_paused: false,
             model: Model::Failed {
@@ -160,12 +171,21 @@ impl Model {
         }
     }
 
+    /// How far the download (or unpacking or checking) of the model loading has got, while that's
+    /// under way: once it's done, the model is loading.
+    fn download(&self) -> Option<Progress> {
+        match self {
+            Self::Loading { download, .. } => download.filter(|progress| progress.done < progress.total),
+            _ => None,
+        }
+    }
+
     fn state(&self) -> ModelState {
         match self {
-            Self::Loading { download, .. } => ModelState::Loading {
-                // A finished download leaves the model loading.
-                percent: download
-                    .filter(|progress| progress.done < progress.total)
+            Self::Loading { .. } => ModelState::Loading {
+                percent: self
+                    .download()
+                    .filter(|progress| progress.stage == Stage::Downloading)
                     .map(Progress::percent),
             },
             Self::Ready { .. } => ModelState::Ready,
@@ -177,6 +197,7 @@ impl Model {
 struct Running {
     controller: DictationController<Platform>,
     settings: Settings,
+    library: Arc<SpeechModelLibrary>,
     hotkey: HotkeyWatch,
     /// The hotkey's name as people say it.
     hotkey_name: String,
@@ -315,6 +336,17 @@ impl Running {
         if before.cleanup_level != after.cleanup_level {
             eprintln!("Cleanup: {}", after.cleanup_level.display_name());
         }
+        if before.stt_language != after.stt_language {
+            let catalog = self.library.catalog();
+            match after
+                .stt_language
+                .as_deref()
+                .and_then(|code| catalog.language_named(code))
+            {
+                Some(choice) => eprintln!("Language: {}", choice.name),
+                None => eprintln!("Language: the speech model's default"),
+            }
+        }
         if cancel && self.controller.is_recording() {
             self.controller.cancel();
         }
@@ -322,26 +354,36 @@ impl Running {
         self.controller.dependencies_mut().configure(after);
     }
 
+    /// The model the settings choose now.
+    fn wanted(&self) -> ModelChoice {
+        ModelChoice::from_settings(
+            &self.settings,
+            self.library.catalog(),
+            self.library.downloads().folder(),
+        )
+    }
+
     /// Starts loading the model the settings choose.
     fn load_model(&mut self) {
         self.generation += 1;
-        self.model = match ModelChoice::from_settings(&self.settings) {
-            Err(error) => Model::Failed {
-                choice: None,
-                error: format!("{error:#}"),
+        let choice = self.wanted();
+        let loading = Transcriber::load(
+            choice.clone(),
+            self.generation,
+            self.messages.clone(),
+            Arc::clone(&self.library),
+        );
+        self.model = match loading {
+            Ok((transcriber, jobs)) => Model::Loading {
+                choice,
+                generation: self.generation,
+                download: None,
+                transcriber,
+                jobs,
             },
-            Ok(choice) => match Transcriber::load(choice.clone(), self.generation, self.messages.clone()) {
-                Ok((transcriber, jobs)) => Model::Loading {
-                    choice,
-                    generation: self.generation,
-                    download: None,
-                    transcriber,
-                    jobs,
-                },
-                Err(error) => Model::Failed {
-                    choice: Some(choice),
-                    error: format!("{error:#}"),
-                },
+            Err(error) => Model::Failed {
+                choice: Some(choice),
+                error: format!("{error:#}"),
             },
         };
         if let Model::Failed { error, .. } = &self.model {
@@ -399,14 +441,20 @@ impl Running {
 
     /// Loads the model the settings choose now, if it isn't the one loaded (or loading, or that
     /// failed) or a reload was asked for, once nothing is being dictated: the model in use goes
-    /// first, so the two are never on the device together.
+    /// first, so the two are never on the device together. A model still downloading is left to
+    /// download; one that has started loading loads first.
     fn load_model_if_changed(&mut self) {
-        if matches!(self.model, Model::Loading { .. }) || !self.controller.is_idle() {
+        if !self.controller.is_idle() {
+            return;
+        }
+        let wanted = self.wanted();
+        if let Model::Loading { choice, .. } = &self.model
+            && (*choice == wanted || self.model.download().is_none())
+        {
             return;
         }
         let reload = std::mem::take(&mut self.reload);
-        let wanted = ModelChoice::from_settings(&self.settings).ok();
-        if wanted.as_ref() == self.model.choice() && !reload {
+        if Some(&wanted) == self.model.choice() && !reload {
             return;
         }
         self.controller.dependencies_mut().set_transcriber(None);
@@ -414,17 +462,30 @@ impl Running {
             choice: None,
             error: String::new(),
         };
-        if let Model::Ready { transcriber, .. } = std::mem::replace(&mut self.model, unloading) {
-            transcriber.finish();
+        match std::mem::replace(&mut self.model, unloading) {
+            Model::Ready { transcriber, .. } => transcriber.finish(),
+            Model::Loading { transcriber, jobs, .. } => {
+                transcriber.abandon();
+                drop(jobs);
+                transcriber.finish();
+            }
+            Model::Failed { .. } => {}
         }
         self.load_model();
     }
 
     /// Tells the tray how things stand, when that has changed.
     fn report(&mut self) {
+        let choice = self.model.choice();
         let status = DictationStatus {
             phase: self.controller.phase(),
             model: self.model.state(),
+            model_id: choice.and_then(|choice| match &choice.model {
+                ChosenModel::Catalog(model) => Some(model.id.clone()),
+                ChosenModel::Converted(_) => None,
+            }),
+            model_name: choice.map(|choice| choice.model.name()),
+            download: self.model.download(),
             placement: match &self.model {
                 Model::Ready { placement, .. } => Some(placement.clone()),
                 _ => None,

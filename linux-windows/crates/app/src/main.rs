@@ -5,10 +5,10 @@
 mod dictation;
 #[cfg(target_os = "linux")]
 mod keys;
-mod model_download;
 mod paths;
 #[cfg(target_os = "linux")]
 mod settings;
+mod speech_models;
 mod transcribe;
 mod wav;
 
@@ -34,14 +34,18 @@ struct Cli {
 /// Which speech model to run, and where.
 #[derive(Clone, clap::Args)]
 struct ModelOptions {
-    /// The model folder tools/export-qwen3-asr.py wrote [default: the app's data folder's
-    /// models/qwen3-asr-0.6b-sinhala]
-    #[arg(long, value_name = "FOLDER")]
-    model: Option<PathBuf>,
-    /// Where the model runs: auto (the NPU if there is one, and the CPU for what the NPU can't
-    /// run), or only on one OpenVINO device: CPU, GPU or NPU
+    /// The speech model: one `livetranscribe models` lists, by its id, downloaded the first time
+    /// it's used; or a folder tools/export-qwen3-asr.py wrote [default: qwen3-asr-0.6b-sinhala]
+    #[arg(long, value_name = "MODEL")]
+    model: Option<String>,
+    /// Where a Qwen3-ASR model runs: auto (the NPU if there is one, and the CPU for what the NPU
+    /// can't run), or only on one OpenVINO device: CPU, GPU or NPU. The other models run on the CPU
     #[arg(long, default_value = "auto", value_name = "DEVICE")]
     device: DeviceChoice,
+    /// The language Cohere Transcribe writes, by its code or name, such as de or German; the
+    /// other models find the language themselves [default: English]
+    #[arg(long, value_name = "LANGUAGE")]
+    language: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -53,6 +57,8 @@ enum Command {
     /// Prints the name of each key pressed, for choosing the hotkey
     #[cfg(target_os = "linux")]
     Keys,
+    /// Lists the speech models this app can download, and which are downloaded
+    Models,
     /// Transcribes WAV files and prints each transcript on a line
     Transcribe {
         #[command(flatten)]
@@ -88,6 +94,7 @@ fn main() -> ExitCode {
         Some(Command::Run(options)) => dictation::run(&options),
         #[cfg(target_os = "linux")]
         Some(Command::Keys) => keys::run(),
+        Some(Command::Models) => transcribe::list_models(),
         Some(Command::Transcribe { model, files, json }) => transcribe::run(&model, &files, json),
     };
     match result {

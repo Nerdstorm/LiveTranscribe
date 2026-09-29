@@ -164,7 +164,7 @@
 - **Pick your speech model.** **Settings › Models** lists speech-to-text models worth trying,
   from the most accurate (Qwen3-ASR 1.7B) to the fastest (Parakeet), with their languages, sizes
   and licences. Download one and switch to it without a restart, and remove what you no longer
-  use.
+  use. Cohere Transcribe writes the one of its 14 languages you choose on its row.
 - **Bring your own models.** Settings also takes any other Hugging Face speech-to-text model that
   mlx-audio-swift can load, or one in a folder on your Mac, and in **Advanced**, another cleanup
   or voice-activity model. Or turn the language model off, and dictation still removes fillers

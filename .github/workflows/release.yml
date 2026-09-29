@@ -4,8 +4,8 @@
 #   scripts/release.sh, with the Xcode the app is released with. The keys are secrets of the release
 #   environment, which waits for the owner's approval;
 # - the Linux app's deb, rpm and AppImage, built in Ubuntu 22.04, whose glibc (2.35) sets the
-#   oldest distributions they run on, with the OpenVINO runtime they carry
-#   (linux-windows/packaging/linux/fetch-openvino.sh).
+#   oldest distributions they run on, with the OpenVINO runtime and the sherpa-onnx libraries they
+#   carry (linux-windows/packaging/linux/fetch-openvino.sh, linux-windows/packaging/fetch-sherpa-onnx.sh).
 # Every system gets the tag's version. The Windows app joins once it has an installer.
 #
 # A pull request that changes how they're made builds them as test builds, to try from the run's
@@ -243,12 +243,19 @@ jobs:
           grep -qx "version = \"$VERSION\"" crates/app/Cargo.toml
       - name: Fetch the OpenVINO runtime
         run: packaging/linux/fetch-openvino.sh
+      # The speech-only sherpa-onnx libraries, which the sherpa-onnx crate links (.cargo/config.toml).
+      - name: Fetch the sherpa-onnx libraries
+        run: packaging/fetch-sherpa-onnx.sh
+      # linuxdeploy copies the libraries the app links into the AppImage, and finds sherpa-onnx's
+      # through LD_LIBRARY_PATH: the app looks for them where the deb and rpm put them, which the
+      # AppImage doesn't have (crates/app/build.rs).
       - name: Build the packages
         working-directory: linux-windows/crates/app
         env:
           # linuxdeploy is an AppImage itself, and the container has no FUSE.
           APPIMAGE_EXTRACT_AND_RUN: "1"
-        run: cargo tauri build --bundles deb,rpm,appimage
+        run: |
+          LD_LIBRARY_PATH=$(cd ../../target/sherpa-onnx/lib && pwd) cargo tauri build --bundles deb,rpm,appimage
       # Tauri names them after the product, "Live Transcribe", space and all.
       - name: Name the files as the packages are named
         working-directory: linux-windows/target/release/bundle
@@ -259,8 +266,9 @@ jobs:
             mv "$file" "../packages/${name/Live Transcribe/live-transcribe}"
           done
           ls -l ../packages
-      # Intel's licence allows shipping its libraries only unmodified.
-      - name: Check that each package carries Intel's libraries unmodified
+      # Intel's licence allows shipping its libraries only unmodified. And the app must find
+      # sherpa-onnx's, which it can't start without.
+      - name: Check each package's libraries, and that its app starts
         run: packaging/linux/check-packages.sh target/release/packages
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

@@ -61,8 +61,9 @@ final class AppComposition {
         let inputDevices = SystemInputDevices(store: store)
         self.inputDevices = inputDevices
         // One instance of each model, shared by the live transcript and dictation: they never
-        // run at once, and the models are loaded only once.
-        let transcriber = MLXTranscriber(modelID: settings.sttModel)
+        // run at once, and the models are loaded only once. The language is read at each
+        // transcription, so a change in Settings › Models applies to the next.
+        let transcriber = MLXTranscriber(modelID: settings.sttModel, language: { store.speechLanguage })
         let cleaner = MLXCleaner(configuration: .init(settings: settings))
         let relay = CaptureNoticeRelay()
 

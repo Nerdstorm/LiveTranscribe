@@ -10,7 +10,7 @@
     "licenseFile": "../../../LICENSE",
     "copyright": "Copyright (c) 2026 Nerdstorm",
     "shortDescription": "Dictation: hold a key, speak, and the text is typed where you are",
-    "longDescription": "Live Transcribe types what you say into the app you're using: hold a key, speak, and let go. Speech to text runs on your computer, on the NPU of an Intel Core Ultra or on the CPU, with a model that knows Sinhala and English. The speech model (1.1 GB) is downloaded on first start.",
+    "longDescription": "Live Transcribe types what you say into the app you're using: hold a key, speak, and let go. Speech to text runs on your computer: by default on the NPU of an Intel Core Ultra or on the CPU, with a model that knows Sinhala and English, which is downloaded on first start (1.1 GB). Other models, such as NVIDIA's Parakeet and Cohere Transcribe, can be chosen and downloaded in Settings.",
     "linux": {
       "deb": {
         "section": "utils",
@@ -18,6 +18,8 @@
         "recommends": ["intel-level-zero-npu", "libze1"],
         "files": {
           "/usr/lib/live-transcribe/openvino": "../../target/openvino-runtime",
+          "/usr/lib/live-transcribe/sherpa-onnx": "../../target/sherpa-onnx/lib",
+          "/usr/share/doc/live-transcribe/sherpa-onnx": "../../target/sherpa-onnx/licenses",
           "/usr/lib/udev/rules.d/70-live-transcribe-keyboard.rules": "../../packaging/linux/70-live-transcribe-keyboard.rules",
           "/usr/share/doc/live-transcribe/README.Linux": "../../packaging/linux/README.Linux"
         },
@@ -29,6 +31,8 @@
         "recommends": ["intel-npu-driver"],
         "files": {
           "/usr/lib/live-transcribe/openvino": "../../target/openvino-runtime",
+          "/usr/lib/live-transcribe/sherpa-onnx": "../../target/sherpa-onnx/lib",
+          "/usr/share/doc/live-transcribe/sherpa-onnx": "../../target/sherpa-onnx/licenses",
           "/usr/lib/udev/rules.d/70-live-transcribe-keyboard.rules": "../../packaging/linux/70-live-transcribe-keyboard.rules",
           "/usr/share/doc/live-transcribe/README.Linux": "../../packaging/linux/README.Linux"
         },
@@ -39,6 +43,7 @@
         "bundleMediaFramework": false,
         "files": {
           "/usr/share/live-transcribe/openvino": "../../target/openvino-runtime",
+          "/usr/share/doc/live-transcribe/sherpa-onnx": "../../target/sherpa-onnx/licenses",
           "/usr/share/live-transcribe/70-live-transcribe-keyboard.rules": "../../packaging/linux/70-live-transcribe-keyboard.rules",
           "/usr/share/doc/live-transcribe/README.Linux": "../../packaging/linux/README.Linux"
         }

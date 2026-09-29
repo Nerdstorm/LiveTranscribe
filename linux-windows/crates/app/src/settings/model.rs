@@ -7,6 +7,7 @@
 
 use lt_hotkey::{KeyTracker, key_code, key_name};
 use lt_shared::CleanupLevel;
+use lt_transcription::catalog::SpeechModelCatalog;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -33,10 +34,13 @@ pub struct Settings {
     pub dictation_max_recording_seconds: u32,
     pub dictation_notice_seconds: f64,
     pub paste_restore_delay_ms: u64,
-    /// The speech model: a folder in the app's models folder, or a path to one; `None` for the
-    /// default model.
+    /// The speech model: a catalog model's id, or a folder the setup kit converted a model into,
+    /// in the app's models folder or a path; `None` for the default model.
     pub stt_model: Option<String>,
-    /// Where the speech model runs: one of [`DEVICES`].
+    /// The language a speech model that is told one (Cohere Transcribe) writes, by its code;
+    /// `None` for the model's first, English. The other models find the language themselves.
+    pub stt_language: Option<String>,
+    /// Where a Qwen3-ASR model runs: one of [`DEVICES`]. The catalog's other models run on the CPU.
     pub stt_device: String,
     /// Keys this version doesn't know, kept for the version that wrote them.
     #[serde(flatten)]
@@ -59,14 +63,16 @@ impl Default for Settings {
             dictation_notice_seconds: 2.5,
             paste_restore_delay_ms: 250,
             stt_model: None,
+            stt_language: None,
             stt_device: "auto".to_owned(),
             unknown: Map::new(),
         }
     }
 }
 
-/// The settings on the Advanced tab, which its Restore Defaults resets, as the Mac's does.
-pub const ADVANCED_KEYS: [&str; 2] = ["sttModel", "sttDevice"];
+/// The settings on the Advanced tab, which its Restore Defaults resets, as the Mac's does. The
+/// model is chosen in the Models tab.
+pub const ADVANCED_KEYS: [&str; 1] = ["sttDevice"];
 
 impl Settings {
     /// Every key the settings have.
@@ -148,9 +154,18 @@ impl Settings {
                 self.stt_device = defaults.stt_device;
             }
         }
-        for text in [&mut self.input_device_id, &mut self.stt_model] {
+        for text in [&mut self.input_device_id, &mut self.stt_model, &mut self.stt_language] {
             if text.as_deref().is_some_and(|text| text.trim().is_empty()) {
                 *text = None;
+            }
+        }
+        if let Some(text) = &self.stt_language {
+            match canonical_language(text) {
+                Ok(code) => self.stt_language = Some(code),
+                Err(problem) => {
+                    problems.push(format!("sttLanguage: {problem}"));
+                    self.stt_language = defaults.stt_language;
+                }
             }
         }
         self.hotkey_tap_max_ms = self.hotkey_tap_max_ms.clamp(100, 1_000);
@@ -172,6 +187,27 @@ fn canonical_hotkey(name: &str) -> Result<String, String> {
     let code = key_code(name).ok_or_else(|| format!("{name} isn't a key name"))?;
     KeyTracker::new(code).map_err(|reason| reason.to_string())?;
     Ok(key_name(code))
+}
+
+/// The code of the language `text` names, by its code or its name, if a speech model here can be
+/// told it.
+fn canonical_language(text: &str) -> Result<String, String> {
+    let catalog = SpeechModelCatalog::bundled();
+    if let Some(choice) = catalog.language_named(text) {
+        return Ok(choice.code.clone());
+    }
+    let mut codes: Vec<&str> = catalog
+        .models()
+        .iter()
+        .flat_map(|model| &model.language_choices)
+        .map(|choice| choice.code.as_str())
+        .collect();
+    codes.sort_unstable();
+    codes.dedup();
+    Err(format!(
+        "{text} isn't a language a speech model here can be told: {}",
+        codes.join(", ")
+    ))
 }
 
 /// A cleanup level as its name: `none`, `light`, `medium` or `high`.
@@ -227,9 +263,33 @@ mod tests {
                 "dictationNoticeSeconds": 2.5,
                 "pasteRestoreDelayMs": 250,
                 "sttModel": null,
+                "sttLanguage": null,
                 "sttDevice": "auto",
             })
         );
+    }
+
+    #[test]
+    fn a_language_is_kept_by_its_code_if_a_model_can_be_told_it() {
+        for (given, kept) in [
+            ("German", Some("de")),
+            ("DE", Some("de")),
+            (" ja ", Some("ja")),
+            (" ", None),
+        ] {
+            let (settings, problems) = Settings::read(&json!({"sttLanguage": given}).to_string()).unwrap();
+            assert_eq!(settings.stt_language.as_deref(), kept, "{given:?}");
+            assert!(problems.is_empty(), "{problems:?}");
+        }
+
+        let (settings, problems) = Settings::read(r#"{"sttLanguage": "si"}"#).unwrap();
+        assert_eq!(settings.stt_language, None);
+        assert_eq!(problems.len(), 1);
+        assert!(problems[0].contains("si isn't a language"), "{problems:?}");
+        assert!(problems[0].contains("de, el, en"), "{problems:?}");
+
+        let refused = Settings::default().changed(&changes(json!({"sttLanguage": "Klingon"})));
+        assert!(refused.unwrap_err().contains("Klingon isn't a language"));
     }
 
     #[test]

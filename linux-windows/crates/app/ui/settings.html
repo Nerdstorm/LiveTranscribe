@@ -1,7 +1,7 @@
 <!doctype html>
-<!-- Settings, as the Mac app's Settings window has them, a tab at a time: General and Advanced
-     for now; Snippets, Vocabulary, History and Setup follow. Every control changes its setting
-     at once (settings.js); there is no Save. -->
+<!-- Settings, as the Mac app's Settings window has them, a tab at a time: General, Models and
+     Advanced for now; Snippets, Vocabulary, History and Setup follow. Every control changes its
+     setting at once (settings.js); there is no Save. -->
 <html lang="en">
   <head>
     <meta charset="utf-8">
@@ -14,6 +14,7 @@
     <header class="bar">
       <nav class="tabs" role="tablist" aria-label="Settings">
         <button class="tab" role="tab" id="tab-general" aria-controls="general" aria-selected="true">General</button>
+        <button class="tab" role="tab" id="tab-models" aria-controls="models" aria-selected="false" tabindex="-1">Models</button>
         <button class="tab" role="tab" id="tab-advanced" aria-controls="advanced" aria-selected="false" tabindex="-1">Advanced</button>
       </nav>
     </header>
@@ -132,18 +133,48 @@
         </details>
       </section>
 
+      <section class="page" id="models" role="tabpanel" aria-labelledby="tab-models" hidden>
+        <div class="group">
+          <h2>Speech to text</h2>
+          <div class="list" id="catalog" aria-live="polite">
+            <!-- A row per model in the app's catalog, from settings.js. -->
+          </div>
+          <p class="problem" id="catalog-problem" role="alert" hidden></p>
+          <p class="footnote" id="catalog-note">
+            A model you choose loads once no dictation is under way, and dictation waits for it.
+          </p>
+          <span class="override" data-override="sttModel" hidden></span>
+          <span class="override" data-override="sttLanguage" hidden></span>
+        </div>
+
+        <div class="group">
+          <h2>Another model</h2>
+          <div class="list">
+            <div class="row model" id="other-chosen" hidden>
+              <span class="text">
+                <span class="title" id="other-name"></span>
+                <span class="subtitle" id="other-source"></span>
+              </span>
+              <span class="model-status" id="other-status"></span>
+            </div>
+            <div class="row other">
+              <input id="other-model" list="converted" autocomplete="off" spellcheck="false"
+                     placeholder="A folder in the models folder, or a path starting with /"
+                     aria-label="Another model's folder">
+              <datalist id="converted"></datalist>
+              <button class="plain" id="use-other" disabled>Use</button>
+            </div>
+          </div>
+          <p class="footnote" id="models-folder">
+            A Qwen3-ASR model the setup kit converted (<code>07-export-model.sh</code>).
+          </p>
+        </div>
+      </section>
+
       <section class="page" id="advanced" role="tabpanel" aria-labelledby="tab-advanced" hidden>
         <div class="group">
           <h2>Speech to text</h2>
           <div class="list">
-            <label class="row">
-              <span class="text">
-                <span class="title">Model</span>
-                <span class="subtitle" id="model-source"></span>
-                <span class="override" data-override="sttModel" hidden></span>
-              </span>
-              <select id="model" data-setting="sttModel"></select>
-            </label>
             <label class="row">
               <span class="text">
                 <span class="title">Runs on</span>
@@ -161,9 +192,9 @@
               <button class="plain" id="reload-model" hidden>Try Again</button>
             </div>
           </div>
-          <p class="footnote" id="models-folder">
-            The setup kit converts models into the app’s models folder (<code>07-export-model.sh</code>).
-            A change loads the model once no dictation is under way.
+          <p class="footnote">
+            The device is for the Qwen3-ASR models; the others run on the CPU. A change loads the
+            model again once no dictation is under way.
           </p>
         </div>
         <div class="actions">

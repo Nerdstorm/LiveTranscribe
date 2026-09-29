@@ -16,7 +16,6 @@ mod single_instance;
 mod transcriber;
 mod tray;
 
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::mpsc::{self, Sender};
 
@@ -26,25 +25,31 @@ use lt_dictation::Phase;
 use lt_dictation_ui::{Blocker, ModelState, PanelView, load_interface_font};
 use lt_hotkey::{MonitorError, display_name, key_code, key_name, watch_hotkey};
 use lt_shared::CleanupLevel;
+use lt_transcription::catalog::SpeechModelCatalog;
 use lt_wayland::{PanelConfiguration, SessionConfiguration, SessionError, WaylandSession};
 use serde_json::{Map, Value};
 
 use crate::paths;
 use crate::settings::{AppControl, Settings, SettingsService, SettingsStore};
+use crate::speech_models::{SpeechModelDownloads, SpeechModelLibrary};
 use engine::{DictationStatus, Engine, Message, StatusSink};
 
 /// Settings for this run only, over the ones Settings keeps (the tray's *Settings…*), which
 /// they leave as they are. Changing one in the app ends its override.
 #[derive(clap::Args, Default)]
 pub struct Options {
-    /// The speech model's folder, as tools/export-qwen3-asr.py wrote it [default: Settings'
-    /// model, which at first is the app's data folder's models/qwen3-asr-0.6b-sinhala]
-    #[arg(long, value_name = "FOLDER")]
-    model: Option<PathBuf>,
-    /// Where the model runs: auto (the NPU if there is one, and the CPU for what the NPU can't
-    /// run), or only on one OpenVINO device: CPU, GPU or NPU [default: Settings']
+    /// The speech model: one `livetranscribe models` lists, by its id, or a folder
+    /// tools/export-qwen3-asr.py wrote [default: Settings' model, at first qwen3-asr-0.6b-sinhala]
+    #[arg(long, value_name = "MODEL")]
+    model: Option<String>,
+    /// Where a Qwen3-ASR model runs: auto (the NPU if there is one, and the CPU for what the NPU
+    /// can't run), or only on one OpenVINO device: CPU, GPU or NPU [default: Settings']
     #[arg(long, value_name = "DEVICE")]
     device: Option<String>,
+    /// The language Cohere Transcribe writes, by its code or name, such as de or German; the
+    /// other models find the language themselves [default: Settings', at first English]
+    #[arg(long, value_name = "LANGUAGE")]
+    language: Option<String>,
     /// The key to hold, as linux/input-event-codes.h names it (`livetranscribe keys` shows the
     /// name of each key you press) [default: Settings', at first KEY_RIGHTCTRL]
     #[arg(long, value_name = "KEY")]
@@ -63,14 +68,13 @@ impl Options {
     fn overrides(&self) -> anyhow::Result<Map<String, Value>> {
         let mut overrides = Map::new();
         if let Some(model) = &self.model {
-            let absolute = std::path::absolute(model).with_context(|| format!("{} isn't a path", model.display()))?;
-            let absolute = absolute
-                .to_str()
-                .with_context(|| format!("{} isn't UTF-8", absolute.display()))?;
-            overrides.insert("sttModel".to_owned(), Value::from(absolute));
+            overrides.insert("sttModel".to_owned(), Value::from(model_setting(model)?));
         }
         if let Some(device) = &self.device {
             overrides.insert("sttDevice".to_owned(), Value::from(device.as_str()));
+        }
+        if let Some(language) = &self.language {
+            overrides.insert("sttLanguage".to_owned(), Value::from(language.as_str()));
         }
         if let Some(key) = &self.key {
             overrides.insert("dictationHotkey".to_owned(), Value::from(key.as_str()));
@@ -83,6 +87,19 @@ impl Options {
         }
         Ok(overrides)
     }
+}
+
+/// `--model` as the setting keeps it: a catalog model's id as it is, and a folder as a path from
+/// where the app started, since the setting takes a relative one from the models folder.
+fn model_setting(model: &str) -> anyhow::Result<String> {
+    if SpeechModelCatalog::bundled().model(model).is_some() {
+        return Ok(model.to_owned());
+    }
+    let absolute = std::path::absolute(model).with_context(|| format!("{model} isn't a path"))?;
+    absolute
+        .to_str()
+        .map(str::to_owned)
+        .with_context(|| format!("{} isn't UTF-8", absolute.display()))
 }
 
 fn parse_cleanup(name: &str) -> Result<CleanupLevel, String> {
@@ -101,6 +118,10 @@ pub fn run(options: &Options) -> anyhow::Result<()> {
     }
     let settings = Arc::new(SettingsService::new(store));
     let current = settings.current().0;
+    let library = SpeechModelLibrary::new(
+        SpeechModelCatalog::bundled(),
+        SpeechModelDownloads::new(paths::models_folder()?),
+    );
     // The settings only hold keys that can be the hotkey.
     let hotkey = key_code(&current.dictation_hotkey)
         .with_context(|| format!("{} isn't a key name", current.dictation_hotkey))?;
@@ -130,8 +151,8 @@ pub fn run(options: &Options) -> anyhow::Result<()> {
     let (session, (hotkey_watch, keyboards)) = match (session, watch) {
         (Ok(session), Ok(watch)) => (session, watch),
         // The desktop first: a readable keyboard is no use where the text can't go.
-        (Err(error), _) => return run_blocked(desktop_blocker(&error), messages, settings),
-        (_, Err(error)) => return run_blocked(hotkey_blocker(&error), messages, settings),
+        (Err(error), _) => return run_blocked(desktop_blocker(&error), messages, settings, library),
+        (_, Err(error)) => return run_blocked(hotkey_blocker(&error), messages, settings, library),
     };
     for keyboard in &keyboards {
         eprintln!("Listening for {} on {}", key_name(hotkey), keyboard.name);
@@ -144,6 +165,7 @@ pub fn run(options: &Options) -> anyhow::Result<()> {
     });
     let engine = Engine {
         settings: current,
+        library: Arc::clone(&library),
         hotkey: hotkey_watch,
         recorder,
         session,
@@ -151,17 +173,24 @@ pub fn run(options: &Options) -> anyhow::Result<()> {
         received,
     };
     let control = Box::new(EngineControl(messages.clone()));
-    tray::run(messages, settings, control, false, move |status| engine.start(status))
+    tray::run(messages, settings, library, control, false, move |status| {
+        engine.start(status)
+    })
 }
 
 /// Runs the tray and Settings without dictation, which can't start: both say why, and Settings
 /// opens, since some desktops (GNOME) show no tray. Quitting ends it, as always.
-fn run_blocked(blocker: Blocker, messages: Sender<Message>, settings: Arc<SettingsService>) -> anyhow::Result<()> {
+fn run_blocked(
+    blocker: Blocker,
+    messages: Sender<Message>,
+    settings: Arc<SettingsService>,
+    library: Arc<SpeechModelLibrary>,
+) -> anyhow::Result<()> {
     let (Blocker::Hotkey(detail) | Blocker::Desktop(detail)) = &blocker;
     eprintln!("livetranscribe: dictation can't start: {detail}");
     let control = Box::new(EngineControl(messages.clone()));
     let service = Arc::clone(&settings);
-    tray::run(messages, settings, control, true, move |status: StatusSink| {
+    tray::run(messages, settings, library, control, true, move |status: StatusSink| {
         status(&blocked_status(&service.current().0, &blocker));
         // Turning dictation off, or on, still shows.
         service.subscribe(move |settings, _| status(&blocked_status(settings, &blocker)));
@@ -175,6 +204,9 @@ fn blocked_status(settings: &Settings, blocker: &Blocker) -> DictationStatus {
     DictationStatus {
         phase: Phase::Idle,
         model: ModelState::Loading { percent: None },
+        model_id: None,
+        model_name: None,
+        download: None,
         placement: None,
         hotkey: settings.dictation_enabled.then_some(hotkey),
         has_last_dictation: false,
@@ -267,6 +299,8 @@ impl AppControl for EngineControl {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use clap::Parser;
 
     use super::*;
@@ -338,12 +372,24 @@ mod tests {
             "CPU",
             "--model",
             "/srv/models/mine",
+            "--language",
+            "German",
         ]);
         assert_eq!(given["dictationHotkey"], "KEY_F23");
         assert_eq!(given["handsFreeEnabled"], false);
         assert_eq!(given["cleanupLevel"], "light");
         assert_eq!(given["sttDevice"], "CPU");
         assert_eq!(given["sttModel"], "/srv/models/mine");
+        // The settings keep it by its code (Settings::changed).
+        assert_eq!(given["sttLanguage"], "German");
+    }
+
+    #[test]
+    fn a_catalog_model_is_kept_by_its_id() {
+        assert_eq!(
+            overrides(&["--model", "parakeet-tdt-0.6b-v2"])["sttModel"],
+            "parakeet-tdt-0.6b-v2"
+        );
     }
 
     #[test]

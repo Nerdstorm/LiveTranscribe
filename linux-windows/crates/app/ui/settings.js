@@ -2,7 +2,8 @@
 // The Settings window. It shows the settings in effect and changes one at a time through the
 // app's commands (src/settings/window.rs), which save it, apply it to dictation and send every
 // window the settings now in effect ("settings"), so a change from the tray shows here too.
-// How dictation stands comes as "status".
+// How dictation stands comes as "status", and how each speech model's download goes as
+// "speech-model".
 
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
@@ -14,6 +15,7 @@ const OPTION_FOR = {
   handsFreeEnabled: "--no-hands-free",
   cleanupLevel: "--cleanup",
   sttModel: "--model",
+  sttLanguage: "--language",
   sttDevice: "--device",
 };
 
@@ -84,7 +86,12 @@ const $$ = (selector) => [...document.querySelectorAll(selector)];
 
 let snapshot = null;
 let microphones = null;
-let models = null;
+/** The catalog's models and the converted ones, from the speech_models command. */
+let speechModels = null;
+/** The catalog model whose removal is being confirmed, by id. */
+let confirmingRemoval = null;
+/** The catalog wasn't drawn again while a language menu was in use, and should be. */
+let catalogStale = false;
 let status = null;
 /**
  * The shortcut being recorded: the modifier pressed first, if any, and whether a key has been
@@ -140,7 +147,7 @@ function render(next) {
   }
   renderOverrides(next);
   renderMicrophones();
-  renderModels();
+  renderSpeechModels();
   renderDevices();
 }
 
@@ -231,42 +238,310 @@ function shortDevice(id) {
   return name.length > 40 ? `${name.slice(0, 39)}…` : name;
 }
 
-function renderModels() {
+// Models
+
+/**
+ * What a model's row shows: for the model chosen, how its loading goes; for the rest, their
+ * download. `id` is a catalog model's id, or the setting naming a converted model's folder, which
+ * the status names no id for.
+ */
+function rowStatus(id, download, { converted = false } = {}) {
+  const chosen = snapshot.settings.sttModel ?? snapshot.defaultModel;
+  const engine = status && status.model !== "idle" ? status : null;
+  const loadedHere = Boolean(engine) && (converted ? engine.modelId == null : engine.modelId === id);
+  if (id === chosen) {
+    if (loadedHere) {
+      switch (engine.model) {
+        case "downloading":
+        case "unpacking":
+        case "checking":
+          return { kind: "loading", stage: engine.model, percent: engine.percent };
+        case "loading":
+          return { kind: "loading" };
+        case "ready":
+          return { kind: "inUse" };
+        case "failed":
+          return { kind: "failedToLoad", message: engine.detail };
+      }
+    }
+    // Dictation can't start, so nothing loads; or the model before it is still in use.
+    if (!engine && download?.state === "downloaded") {
+      return { kind: "chosen" };
+    }
+    if (engine) {
+      return { kind: "waiting" };
+    }
+  } else if (loadedHere && engine.model === "ready") {
+    // Chosen away from while dictating: it stays until the model chosen loads.
+    return { kind: "inUse" };
+  }
+  switch (download?.state) {
+    case "downloading":
+      return { kind: "downloading", stage: download.stage, percent: download.percent };
+    case "downloaded":
+      return { kind: "downloaded" };
+    case "failed":
+      return { kind: "downloadFailed", message: download.problem };
+    default:
+      return { kind: "notDownloaded" };
+  }
+}
+
+const STAGE_NAMES = { downloading: "Downloading", unpacking: "Unpacking", checking: "Checking" };
+
+function button(label, action, accessibleName) {
+  const element = document.createElement("button");
+  element.className = "plain";
+  element.textContent = label;
+  if (accessibleName) {
+    element.setAttribute("aria-label", accessibleName);
+  }
+  element.addEventListener("click", action);
+  return element;
+}
+
+function note(text, className = "note") {
+  const element = document.createElement("span");
+  element.className = className;
+  element.textContent = text;
+  return element;
+}
+
+function bar(percent, label) {
+  const element = document.createElement("progress");
+  element.max = 100;
+  if (percent != null) {
+    element.value = percent;
+  }
+  element.setAttribute("aria-label", label);
+  return element;
+}
+
+/** The status, or the button for what comes next, of the model `name` (`id` in the catalog). */
+function statusElements(row, name, id) {
+  switch (row.kind) {
+    case "inUse":
+      return [note("✓ In use", "in-use")];
+    case "chosen":
+      return [note("Chosen", "in-use")];
+    case "loading":
+      return row.stage
+        ? [bar(row.percent, `${STAGE_NAMES[row.stage]} ${name}`), note(`${STAGE_NAMES[row.stage]} ${row.percent ?? 0}%`)]
+        : [bar(null, `Loading ${name}`), note("Loading…")];
+    case "waiting":
+      return [note("Loads once dictation is idle")];
+    case "failedToLoad": {
+      const failed = note("Couldn’t load", "failed");
+      failed.title = row.message ?? "";
+      return [failed, button("Try Again", reloadModel, `Load ${name} again`)];
+    }
+    case "downloading":
+      return [
+        bar(row.percent, `${STAGE_NAMES[row.stage]} ${name}`),
+        note(`${STAGE_NAMES[row.stage]} ${row.percent}%`),
+        button("Cancel", () => modelCommand("cancel_download", id), `Cancel downloading ${name}`),
+      ];
+    case "downloadFailed": {
+      const failed = note("Download failed", "failed");
+      failed.title = row.message ?? "";
+      return [failed, button("Try Again", () => modelCommand("download_model", id), `Download ${name} again`)];
+    }
+    case "downloaded":
+      return [button("Use", () => useModel(id), `Use ${name}`)];
+    default:
+      return [button("Download", () => modelCommand("download_model", id), `Download ${name}`)];
+  }
+}
+
+function renderSpeechModels() {
   if (!snapshot) {
     return;
   }
-  const select = $("#model");
-  const chosen = snapshot.settings.sttModel ?? "";
-  const list = models?.models ?? [];
-  const defaultModel = list.find((model) => model.name === snapshot.defaultModel);
-  const options = [option("", `${snapshot.defaultModel} (default)`)];
-  for (const model of list) {
-    if (model.name !== snapshot.defaultModel) {
-      options.push(option(model.name, model.problem ? `${model.name} (can’t run)` : model.name));
-    }
-  }
-  if (chosen && !list.some((model) => model.name === chosen)) {
-    options.push(option(chosen, `${chosen} (not found)`));
-  }
-  select.replaceChildren(...options);
-  select.value = chosen;
+  renderCatalog();
+  renderOther();
+}
 
-  const shown = chosen ? list.find((model) => model.name === chosen) : defaultModel;
-  let source;
-  if (!models) {
-    source = "";
-  } else if (!shown) {
-    source = chosen
-      ? "Not in the models folder: convert it with the setup kit, or choose another."
-      : "Not converted yet: the setup kit’s 07-export-model.sh converts it.";
-  } else if (shown.problem) {
-    source = `${shown.source || shown.name}: this version can’t run it (${shown.problem}).`;
-  } else {
-    source = shown.source ? `Converted from ${shown.source}.` : "";
+function renderCatalog({ force = false } = {}) {
+  // A download's progress would otherwise draw the rows again under a language menu in use,
+  // and close it.
+  if (!force && document.activeElement?.closest("#catalog .language")) {
+    catalogStale = true;
+    return;
   }
-  $("#model-source").textContent = source;
-  if (models) {
-    $("#models-folder").firstChild.textContent = `The setup kit converts models into ${models.folder} (`;
+  catalogStale = false;
+  const list = $("#catalog");
+  const models = speechModels?.models ?? [];
+  const chosen = snapshot.settings.sttModel ?? snapshot.defaultModel;
+  list.replaceChildren(
+    ...models.map((model) => {
+      const row = document.createElement("div");
+      row.className = "row model";
+      row.dataset.id = model.id;
+
+      const text = document.createElement("span");
+      text.className = "text";
+      const title = document.createElement("span");
+      title.className = "title";
+      title.textContent = model.name;
+      if (model.id === snapshot.defaultModel) {
+        title.append(note("Default", "badge"));
+      }
+      const meta = [model.languages, gigabytes(model.bytes), model.licence];
+      if (model.cpuOnly) {
+        meta.push("runs on the CPU");
+      }
+      text.append(
+        title,
+        note(model.summary, "subtitle"),
+        note(meta.join(" · "), "meta"),
+        note(model.credit, "credit"),
+      );
+      if (model.languageChoices.length) {
+        text.append(languageMenu(model));
+      }
+
+      const side = document.createElement("span");
+      side.className = "model-status";
+      const shown = rowStatus(model.id, model.download);
+      if (confirmingRemoval === model.id) {
+        side.append(
+          note(`Remove its ${gigabytes(model.bytes)}?`),
+          button("Remove", () => removeModel(model.id), `Remove ${model.name}`),
+          button("Keep", () => {
+            confirmingRemoval = null;
+            renderCatalog();
+          }),
+        );
+      } else {
+        side.append(...statusElements(shown, model.name, model.id));
+        const canRemove = model.canRemove && model.id !== chosen && shown.kind !== "inUse";
+        if (canRemove) {
+          const remove = button("Remove", () => {
+            confirmingRemoval = model.id;
+            renderCatalog();
+          }, `Remove ${model.name}`);
+          remove.classList.add("link");
+          side.append(remove);
+        }
+      }
+      row.append(text, side);
+      return row;
+    }),
+  );
+  if (speechModels) {
+    $("#catalog-note").textContent = `Downloaded into ${speechModels.folder}. A model you choose loads once no dictation is under way, and dictation waits for it.`;
+  }
+}
+
+/**
+ * The language a model told one writes: the Language setting's, if the model has it, and
+ * otherwise its first. The setting is one for every such model.
+ */
+function languageMenu(model) {
+  const choices = model.languageChoices;
+  const setting = snapshot.settings.sttLanguage;
+  const select = document.createElement("select");
+  select.dataset.model = model.id;
+  select.setAttribute("aria-label", `${model.name}’s language`);
+  select.replaceChildren(...choices.map((choice) => option(choice.code, choice.name)));
+  select.value = choices.some((choice) => choice.code === setting) ? setting : choices[0].code;
+  select.addEventListener("change", async () => {
+    await change({ sttLanguage: select.value });
+    // The menu has closed, so the rows can be drawn again, keeping the focus on it.
+    if (catalogStale) {
+      renderCatalog({ force: true });
+      $(`#catalog select[data-model="${CSS.escape(model.id)}"]`)?.focus();
+    }
+  });
+  select.addEventListener("blur", () => {
+    // Once the focus has moved on: while this runs, it's still here.
+    setTimeout(() => {
+      if (catalogStale) {
+        renderCatalog();
+      }
+    });
+  });
+  const label = document.createElement("label");
+  label.className = "language";
+  label.append(note("Language", "meta"), select);
+  return label;
+}
+
+function renderOther() {
+  const chosen = snapshot.settings.sttModel;
+  const inCatalog = (speechModels?.models ?? []).some((model) => model.id === (chosen ?? snapshot.defaultModel));
+  const row = $("#other-chosen");
+  row.hidden = !chosen || inCatalog || !speechModels;
+  if (!row.hidden) {
+    $("#other-name").textContent = chosen;
+    const converted = speechModels.converted.find((model) => model.name === chosen);
+    $("#other-source").textContent = converted?.problem
+      ? `This version can’t run it (${converted.problem}).`
+      : converted?.source ? `Converted from ${converted.source}.` : "";
+    const shown = rowStatus(chosen, { state: "downloaded" }, { converted: true });
+    $("#other-status").replaceChildren(...statusElements(shown, chosen, null));
+  }
+  $("#converted").replaceChildren(
+    ...(speechModels?.converted ?? []).map((model) => option(model.name, model.source || model.name)),
+  );
+  if (speechModels) {
+    $("#models-folder").firstChild.textContent = `A Qwen3-ASR model the setup kit converted into ${speechModels.folder} (`;
+  }
+}
+
+function gigabytes(bytes) {
+  return `${(bytes / 1e9).toFixed(1)} GB`;
+}
+
+async function modelCommand(command, id) {
+  $("#catalog-problem").hidden = true;
+  try {
+    await invoke(command, { id });
+  } catch (error) {
+    showModelProblem(String(error));
+  }
+  await loadSpeechModels();
+}
+
+async function removeModel(id) {
+  confirmingRemoval = null;
+  await modelCommand("remove_model", id);
+}
+
+function useModel(id) {
+  // The default is kept as no choice, so a later default applies.
+  change({ sttModel: id === snapshot.defaultModel ? null : id });
+}
+
+function useOtherModel() {
+  const value = $("#other-model").value.trim();
+  if (!value) {
+    return;
+  }
+  change({ sttModel: value });
+  $("#other-model").value = "";
+  $("#use-other").disabled = true;
+}
+
+function reloadModel() {
+  invoke("reload_model").catch((error) => showToast(String(error)));
+}
+
+function showModelProblem(message) {
+  const problem = $("#catalog-problem");
+  problem.textContent = `${capitalise(message)}.`;
+  problem.hidden = false;
+}
+
+/** A download moved on: its row, as the app sent it. */
+function modelChanged(model) {
+  if (!speechModels) {
+    return;
+  }
+  const index = speechModels.models.findIndex((known) => known.id === model.id);
+  if (index >= 0) {
+    speechModels.models[index] = model;
+    renderCatalog();
   }
 }
 
@@ -287,12 +562,15 @@ function renderStatus(next) {
   $("#model-state").textContent = {
     idle: "The speech model loads once dictation can start",
     downloading: "Downloading the speech model…",
+    unpacking: "Unpacking the speech model…",
+    checking: "Checking the speech model’s files…",
     loading: "Loading the speech model…",
     ready: "The speech model is ready",
     failed: "The speech model couldn’t load",
   }[state];
   $("#model-detail").textContent = next?.detail ? capitalise(next.detail) : "";
   $("#reload-model").hidden = state !== "failed";
+  renderSpeechModels();
   const blocker = next?.blocker;
   $("#blocker").hidden = !blocker;
   $("#blocker-title").textContent = blocker?.title ?? "";
@@ -315,14 +593,14 @@ async function loadMicrophones() {
   renderMicrophones();
 }
 
-async function loadModels() {
+async function loadSpeechModels() {
   try {
-    models = await invoke("models");
+    speechModels = await invoke("speech_models");
   } catch (error) {
-    models = null;
-    $("#model-source").textContent = `The models couldn’t be listed: ${error}`;
+    speechModels = null;
+    showModelProblem(`The models couldn’t be listed: ${error}`);
   }
-  renderModels();
+  renderSpeechModels();
 }
 
 // Recording the hotkey
@@ -446,7 +724,7 @@ function bind() {
       change({ [input.dataset.setting]: value });
     });
   }
-  for (const select of [$("#microphone"), $("#model"), $("#device")]) {
+  for (const select of [$("#microphone"), $("#device")]) {
     select.addEventListener("change", () => change({ [select.dataset.setting]: select.value || null }));
   }
   $("#hotkey").addEventListener("click", startRecording);
@@ -457,9 +735,18 @@ function bind() {
   // A microphone plugged in, or a model converted, while the window was in the background.
   window.addEventListener("focus", () => {
     loadMicrophones();
-    loadModels();
+    loadSpeechModels();
   });
-  $("#reload-model").addEventListener("click", () => invoke("reload_model").catch((error) => showToast(String(error))));
+  $("#reload-model").addEventListener("click", reloadModel);
+  $("#other-model").addEventListener("input", () => {
+    $("#use-other").disabled = !$("#other-model").value.trim();
+  });
+  $("#other-model").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      useOtherModel();
+    }
+  });
+  $("#use-other").addEventListener("click", useOtherModel);
   $("#restore-advanced").addEventListener("click", () => {
     const changes = Object.fromEntries(snapshot.advancedKeys.map((key) => [key, snapshot.defaults[key]]));
     change(changes);
@@ -470,9 +757,10 @@ async function start() {
   bind();
   await listen("settings", (event) => render(event.payload));
   await listen("status", (event) => renderStatus(event.payload));
+  await listen("speech-model", (event) => modelChanged(event.payload));
   render(await invoke("settings_snapshot"));
   renderStatus(await invoke("dictation_status"));
-  await Promise.all([loadMicrophones(), loadModels()]);
+  await Promise.all([loadMicrophones(), loadSpeechModels()]);
 }
 
 start().catch((error) => showToast(`Settings couldn’t load: ${error}`));

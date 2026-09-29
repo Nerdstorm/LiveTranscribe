@@ -12,7 +12,9 @@ import Shared
 ///
 /// The model is loaded once and warmed up, and replaced when ``switchModel(to:progress:)`` names
 /// another. It never leaves this actor, which runs on its own serial queue so the blocking MLX
-/// inference does not occupy the cooperative thread pool.
+/// inference does not occupy the cooperative thread pool. A catalog model that is told which
+/// language to write (Cohere Transcribe) is told the Language setting's at each transcription, so
+/// a change applies to the next without loading the model again.
 public actor MLXTranscriber: Transcriber {
     /// Shorter clips are returned as empty text rather than sent to the model: they hold no word,
     /// and some models' subsampling (Parakeet's conformer, say) needs a minimum number of frames.
@@ -30,14 +32,22 @@ public actor MLXTranscriber: Transcriber {
 
     private let catalog: SpeechModelCatalog
     private let downloads: SpeechModelDownloads
+    /// The Language setting, a code, read at each transcription; `nil` for each model's first.
+    private let language: @Sendable () -> String?
 
     private let queue = DispatchSerialQueue(label: "LiveTranscribe.MLXTranscriber", qos: .userInitiated)
     public nonisolated var unownedExecutor: UnownedSerialExecutor { queue.asUnownedSerialExecutor() }
 
-    public init(modelID: String, catalog: SpeechModelCatalog = .bundled, downloads: SpeechModelDownloads = SpeechModelDownloads()) {
+    public init(
+        modelID: String,
+        catalog: SpeechModelCatalog = .bundled,
+        downloads: SpeechModelDownloads = SpeechModelDownloads(),
+        language: @escaping @Sendable () -> String? = { nil }
+    ) {
         self.modelID = modelID
         self.catalog = catalog
         self.downloads = downloads
+        self.language = language
     }
 
     /// Loads the model the setting names, unless it's loaded already.
@@ -84,7 +94,8 @@ public actor MLXTranscriber: Transcriber {
         if isReplacingModel {
             await withCheckedContinuation { waitingForModel.append($0) }
         }
-        guard let model = loaded?.model else { throw TranscriptionError.modelNotLoaded }
+        guard let loaded else { throw TranscriptionError.modelNotLoaded }
+        let model = loaded.model
         guard sampleRate == AudioFormat.sampleRate else {
             throw TranscriptionError.unsupportedSampleRate(sampleRate)
         }
@@ -94,7 +105,12 @@ public actor MLXTranscriber: Transcriber {
         let interval = signposter.beginInterval("STT", id: signposter.makeSignpostID())
         defer { signposter.endInterval("STT", interval) }
 
-        let parameters = OutputLimit.capping(model.defaultGenerationParameters, sampleCount: samples.count)
+        let told = Self.parameters(
+            model.defaultGenerationParameters,
+            for: catalog.model(forSetting: loaded.modelID),
+            language: language()
+        )
+        let parameters = OutputLimit.capping(told, sampleCount: samples.count)
         let output = model.generate(audio: MLXArray(samples), generationParameters: parameters)
         if parameters.maxTokens > 0, output.generationTokens >= parameters.maxTokens {
             Log.transcription.warning(
@@ -102,6 +118,18 @@ public actor MLXTranscriber: Transcriber {
             )
         }
         return output.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// `parameters`, with the language to write for a catalog model that is told one: the
+    /// Language setting's if the model has it, and otherwise its first
+    /// (``SpeechModelCatalog/Model/language(forSetting:)``). Any other model keeps its own.
+    static func parameters(
+        _ parameters: STTGenerateParameters,
+        for model: SpeechModelCatalog.Model?,
+        language setting: String?
+    ) -> STTGenerateParameters {
+        guard let told = model?.language(forSetting: setting) else { return parameters }
+        return parameters.replacing(language: told.code)
     }
 
     /// The model's folder, downloaded first when it's a repository.

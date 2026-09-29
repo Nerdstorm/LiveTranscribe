@@ -1,16 +1,17 @@
 //! What each part of dictation takes from the settings.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Duration;
 
 use lt_capture::RecorderConfiguration;
 use lt_dictation::{Configuration, ControllerConfiguration};
 use lt_hotkey::HotkeyGestureConfiguration;
 use lt_insertion::InsertionConfiguration;
+use lt_transcription::catalog::SpeechModelCatalog;
 use lt_transcription::qwen3_asr::DeviceChoice;
 
-use crate::paths;
 use crate::settings::Settings;
+use crate::speech_models::{ChosenModel, DEFAULT_MODEL};
 
 /// How long an app gets to read pasted text before it is left on the clipboard instead.
 const PASTE_READ_TIMEOUT: Duration = Duration::from_secs(2);
@@ -54,37 +55,32 @@ pub(crate) fn notice_ms(settings: &Settings) -> u64 {
     (settings.dictation_notice_seconds * 1_000.0).round() as u64
 }
 
+/// The Language setting each dictation is transcribed with. It goes with the recording to the
+/// model, which is told it for that clip: a change doesn't load the model again.
+pub(crate) fn language(settings: &Settings) -> Option<String> {
+    settings.stt_language.clone()
+}
+
 /// The speech model to load, and where it runs.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ModelChoice {
-    pub(crate) folder: PathBuf,
+    pub(crate) model: ChosenModel,
+    /// Where an OpenVINO model runs. sherpa-onnx runs its models on the CPU, so for them it's
+    /// always `Auto`, and changing the device doesn't load them again.
     pub(crate) device: DeviceChoice,
-    /// It's the default model, which is downloaded when it isn't in its folder yet.
-    pub(crate) downloadable: bool,
 }
 
 impl ModelChoice {
-    pub(crate) fn from_settings(settings: &Settings) -> anyhow::Result<Self> {
-        let default = paths::default_model()?;
-        let folder = match settings.stt_model.as_deref() {
-            None => default.clone(),
-            Some(model) => model_folder(model, &paths::models_folder()?),
+    /// The model the settings choose, from `catalog`, or a folder in `models` or a path.
+    pub(crate) fn from_settings(settings: &Settings, catalog: &'static SpeechModelCatalog, models: &Path) -> Self {
+        let setting = settings.stt_model.as_deref().unwrap_or(DEFAULT_MODEL);
+        let model = ChosenModel::named(setting, catalog, models);
+        let device = if model.runs_on_openvino() {
+            settings.stt_device.parse().unwrap_or(DeviceChoice::Auto)
+        } else {
+            DeviceChoice::Auto
         };
-        Ok(Self {
-            downloadable: folder == default,
-            folder,
-            device: settings.stt_device.parse().unwrap_or(DeviceChoice::Auto),
-        })
-    }
-}
-
-/// `model` is a folder in `models`, or a path to one elsewhere.
-fn model_folder(model: &str, models: &Path) -> PathBuf {
-    let path = Path::new(model);
-    if path.is_absolute() {
-        path.to_owned()
-    } else {
-        models.join(path)
+        Self { model, device }
     }
 }
 
@@ -105,6 +101,7 @@ mod tests {
             dictation_notice_seconds: 1.5,
             paste_restore_delay_ms: 500,
             input_device_id: Some("pulseaudio:alsa_input.usb".to_owned()),
+            stt_language: Some("de".to_owned()),
             ..Settings::default()
         };
         let controller = controller(&settings);
@@ -121,15 +118,53 @@ mod tests {
         assert_eq!(recorder.device.as_deref(), Some("pulseaudio:alsa_input.usb"));
         assert_eq!(insertion(&settings).restore_delay, Duration::from_millis(500));
         assert_eq!(notice_ms(&settings), 1_500);
+        assert_eq!(language(&settings).as_deref(), Some("de"));
     }
 
     #[test]
-    fn a_model_is_a_folder_in_the_models_folder_or_a_path() {
+    fn the_settings_choose_a_catalog_model_or_a_folder() {
+        let catalog = SpeechModelCatalog::bundled();
         let models = Path::new("/home/me/.local/share/live-transcribe/models");
-        assert_eq!(
-            model_folder("qwen3-asr-0.6b-v2", models),
-            models.join("qwen3-asr-0.6b-v2")
-        );
-        assert_eq!(model_folder("/srv/models/mine", models), Path::new("/srv/models/mine"));
+        let default = ModelChoice::from_settings(&Settings::default(), catalog, models);
+        assert!(matches!(&default.model, ChosenModel::Catalog(model) if model.id == DEFAULT_MODEL));
+
+        let converted = Settings {
+            stt_model: Some("qwen3-asr-0.6b-v2".to_owned()),
+            stt_device: "CPU".to_owned(),
+            ..Settings::default()
+        };
+        let choice = ModelChoice::from_settings(&converted, catalog, models);
+        assert_eq!(choice.model, ChosenModel::Converted(models.join("qwen3-asr-0.6b-v2")));
+        assert_eq!(choice.device, DeviceChoice::Only("CPU".to_owned()));
+    }
+
+    #[test]
+    fn the_device_doesnt_count_for_a_model_that_runs_on_the_cpu() {
+        let catalog = SpeechModelCatalog::bundled();
+        let models = Path::new("/models");
+        let on = |device: &str| {
+            let settings = Settings {
+                stt_model: Some("parakeet-tdt-0.6b-v2".to_owned()),
+                stt_device: device.to_owned(),
+                ..Settings::default()
+            };
+            ModelChoice::from_settings(&settings, catalog, models)
+        };
+        assert_eq!(on("NPU"), on("CPU"), "no reload for a change of device");
+    }
+
+    #[test]
+    fn a_change_of_language_doesnt_load_the_model_again() {
+        let catalog = SpeechModelCatalog::bundled();
+        let models = Path::new("/models");
+        let on = |language: Option<&str>| {
+            let settings = Settings {
+                stt_model: Some("cohere-transcribe".to_owned()),
+                stt_language: language.map(str::to_owned),
+                ..Settings::default()
+            };
+            ModelChoice::from_settings(&settings, catalog, models)
+        };
+        assert_eq!(on(Some("de")), on(None), "each clip is told its language instead");
     }
 }

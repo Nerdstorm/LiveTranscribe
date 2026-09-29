@@ -25,20 +25,6 @@ public enum OutputLimit {
     public static func capping(_ parameters: STTGenerateParameters, sampleCount: Int) -> STTGenerateParameters {
         let limit = maxTokens(forSampleCount: sampleCount)
         guard parameters.maxTokens > limit else { return parameters }
-        return STTGenerateParameters(
-            maxTokens: limit,
-            temperature: parameters.temperature,
-            topP: parameters.topP,
-            topK: parameters.topK,
-            verbose: parameters.verbose,
-            language: parameters.language,
-            chunkDuration: parameters.chunkDuration,
-            minChunkDuration: parameters.minChunkDuration,
-            repetitionPenalty: parameters.repetitionPenalty,
-            repetitionContextSize: parameters.repetitionContextSize,
-            kvBits: parameters.kvBits,
-            kvGroupSize: parameters.kvGroupSize,
-            quantizedKVStart: parameters.quantizedKVStart
-        )
+        return parameters.replacing(maxTokens: limit)
     }
 }

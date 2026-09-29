@@ -1,0 +1,7 @@
+# The sherpa-onnx crate's build script links the libraries in SHERPA_ONNX_LIB_DIR: here, the
+# speech-only ones packaging/fetch-sherpa-onnx.sh puts in target/sherpa-onnx/lib, checked against
+# their SHA-256s. Without it, that script would download sherpa-onnx's default libraries, unchecked,
+# and they link espeak-ng (GPL-3.0) for text to speech. An environment variable of the same name
+# takes precedence; lt-transcription's build script refuses to build without either.
+[env]
+SHERPA_ONNX_LIB_DIR = { value = "target/sherpa-onnx/lib", relative = true }

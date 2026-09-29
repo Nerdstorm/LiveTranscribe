@@ -1,5 +1,6 @@
 import Foundation
 import HuggingFace
+import MLXAudioSTT
 import Shared
 import Testing
 @testable import Transcription
@@ -37,6 +38,40 @@ struct SpeechModelCatalogTests {
         #expect(Set(catalog.models.map { $0.mac.repository.rawValue.lowercased() }).count == catalog.models.count)
     }
 
+    /// mlx-audio-swift's Cohere tokenizer knows these codes, and writes English for any other.
+    @Test func cohereIsToldOneOfTheLanguagesItKnows() throws {
+        let cohere = try #require(catalog.models.first { $0.id == "cohere-transcribe" })
+        #expect(cohere.languageChoices.first?.code == "en", "English is the default")
+        #expect(cohere.languageChoices.map(\.code).sorted() == ["ar", "de", "el", "en", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "vi", "zh"])
+        #expect(cohere.languageChoices.allSatisfy { !$0.name.isEmpty })
+        for model in catalog.models where model.id != "cohere-transcribe" {
+            #expect(model.languageChoices.isEmpty, "\(model.id) finds the language itself")
+        }
+    }
+
+    @Test func theLanguageToldIsTheSettingsIfTheModelHasItAndElseItsFirst() throws {
+        let cohere = try #require(catalog.models.first { $0.id == "cohere-transcribe" })
+        #expect(cohere.language(forSetting: "de")?.name == "German")
+        #expect(cohere.language(forSetting: nil)?.code == "en")
+        #expect(cohere.language(forSetting: "si")?.code == "en", "Sinhala isn't one of its languages")
+        let parakeet = try #require(catalog.models.first { $0.id == "parakeet-tdt-0.6b-v3" })
+        #expect(parakeet.language(forSetting: "de") == nil)
+    }
+
+    /// The transcriber tells Cohere the language at each transcription, and leaves the others'
+    /// parameters as they are.
+    @Test func onlyAModelThatIsToldALanguageGetsTheSettings() throws {
+        let cohere = try #require(catalog.models.first { $0.id == "cohere-transcribe" })
+        let parakeet = try #require(catalog.models.first { $0.id == "parakeet-tdt-0.6b-v3" })
+        let english = STTGenerateParameters(maxTokens: 512, temperature: 0.2, language: "en")
+        let told = MLXTranscriber.parameters(english, for: cohere, language: "de")
+        #expect(told.language == "de")
+        #expect(told.maxTokens == 512 && told.temperature == 0.2, "the rest are kept")
+        #expect(MLXTranscriber.parameters(english, for: cohere, language: "si").language == "en")
+        #expect(MLXTranscriber.parameters(STTGenerateParameters(), for: parakeet, language: "de").language == nil)
+        #expect(MLXTranscriber.parameters(english, for: nil, language: "de").language == "en", "a model outside the catalog")
+    }
+
     /// Parakeet's config.json names no kind, so the app reads it from the repository's name.
     @Test func aKindItsConfigDoesntNameIsInTheRepositorysName() throws {
         for model in catalog.models where model.mac.kind == "parakeet" {
@@ -54,6 +89,14 @@ struct SpeechModelCatalogTests {
             Self.entry(id: "linux-only", mac: false),
         ]))
         #expect(catalog.models.map(\.id) == ["both"])
+    }
+
+    @Test func aModelsLanguageChoicesAreReadAndOptional() throws {
+        var told = Self.entry(id: "told", mac: true)
+        told["language_choices"] = [["code": "en", "name": "English"], ["code": "de", "name": "German"]]
+        let catalog = try SpeechModelCatalog(json: Self.json(models: [told, Self.entry(id: "finds", mac: true)]))
+        #expect(catalog.models[0].languageChoices.map(\.code) == ["en", "de"])
+        #expect(catalog.models[1].languageChoices.isEmpty)
     }
 
     @Test func anotherFormatIsRefused() {
@@ -139,6 +182,7 @@ struct SpeechModelCatalogTests {
     private static func model(repository: Repo.ID = "owner/a-model") -> SpeechModelCatalog.Model {
         SpeechModelCatalog.Model(
             id: "a-model", name: "A Model", summary: "For tests.", languages: "English", licence: "MIT", credit: "Nobody",
+            languageChoices: [],
             mac: .init(repository: repository, revision: String(repeating: "a", count: 40), bytes: 1, kind: "qwen3_asr")
         )
     }

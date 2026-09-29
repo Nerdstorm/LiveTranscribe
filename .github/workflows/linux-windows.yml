@@ -9,11 +9,15 @@ on:
     paths:
       - "linux-windows/**"
       - "Fixtures/golden/**"
+      # The speech model catalog, which the app embeds and checks.
+      - "Packages/LiveTranscribeKit/Sources/Transcription/Resources/speech-models.json"
       - ".github/workflows/linux-windows.yml"
   pull_request:
     paths:
       - "linux-windows/**"
       - "Fixtures/golden/**"
+      # The speech model catalog, which the app embeds and checks.
+      - "Packages/LiveTranscribeKit/Sources/Transcription/Resources/speech-models.json"
       - ".github/workflows/linux-windows.yml"
   workflow_dispatch:
 
@@ -53,9 +57,40 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: linux-windows
+      # The speech-only sherpa-onnx libraries, which the sherpa-onnx crate links (.cargo/config.toml).
+      - name: Fetch the sherpa-onnx libraries
+        shell: bash
+        run: packaging/fetch-sherpa-onnx.sh
       - name: Formatting
         run: cargo fmt --all --check
       - name: Lints
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Tests
         run: cargo test --workspace --locked
+      # A catalog model through sherpa-onnx, as the app opens it: Parakeet TDT 0.6B v2 (English,
+      # 480 MB to download) is checked against the catalog and transcribes its own test clip. The
+      # unpacked model is kept between runs, by its archive's SHA-256. The test gets the model's
+      # folder as the system spells paths (cygpath, in Windows' Git Bash).
+      - name: Restore the Parakeet model
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/lt-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8
+          key: parakeet-tdt-0.6b-v2-int8-157c157bc51155e03e37d2466522a3a737dd9c72bb25f36eb18912964161e1ad
+      - name: Transcribe with sherpa-onnx
+        shell: bash
+        env:
+          MODEL: sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8
+          SHA256: 157c157bc51155e03e37d2466522a3a737dd9c72bb25f36eb18912964161e1ad
+        run: |
+          models=$HOME/lt-models
+          if [ ! -f "$models/$MODEL/encoder.int8.onnx" ]; then
+            mkdir -p "$models"
+            curl --fail --location --retry 3 --silent --show-error --output "$models/$MODEL.tar.bz2" \
+              "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/$MODEL.tar.bz2"
+            echo "$SHA256  $models/$MODEL.tar.bz2" | sha256sum --check
+            tar -xjf "$models/$MODEL.tar.bz2" -C "$models"
+            rm "$models/$MODEL.tar.bz2"
+          fi
+          folder=$models/$MODEL
+          if command -v cygpath >/dev/null; then folder=$(cygpath --windows "$folder"); fi
+          LT_SHERPA_PARAKEET_DIR=$folder cargo test -p lt-transcription --locked --test sherpa -- --ignored
