@@ -114,21 +114,28 @@ fn chosen(option: Option<&str>, library: &SpeechModelLibrary) -> anyhow::Result<
     Ok(chosen)
 }
 
-/// Says on standard error how far a download has got, every 5%.
+/// Says on standard error how far a download has got, every 5%, and when each stage finishes.
 fn show(progress: Progress, shown: &mut Option<(Stage, u8)>) {
-    let percent = progress.percent();
-    let due = match *shown {
-        Some((stage, last)) => stage != progress.stage || percent >= last + 5,
-        None => true,
+    if !is_due(progress, *shown) {
+        return;
+    }
+    let stage = match progress.stage {
+        Stage::Downloading => "Downloading",
+        Stage::Unpacking => "Unpacking",
+        Stage::Checking => "Checking",
     };
-    if due {
-        let stage = match progress.stage {
-            Stage::Downloading => "Downloading",
-            Stage::Unpacking => "Unpacking",
-            Stage::Checking => "Checking",
-        };
-        eprintln!("  {stage}: {percent}%");
-        *shown = Some((progress.stage, percent));
+    let percent = progress.percent();
+    eprintln!("  {stage}: {percent}%");
+    *shown = Some((progress.stage, percent));
+}
+
+/// Whether `progress` is worth saying, after what was said last: a new stage, 5% more of this
+/// one, or its end.
+fn is_due(progress: Progress, shown: Option<(Stage, u8)>) -> bool {
+    let percent = progress.percent();
+    match shown {
+        Some((stage, last)) => stage != progress.stage || percent >= last + 5 || (percent == 100 && last < 100),
+        None => true,
     }
 }
 
@@ -161,4 +168,46 @@ pub fn list_models() -> anyhow::Result<()> {
         library.downloads().folder().display()
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn at(stage: Stage, done: u64) -> Progress {
+        Progress {
+            stage,
+            done,
+            total: 100,
+        }
+    }
+
+    #[test]
+    fn progress_is_said_every_5_percent_and_at_the_end_of_each_stage() {
+        let mut shown = None;
+        let said: Vec<_> = [0, 3, 5, 9, 96, 100, 100]
+            .into_iter()
+            .map(|done| at(Stage::Downloading, done))
+            .chain([at(Stage::Unpacking, 1), at(Stage::Unpacking, 100)])
+            .filter(|&progress| {
+                let due = is_due(progress, shown);
+                if due {
+                    shown = Some((progress.stage, progress.percent()));
+                }
+                due
+            })
+            .map(|progress| (progress.stage, progress.percent()))
+            .collect();
+        assert_eq!(
+            said,
+            [
+                (Stage::Downloading, 0),
+                (Stage::Downloading, 5),
+                (Stage::Downloading, 96),
+                (Stage::Downloading, 100),
+                (Stage::Unpacking, 1),
+                (Stage::Unpacking, 100),
+            ]
+        );
+    }
 }
