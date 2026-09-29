@@ -18,6 +18,12 @@ What the package installs
     redistributing the files listed in licenses/redist.txt; TBB and the other components are under
     the licences in licenses/.
 
+/usr/lib/live-transcribe/sherpa-onnx (in the AppImage, usr/lib)
+    sherpa-onnx 1.13.8's C API and ONNX Runtime 1.28.2, which run the speech models other than
+    Qwen3-ASR, on the CPU. sherpa-onnx is k2-fsa's, under the Apache License 2.0, and ONNX Runtime
+    is Microsoft's, under the MIT licence, with its third-party notices: all three are in
+    /usr/share/doc/live-transcribe/sherpa-onnx.
+
 /usr/lib/udev/rules.d/70-live-transcribe-keyboard.rules (the deb and rpm)
     Lets whoever is logged in at the machine read the keyboards, which hold-to-talk needs: it
     watches the hotkey in /dev/input. Any program that user runs can then read what they type,
@@ -37,16 +43,19 @@ What the app downloads
 
 On first start, the speech model, Nerdstorm/Qwen3-ASR-0.6B-Sinhala-OpenVINO from Hugging Face
 (about 1.1 GB, CC BY-SA 4.0), into ~/.local/share/live-transcribe/models, checking the connection
-with the system's CA certificates (the deb and rpm depend on ca-certificates). It keeps its
+with the system's CA certificates (the deb and rpm depend on ca-certificates). Settings › Models
+downloads the others when you choose one: NVIDIA's Parakeet TDT 0.6B v2 and v3 (0.5 GB each,
+CC BY 4.0) and Cohere Transcribe (1.7 GB, Apache 2.0), which the sherpa-onnx project publishes on
+GitHub. Each file is checked against the size and SHA-256 the app was built with. It keeps its
 settings in ~/.config/live-transcribe and OpenVINO's compiled models in ~/.cache/live-transcribe.
 
 The NPU
 -------
 
-On an Intel Core Ultra the speech model runs on the NPU when Intel's NPU driver is installed:
-intel-npu-driver on Fedora, Arch and openSUSE, or Intel's packages from
+On an Intel Core Ultra the default speech model runs on the NPU when Intel's NPU driver is
+installed: intel-npu-driver on Fedora, Arch and openSUSE, or Intel's packages from
 https://github.com/intel/linux-npu-driver/releases on Ubuntu and Debian. Without it the model runs
-on the CPU, more slowly.
+on the CPU, more slowly. Parakeet and Cohere Transcribe always run on the CPU.
 
 Desktops
 --------
