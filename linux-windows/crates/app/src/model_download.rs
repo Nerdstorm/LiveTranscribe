@@ -186,15 +186,9 @@ impl fmt::Display for DownloadError {
     }
 }
 
-impl std::error::Error for DownloadError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Network { source, .. } => Some(source.as_ref()),
-            Self::Disk { source, .. } => Some(source),
-            _ => None,
-        }
-    }
-}
+/// The message already says what caused the error, so it has no source: printed with its causes,
+/// as `{:#}` prints an `anyhow::Error` in the tray and on the command line, it would say them twice.
+impl std::error::Error for DownloadError {}
 
 /// An error and what caused it, on one line: reqwest's own message says only which request failed.
 fn full_chain(error: &dyn std::error::Error) -> String {
@@ -308,7 +302,7 @@ fn fetch_rest(
         file: file.name,
         source,
     };
-    let mut request = client().get(url);
+    let mut request = client().map_err(|error| network(Box::new(error)))?.get(url);
     if from > 0 {
         request = request.header(RANGE, format!("bytes={from}-"));
     }
@@ -374,23 +368,23 @@ fn disk(path: &Path, source: io::Error) -> DownloadError {
     }
 }
 
-/// One HTTP client for the process, which keeps its connections to Hugging Face.
-fn client() -> &'static Client {
+/// One HTTP client for the process, which keeps its connections to Hugging Face. It checks them
+/// with the system's CA certificates, and can't be made without any, as in a container without
+/// the ca-certificates package: then each download fails with why, and the next try makes it anew.
+fn client() -> Result<&'static Client, reqwest::Error> {
     static CLIENT: OnceLock<Client> = OnceLock::new();
-    CLIENT.get_or_init(|| {
-        // reqwest takes rustls's process-wide cryptography, which is ring here.
-        let _ = rustls::crypto::ring::default_provider().install_default();
-        Client::builder()
-            .user_agent(concat!("livetranscribe/", env!("CARGO_PKG_VERSION")))
-            .connect_timeout(CONNECT_TIMEOUT)
-            // For a blocking client, this bounds each read of the body, not the whole download.
-            .timeout(READ_TIMEOUT)
-            .build()
-            .unwrap_or_else(|error| {
-                tracing::error!("The HTTP client couldn't be set up ({error}); using the defaults");
-                Client::new()
-            })
-    })
+    if let Some(client) = CLIENT.get() {
+        return Ok(client);
+    }
+    // reqwest takes rustls's process-wide cryptography, which is ring here.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let client = Client::builder()
+        .user_agent(concat!("livetranscribe/", env!("CARGO_PKG_VERSION")))
+        .connect_timeout(CONNECT_TIMEOUT)
+        // For a blocking client, this bounds each read of the body, not the whole download.
+        .timeout(READ_TIMEOUT)
+        .build()?;
+    Ok(CLIENT.get_or_init(|| client))
 }
 
 /// Counts bytes across the files and tells the listener, every [`PROGRESS_INTERVAL`] at most.
@@ -638,6 +632,25 @@ mod tests {
             error.to_string(),
             "Hugging Face answered 404 Not Found for the speech model's manifest.json"
         );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn a_failure_says_its_cause_once_when_printed_with_its_causes() {
+        let (model, _) = model(WEIGHTS, MANIFEST);
+        let root = scratch("refused");
+        // Nothing listens on port 1, and the other tests' servers take ports the system picks.
+        let error = download_from("http://127.0.0.1:1", &model, &root.join("the-model"), &mut |_| true).unwrap_err();
+        assert!(matches!(error, DownloadError::Network { .. }), "{error}");
+        let printed = format!(
+            "{:#}",
+            anyhow::Error::new(error).context("couldn't download the speech model")
+        );
+        assert_eq!(printed.matches("error sending request").count(), 1, "{printed}");
+
+        let error = disk(&root, io::Error::new(io::ErrorKind::PermissionDenied, "not allowed"));
+        let printed = format!("{:#}", anyhow::Error::new(error));
+        assert_eq!(printed, format!("couldn't write {}: not allowed", root.display()));
         let _ = fs::remove_dir_all(root);
     }
 

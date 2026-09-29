@@ -28,12 +28,17 @@ What the package installs
         sudo udevadm trigger --subsystem-match=input --action=change
     (The AppImage carries the rule in usr/share/live-transcribe.)
 
+The AppImage carries the app's libraries but, like other AppImages, uses the desktop's own for
+graphics, fonts and sound (ALSA's libasound), and its CA certificates for the download below.
+Every desktop has them; a bare container or server may not.
+
 What the app downloads
 ----------------------
 
 On first start, the speech model, Nerdstorm/Qwen3-ASR-0.6B-Sinhala-OpenVINO from Hugging Face
-(about 1.1 GB, CC BY-SA 4.0), into ~/.local/share/live-transcribe/models. It keeps its settings
-in ~/.config/live-transcribe and OpenVINO's compiled models in ~/.cache/live-transcribe.
+(about 1.1 GB, CC BY-SA 4.0), into ~/.local/share/live-transcribe/models, checking the connection
+with the system's CA certificates (the deb and rpm depend on ca-certificates). It keeps its
+settings in ~/.config/live-transcribe and OpenVINO's compiled models in ~/.cache/live-transcribe.
 
 The NPU
 -------
