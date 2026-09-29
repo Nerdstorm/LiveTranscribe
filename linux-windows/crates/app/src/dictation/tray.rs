@@ -18,8 +18,8 @@ use tauri::tray::{TrayIcon, TrayIconBuilder};
 use tauri::{AppHandle, RunEvent, Wry};
 
 use super::engine::{DictationStatus, MenuCommand, Message, StatusSink};
-use crate::model_download;
 use crate::settings::{self, AppControl, BlockerView, SettingsService, StatusView, WindowState};
+use crate::speech_models::{SpeechModelLibrary, Stage};
 
 /// Pixels on a side of the tray icon; the tray scales it to fit.
 const ICON_SIZE: u32 = 64;
@@ -32,15 +32,16 @@ const ICON_SIZE: u32 = 64;
 pub(crate) fn run(
     messages: Sender<Message>,
     settings: Arc<SettingsService>,
+    library: Arc<SpeechModelLibrary>,
     control: Box<dyn AppControl>,
     blocked: bool,
     start: impl FnOnce(StatusSink) + Send + 'static,
 ) -> anyhow::Result<()> {
     let app = tauri::Builder::default()
-        .manage(WindowState::new(Arc::clone(&settings), control))
+        .manage(WindowState::new(Arc::clone(&settings), Arc::clone(&library), control))
         .invoke_handler(settings::commands())
         .setup(move |app| {
-            settings::follow_changes(app.handle(), &settings);
+            settings::follow_changes(app.handle(), &settings, &library);
             let tray = Tray::build(app.handle(), messages, settings)?;
             let handle = app.handle().clone();
             start(Box::new(move |status| {
@@ -82,33 +83,45 @@ fn status_view(status: &DictationStatus) -> StatusView {
         return StatusView {
             model: "idle",
             detail: None,
+            model_id: None,
+            percent: None,
             blocker,
         };
     }
-    match &status.model {
-        ModelState::Loading { percent: Some(percent) } => StatusView {
-            model: "downloading",
-            detail: Some(format!(
-                "{percent}% of {:.1} GB, from Hugging Face",
-                model_download::DEFAULT_MODEL.size() as f64 / 1e9
-            )),
-            blocker: None,
-        },
-        ModelState::Loading { percent: None } => StatusView {
-            model: "loading",
-            detail: None,
-            blocker: None,
-        },
-        ModelState::Ready => StatusView {
-            model: "ready",
-            detail: status.placement.clone(),
-            blocker: None,
-        },
-        ModelState::Failed(error) => StatusView {
-            model: "failed",
-            detail: Some(error.clone()),
-            blocker: None,
-        },
+    let name = status.model_name.clone().unwrap_or_default();
+    let (model, detail, percent) = match (&status.model, status.download) {
+        (ModelState::Loading { .. }, Some(progress)) => {
+            let percent = progress.percent();
+            let (stage, detail) = match progress.stage {
+                Stage::Downloading => (
+                    "downloading",
+                    format!("{percent}% of {:.1} GB: {name}", progress.total as f64 / 1e9),
+                ),
+                Stage::Unpacking => ("unpacking", format!("{percent}%: {name}")),
+                Stage::Checking => (
+                    "checking",
+                    format!("{percent}% of {:.1} GB: {name}", progress.total as f64 / 1e9),
+                ),
+            };
+            (stage, Some(detail), Some(percent))
+        }
+        (ModelState::Loading { .. }, None) => ("loading", Some(name), None),
+        (ModelState::Ready, _) => (
+            "ready",
+            Some(match &status.placement {
+                Some(placement) => format!("{name}: {placement}"),
+                None => name,
+            }),
+            None,
+        ),
+        (ModelState::Failed(error), _) => ("failed", Some(error.clone()), None),
+    };
+    StatusView {
+        model,
+        detail,
+        model_id: status.model_id.clone(),
+        percent,
+        blocker: None,
     }
 }
 
