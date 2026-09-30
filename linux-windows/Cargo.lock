@@ -2412,6 +2412,7 @@ dependencies = [
  "lt-insertion",
  "tiny-skia",
  "tracing",
+ "winsafe",
 ]
 
 [[package]]

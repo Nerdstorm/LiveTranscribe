@@ -15,6 +15,9 @@ lt-dictation.workspace = true
 tiny-skia.workspace = true
 tracing.workspace = true
 
+[target.'cfg(windows)'.dependencies]
+winsafe.workspace = true
+
 [dev-dependencies]
 lt-insertion.workspace = true
 
