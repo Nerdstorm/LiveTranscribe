@@ -11,6 +11,7 @@
 //! - [`adapter`] reads the Mac's LoRA adapters, any number of them, for a model with adapter
 //!   inputs to run with, one or none a request.
 //! - [`LanguageModel`] puts them together: a chat in, a reply out, with its timings.
+//! - [`pinned_model`] is the cleanup model the app downloads, pinned to a commit and checked.
 //!
 //! Prompts and replies are never logged: log lines carry counts only.
 
@@ -18,6 +19,7 @@ pub mod adapter;
 pub mod chat;
 mod language_model;
 pub mod openvino_model;
+pub mod pinned_model;
 pub mod pretokenizer;
 pub mod runtime;
 pub mod sampling;
@@ -27,5 +29,6 @@ pub use adapter::{Adapter, AdapterError};
 pub use chat::{Message, Role};
 pub use language_model::{GenerateError, LanguageModel, OpenError, Reply, Request, Stop};
 pub use openvino_model::Options;
+pub use pinned_model::{CLEANUP_MODEL, PinnedModel, prepare};
 pub use sampling::Sampling;
 pub use tokenizer::{Tokenizer, TokenizerError};
