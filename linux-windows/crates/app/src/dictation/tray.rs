@@ -288,7 +288,7 @@ fn choose_cleanup(settings: &SettingsService, choices: &[(CleanupLevel, CheckMen
             settings.current().0.cleanup_level
         }
     };
-    // Each item ticks itself when chosen; the rest untick here, so the four read as one choice.
+    // Each item ticks itself when chosen; the rest untick here, so the levels read as one choice.
     for (other, item) in choices {
         if let Err(error) = item.set_checked(*other == level) {
             tracing::warn!("Couldn't update the Cleanup menu: {error}");

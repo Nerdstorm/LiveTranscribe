@@ -21,7 +21,7 @@ const SENTENCE_ENDERS: [&str; 3] = [".", "!", "?"];
 pub(crate) struct PreparedDictation {
     /// The transcript with phrases replaced and vocabulary applied: what cleanup starts from.
     text: String,
-    /// Lists and letters are laid out: at Medium and High, in fields that take several lines.
+    /// Lists and letters are laid out: from Medium up, in fields that take several lines.
     lays_out: bool,
     protected: ProtectedText,
     layout: Layout,
