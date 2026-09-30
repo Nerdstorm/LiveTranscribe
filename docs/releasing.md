@@ -11,9 +11,11 @@ app for every system, all at the same version, built from one tag `vX.Y.Z` by th
   [`scripts/release.sh`](../scripts/release.sh) builds it.
 - **Linux:** a deb, an rpm and an AppImage for x86-64
   ([`linux-windows/README.md`](../linux-windows/README.md#packages) says what they carry).
+- **Windows:** an installer for x86-64, `live-transcribe_X.Y.Z_x64-setup.exe`, which isn't signed
+  ([`linux-windows/README.md`](../linux-windows/README.md#the-windows-installer) says what it
+  carries).
 
-The Windows app joins once it has an installer. The [Makefile](../Makefile) has a target for each
-step below that runs on your Mac.
+The [Makefile](../Makefile) has a target for each step below that runs on your Mac.
 
 ## One-time setup
 
@@ -129,8 +131,8 @@ SDK. `LT_BASELINE_SDK` names another.
    release, and so does `make tag`.
 4. Approve the run: the Actions tab › the run › Review deployments › `release`. The Mac app takes
    about half an hour, mostly waiting for Apple's notary service, which sometimes takes much
-   longer; the Linux packages about 15 minutes. Then the workflow drafts the release, with every
-   download, `SHA256SUMS` and the notes.
+   longer; the Linux packages about 15 minutes, and the Windows installer is built meanwhile. Then
+   the workflow drafts the release, with every download, `SHA256SUMS` and the notes.
 
    If a job fails, nothing is public yet. Fix the problem on main, delete the tag
    (`git push origin --delete v0.1.0` and `git tag -d v0.1.0`), and tag again.
@@ -138,7 +140,10 @@ SDK. `LT_BASELINE_SDK` names another.
    - the disk image, on a Mac that has never run a build of Live Transcribe, or in another user
      account. Open it, drag the app to Applications and open it. macOS should only say that it
      was downloaded from the internet;
-   - a Linux package, on a desktop the app types on.
+   - a Linux package, on a desktop the app types on;
+   - the Windows installer, on a PC that has never had Live Transcribe. SmartScreen warns about an
+     unrecognised app, since it isn't signed (More info, then Run anyway); then dictate into
+     Notepad and into a browser.
 6. Publish the draft on GitHub. It becomes the latest release, which the website's Download button
    goes to.
 7. Offer it as an update: put the new appcast in `site/` and merge it into main through a pull
@@ -164,8 +169,8 @@ SDK. `LT_BASELINE_SDK` names another.
 
 The Actions tab › Release › Run workflow, on main, with **Rehearse** ticked, builds main's Mac app
 as a release would: signed, notarized and signed as an update, with the keys in the release
-environment, so it waits for your approval too. It builds the Linux packages as well, and releases
-nothing. A problem with the keys shows there, not after a tag.
+environment, so it waits for your approval too. It builds the Linux packages and the Windows
+installer as well, and releases nothing. A problem with the keys shows there, not after a tag.
 
 ## What the script does
 
@@ -225,8 +230,8 @@ signing, without notarization, and without signing an update or writing an appca
 build and the packaging without the certificate, the update signing key or Apple's service.
 Gatekeeper blocks the result on other Macs. Like a release, it checks the appcast for updates.
 
-A pull request that changes the release workflow, its scripts or the Linux packaging makes test
-builds of both systems, to try from the run's artifacts.
+A pull request that changes the release workflow, its scripts or the Linux or Windows packaging
+makes test builds for every system, to try from the run's artifacts.
 
 ## A release on your own Mac
 

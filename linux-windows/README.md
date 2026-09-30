@@ -7,16 +7,16 @@ behaviour through the golden cases in [`Fixtures/golden`](../Fixtures/golden/REA
 This is the start. The dictation text rules, ported from the Mac app, type the same text as the
 Mac app for all 9,728 golden cases, and speech to text computes Qwen3-ASR's audio features,
 prompt and decoding as the Mac app does, with the model running on OpenVINO. The app,
-`livetranscribe`, dictates on Linux under Wayland as the Mac app does: hold a key and speak, and
-a small circle by the mouse pointer shows the microphone's level while the text goes straight into
-the focused field.
+`livetranscribe`, dictates on Linux under Wayland and on Windows as the Mac app does: hold a key
+and speak, and a small circle by the mouse pointer shows the microphone's level while the text goes
+straight into the focused field.
 A tray menu starts, stops and cancels dictation, copies the last one, sets the cleanup level and
 opens Settings, whose General, Models and Advanced tabs change dictation without a restart.
 Settings › Models chooses the speech model from the catalog the Mac app reads too, and downloads
 and removes them: by default the Mac app's Sinhala fine-tune of Qwen3-ASR, which runs on the NPU of
 an Intel Core Ultra or on the CPU, and NVIDIA's Parakeet TDT 0.6B v2 (English) and v3 (25 European
 languages) and Cohere Transcribe (the one of its 14 languages chosen on its row), which run on the
-CPU with sherpa-onnx. Settings' other tabs, the history window, and Windows come later.
+CPU with sherpa-onnx. Settings' other tabs and the history window come later.
 
 ## Building and testing
 
@@ -37,7 +37,8 @@ against their SHA-256: sherpa-onnx (k2-fsa, Apache-2.0) runs the catalog's other
 with ONNX Runtime (Microsoft, MIT). `.cargo/config.toml` points the `sherpa-onnx` crate at them,
 and without them the build stops rather than let the crate download sherpa-onnx's default
 libraries, which link espeak-ng (GPL-3.0) for text to speech. The script runs on Linux x64, on
-Windows x64 in Git Bash, and on Apple silicon Macs.
+Windows x64 in Git Bash, and on Apple silicon Macs. On Windows the build needs Tauri's
+prerequisites: Visual Studio's C++ build tools, and WebView2, which Windows 10 and 11 have.
 
 The workspace builds its own copy of the `openvino` crate, which can pass properties to a model's
 compilation, as the NPU's LLM mode needs: see [`vendor/openvino/VENDORED.md`](vendor/openvino/VENDORED.md).
@@ -57,12 +58,13 @@ same place in both apps:
 | `lt-cleanup` | `Cleanup` | Cleanup at each level; for now the rules that need no language model |
 | `lt-dictation` | `Dictation` | The dictation flow from hotkey to typed text, and a transcript to the text it types |
 | `lt-transcription` | `Transcription`, and mlx-audio-swift's Qwen3-ASR | Speech to text: the log-mel features, the encoder's chunks and windows, the prompt, greedy decoding and its limits. The model's forward passes are behind the `SpeechModel` trait; `OpenVinoModel` runs them on OpenVINO. `sherpa` runs the catalog's other models through sherpa-onnx, on the CPU. `catalog` reads the speech model catalog and checks a model's files before it's opened; `speech_to_text` opens a model with its engine |
-| `lt-hotkey` | `Hotkey` | The hold, tap and double-tap gesture; what each key means for it; on Linux, reading the keyboards (evdev) |
-| `lt-capture` | `Capture` | Recording the microphone chosen in Settings, or the default one (cpal; on Linux, the sound server's), as 16 kHz mono, and its level for the meter |
+| `lt-hotkey` | `Hotkey` | The hold, tap and double-tap gesture; what each key means for it; reading the keyboards: evdev on Linux, a low-level keyboard hook on Windows |
+| `lt-capture` | `Capture` | Recording the microphone chosen in Settings, or the default one (cpal: on Linux, the sound server's; on Windows, WASAPI), as 16 kHz mono, and its level for the meter |
 | `lt-insertion` | `Insertion` | What is known about the focused field, what the clipboard holds while text is pasted, and what an insertion did |
 | `lt-dictation-ui` | `DictationUI` | The panel shown while dictating (what it shows when, drawn to pixels, and where by the pointer) and what the tray says, with its icons |
 | `lt-wayland` | `Insertion`'s typing and the HUD's window, for Wayland | One connection for the desktop: the input method (input-method-v2), which reads the focused field and types straight into it; pasting where no field takes one (ext-data-control and a virtual keyboard); the panel by the mouse pointer (wlr-layer-shell, with ext-image-copy-capture's cursor sessions saying where the pointer is), or at the bottom of the screen |
-| `lt-app` | the app | The `livetranscribe` command: `run` (dictation, with the tray and the Settings window, Tauri's; `ui/` holds the window's page), `keys`, `transcribe`, `models`; the settings file; downloading the catalog's models (`speech_models`) |
+| `lt-windows` | `Insertion`'s typing, for Windows | Typing into the focused app as Unicode keystrokes (SendInput), in pieces that stop if the focus moves; what the focused field is, where Windows says (its own edit controls); the clipboard, out of its history, where nothing would take the text; the console a command was typed in |
+| `lt-app` | the app | The `livetranscribe` command: `run` (dictation, with the tray and the Settings window, Tauri's; `ui/` holds their pages), `keys`, `transcribe`, `models`; the settings file; downloading the catalog's models (`speech_models`). What dictation needs from the desktop is one trait (`src/dictation/desktop.rs`): Linux's side is lt-wayland, and Windows' is lt-windows with the panel, a window of the app's own that shows lt-dictation-ui's frames (`ui/panel.html`) |
 
 ## Packages
 
@@ -94,10 +96,10 @@ are made builds them too, to try from the run's artifacts. Each carries:
   which hold-to-talk needs. **Any program that user runs can then read what they type**, as any
   X11 program always could. The AppImage can't install it; `packaging/linux/README.Linux` says how.
 
-The speech models aren't in the packages. The app downloads the one chosen the first time it's
-needed, by default Nerdstorm/Qwen3-ASR-0.6B-Sinhala-OpenVINO (1.1 GB) from Hugging Face, and
-Settings › Models downloads and removes the others, which sherpa-onnx publishes on GitHub as
-`.tar.bz2` archives. The catalog,
+The speech models aren't in the packages, nor in the Windows installer. The app downloads the one
+chosen the first time it's needed, by default Nerdstorm/Qwen3-ASR-0.6B-Sinhala-OpenVINO (1.1 GB)
+from Hugging Face, and Settings › Models downloads and removes the others, which sherpa-onnx
+publishes on GitHub as `.tar.bz2` archives. The catalog,
 [`speech-models.json`](../Packages/LiveTranscribeKit/Sources/Transcription/Resources/speech-models.json),
 pins each model: a Hugging Face repository at a commit, or an archive, with each file's size and
 SHA-256 (`scripts/pin-linux-windows-speech-model.sh` writes a model's entry). A model downloads
@@ -110,7 +112,8 @@ that stops carries on where it stopped the next time; after that the app never g
 model again. `livetranscribe models` lists the catalog, and
 `livetranscribe transcribe --model parakeet-tdt-0.6b-v2 clip.wav` transcribes with one of its
 models, downloading it first; `--language de` tells Cohere Transcribe which language to write. Intel's NPU driver isn't in the packages either: the rpm recommends
-Fedora's `intel-npu-driver`, and without one the Qwen3-ASR models run on the CPU.
+Fedora's `intel-npu-driver`, Windows gets it from Windows Update or the PC's maker, and without one
+the Qwen3-ASR models run on the CPU.
 
 To build them by hand, in Ubuntu 22.04 with Tauri's build dependencies and the Tauri CLI 2.12:
 
@@ -127,6 +130,53 @@ cd crates/app && LD_LIBRARY_PATH=$(cd ../../target/sherpa-onnx/lib && pwd) cargo
 ```
 
 `LD_LIBRARY_PATH` is how linuxdeploy finds the sherpa-onnx libraries for the AppImage.
+
+### The Windows installer
+
+For Windows 10 and 11 on x86-64, the release workflow builds an installer with Tauri's NSIS
+bundler, `live-transcribe_X.Y.Z_x64-setup.exe`, which the release carries with the others. It
+installs for the current user, without administrator rights, in `%LOCALAPPDATA%\Live Transcribe`,
+with a Start menu shortcut, and carries:
+
+- the app, `livetranscribe.exe`, which runs dictation when started with no command, as the Start
+  menu starts it. It's a windowed program, so it opens no console window; typed in a terminal, its
+  commands print there, but cmd and PowerShell don't wait for a windowed program, so the output
+  can come after the prompt (`livetranscribe models | more` waits for it);
+- OpenVINO 2026.2.1's DLLs in the `openvino` folder beside it, where the app loads them from
+  (`crates/app/src/paths.rs`), with their licences in `openvino\licenses`. They come from Intel's
+  Python wheel for Windows, which is Apache-2.0 and has the NPU's compiler too: the same DLLs as
+  Intel's archive, which is under Intel's licence (the Linux wheel has no NPU compiler, hence the
+  archive there). `packaging/windows/fetch-openvino.sh` fetches them;
+- sherpa-onnx's and ONNX Runtime's DLLs beside the app, where Windows looks first (System32 has an
+  older ONNX Runtime, which sherpa-onnx can't use), with their licences in `licenses\sherpa-onnx`;
+- the parts of Microsoft's C++ runtime that OpenVINO's DLLs load (the app and sherpa-onnx's DLLs
+  have it built in), so no Visual C++ Redistributable needs installing;
+- the app's licence, `LICENSE.txt`.
+
+What it carries is in `packaging/windows/tauri.installer.conf.json`, which only the installer's
+build reads: Tauri's build script copies an app's resources beside it on every build, and other
+builds have no OpenVINO to copy. `packaging/windows/check-installer.ps1` installs it silently,
+checks every DLL and licence against those fetched, that the app starts and lists the speech
+models, and that uninstalling removes what was installed. **The installer isn't signed**, so
+Windows' SmartScreen warns about an unrecognised app when it's opened (More info, then Run anyway).
+Uninstalling it (Settings › Apps) keeps the downloaded models and the settings, for a later
+install, unless **Delete the application data** is ticked (`packaging/windows/installer-hooks.nsh`).
+
+To build it by hand, in Git Bash, with Tauri's prerequisites and the Tauri CLI 2.12:
+
+```bash
+packaging/windows/fetch-openvino.sh
+```
+
+```bash
+packaging/fetch-sherpa-onnx.sh
+```
+
+```bash
+cd crates/app && cargo tauri build --bundles nsis --config ../../packaging/windows/tauri.installer.conf.json
+```
+
+The C++ runtime comes from the Visual Studio that builds it, which Tauri finds.
 
 ## Running it from source
 
@@ -177,7 +227,8 @@ machine, the setup kit (not in the repository) installs both in an Ubuntu 24.04 
 
    The tray's *Settings…* sets the hotkey, hands-free, the cleanup level, the microphone, the
    timing, the speech model (Models) and where it runs (Advanced), each at once, and keeps them in
-   `~/.config/live-transcribe/settings.json`. Options after `run` set one for that run only:
+   `~/.config/live-transcribe/settings.json` (on Windows, below). Options after `run` set one for
+   that run only:
    `livetranscribe run --key KEY_RIGHTALT` holds Right Alt instead of Right Ctrl.
    `livetranscribe keys` names the keys you press.
 
@@ -211,6 +262,37 @@ clipboard, the microphone stopped), a short message shows in a bubble beside it 
 The desktop says where the pointer is through cursor sessions (ext-image-copy-capture-v1), which
 report the pointer's position without capturing the screen, and only while the circle shows.
 Where the desktop has none, the circle sits at the bottom of the screen.
+
+### On Windows
+
+From source, in Git Bash: `packaging/windows/fetch-openvino.sh`, `cargo build --release -p lt-app`,
+then put OpenVINO where the installed app has it, beside the program:
+`cp -r target/openvino-runtime target/release/openvino`. sherpa-onnx's DLLs are there already, as
+its crate's build script copies them. `target/release/livetranscribe.exe run` starts dictation. The
+settings are in `%APPDATA%\live-transcribe\settings.json`, and the models and OpenVINO's cache in
+`%LOCALAPPDATA%\live-transcribe`, which doesn't roam with the user: `--local-dir` above becomes
+`"$LOCALAPPDATA/live-transcribe/models/qwen3-asr-0.6b-sinhala"`. If Windows' privacy settings keep
+desktop apps from the microphone (Settings › Privacy & security › Microphone), the app hears
+nothing.
+
+The hotkey is watched through a low-level keyboard hook, which needs no permission. Text is typed
+as Unicode keystrokes (SendInput), so any script goes in whatever the keyboard layout, and the
+clipboard is left alone: in pieces of 32 letters, stopping if the focus moves or a modifier key is
+held down. Windows says what a field is only for its own edit controls (Notepad's, and older
+programs'): their password fields are refused, and those with several lines take line breaks.
+Browsers, Electron apps, Office and newer apps draw their fields themselves, and Windows says
+nothing about them, so they're typed on one line, line breaks as spaces, so that a Return never
+sends a message or a form; **their password fields aren't recognised**. **Where Windows would drop
+the keystrokes, the text is left on the clipboard**, out of the clipboard history, for you to paste:
+when no window has the keyboard, the desktop or the taskbar has it, dictation was started from the
+tray's menu (which leaves the keyboard with the app itself), or the focused app runs as
+administrator, which Windows keeps other apps from typing into. The hotkey isn't seen either while
+an app running as administrator has the keyboard.
+
+The circle by the pointer is a small window of the app's own, drawn by the same code as on Linux.
+It never takes the keyboard from the app being typed into, lets clicks through to the window
+below, and stays above other windows and out of the taskbar; it follows the pointer from screen to
+screen, at each screen's scale.
 
 ## Speech models on Linux
 
