@@ -2436,6 +2436,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "lt-language-model"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "openvino",
+ "reqwest",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tracing",
+ "tracing-subscriber",
+ "unicode-normalization",
+ "unicode-properties",
+]
+
+[[package]]
 name = "lt-shared"
 version = "0.1.0"
 dependencies = [
@@ -2472,6 +2489,7 @@ dependencies = [
 name = "lt-transcription"
 version = "0.1.0"
 dependencies = [
+ "lt-language-model",
  "lt-shared",
  "openvino",
  "realfft",

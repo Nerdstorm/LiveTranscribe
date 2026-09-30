@@ -8,6 +8,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+lt-language-model.workspace = true
 lt-shared.workspace = true
 openvino.workspace = true
 realfft.workspace = true
