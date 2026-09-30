@@ -28,7 +28,7 @@ struct BenchOptions {
     /// Dictate into a field that takes several lines, where line breaks, lists and letters are
     /// laid out, and score each clip's layout.
     var multiline = false
-    /// The dictation latency target from docs/dictation.md: p95 of release-to-text under 1.2 s.
+    /// The dictation latency target: p95 of release-to-text under 1.2 s.
     var p95TargetMs = 1_200
     var verbose = false
     /// A speech-to-text model to measure instead of the default, to compare models on the same clips.

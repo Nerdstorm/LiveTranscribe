@@ -1,193 +1,191 @@
 # Development
 
-Building and running the app is in the README's [Build and run](../README.md#build-and-run).
-This covers the tests, the bench, the adapters, the licence notices and the icons.
+Building, testing and measuring Live Transcribe. How it is put together is in
+[Architecture](architecture.md), and why, in [Design notes](design-notes.md). The Linux and
+Windows app has its own guide, [linux-windows/README.md](../linux-windows/README.md). Releases are
+in [Releasing](releasing.md).
 
-## Tests
+## Mac
 
-The package has more than 1,000 Swift Testing tests. Unit tests need no models:
+### Build and run
+
+You need an Apple silicon Mac, Xcode 26.4 or later (Swift 6.3 or later) with its Metal Toolchain
+component (`xcodebuild -downloadComponent MetalToolchain`), and disk space: about 2 GB for the
+models and 2 GB for the build, and about 6 GB more for the tests and the bench, which build into
+their own copy of the build (the models are shared). MLX compiles Metal shaders, so build with
+`xcodebuild` or Xcode: `swift build` produces binaries without the Metal library.
+
+```bash
+make run
+```
+
+builds the app in Release and opens it. `make` on its own lists every target, and `make doctor`
+checks what building on your Mac needs. Or open `LiveTranscribe.xcodeproj` in Xcode and choose
+Run. The shared scheme uses the **Release** configuration, because MLX inference in Debug is
+several times slower. On the first build Xcode asks you to trust mlx-swift's `CudaBuild` plugin,
+which only does work in CUDA builds; the Makefile skips that prompt with
+`-skipPackagePluginValidation`.
+
+### Signing your builds
+
+Builds from this repository are ad-hoc signed ("Sign to Run Locally") and not notarized, so they
+run on the Mac that built them, and Gatekeeper blocks a copy downloaded onto another Mac. The app
+runs outside the App Sandbox, since typing into other apps needs the Accessibility permission,
+which sandboxed apps can't use; that rules out the Mac App Store.
+
+**macOS treats every ad-hoc build as a new app.** After a rebuild it asks for microphone access
+again, and the shortcut doesn't work until you remove the old Live Transcribe entry in Privacy &
+Security › Accessibility and add the new build. If the floating panel then says to quit and reopen
+Live Transcribe so it can paste, do that: **Reopen Live Transcribe** in **Settings › Permissions**
+does it for you.
+
+To keep the permissions across rebuilds, sign with your own certificate. Copy
+`Config/Signing.local.xcconfig.example` to `Config/Signing.local.xcconfig` (gitignored) and set
+your team ID. An Apple Development certificate is enough; Xcode › Settings › Accounts makes one
+for free with any Apple ID. Grant the permissions once more after switching, and they survive
+every rebuild after that. Releases are signed with Developer ID and notarized by Apple
+([Releasing](releasing.md)).
+
+### Tests
 
 ```bash
 make test
 ```
 
-It also runs `scripts/tests/`, which tests `scripts/write-changelog.sh` in a scratch repository and
-`scripts/check-swift-runtime.sh` with small programs.
+The Swift package has more than 1,000 Swift Testing tests, and unit tests need no models. The
+target also runs `scripts/tests/`, which tests the release scripts.
 
-The end-to-end tests and the bench use short spoken clips. The clips are not in the repository,
-because Apple's licence does not allow publishing recordings of its system voices. `make audio`
+The end-to-end tests and the bench use short spoken clips. The clips aren't in the repository,
+because Apple's licence doesn't allow publishing recordings of its system voices. `make audio`
 generates them with macOS text-to-speech, and `make dictation-audio` generates the dictation
-eval's 65 clips (`Tests/IntegrationTests/Fixtures/Dictation/clips.tsv`). Each makes only the clips
-that are missing, and the targets that use them run it first. To make every clip again, run
-`scripts/generate-test-audio.sh` or `scripts/generate-dictation-audio.sh`.
-
-The end-to-end tests run the real models, downloading them into `~/.cache/huggingface`:
+eval's 65 clips
+(`Packages/LiveTranscribeKit/Tests/IntegrationTests/Fixtures/Dictation/clips.tsv`). Each runs its
+script only if a clip is missing, and the script then makes every clip again
+(`scripts/generate-test-audio.sh`, `scripts/generate-dictation-audio.sh`); the targets that use
+the clips run it first.
 
 ```bash
 make test-integration
 ```
 
+runs the end-to-end tests with the real models, downloading them into `~/.cache/huggingface`.
 xcodebuild passes environment variables to the test runner only with the `TEST_RUNNER_` prefix,
-so this sets `TEST_RUNNER_LT_RUN_MODEL_TESTS=1`. `make prompt-probe` sets
-`TEST_RUNNER_LT_PROMPT_PROBE=1` instead, to print the cleanup model's output for a set of hard
-prompt cases, a development aid for prompt changes.
+so the target sets `TEST_RUNNER_LT_RUN_MODEL_TESTS=1`. `make prompt-probe` sets
+`TEST_RUNNER_LT_PROMPT_PROBE=1` instead, to print the cleanup model's answers to a set of hard
+prompts while you change a prompt.
 
-## Bench
+### Bench and eval
 
-```bash
-make bench
-```
+`make bench` builds the `Bench` tool and measures the live transcript pipeline on spoken clips:
+word error rate (WER) of the raw and cleaned text, and p50 and p95 latency per stage. It checks
+that p95 from end of speech to text is under 1.5 s, that cleaned WER is no worse than raw WER,
+that no clip gets more than 2 points worse, and that cleanup falls back to the raw text for fewer
+than 5% of segments.
 
-It builds the `Bench` tool and runs it. Give it options with `ARGS`, for example
-`make bench ARGS="--level high --fast"`:
+With the default speech model the first check fails: p95 was 1,645 ms in the last real-time run (M4
+Pro, 2026-09-25, four synthetic clips), because Qwen3-ASR writes its text a token at a time, so a
+long segment takes longer; Parakeet TDT 0.6B v3 passed at 1,290 ms. The fix, transcribing during the
+silence that ends a segment, isn't built yet. Dictation is not affected: its p95 is 654 ms at High,
+against a 1.2 s target.
 
-- `--fixtures <dir>`: a folder of `.wav` clips, each with a matching `.txt` transcript.
-- `--level <none|light|medium|high|deep>`: the cleanup level (default: Medium).
-- `--no-cleanup`: speech-to-text only.
-- `--no-adapter`: clean up without the fine-tuned adapters, the self-correction adapter and
-  Deep's.
-- `--fast`: feed audio as fast as possible instead of in real time. Latency numbers are then
-  meaningless.
-- `--stt-model <repo or folder>`: measure another speech-to-text model instead of the default,
-  such as `mlx-community/parakeet-tdt-0.6b-v3` or a model folder on this Mac, to compare models
-  on the same clips. A model in the catalog is downloaded at its pinned commit.
+`make eval` measures dictation on the 65 clips (plain sentences, fillers, self-corrections,
+questions, longer passages, emoji, dictated punctuation, addresses, line breaks, spoken lists and
+letters). At each cleanup level it reports the WER against what was *said* and against what was
+*meant*, the fallbacks, and p50 and p95 latency against a target of p95 under 1.2 s. Latency is
+speech-to-text plus cleanup; stopping the recorder and inserting the text aren't included.
 
-The bench prints the word error rate (WER) of the raw and cleaned text, p50 and p95 latency per
-stage, and four checks:
+Both take options with `ARGS`, for example `make eval ARGS="--multiline --level deep"`:
 
-- p95 from end of speech to text on screen is under 1.5 s;
-- cleaned WER is no worse than raw WER;
-- no clip's WER gets more than 2 points worse after cleanup;
-- cleanup falls back to the raw text for fewer than 5% of segments.
+- `--level <none|light|medium|high|deep>` picks the cleanup level (the eval repeats it);
+- `--multiline` (eval) dictates into a field that takes several lines, where lists and letters
+  are laid out, and counts the clips that came out with the intended lines;
+- `--no-cleanup` (bench) measures speech-to-text alone, and `--no-adapter` cleans up without the
+  adapters;
+- `--fast` (bench) feeds audio as fast as possible, so its latencies mean nothing;
+- `--stt-model <repository or folder>` measures another speech-to-text model on the same clips;
+- `--stt-language <code>` sets the language for a speech model that is told which to write
+  (Cohere Transcribe), such as `de`;
+- `--fixtures <dir>` (bench) and `--clips <dir>` (eval) read other clips, `--p95-target-ms <n>`
+  (eval) changes the 1.2 s target (the bench's 1.5 s is fixed), and `--verbose` (eval) prints
+  every output with the reason for each fallback.
 
-Last run, on an M4 Pro with the four generated clips played in real time, with the default
-speech model (Qwen3-ASR 0.6B fine-tuned for Sinhala) and, for comparison, Parakeet TDT 0.6B v3
-(the default until 2026-09-25) on the same clips:
+The clips are synthetic speech, so measure with real recordings on your own hardware before you
+rely on the numbers. Speech-to-text and cleanup calls are also marked as signpost intervals
+("STT", "LLM") for Instruments.
 
-| Stage | Qwen3-ASR p50 (ms) | p95 (ms) | Parakeet v3 p50 (ms) | p95 (ms) |
-|---|---:|---:|---:|---:|
-| Silence that ends a segment | 608 | 608 | 608 | 608 |
-| Speech-to-text | 204 | 481 | 68 | 148 |
-| Cleanup | 227 | 556 | 219 | 557 |
-| End of speech → text | 1038 | 1645 | 900 | 1290 |
+The last `make eval ARGS="--multiline"` (M4 Pro, macOS 27, the macOS voice Samantha, the default
+speech model), dictating into a field that takes several lines:
 
-With Qwen3-ASR, WER was 1.0% raw and 1.0% cleaned (Parakeet: 2.5% and 2.5%), with no fallbacks.
-The base Qwen3-ASR 0.6B, the default in 0.2.0, took 195 and 465 ms for speech-to-text on the
-same clips. **Qwen3-ASR fails the latency check: p95 from end of speech to text is 1,645 ms,
-against the 1.5 s target that Parakeet meets.** Qwen3-ASR writes its text a token at a time, so a segment
-takes longer the more words it holds. The other three checks pass with both. The first row is
-the configured 600 ms of silence that closes a segment; lower `vadSilenceMs` to trade it for
-more segment splits. The clips are synthetic speech, so measure with real recordings on your own
-hardware before relying on these numbers. Speech-to-text and cleanup calls are also marked as
-signpost intervals ("STT", "LLM") for Instruments.
-
-### Dictation eval
-
-```bash
-make eval
-```
-
-Runs the 65 dictation clips (plain sentences, fillers, self-corrections, questions, longer
-passages, emoji, dictated punctuation, addresses, line breaks, spoken lists and letters) through
-dictation's speech-to-text and cleanup at every cleanup level, and reports per level and
-category the WER against what was *said* and against what was *meant* (fillers dropped,
-self-corrections resolved, commands turned into what they name), the fallbacks, and p50/p95
-latency against the target of p95 under 1.2 s. Latency here is speech-to-text plus cleanup;
-stopping the recorder and inserting the text are not included. `--multiline` dictates into a
-multi-line field, where line breaks, lists and letters are laid out, and adds how many clips came
-out with the intended lines. `--level <none|light|medium|high|deep>` (repeatable) limits the levels,
-`--clips <dir>` reads other clips, `--p95-target-ms <n>` changes the target, `--no-adapter`
-cleans up without the adapters, `--stt-model <repo or folder>` measures another speech-to-text
-model and `--verbose` prints every output, with the reason for each fallback. Give them with `ARGS`, as for the bench: `make eval ARGS="--multiline --verbose"`.
-
-Last run, on an M4 Pro with macOS 27 and synthetic speech, with the default speech model and
-`--multiline` ([Eval results](dictation.md#eval-results) compares the base Qwen3-ASR and the
-single-line field):
-
-| Level | WER vs said | WER vs meant | Fallbacks | p50 (ms) | p95 (ms) | Laid out as meant |
+| Level | WER vs said | WER vs meant | Fallbacks | p50 | p95 | Laid out as meant |
 |---|---:|---:|---:|---:|---:|---:|
-| None | 12.1% | 24.9% | 0 | 126 | 266 | 57/65 |
-| Light | 11.7% | 23.9% | 1 | 258 | 541 | 57/65 |
-| Medium | 22.7% | 6.4% | 3 | 280 | 641 | 65/65 |
-| High | 22.7% | 6.4% | 3 | 319 | 654 | 65/65 |
+| None | 12.1% | 24.9% | 0 | 126 ms | 266 ms | 57/65 |
+| Light | 11.7% | 23.9% | 1 | 258 ms | 541 ms | 57/65 |
+| Medium | 22.7% | 6.4% | 3 | 280 ms | 641 ms | 65/65 |
+| High | 22.7% | 6.4% | 3 | 319 ms | 654 ms | 65/65 |
 
-Medium resolved all 12 self-corrections and removed the fillers from all 10 filler clips, and
-Medium and High laid out every list and letter. WER against what was said counts each spoken
-command as wrong, because it is replaced by what it names. None and Light lay out only line
-breaks, by design. Every level met the latency target; High takes longer on self-corrections
-because it cleans them in two passes. Most of the 6.4% against what was meant is words both
-Qwen3-ASR models mishear in the synthetic voice ("emoji" as "M O G", "hi" as "high", "Acme" and
-"comma"); the rest is how the fine-tune writes some words, such as "10" for "ten" and "We are"
-for "We're". The base model scores 5.1% on the same run.
+Every level is well under the 1.2 s target. At Medium and High all 12 self-corrections are
+resolved and every filler is removed. WER against what was said counts spoken commands as wrong,
+since they are replaced by what they name; against what was meant, most of the 6.4% is words both
+speech models mishear in the synthetic voice ("emoji" as "M O G", "comma" as "common"). The
+Sinhala fine-tune costs English a little: 6.4% at Medium, against 5.1% for the base Qwen3-ASR.
+Deep, measured later beside Medium in one run (7.6% at Medium), took 8.0% against what was meant,
+379 ms at p50 and 715 ms at p95 (Medium 288 and 639 ms), and laid out 63 of 65 clips as meant: the
+two it lays out otherwise are what Deep is for ("We need milk, eggs, and bread." as three bullets,
+and the three things to do before a merge as a numbered list).
 
-The fallbacks, where OutputGuard rejected the model's output and the uncleaned transcript was
-inserted:
-- The same plain sentence at Medium and High ("I've attached the invoice and the signed
-  agreement."): the self-correction adapter changed a sentence that had nothing to correct
-  (three spoken words dropped at Medium; similarity 0.48, below the floor, at High).
-- A filler clip at Medium and High: Qwen3-ASR ends a sentence at the hesitation ("tomorrow. Ah,
-  before noon"), and the model then drops a word that carries meaning. The filler rule has
-  already removed "ah".
-- A punctuation clip at Medium and High: Qwen3-ASR hears the spoken "comma" as "common"
-  ("We need milk, common eggs, common, and bread."), and the model drops both.
-- The long letter at Light, which keeps every word: the model resolved its self-correction.
+The three fallbacks at Medium and High are a plain sentence the adapter mistakes for a correction
+("I've attached the invoice and the signed agreement."); a sentence the speech model breaks at a
+hesitation, after which the model drops a word that carries meaning ("Um, the package should
+arrive tomorrow, uh, before noon"); and a spoken "comma" the speech model hears as "common" ("we
+need milk comma eggs comma and bread full stop"), which the check counts as words dropped.
 
-Without `--multiline` (a single-line field), where lists are not laid out, Light falls back on 1
-clip and Medium and High on 4 each: the same clips, and the long letter at Medium and High too,
-where the model changed more than the self-correction. The longest clip is about 40 words, so
-these numbers say nothing about long dictations.
+### Training the adapters
 
-Deep, measured the same way beside Medium on 2026-09-30 ([Eval results](dictation.md#eval-results)):
-in a multi-line field, 8.0% against what was meant (Medium 7.6%), 2 fallbacks, p50 379 ms and
-p95 715 ms, and 63 of 65 clips laid out as meant; the other two it lays out as lists by design.
+The `Train` tool generates the synthetic data, trains the cleanup adapters on the Mac, in Swift,
+and measures them as the app runs them: `make train ARGS="evaluate"`. The commands and the data
+are in [Training/README.md](../Packages/LiveTranscribeKit/Training/README.md).
 
-## Training the adapters
-
-The self-correction adapter is trained on the Mac, in Swift, with the `Train` tool: `generate`
-builds the synthetic dataset, `validate` checks every example against the app's own OutputGuard,
-`train` fine-tunes the adapter and `evaluate` measures it as the app runs it. On 515 held-out
-examples of synthetic sentences it resolved 97.3% of self-corrections (the base model 0.8%) and
-kept 98.4% of look-alike sentences as spoken. On the 95 curated held-out examples alone, written
-separately from the generator's templates, it resolved 39 of 40 corrections. `make train
-ARGS="evaluate"` builds the tool and runs a step. Commands and full results are in
-[Training/README.md](../Packages/LiveTranscribeKit/Training/README.md).
-
-Deep's adapter is trained the same way, on synthetic examples of its own (`generate --deep`,
-`train --deep`), and measured with `measure --level deep`, which cleans each case as the app
-does at that level. On the 114 hand-written cases in `Training/eval/deep.jsonl`, none of them
-trained on, it got 108 right, against 88 with the self-correction adapter and 52 with no
-adapter; on 599 generated test examples, 535 ([Deep's adapter](../Packages/LiveTranscribeKit/Training/README.md#deeps-adapter)).
-
-## Licence notices
+### Licence notices
 
 **About Live Transcribe** shows the licence of every Swift package the app is built with, from
-`Sources/About/Acknowledgements.json`. After adding, removing or updating a package, run:
+`Packages/LiveTranscribeKit/Sources/About/Acknowledgements.json`. After adding, removing or
+updating a package, run:
 
 ```bash
 make acknowledgements
 ```
 
-It runs `scripts/generate-acknowledgements.sh`. Commit what it writes: AboutTests fails while the
-file doesn't match `Package.resolved`. It takes each package's LICENSE, COPYING and NOTICE files.
-A licence kept in a source file's header instead, like the PocketFFT code in MLX, needs an entry in
-`embeddedNotices` in `scripts/generate-acknowledgements.swift`.
+and commit what it writes: AboutTests fails while the file doesn't match `Package.resolved`. The
+script (`scripts/generate-acknowledgements.sh`) takes each package's LICENSE, COPYING and NOTICE
+files. A licence kept in a source file's header instead, like the PocketFFT code in MLX, needs an
+entry in `embeddedNotices` in `scripts/generate-acknowledgements.swift`.
 
-## Icons
+### Icons
 
 The app icon is drawn as SVG in `design/`: `AppIcon.svg` for every size from 32 pixels up,
-`AppIcon-16.svg`, a simpler drawing whose edges fall on the 16-pixel grid, and `TouchIcon.svg`,
-a square version for the website's home-screen icon, which iOS rounds itself. The website's
-favicon and header mark is `site/favicon.svg`.
+`AppIcon-16.svg`, a simpler drawing whose edges fall on the 16-pixel grid, and `TouchIcon.svg`, a
+square version for the website's home-screen icon. The website's favicon and header mark is
+`site/favicon.svg`. The PNGs made from them are committed, so building the app doesn't need this.
+After editing an SVG, run `make icons` and commit what it writes: the app icon set in
+`App/Assets.xcassets/AppIcon.appiconset` and the website's icons.
 
-The PNGs made from them are committed, so building the app doesn't need this. After editing an
-SVG, run:
+## Linux and Windows
 
-```bash
-make icons
-```
+The app is a Cargo workspace in `linux-windows/`. From there, `packaging/fetch-sherpa-onnx.sh`
+fetches the libraries that run the catalog's other speech models, and `cargo test` runs the
+tests, including the golden cases. CI runs formatting, clippy and the tests on Linux and Windows
+for every change to `linux-windows/` or to the fixtures. Building it, its packages and its
+installer are in [linux-windows/README.md](../linux-windows/README.md).
 
-It runs `scripts/render-icons.sh`, which writes the app icon set in
-`App/Assets.xcassets/AppIcon.appiconset`, and the website's `favicon-32.png`,
-`apple-touch-icon.png` and `images/app-icon.png`. WebKit draws each one, so it matches what a
-browser shows, at the screen's scale; the script then scales it down by averaging each block of
-pixels, which keeps edges on the pixel grid sharp. Commit what it writes.
+## Keeping the two apps the same
+
+The Mac app is the reference. Its tests write the expected results in `Fixtures/golden` and
+`Fixtures/cleanup`, and the Rust tests must reproduce them. After changing a rule, run `make
+golden`, review the diff, and port the change until `cargo test` passes in `linux-windows/`; commit
+both apps' changes in one pull request. The steps for each kind of change are in
+[Architecture](architecture.md#where-to-change-what), and the fixtures are described in
+[Fixtures/golden](../Fixtures/golden/README.md) and
+[Fixtures/cleanup](../Fixtures/cleanup/README.md).
+
+A pull request that changes behaviour also updates the page that describes it:
+[Using](using.md), [Cleanup](cleanup.md) or [Known limitations](limitations.md).

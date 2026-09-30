@@ -23,8 +23,7 @@ public enum DeviceChangeDecision: Sendable, Equatable {
 /// Which microphone capture uses, and when it moves to another one.
 ///
 /// Pure functions over an ``InputDeviceSnapshot``, so every rule is unit-tested and
-/// ``CaptureSessionSource`` only applies the answers. The rules (docs/dictation.md, decision M1
-/// and handoff F6):
+/// ``CaptureSessionSource`` only applies the answers. The rules:
 ///
 /// - **A chosen microphone** (a selected UID) is used whenever it is connected, virtual or not,
 ///   and changes to the system default are ignored while it is in use.

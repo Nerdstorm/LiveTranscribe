@@ -60,7 +60,7 @@ struct GeneralSettingsTimingField: Identifiable {
                   help: "How long after an insertion Undo AI edit still applies.",
                   value: .int(\.undoWindowSeconds, range: 5...600, step: 5)),
             .init(key: .dictationNoticeSeconds, label: "Message duration", unit: "s",
-                  help: "How long a message stays up near the cursor.",
+                  help: "How long a message stays up beside the mouse pointer.",
                   value: .double(\.noticeSeconds, range: 0.5...10, step: 0.5, fractionDigits: 1)),
             .init(key: .pasteRestoreDelayMs, label: "Clipboard restore delay", unit: "ms",
                   help: "Wait after pasting before the clipboard is put back.",

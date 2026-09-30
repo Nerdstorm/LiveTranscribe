@@ -370,7 +370,7 @@ jobs:
         with:
           name: windows-installer
           path: downloads
-      # The notes name the Linux packages by version, and the website links to the disk image.
+      # The notes name the Linux packages by version, and the appcast points at the disk image.
       - name: Check that every download is there
         env:
           VERSION: ${{ needs.plan.outputs.version }}

@@ -115,7 +115,7 @@ doctor: ## Check the tools and credentials that building and releasing need
 	@printf '%-26s' 'Earlier macOS SDK'; scripts/check-swift-runtime.sh --sdk 2>/dev/null \
 	  || echo 'missing, and release builds check the app against one (docs/releasing.md)'
 	@printf '%-26s' 'Signing your own builds'; [ -f Config/Signing.local.xcconfig ] && echo 'Config/Signing.local.xcconfig' \
-	  || echo 'ad-hoc, so macOS asks for permissions after every build (docs/signing.md)'
+	  || echo 'ad-hoc, so macOS asks for permissions after every build (docs/development.md#signing-your-builds)'
 	@printf '%-26s' 'Developer ID certificate'; security find-identity -v -p codesigning \
 	  | grep -q '"Developer ID Application: ' && echo 'in the keychain' || echo 'missing (docs/releasing.md)'
 	@printf '%-26s' 'Notary credentials'; xcrun notarytool history --keychain-profile '$(NOTARY_PROFILE)' >/dev/null 2>&1 \

@@ -8,7 +8,7 @@ import Transcription
 /// `Bench --dictation`: runs every eval clip through the dictation processor at each cleanup
 /// level and reports, per level and category, word error rate against what was said and against
 /// what was meant, how often cleanup fell back, and latency (speech-to-text plus cleanup) against
-/// the p95 target in docs/dictation.md. With `--multiline` the clips are dictated into a field
+/// the p95 target. With `--multiline` the clips are dictated into a field
 /// that takes several lines, and the report adds how many came out with the intended layout.
 ///
 /// Clips come from Tests/IntegrationTests/Fixtures/Dictation/clips.tsv, synthesised to WAV by

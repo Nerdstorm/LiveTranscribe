@@ -20,7 +20,7 @@
     "license": "MIT",
     "copyright": "Copyright (c) 2026 Nerdstorm",
     "shortDescription": "Dictation: hold a key, speak, and the text is typed where you are",
-    "longDescription": "Live Transcribe types what you say into the app you're using: hold a key, speak, and let go. Speech to text runs on your computer: by default on the NPU of an Intel Core Ultra or on the CPU, with a model that knows Sinhala and English, which is downloaded on first start (1.1 GB). Other models, such as NVIDIA's Parakeet and Cohere Transcribe, can be chosen and downloaded in Settings.",
+    "longDescription": "Live Transcribe types what you say into the app you're using: hold a key, speak, and let go. Speech to text runs on your computer: by default on the NPU of an Intel Core Ultra or on the CPU, with a model that knows Sinhala and English, which is downloaded on first start (1.1 GB) with a cleanup model (0.9 GB) that tidies the text. Other speech models, such as NVIDIA's Parakeet and Cohere Transcribe, can be chosen and downloaded in Settings.",
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.png", "icons/icon.ico"]
   }
 }

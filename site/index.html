@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Live Transcribe: private dictation for your Mac</title>
-  <meta name="description" content="Hold fn, speak and let go. Live Transcribe types what you said at your cursor in almost any app, cleaned up, and runs entirely on your Mac. Free and open source.">
+  <title>Live Transcribe: private dictation for Mac, Linux and Windows</title>
+  <meta name="description" content="Hold a key, speak and let go. Live Transcribe types what you said at your cursor in almost any app, cleaned up, and runs entirely on your computer. Free and open source, for Mac, Linux and Windows.">
   <meta name="color-scheme" content="light">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Live Transcribe">
-  <meta property="og:description" content="Private dictation for your Mac. Hold fn, speak and let go: the text appears at your cursor, cleaned up. Runs entirely on your Mac.">
+  <meta property="og:description" content="Private dictation for Mac, Linux and Windows. Hold a key, speak and let go: the text appears at your cursor, cleaned up. Runs entirely on your computer.">
   <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -26,25 +26,26 @@
   <main>
     <section class="intro">
       <img class="app-icon" src="images/app-icon.png" alt="" width="128" height="128">
-      <h1>Private dictation for your Mac</h1>
+      <h1>Private dictation for your computer</h1>
       <p class="lead">
-        Hold <kbd>fn</kbd>, speak and let go. Live Transcribe types what you said at your cursor,
-        in almost any app, with the “um”s removed and the punctuation fixed. Speech recognition
-        and cleanup run on your Mac, so what you say never leaves it.
+        Hold <kbd>fn</kbd> on a Mac, or <kbd>Right Ctrl</kbd> on Linux and Windows, speak and let
+        go. Live Transcribe types what you said at your cursor, in almost any app, with the “um”s
+        removed and the punctuation fixed. Speech recognition and cleanup run on your computer, so
+        what you say never leaves it.
       </p>
       <p>
-        <a class="download" href="https://github.com/Nerdstorm/LiveTranscribe/releases/latest">Download for Mac</a>
+        <a class="download" href="https://github.com/Nerdstorm/LiveTranscribe/releases/latest">Download</a>
       </p>
-      <p class="meta">Free and open source · Apple silicon · macOS 14 or later</p>
+      <p class="meta">Free and open source · Mac (Apple silicon, macOS 14 or later) · Linux (x86-64, COSMIC) · Windows 10 and 11</p>
     </section>
 
     <section aria-labelledby="examples">
       <h2 id="examples">What you say, and what it types</h2>
-      <p>A reply dictated into Slack: hold the shortcut, speak, let go.</p>
+      <p>A reply dictated into Slack on a Mac: hold the shortcut, speak, let go. (Recorded with an earlier version, when the panel was a capsule at the text cursor; it is now a small circle by the mouse pointer.)</p>
       <figure>
         <video src="images/slack-demo-clip.mp4" poster="images/slack-demo-clip.png" width="732" height="214"
                autoplay muted loop playsinline controls
-               aria-label="Dictating a reply in Slack. A pill by the message box shows Listening, then Transcribing, and the reply appears laid out: “Thanks for the feedback, Rost. I have a couple of things for you:”, a numbered list, “1. Can you check the application on your iOS device?” and “2. Once done, tag it and push it to GitHub.”, then “Thanks, I’ll talk to you later.” in a paragraph of its own."></video>
+               aria-label="Dictating a reply in Slack. The reply appears laid out: “Thanks for the feedback, Rost. I have a couple of things for you:”, a numbered list, “1. Can you check the application on your iOS device?” and “2. Once done, tag it and push it to GitHub.”, then “Thanks, I’ll talk to you later.” in a paragraph of its own."></video>
       </figure>
       <table class="examples">
         <thead>
@@ -59,8 +60,8 @@
       </table>
       <p class="note">Outputs from the dictation test set (synthetic speech) at the default cleanup level.</p>
       <p>
-        Dictation History keeps what you said next to what it typed, so you can copy your original
-        wording. It stays on your Mac, and you can turn it off.
+        On the Mac, Dictation History keeps what you said next to what it typed, so you can copy
+        your original wording. It stays on your Mac, and you can turn it off.
       </p>
       <figure>
         <img src="images/history.png" width="803" height="528" loading="lazy" decoding="async"
@@ -74,22 +75,21 @@
         <li>Works in almost any app: email, chat, documents, browsers, code editors and terminals.</li>
         <li>Removes filler words and fixes punctuation and capitals.</li>
         <li>Follows your corrections: “Monday, no wait, Tuesday” becomes “Tuesday”.</li>
-        <li>Lays out spoken lists, letters and line breaks in any app that takes several lines, chat apps included.</li>
-        <li>Inserts saved text when you say its phrase, such as “my calendar link”.</li>
-        <li>Spells your names and jargon correctly once you add them.</li>
-        <li>Puts back exactly what you said if you press <kbd>⌃</kbd><kbd>⌥</kbd><kbd>Z</kbd> within 30 seconds.</li>
+        <li>Lays out spoken lists, letters and line breaks in any field that takes several lines. On the Mac that includes chat apps; on Windows, browser and Electron apps are typed on one line.</li>
         <li>Listens hands-free when you double-tap the key, until you tap it once more.</li>
         <li>Lets you choose how much it edits: None, Light, Medium, High or Deep.</li>
-        <li>Shows a live transcript as you speak, for longer sessions.</li>
-        <li>Recognises and cleans up a sentence in about 0.2 seconds on an M4 Pro.</li>
+        <li>Recognises and cleans up a sentence in about 0.3 seconds (280 ms median) on an M4 Pro.</li>
+        <li>On the Mac, inserts saved text when you say its phrase, such as “my calendar link”.</li>
+        <li>On the Mac, spells your names and jargon correctly once you add them.</li>
+        <li>On the Mac, puts back exactly what you said if you press <kbd>⌃</kbd><kbd>⌥</kbd><kbd>Z</kbd> within 30 seconds.</li>
+        <li>On the Mac, shows a live transcript as you speak, for longer sessions.</li>
       </ul>
     </section>
 
     <section aria-labelledby="languages">
       <h2 id="languages">Languages</h2>
       <p>
-        Live Transcribe recognises 31 languages, and 22 Chinese dialects, and works out which one
-        you’re speaking. Sinhala comes out in Sinhala script with English words in English letters,
+        Live Transcribe recognises 31 languages, and works out which one you’re speaking. Sinhala comes out in Sinhala script with English words in English letters,
         as people type it: “meeting එක cancel කරන්න”.
       </p>
       <table class="languages">
@@ -111,16 +111,17 @@
     </section>
 
     <section aria-labelledby="settings">
-      <h2 id="settings">Settings</h2>
+      <h2 id="settings">Settings on the Mac</h2>
 
       <h3>Shortcut and cleanup</h3>
       <p>
         Hold <kbd>fn</kbd> while you speak, or double-tap it to keep listening until you press it
-        again. You can choose another key. Cleanup has five levels: None only applies your snippets
-        and vocabulary, Light fixes punctuation, capitals and misheard words, Medium also removes
-        fillers and follows your corrections, High also rewords lightly for clarity, and Deep
-        follows a correction back into an earlier sentence, fixes grammar and lays out emails and
-        lists.
+        again. You can choose another key. Cleanup has five levels: None only applies your spoken
+        commands, snippets and vocabulary, Light fixes punctuation, capitals and misheard words,
+        Medium also removes fillers and follows your corrections, High also rewords lightly for
+        clarity, and Deep follows a correction back into an earlier sentence, fixes grammar and
+        lays out emails and lists. Linux and Windows have the same levels in a smaller Settings
+        window, with General, Models and Advanced tabs.
       </p>
       <figure>
         <img src="images/settings-general.png" width="726" height="774" loading="lazy" decoding="async"
@@ -161,17 +162,20 @@
     </section>
 
     <section aria-labelledby="privacy">
-      <h2 id="privacy">Stays on your Mac</h2>
+      <h2 id="privacy">Stays on your computer</h2>
       <p>
-        Speech recognition and cleanup run locally with Apple’s MLX. There is no account, no cloud
-        service and no telemetry. The app goes online only to download its models from Hugging Face
-        on first launch and, if you let it, to check GitHub for a new version about once a day.
-        Dictation works offline. Your dictation history is kept on your Mac, and you can turn it off.
+        Speech recognition and cleanup run locally, with Apple’s MLX on a Mac and with OpenVINO and
+        sherpa-onnx on Linux and Windows. There is no account, no cloud service and no telemetry. The app goes
+        online only to download its models (from Hugging Face, and on Linux and Windows for some
+        models from GitHub) and, on the Mac if you let it, to check GitHub for a new version about
+        once a day. Dictation works offline. The Mac keeps your dictation history on the Mac, and
+        you can turn it off; Linux and Windows keep none.
       </p>
     </section>
 
     <section aria-labelledby="install">
       <h2 id="install">Install</h2>
+      <h3>Mac</h3>
       <ol class="steps">
         <li>Download the latest release from GitHub and move Live Transcribe to your Applications folder.</li>
         <li>Open it. Setup walks you through microphone access, Accessibility and the fn key setting, while the speech models (about 2 GB) download.</li>
@@ -179,17 +183,47 @@
       </ol>
       <p class="note">
         The app is signed and notarized by Apple, so macOS only asks you to confirm opening an app
-        downloaded from the internet. It keeps itself up to date. You can also
-        <a href="https://github.com/Nerdstorm/LiveTranscribe#build-and-run">build it from source</a>.
+        downloaded from the internet. It keeps itself up to date.
+      </p>
+
+      <h3>Linux</h3>
+      <ol class="steps">
+        <li>Download the latest release from GitHub: a deb for Ubuntu and Debian, an rpm for Fedora and openSUSE, or an AppImage for anything else, and install it. The release notes give the commands.</li>
+        <li>Start Live Transcribe. It lives in the tray, and downloads its speech and cleanup models (about 2 GB) on first start.</li>
+        <li>When the tray says “Hold Right Ctrl to dictate”, hold <kbd>Right Ctrl</kbd> in any app and speak.</li>
+      </ol>
+      <p class="note">
+                Dictation types on Wayland desktops that allow it. COSMIC works; Sway and Hyprland should
+        but haven’t been tried. GNOME, KDE Plasma and X11 desktops are not supported yet: there the
+        app starts and Settings says why. Hold-to-talk reads the keyboard through a udev rule,
+        which the deb and rpm install and the AppImage needs added by hand (the release notes give
+        the commands). <strong>The rule lets any program you run read what you type</strong>, as any
+        X11 program always could.
+      </p>
+
+      <h3>Windows</h3>
+      <ol class="steps">
+        <li>Download the latest release from GitHub and run the setup program. It installs for your account, without administrator rights.</li>
+        <li>Start Live Transcribe. It lives in the tray, and downloads its speech and cleanup models (about 2 GB) on first start.</li>
+        <li>When the tray says “Hold Right Ctrl to dictate”, hold <kbd>Right Ctrl</kbd> in any app and speak.</li>
+      </ol>
+      <p class="note">
+        The installer isn’t signed yet, so SmartScreen warns about an unrecognised app: choose
+        More info, then Run anyway.
+      </p>
+
+      <p class="note">
+        You can also <a href="https://github.com/Nerdstorm/LiveTranscribe#build-and-run">build it from source</a>.
       </p>
     </section>
 
     <section aria-labelledby="requirements">
       <h2 id="requirements">Requirements</h2>
       <ul>
-        <li>A Mac with Apple silicon</li>
-        <li>macOS 14 or later (tested on macOS 27)</li>
-        <li>About 2 GB of disk space for the models, and about 3 GB of memory while running</li>
+        <li>Mac: Apple silicon and macOS 14 or later (tested on macOS 27)</li>
+        <li>Linux: x86-64 with glibc 2.35 or later, on a Wayland desktop that allows typing</li>
+        <li>Windows: Windows 10 or 11 on x86-64</li>
+        <li>About 2 GB of disk space for the models, and on a Mac about 3 GB of memory while running</li>
         <li>Speech in one of the <a href="#languages">31 languages</a></li>
       </ul>
     </section>
@@ -204,7 +238,7 @@
     </p>
     <p>
       Speech recognition uses Qwen3-ASR, fine-tuned by Nerdstorm to add Sinhala, and cleanup uses
-      Qwen3, both run with MLX.
+      Qwen3, both run locally with MLX on a Mac, and with OpenVINO and sherpa-onnx on Linux and Windows.
       <a href="https://github.com/Nerdstorm/LiveTranscribe#models-and-credits">Models and credits</a>.
     </p>
     <p><a href="https://nerdstorm.com.au">© 2026 Nerdstorm</a></p>

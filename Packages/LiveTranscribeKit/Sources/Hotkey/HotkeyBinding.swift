@@ -14,7 +14,7 @@ public enum HotkeyBinding: Sendable, Hashable {
     /// Fn (the globe key): a key few people press on its own, and the one other dictation tools use.
     public static let defaultDictation = HotkeyBinding.modifierKey(.fn)
 
-    /// ⌃⌥Z: undo the last AI edit (see docs/dictation.md, "Undo AI edit").
+    /// ⌃⌥Z: undo the last AI edit.
     public static let defaultUndo = HotkeyBinding.keyCombo(keyCode: 6, modifiers: [.control, .option])
 
     /// The name shown in Settings and menus: "fn" with the globe symbol, "⌃⌥Space", "⌃⌥Z".

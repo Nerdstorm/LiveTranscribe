@@ -48,7 +48,7 @@ public enum HotkeyAction: Sendable, Equatable {
     case scheduleTimer(ms: Int)
 }
 
-/// The push-to-talk gesture as a pure state machine (docs/dictation.md, "Hotkey gestures").
+/// The push-to-talk gesture as a pure state machine.
 ///
 /// - Hold for at least `tapMaxMs`, then release: the recording is processed.
 /// - Tap, then press again within `doubleTapWindowMs`: hands-free. The second press's release

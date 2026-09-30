@@ -5,9 +5,10 @@ import Shared
 /// the vocabulary and the placeholder rule, each from its own function.
 ///
 /// Without the fine-tuned adapter the model cannot resolve spoken self-corrections reliably (see
-/// ``Prompt/cleanup``), so every level gets the strict keep-every-word rules; with it, Medium
-/// and High ask for the correction only. Medium with the adapter and nothing else to add is
-/// exactly ``Prompt/adapted``, the prompt the adapter was trained on.
+/// ``Prompt/cleanup``), so Light, Medium and High get the strict keep-every-word rules (High
+/// may reword, but not remove); with it, Medium and High ask for the correction only. Medium with
+/// the adapter and nothing else to add is exactly ``Prompt/adapted``, the prompt the adapter was
+/// trained on.
 ///
 /// Deep has its own instruction, with or without the adapter (``deepRules(multiline:)``).
 public struct PromptBuilder: Sendable, Equatable {

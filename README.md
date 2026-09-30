@@ -6,30 +6,46 @@
 
 <p align="center">
   <strong>Talk the way you talk. Get the sentence you meant, typed at your cursor in almost any
-  app, and not a word leaves your Mac.</strong>
+  app, and not a word leaves your computer.</strong>
 </p>
 
-Hold **fn (🌐)**, speak, and let go. Live Transcribe turns what you said into clean, punctuated
-text and types it where you are working: a message, an email, a document, a terminal. The "um"s
-are gone. "Monday, no wait, Tuesday" comes out as "Tuesday". Add your names and jargon once, and
-they are spelled your way.
+Hold a key (**fn (🌐)** on a Mac, **Right Ctrl** on Linux and Windows), speak, and let go. Live
+Transcribe turns what you said into clean, punctuated text and types it where you are working: a
+message, an email, a document, a terminal. The "um"s are gone. "Monday, no wait, Tuesday" comes
+out as "Tuesday". On the Mac, add your names and jargon once, and they are spelled your way.
 
-Speech-to-text and a small language model run on your Apple silicon Mac with
-[MLX](https://github.com/ml-explore/mlx-swift). There is no account, no cloud and no telemetry,
-and once the models are downloaded it works offline. When you would rather watch than type, a
-live transcript window shows your words as you speak and tidies each line in place.
+Speech-to-text and a small language model run on your computer, with
+[MLX](https://github.com/ml-explore/mlx-swift) on an Apple silicon Mac and with
+[OpenVINO](https://github.com/openvinotoolkit/openvino) and
+[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) on Linux and Windows. There is no
+account, no cloud and no telemetry, and once the models are downloaded it works offline. On the
+Mac, a live transcript window shows your words as you speak and tidies each line in place.
 
-Free and open source (MIT) · Apple silicon · macOS 14 or later (tested on macOS 27) ·
-[31 languages](#languages) ·
-[Download for Mac](https://github.com/Nerdstorm/LiveTranscribe/releases/latest) or
+Free and open source (MIT) · Mac, Linux and Windows · [31 languages](#languages) ·
+[Download](https://github.com/Nerdstorm/LiveTranscribe/releases/latest) or
 [build from source](#build-and-run)
+
+## Download
+
+| | Get | Notes |
+|---|---|---|
+| **Mac** | `LiveTranscribe.dmg`, signed with Developer ID and notarized. It keeps itself up to date. | Apple silicon, macOS 14 or later. Everything below. |
+| **Linux** | a `.deb`, an `.rpm` or an `.AppImage` | x86-64, glibc 2.35 or later, on a Wayland desktop that allows typing: COSMIC works; GNOME, KDE Plasma and X11 don't yet. Hold-to-talk needs a udev rule to read the keyboard: the deb and rpm install it, and the AppImage needs it added by hand. |
+| **Windows** | `live-transcribe_X.Y.Z_x64-setup.exe`, not signed yet, so SmartScreen warns (More info, then Run anyway) | Windows 10 or 11, x86-64. |
+
+Linux and Windows have dictation, the tray and Settings; the live transcript, dictation history,
+Undo AI Edit, snippets, vocabulary and per-app settings are Mac-only for now. The install
+commands are in each release's notes; first start and every setting are in
+[Using Live Transcribe](docs/using.md).
 
 ## See the difference
 
-A reply dictated into Slack: hold the shortcut, speak, let go.
+A reply dictated into Slack on the Mac: hold the shortcut, speak, let go. (Recorded with an
+earlier version, when the panel was a capsule at the text cursor; it is now a small circle by the
+mouse pointer.)
 
 <p align="center">
-  <img src="site/images/slack-demo-clip.gif" width="732" alt="Dictating a reply in Slack. A pill by the message box shows Listening, then Transcribing, and the reply appears laid out: “Thanks for the feedback, Rost. I have a couple of things for you:”, a numbered list, “1. Can you check the application on your iOS device?” and “2. Once done, tag it and push it to GitHub.”, then “Thanks, I'll talk to you later.” in a paragraph of its own.">
+  <img src="site/images/slack-demo-clip.gif" width="732" alt="Dictating a reply in Slack. The reply appears laid out: “Thanks for the feedback, Rost. I have a couple of things for you:”, a numbered list, “1. Can you check the application on your iOS device?” and “2. Once done, tag it and push it to GitHub.”, then “Thanks, I'll talk to you later.” in a paragraph of its own.">
 </p>
 
 Real outputs from the dictation eval, at the default **Medium** cleanup level:
@@ -58,41 +74,44 @@ meant. 641 ms at p95.** In the 65-clip dictation eval at Medium, dictating into 
 field, speech-to-text plus cleanup of sentence-length dictations took 280 ms at p50 and 641 ms at
 p95, well inside the 1.2 s target.
 
-Measured on an M4 Pro with synthetic speech: the left column is the script a macOS text-to-speech
-voice read aloud. Stopping the recorder and inserting the text are not included in those times.
-Three of the 65 clips fell back to the uncleaned transcript, with fillers still removed: a plain
-sentence, a sentence the speech model broke at a hesitation, and a spoken "comma" it heard as
-"common" ([details](docs/development.md#dictation-eval)).
+Measured on an M4 Pro Mac with synthetic speech: the left column is the script a macOS
+text-to-speech voice read aloud. Stopping the recorder and inserting the text are not included in
+those times. Three of the 65 clips fell back to the uncleaned transcript, with fillers still
+removed: a plain sentence, a sentence the speech model broke at a hesitation, and a spoken "comma"
+it heard as "common" ([details](docs/development.md#bench-and-eval)). The Linux and Windows app
+cleans up the same way, on the same model; it runs on the CPU there, about four times slower than
+on a Mac.
 
 ## Features
 
 - **Say it naturally, get what you meant.** At the default **Medium** level, fillers disappear,
   spoken self-corrections are resolved and spoken lists and letters are laid out; say emoji,
-  punctuation and line breaks at any level. Every edit is checked against what you said, and
-  ⌃⌥Z puts your own words back.
-- **Dictate from any app.** Hold **fn (🌐)** or a shortcut of your own, or double-tap it for
-  hands-free. A small circle by the mouse pointer shows what is happening, and Esc cancels.
-- **Make it yours.** Snippets insert saved text when you say their phrase, and vocabulary spells
-  your names and jargon your way. Choose how much it edits: **None**, **Light**, **Medium**,
-  **High**, or **Deep**, which also follows a correction back into an earlier sentence ("…is
-  tomorrow. No, sorry, the after tomorrow." → "…is the day after tomorrow."), fixes grammar and
-  lays out emails and lists.
-- **Dependable, app after app.** Text goes in through Accessibility and is read back, or is
-  pasted with your clipboard put back, so terminals, browsers and Electron apps work too. Line
-  breaks go only where they belong, and nothing goes into a password field.
-- **Private by design.** Speech-to-text and cleanup run on your Mac, with no account, no cloud
-  and no telemetry. Dictation history stays on this Mac, and you can turn it off.
-- **A live transcript, too.** Watch your words appear as you speak, each line cleaned in place
-  and every session saved.
-- **Easy to start, easy to trust.** Guided setup, VoiceOver support, more than 1,000 tests, a
-  bench for your own recordings, a tool that retrains the adapter on your Mac, and your own
-  models if you prefer.
-
-Every feature, in detail: [docs/features.md](docs/features.md).
+  punctuation and line breaks at any level. Every edit is checked against what you said, and on
+  the Mac ⌃⌥Z puts your own words back.
+- **Dictate from any app.** Hold the key, or double-tap it for hands-free. A small circle by the
+  mouse pointer shows what is happening, and Esc cancels. On the Mac the key is **fn (🌐)** or a
+  shortcut of your own; on Linux and Windows, **Right Ctrl** or one other key.
+- **Choose how much it edits.** **None**, **Light**, **Medium**, **High**, or **Deep**, which
+  also follows a correction back into an earlier sentence ("…is tomorrow. No, sorry, the after
+  tomorrow." → "…is the day after tomorrow."), fixes grammar and lays out emails and lists.
+- **Make it yours (Mac).** Snippets insert saved text when you say their phrase, and vocabulary
+  spells your names and jargon your way.
+- **Dependable, app after app.** On the Mac, text goes in through Accessibility and is read
+  back, or is pasted with your clipboard put back, so terminals, browsers and Electron apps work
+  too. Linux types through the Wayland input method, or pastes; Windows types as keystrokes. Line
+  breaks go only where they belong, and nothing goes into a password field it can recognise.
+- **Private by design.** Speech-to-text and cleanup run on your computer, with no account, no
+  cloud and no telemetry. The Mac's dictation history stays on this Mac, and you can turn it off;
+  Linux and Windows keep none.
+- **A live transcript, too (Mac).** Watch your words appear as you speak, each line cleaned in
+  place and every session saved.
+- **Easy to start, easy to trust.** Guided setup and VoiceOver support on the Mac, more than
+  1,000 tests, a bench for your own recordings, a tool that retrains the adapters on your Mac, and
+  your own models if you prefer.
 
 ## Languages
 
-Live Transcribe recognises 31 languages, and 22 Chinese dialects, and works out which one you are
+Live Transcribe recognises 31 languages, and the default speech model works out which one you are
 speaking. Sinhala comes out in Sinhala script with English words in English letters, as people
 type it: "meeting එක cancel කරන්න".
 
@@ -108,37 +127,40 @@ type it: "meeting එක cancel කරන්න".
 | Thai | Turkish | Vietnamese | |
 
 Cleanup is written for English. Sinhala skips the cleanup model and is typed as recognised, and
-the other languages haven't been tested with cleanup. The speech model is Qwen3-ASR 0.6B,
-[fine-tuned for Sinhala](https://github.com/Nerdstorm/LiveTranscribe-Sinhala) by Nerdstorm.
+the other languages haven't been tested with cleanup. The default speech model is Qwen3-ASR 0.6B,
+[fine-tuned for Sinhala](https://github.com/Nerdstorm/LiveTranscribe-Sinhala) by Nerdstorm; the
+Models tab in Settings offers others.
 
 ## Documentation
 
 | Guide | What's in it |
 |---|---|
-| [Features](docs/features.md) | Everything Live Transcribe does, in detail, and what's coming next |
-| [Using Live Transcribe](docs/using.md) | First launch, dictating, Dictation History, the live transcript, microphones, updates and every Settings tab |
-| [Cleanup and spoken commands](docs/cleanup.md) | The five cleanup levels, what OutputGuard and Deep's check reject, how Deep was chosen, and the phrases that become emoji, punctuation, line breaks and addresses |
+| [Using Live Transcribe](docs/using.md) | Installing, first start, dictating and every Settings tab, on the Mac, Linux and Windows, plus the Mac's Dictation History and live transcript |
+| [Cleanup and spoken commands](docs/cleanup.md) | The five cleanup levels, what OutputGuard and Deep's check reject, and the phrases that become emoji, punctuation, line breaks and addresses |
 | [Snippets, vocabulary and apps](docs/snippets-vocabulary-apps.md) | Saved text, your names and jargon, and how each app gets its text and line breaks |
 | [Privacy](docs/privacy.md) | What is kept where, what goes over the network, and how to remove it all |
-| [Signing and Gatekeeper](docs/signing.md) | Ad-hoc signing, and keeping permissions across rebuilds |
-| [Releasing](docs/releasing.md) | The Developer ID certificate, the notary credentials and the update signing key, and writing the changelog, building, notarizing, publishing and offering a release as an update |
-| [Known limitations](docs/limitations.md) | What doesn't work well yet |
-| [Development](docs/development.md) | The tests and their audio clips, the bench and the dictation eval, training the adapter, the licence notices, and the icons |
+| [Known limitations](docs/limitations.md) | What doesn't work well yet, and what isn't built |
+| [Development](docs/development.md) | Building and signing, the tests and their audio clips, the bench and the dictation eval, training the adapters, licence notices and icons |
+| [Linux and Windows app](linux-windows/README.md) | Building, packaging and changing the Rust app |
+| [Releasing](docs/releasing.md) | The signing credentials, and writing the changelog, building, notarizing, publishing and offering a release as an update |
 | [Architecture](docs/architecture.md) | For contributors: how dictation and cleanup work step by step, with diagrams, where each step's code is on the Mac and on Linux and Windows, and where to make a change |
 | [Design notes](docs/design-notes.md) | Why it is built the way it is |
-| [Dictation design](docs/dictation.md) | Dictation's decisions, assumptions, architecture, settings and eval results |
 | [Training the adapters](Packages/LiveTranscribeKit/Training/README.md) | The self-correction and Deep adapters' datasets, training and evaluation |
 
 ## Status
 
-A working proof of concept, free and open source under the [MIT License](LICENSE).
+Version 1.0, free and open source under the [MIT License](LICENSE).
 
-- Download it from [GitHub Releases](https://github.com/Nerdstorm/LiveTranscribe/releases/latest):
-  a disk image signed with Developer ID and notarized by Apple, which keeps itself up to date. Or
-  build it from source (below).
-- What changed in each release is in the [changelog](CHANGELOG.md).
-- Tested on an M4 Pro Mac with macOS 27 and Xcode 27. The app targets macOS 14 or later but has
-  not been run on older systems.
+- Download it from [GitHub Releases](https://github.com/Nerdstorm/LiveTranscribe/releases/latest),
+  or build it from source (below). What changed in each release is in the
+  [changelog](CHANGELOG.md).
+- The Mac app was tested on an M4 Pro Mac with macOS 27 and Xcode 27. It targets macOS 14 or
+  later but has not been run on older systems, nor on 8 GB Macs. With the default models it uses
+  about 3 GB of memory.
+- The Linux app has been run on COSMIC. GNOME, KDE Plasma and X11 desktops are not supported yet.
+  The Windows app is built and tested in CI, which also installs it and starts it. On an Intel
+  desktop CPU on Linux, the default speech model peaked at 5.3 GB of memory over a long test run,
+  and the cleanup model at 2.5 GB.
 - Tested with English and Sinhala speech. It recognises 29 other languages too; see
   [Languages](#languages).
 - Issues and pull requests are welcome; see [Reporting a problem](#reporting-a-problem).
@@ -149,176 +171,127 @@ A working proof of concept, free and open source under the [MIT License](LICENSE
 [Open an issue](https://github.com/Nerdstorm/LiveTranscribe/issues/new), in whatever form suits
 you. These help, when you have them:
 
-- your Mac, the macOS version, and the app's version (**About Live Transcribe** in the menu bar);
+- your computer and its system (the Mac and macOS version; the Linux distribution and desktop;
+  the Windows version), and the app's version (**About Live Transcribe** in the Mac's menu bar,
+  `livetranscribe --version` on Linux and Windows, from a terminal);
 - the app you were dictating into;
 - what you said, what was typed, and what you expected;
-- for a crash, the report macOS offers to send, or the one in Console › Crash Reports.
-
-## Requirements
-
-- An Apple silicon Mac. With the default models the app uses about 3 GB of memory. It has not
-  been tested on 8 GB Macs.
-- To build: Xcode 26.4 or later (Swift 6.3 or later), with its Metal Toolchain component
-  (`xcodebuild -downloadComponent MetalToolchain`). MLX compiles Metal shaders, so build with
-  `xcodebuild` or Xcode; `swift build` produces binaries without the Metal library.
-- Disk space: about 2 GB for the models (Qwen3-ASR 0.6B and Qwen3-1.7B-4bit are about 1 GB
-  each) and about 2 GB for the build. The tests and the bench need roughly 5.5 GB more: their own
-  copy of the models and their own build.
+- for a Mac crash, the report macOS offers to send, or the one in Console › Crash Reports; on
+  Linux and Windows, the terminal output when it is started with `LIVETRANSCRIBE_LOG=info` set
+  (on Windows, run `livetranscribe.exe` from a terminal in its install folder).
 
 ## Build and run
 
-From the repository root, build the app in Release and open it:
+On the Mac you need an Apple silicon Mac and Xcode 26.4 or later with its Metal Toolchain
+component (`make doctor` checks what is missing); from the repository root:
 
 ```bash
 make run
 ```
 
-`make` on its own lists every target: the tests, the bench and the eval, releases, and upkeep such
-as the licence notices, the icons and the app's log. The [Makefile](Makefile) shows the command
-behind each one.
-
-Or open `LiveTranscribe.xcodeproj` in Xcode and choose Run. The shared scheme runs the
-**Release** configuration, because MLX inference in Debug is several times slower. On the first
-build Xcode asks you to trust mlx-swift's `CudaBuild` build-tool plugin, which only does work in
-CUDA builds; the Makefile skips that prompt with `-skipPackagePluginValidation`.
-
-Live Transcribe runs in the menu bar. On first launch, **Set Up Dictation** walks you through
+builds the app in Release and opens it. `make` on its own lists every target: the tests, the bench
+and the eval, releases, and upkeep such as the licence notices and the icons. Building for the
+first time, signing your builds so the permissions survive a rebuild, and disk space: see
+[Development](docs/development.md). On first launch, **Set Up Dictation** walks you through
 microphone access, Accessibility and the fn key while the models (about 2 GB) download; see
 [First launch](docs/using.md#first-launch).
 
-**macOS treats every ad-hoc build as a new app.** After a rebuild it asks for microphone access
-again, and the shortcut does not work until you remove the old Live Transcribe entry in Privacy
-& Security › Accessibility and add the new build. To keep the permissions across rebuilds, sign
-with your own certificate: copy `Config/Signing.local.xcconfig.example` to
-`Config/Signing.local.xcconfig` (gitignored) and set your team ID. More in
-[Signing and Gatekeeper](docs/signing.md).
-
-### Tests
-
-The package has more than 1,000 Swift Testing tests. Unit tests need no models:
-
-```bash
-make test
-```
-
-The end-to-end tests, the bench and the dictation eval need generated audio clips and the
-models; see [Development](docs/development.md).
+Linux and Windows are a Cargo workspace in `linux-windows/`: run `packaging/fetch-sherpa-onnx.sh`
+once, then `cargo test` (Linux also needs Tauri's build packages). Building and packaging it:
+[linux-windows/README.md](linux-windows/README.md).
 
 ## Privacy
 
-Audio and transcripts never leave your Mac, and there is no telemetry. The app goes online only
-to download the models from Hugging Face and, in a downloaded release, to check GitHub for a new
-version about once a day if you allow it. **Dictation history is on by default:** every
-completed dictation (what you said, what was typed, the app and timings) is kept unencrypted on
-this Mac, never synced, until you turn history off, limit how long it is kept or clear it in
-**Settings › History**. Where each file lives, and how to remove everything:
+Audio and transcripts never leave your computer, and there is no telemetry. The app goes online
+only to download models (from Hugging Face; on Linux and Windows also from GitHub) and, in a
+downloaded Mac release, to check GitHub for a new version about once a day if you allow it.
+**On the Mac, dictation history is on by default:** every completed dictation (what you said,
+what was typed, the app and timings) is kept unencrypted on this Mac, never synced, until you turn
+history off, limit how long it is kept or clear it in **Settings › History**. Linux and Windows
+keep nothing about what you say. **On Linux, hold-to-talk needs a udev rule (installed by the deb
+and rpm) that lets any program you run read the keyboard**, as any X11 program always could. Where
+each file lives, and how to remove everything:
 [docs/privacy.md](docs/privacy.md).
 
-## Architecture
+## How it is built
 
-- **Two pipelines, one set of models.** The live transcript runs microphone → Silero voice
-  activity detection → Qwen3-ASR speech-to-text → Qwen3-1.7B cleanup at the chosen level →
-  window and JSONL file. Dictation runs shortcut → recording → Qwen3-ASR → placeholders for
-  snippets, spoken commands and list markers, and vocabulary → filler rule, letter frame and
-  Qwen3-1.7B cleanup, checked by OutputGuard → line breaks and layout → snippets, emoji and
-  addresses restored → text at the cursor. One Qwen3-ASR and one Qwen3-1.7B instance serve both.
-- **A menu bar app.** Dictation has to be available in every app, so Live Transcribe lives in
-  the menu bar (`LSUIElement`) and becomes a regular app with a Dock icon only while one of its
-  windows (transcript, history, Settings, setup) is open.
+- **Two apps, one behaviour.** The Mac app is Swift, with MLX. The Linux and Windows app is Rust
+  (a Tauri tray app), with OpenVINO and sherpa-onnx. The Mac app is the reference: its tests write
+  fixtures that the Rust tests must reproduce, so the same text rules and the same cleanup checks
+  run on all three systems.
+- **Vertical slices.** Each feature's code lives together: on the Mac, one folder per slice of
+  `Packages/LiveTranscribeKit`, and in `linux-windows/` one crate per slice with the same name.
+  Slices depend on protocols, which the unit tests replace with fakes, and
+  `App/AppComposition.swift` constructs every concrete implementation.
+- **Menu bar and tray apps.** Dictation has to be available in every app, so Live Transcribe
+  lives in the menu bar or the tray. On the Mac it becomes a regular app with a Dock icon only
+  while one of its windows (transcript, history, Settings, setup) is open.
 
 ```
-App/                          menu bar app: menu, windows, composition root, app icon
-LiveTranscribe.xcodeproj      app project (ad-hoc signed, hardened runtime, no App Sandbox)
-CHANGELOG.md                  what changed in each release, written by make changelog
-design/                       the app icon, drawn as SVG
-docs/                         the guides indexed above, design notes and dictation's design
-Makefile                      building, tests, the bench, releases and upkeep (make lists them)
+App/                          the Mac app: menu, windows, composition root, app icon
+LiveTranscribe.xcodeproj      the Mac app's project (hardened runtime, no App Sandbox)
+Packages/LiveTranscribeKit/   the Mac app's feature code, as vertical slices
+linux-windows/                the Linux and Windows app, a Cargo workspace
+Fixtures/                     golden and cleanup fixtures the Mac's tests write and the Rust tests replay
+Config/                       signing settings
 scripts/                      releases, the changelog, licence notices, test audio and icons
+docs/                         the guides indexed above
+design/                       the app icon, drawn as SVG
 site/                         the website, published to GitHub Pages
-Packages/LiveTranscribeKit/   all feature code, as vertical slices
-  Sources/
-    Shared/          value types, AppSettings, logging, deadline, edit distance, atomic file writes
-    Capture/         AVCaptureSession microphone capture → 16 kHz mono; microphone list and choice
-    Segmentation/    Silero VAD + segmentation state machine (pre-roll, hysteresis, max length)
-    Transcription/   Qwen3-ASR via mlx-audio-swift; the speech models it can run, by kind, and the catalog
-    Cleanup/         Qwen3 via mlx-swift-lm, prompt, OutputGuard fallbacks, fine-tuned adapter
-    Persistence/     JSONL session files and dictation history
-    Session/         SessionCoordinator (lifecycle) + SessionPipeline (3 concurrent stages)
-    TranscriptUI/    live transcript view model and views
-    Hotkey/          global shortcut monitor (event tap), hold/double-tap gestures, bindings
-    Permissions/     Accessibility and microphone permission, System Settings links
-    Insertion/       typing at the cursor: Accessibility, paste with clipboard restore, per-app settings
-    Styles/          rule-based filler removal and layout: lists and letters
-    SpokenCommands/  emoji, punctuation, line breaks and addresses said aloud
-    Snippets/        trigger phrases and the text they insert
-    Vocabulary/      names and jargon, with how they are spoken
-    Dictation/       DictationController: hotkey → record → transcribe → clean up → insert
-    DictationUI/     menu bar menu, floating panel, setup, Settings tabs, history window
-    MLXSupport/      MLX runtime configuration (GPU cache limit)
-    Bench/           command-line tool: WER and latency over test clips, live transcript or dictation
-    CleanupTraining/ dataset, LoRA training and evaluation for the cleanup adapter
-    Train/           command-line tool: generate, validate, train and evaluate the adapter
-  Tests/             Swift Testing; tests that need the models run only when enabled
-  Training/          the adapter's dataset, and how it is trained (Training/README.md)
+CHANGELOG.md                  what changed in each release, written by make changelog
+Makefile                      building, tests, the bench, releases and upkeep (make lists them)
 ```
-
-`App/AppComposition.swift` is the app's composition root: it constructs every concrete slice
-implementation (the bench and the tests wire their own). The Settings window is the exception: it
-reads and writes the settings in UserDefaults directly. Everything else depends on protocols
-(`AudioSource`, `SpeechSegmenter`, `Transcriber`, `Cleaner`, `SessionSink`,
-`MicrophonePermissionProviding`, for dictation `HotkeyMonitor`, `FocusedTargetProvider`,
-`TextDelivery`, `DictationHistory` and `AccessibilityPermissionProviding`, and in the UI
-`SessionControlling` and `InputDeviceSelecting`), which the unit tests replace with fakes or, for
-`SessionSink`, the in-memory `MemorySessionSink`. Dictation and the live transcript share one
-instance of each model; they never run at the same time.
 
 Each step, with diagrams, and where to change what: [Architecture](docs/architecture.md). Why it
-is built this way: [Design notes](docs/design-notes.md) and [Dictation design](docs/dictation.md).
+is built this way: [Design notes](docs/design-notes.md).
 
 ## Models and credits
 
-The app downloads the models from Hugging Face. They are not part of this repository and not
-covered by its licence. The cleanup adapters, two 10 MB LoRA adapters for Qwen3-1.7B (one that
-resolves self-corrections at Medium and High, and Deep's), are part of this repository.
+The app downloads its models. They are not part of this repository and not covered by its
+licence. The cleanup adapters, two 10 MB LoRA adapters for Qwen3-1.7B (one that resolves
+self-corrections at Medium and High, and Deep's), are part of this repository.
 
 | Role | Model used | Original model | Licence |
 |---|---|---|---|
-| Speech-to-text | [Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit](https://huggingface.co/Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit) | [Qwen3-ASR-0.6B](https://huggingface.co/Qwen/Qwen3-ASR-0.6B) by the Qwen team, Alibaba Cloud, [fine-tuned for Sinhala](https://github.com/Nerdstorm/LiveTranscribe-Sinhala) by Nerdstorm on [OpenSLR 52](https://www.openslr.org/52/) (Google, CC BY-SA 4.0) | CC-BY-SA-4.0 |
-| Cleanup | [mlx-community/Qwen3-1.7B-4bit](https://huggingface.co/mlx-community/Qwen3-1.7B-4bit) | [Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B) by the Qwen team, Alibaba Cloud | Apache-2.0 |
+| Speech-to-text (default) | Mac: [Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit](https://huggingface.co/Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit). Linux, Windows: [Nerdstorm/Qwen3-ASR-0.6B-Sinhala-OpenVINO](https://huggingface.co/Nerdstorm/Qwen3-ASR-0.6B-Sinhala-OpenVINO) | [Qwen3-ASR-0.6B](https://huggingface.co/Qwen/Qwen3-ASR-0.6B) by the Qwen team, Alibaba Cloud, [fine-tuned for Sinhala](https://github.com/Nerdstorm/LiveTranscribe-Sinhala) by Nerdstorm on [OpenSLR 52](https://www.openslr.org/52/) (Google, CC BY-SA 4.0) | CC-BY-SA-4.0 |
+| Cleanup | Mac: [mlx-community/Qwen3-1.7B-4bit](https://huggingface.co/mlx-community/Qwen3-1.7B-4bit). Linux, Windows: [Nerdstorm/Qwen3-1.7B-MLX-4bit-OpenVINO](https://huggingface.co/Nerdstorm/Qwen3-1.7B-MLX-4bit-OpenVINO), the same weights converted | [Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B) by the Qwen team, Alibaba Cloud | Apache-2.0 |
 | Self-correction adapter | bundled (`Sources/Cleanup/Adapter`) | trained on synthetic data in this repository ([`Training/`](Packages/LiveTranscribeKit/Training/README.md)) | MIT |
 | Deep adapter | bundled (`Sources/Cleanup/DeepAdapter`) | trained on synthetic data in this repository ([`Training/`](Packages/LiveTranscribeKit/Training/README.md)) | MIT |
-| Voice activity detection | [mlx-community/silero-vad](https://huggingface.co/mlx-community/silero-vad) | [Silero VAD](https://github.com/snakers4/silero-vad) by the Silero team | MIT |
+| Voice activity detection (Mac live transcript) | [mlx-community/silero-vad](https://huggingface.co/mlx-community/silero-vad) | [Silero VAD](https://github.com/snakers4/silero-vad) by the Silero team | MIT |
 
 **Settings › Models** offers other speech-to-text models to download and switch to, without a
-restart: Qwen3-ASR 0.6B and 1.7B, Parakeet TDT v2 (English) and v3 (European languages), Whisper
-large-v3-turbo and Cohere Transcribe, each credited there with its licence. Cohere Transcribe
-can't tell which language it hears, so its row also chooses which of its 14 it writes (English at
-first); the others find the language themselves. They are listed in
+restart, each credited there with its licence. The Mac offers seven: the default, Qwen3-ASR 0.6B and
+1.7B, Parakeet TDT v2 (English) and v3 (European languages), Whisper large-v3-turbo and Cohere
+Transcribe. Linux and Windows offer four: the default, Parakeet v2 and v3 and Cohere Transcribe; the
+last three are builds that [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (k2-fsa, Apache-2.0)
+quantised to 8 bits for ONNX. Cohere Transcribe can't tell which language it hears, so its row also
+chooses which of its 14 it writes (English at first); the others find the language themselves. They
+are listed in
 [`speech-models.json`](Packages/LiveTranscribeKit/Sources/Transcription/Resources/speech-models.json),
-each pinned to the commit of its repository that was tested, and the Linux and Windows app
-reads the same list. **Another model** there takes any Hugging Face repository that
-mlx-audio-swift can load, at its latest version, or a folder on your Mac with the files such a
-repository has (config.json and the .safetensors weights), such as a fine-tune you haven't
-uploaded. The app finds the kind of model from its config.json, listed in
-[`SpeechModelKind.swift`](Packages/LiveTranscribeKit/Sources/Transcription/SpeechModelKind.swift).
+each pinned to a tested commit or, for sherpa-onnx archives, a SHA-256, and both apps read that
+list. **Another model** there takes, on the Mac, any Hugging Face repository that mlx-audio-swift
+can load or a folder on your Mac with the files such a repository has, and on Linux and Windows a
+model converted for OpenVINO in the models folder.
 
-The cleanup and voice activity models can be changed in **Settings › Advanced** (a Hugging Face
-repository ID for each; it is downloaded on the next launch). They must be models mlx-swift-lm or
-mlx-audio-swift can load, and the adapters are used only with mlx-community/Qwen3-1.7B-4bit.
+The cleanup and voice activity models can be changed on the Mac in **Settings › Advanced**.
 
-Built with [mlx-swift](https://github.com/ml-explore/mlx-swift),
+The Mac app is built with [mlx-swift](https://github.com/ml-explore/mlx-swift),
 [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm),
 [mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift),
-[swift-huggingface](https://github.com/huggingface/swift-huggingface) and
-[swift-transformers](https://github.com/huggingface/swift-transformers). Every package
-dependency, including indirect ones, is MIT or Apache-2.0 licensed. Some bundle third-party code
-under other permissive licences (MLX includes the BSD-licensed PocketFFT, for example), so a
-redistributed build must carry those notices too. The app does: **About Live Transcribe** in the
-menu bar shows every package's licence, collected from `Package.resolved` by
-`scripts/generate-acknowledgements.sh`.
+[swift-huggingface](https://github.com/huggingface/swift-huggingface),
+[swift-transformers](https://github.com/huggingface/swift-transformers) and
+[Sparkle](https://github.com/sparkle-project/Sparkle). Every Swift package dependency, including
+indirect ones, is MIT or Apache-2.0 licensed. Some bundle third-party code under other
+permissive licences (MLX includes the BSD-licensed PocketFFT, for example), so a redistributed
+build must carry those notices too. The app does: **About Live Transcribe** in the menu bar shows
+every package's licence, collected from `Package.resolved` by
+`scripts/generate-acknowledgements.sh`. The Linux and Windows app is built with
+[Tauri](https://tauri.app) and other Rust crates (see `linux-windows/Cargo.lock`), OpenVINO
+(Intel), sherpa-onnx (k2-fsa, Apache-2.0) and ONNX Runtime (Microsoft, MIT); its packages carry
+OpenVINO's, sherpa-onnx's and ONNX Runtime's licences.
 
 ## License
 
 [MIT](LICENSE) [© 2026 Nerdstorm](https://nerdstorm.com.au). The licence covers this repository's
-code only. The models (see [Models and credits](#models-and-credits)) and the Swift package
-dependencies have their own licences.
+code only. The models (see [Models and credits](#models-and-credits)) and the software the apps
+are built with have their own licences.
