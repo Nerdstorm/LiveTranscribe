@@ -4,15 +4,15 @@ import Shared
 
 /// The guard's cases: every input of the guard's unit tests (OutputGuard, SelfCorrection,
 /// DroppedWords, ContentWords, SpokenNames and WordAlignment), then every fallback reason, the
-/// policy's settings, the self-correction search's paths, and text that tests how Swift compares,
-/// cases and splits it.
+/// policy's settings, the self-correction search's paths, text that tests how Swift compares,
+/// cases and splits it, and Deep's repairs (CleanupFixtures+DeepGuardCases.swift).
 extension CleanupFixtures.Guard {
     static var cases: [Case] {
         unitTestCases + outcomeCases + ratioCases + preambleCases + selfCorrectionCases + placeholderCases
-            + wordCases + nameCases + policyCases + numberCases + unicodeCases
+            + wordCases + nameCases + policyCases + numberCases + unicodeCases + deepCases
     }
 
-    private static func completed(_ raw: String, _ output: String, placeholders: [String] = [], policy: Policy? = nil) -> Case {
+    static func completed(_ raw: String, _ output: String, placeholders: [String] = [], policy: Policy? = nil) -> Case {
         Case(raw: raw, outcome: .completed(output), placeholders: placeholders, policy: policy)
     }
 
@@ -21,7 +21,7 @@ extension CleanupFixtures.Guard {
     }
 
     private static let letter = "Hi John thanks for the update I will review it tomorrow cheers Sam."
-    private static let twoTokens = ["⟦S1⟧", "⟦S2⟧"]
+    static let twoTokens = ["⟦S1⟧", "⟦S2⟧"]
 
     // MARK: - The unit tests' inputs
 

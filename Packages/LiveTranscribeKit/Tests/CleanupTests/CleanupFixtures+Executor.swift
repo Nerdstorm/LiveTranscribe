@@ -24,6 +24,8 @@ extension CleanupFixtures {
             var override: PromptTemplate?
             var contextLimit = 3
             var timeoutSeconds: Double = 10
+            /// How Deep runs; `nil`, as shipped.
+            var deep: DeepCleanup?
             let options: CleanupOptions
             let raw: String
             var context: [String] = []
@@ -60,6 +62,8 @@ extension CleanupFixtures {
             let override: Template?
             let contextLimit: Int
             let timeoutSeconds: String
+            /// How Deep runs; absent, as shipped.
+            let deep: Deep?
             let options: Options
             let raw: String
             let context: [String]
@@ -86,7 +90,8 @@ extension CleanupFixtures {
             let executor = CleanupExecutor(
                 contextLimit: testCase.contextLimit,
                 timeoutSeconds: testCase.timeoutSeconds,
-                prompts: PromptBuilder(adapted: testCase.adapted, override: testCase.override)
+                prompts: PromptBuilder(adapted: testCase.adapted, override: testCase.override),
+                deep: testCase.deep ?? .shipped
             )
             let recorder = Recorder()
             let canceller = Canceller()
@@ -121,11 +126,12 @@ extension CleanupFixtures {
                 override: testCase.override.map(Template.init),
                 contextLimit: testCase.contextLimit,
                 timeoutSeconds: number(testCase.timeoutSeconds),
+                deep: testCase.deep.map(Deep.init),
                 options: Options(testCase.options),
                 raw: testCase.raw,
                 context: testCase.context,
                 script: script.map(ScriptStep.init),
-                requests: requests.map { Request($0, adapter: testCase.options.level.resolvesSelfCorrections) },
+                requests: requests.map(Request.init),
                 result: Cleaned(
                     text: cleaned.cleanedText,
                     fellBack: cleaned.fellBack,
@@ -168,13 +174,13 @@ extension CleanupFixtures {
         private static let resolved = "Meet on Wednesday at the office."
         private static let medium = CleanupOptions(level: .medium)
         private static let high = CleanupOptions(level: .high)
-        private static let override = PromptTemplate(
+        static let override = PromptTemplate(
             system: "Fix the TEXT.",
             examples: [.init(text: "um hello", cleaned: "Hello.")]
         )
 
         static var cases: [Case] {
-            unitTestCases + aliasCases + highCases + otherCases
+            unitTestCases + aliasCases + highCases + otherCases + deepCases
         }
 
         /// CleanupExecutorTests, as scripts.

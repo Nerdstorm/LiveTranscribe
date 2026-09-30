@@ -4,8 +4,9 @@ import Shared
 import Testing
 
 extension CleanupFixtures {
-    /// guard.jsonl: the output guard's verdict on each case at every level, and the parts it
-    /// judges by (the words, cues, alignment, names and content it counts), so a difference shows
+    /// guard.jsonl: the output guard's verdict on each case at every level, in a field that takes
+    /// one line, and Deep's in one that takes several too; and the parts it judges by (the words,
+    /// cues, alignment, names and content it counts, and Deep's repair), so a difference shows
     /// where it starts. guard-policy.json: the default policy, word lists included.
     enum Guard {
         /// A raw text, what the model made of it, the placeholders it holds, and changes to the
@@ -99,10 +100,14 @@ extension CleanupFixtures {
             let outcome: Outcome
             let placeholders: [String]
             let policy: Policy?
-            /// By level.
+            /// By level, in a field that takes one line.
             let verdicts: [String: Verdict]
+            /// Deep's verdict in a field that takes several lines, which only Deep reads.
+            let deepMultiline: Verdict?
             /// For a completed generation only.
             let parts: Parts?
+            /// Deep's check of a completed generation (``SelfRepair``).
+            let repair: Repair?
         }
 
         struct Outcome: Encodable {
@@ -115,6 +120,13 @@ extension CleanupFixtures {
         struct Verdict: Encodable {
             var accepted: String?
             var rejected: Reason?
+
+            init(_ verdict: GuardVerdict) {
+                switch verdict {
+                case .accepted(let text): accepted = text
+                case .rejected(let reason): rejected = Reason(reason)
+                }
+            }
         }
 
         struct Gap: Encodable {
@@ -141,6 +153,56 @@ extension CleanupFixtures {
             let similarity: String
             /// Absent when the raw text has no words.
             let wordRatio: String?
+        }
+
+        /// What Deep's check judges a completed generation by: the words said, with every word of
+        /// a correction cue marked; the words written; the words said with the corrections whose
+        /// phrase goes back applied, in the order they are tried; and whether it accepts.
+        struct Repair: Encodable {
+            let said: [SaidWord]
+            let written: [WrittenWord]
+            let rewrites: [[SaidWord]]
+            let accepts: Bool
+        }
+
+        /// A word as said, with the flags that are set.
+        struct SaidWord: Encodable {
+            let word: String
+            var endsSentence: Bool?
+            var endsQuestion: Bool?
+            var isName: Bool?
+            var isCapitalised: Bool?
+            var mayBeName: Bool?
+            var isCue: Bool?
+            var opensPhrase: Int?
+            var spare: [String]?
+
+            init(_ said: SelfRepair.SaidWord) {
+                word = said.word
+                endsSentence = said.endsSentence ? true : nil
+                endsQuestion = said.endsQuestion ? true : nil
+                isName = said.isName ? true : nil
+                isCapitalised = said.isCapitalised ? true : nil
+                mayBeName = said.mayBeName ? true : nil
+                isCue = said.isCue ? true : nil
+                opensPhrase = said.opensPhrase > 0 ? said.opensPhrase : nil
+                spare = said.spare.isEmpty ? nil : said.spare
+            }
+        }
+
+        /// A word as written, with the flags that are set.
+        struct WrittenWord: Encodable {
+            let word: String
+            var isCapitalised: Bool?
+            var startsSentence: Bool?
+            var startsListItem: Bool?
+
+            init(_ written: SelfRepair.WrittenWord) {
+                word = written.word
+                isCapitalised = written.isCapitalised ? true : nil
+                startsSentence = written.startsSentence ? true : nil
+                startsListItem = written.startsListItem ? true : nil
+            }
         }
 
         static func defaultPolicyLine() throws -> String {
@@ -176,20 +238,28 @@ extension CleanupFixtures {
         private static func line(for testCase: Case) -> Line {
             let policy = testCase.policy?.applied ?? .default
             let outputGuard = OutputGuard(policy: policy)
-            var verdicts: [String: Verdict] = [:]
-            for level in CleanupLevel.allCases {
-                let options = CleanupOptions(level: level, placeholders: testCase.placeholders)
-                switch outputGuard.review(raw: testCase.raw, outcome: testCase.outcome, options: options) {
-                case .accepted(let text): verdicts[level.rawValue] = Verdict(accepted: text)
-                case .rejected(let reason): verdicts[level.rawValue] = Verdict(rejected: Reason(reason))
-                }
+            // SelfRepair's search counts `1...min(retractionLimit, …)`, which traps when the policy
+            // retracts no words, so Deep is not judged under such a policy.
+            let judgesDeep = policy.maxRetractedWords > 0
+            func verdict(at level: CleanupLevel, multiline: Bool) -> Verdict {
+                let options = CleanupOptions(level: level, placeholders: testCase.placeholders, multiline: multiline)
+                return Verdict(outputGuard.review(raw: testCase.raw, outcome: testCase.outcome, options: options))
             }
+            var verdicts: [String: Verdict] = [:]
+            for level in CleanupLevel.allCases where judgesDeep || !level.repairsAcrossSentences {
+                verdicts[level.rawValue] = verdict(at: level, multiline: false)
+            }
+            let deepMultiline = judgesDeep ? verdict(at: .deep, multiline: true) : nil
             var outcome = Outcome()
             var parts: Parts?
+            var repair: Repair?
             switch testCase.outcome {
             case .completed(let output):
                 outcome.completed = output
                 parts = Self.parts(raw: testCase.raw, output: output, placeholders: testCase.placeholders, policy: policy)
+                if judgesDeep {
+                    repair = Self.repair(raw: testCase.raw, output: output, placeholders: testCase.placeholders, policy: policy)
+                }
             case .timedOut(let seconds): outcome.timedOut = number(seconds)
             case .cancelled: outcome.cancelled = true
             case .failed(let message): outcome.failed = message
@@ -200,7 +270,29 @@ extension CleanupFixtures {
                 placeholders: testCase.placeholders,
                 policy: testCase.policy,
                 verdicts: verdicts,
-                parts: parts
+                deepMultiline: deepMultiline,
+                parts: parts,
+                repair: repair
+            )
+        }
+
+        private static func repair(raw: String, output: String, placeholders: [String], policy: OutputGuard.Policy) -> Repair {
+            let cleaned = output.trimmingCharacters(in: .whitespacesAndNewlines)
+            let repair = SelfRepair(policy: policy)
+            let tokens = Set(placeholders.map(EditDistance.normalize))
+            var said = SelfRepair.saidWords(in: raw, functionWords: Set(policy.functionWords.map(EditDistance.normalize)), placeholders: tokens)
+            // Marked as SelfRepair.accepts(raw:cleaned:placeholders:) marks them, privately.
+            let texts = said.map(\.word)
+            for cue in repair.correctionCues where texts.count >= cue.count {
+                for start in 0...(texts.count - cue.count) where texts[start..<(start + cue.count)].elementsEqual(cue) {
+                    for index in start..<(start + cue.count) { said[index].isCue = true }
+                }
+            }
+            return Repair(
+                said: said.map(SaidWord.init),
+                written: SelfRepair.writtenWords(in: cleaned).map(WrittenWord.init),
+                rewrites: SelfRepair.Corrections.applied(to: said, repair: repair, placeholders: tokens).map { $0.map(SaidWord.init) },
+                accepts: repair.accepts(raw: raw, cleaned: cleaned, placeholders: tokens)
             )
         }
 

@@ -82,11 +82,13 @@ enum CleanupFixtures {
         let level: String
         let vocabulary: [String]
         let placeholders: [String]
+        let multiline: Bool
 
         init(_ options: CleanupOptions) {
             level = options.level.rawValue
             vocabulary = options.vocabulary
             placeholders = options.placeholders
+            multiline = options.multiline
         }
     }
 
@@ -100,15 +102,51 @@ enum CleanupFixtures {
         let messages: [Message]
         let templateContext: [String: Bool]
         let maxTokens: Int
-        /// Whether MLXCleaner switches the adapter on for the request: at the levels that resolve
-        /// self-corrections, for both of High's passes, and for the warm-up.
-        let adapter: Bool
+        /// The adapter the request asks for: `none`, `medium` or `deep`.
+        let adapter: String
+        let sampling: Sampling
 
-        init(_ request: CleanupRequest, adapter: Bool) {
+        init(_ request: CleanupRequest) {
             messages = request.messages.map { Message(role: $0.role.rawValue, content: $0.content) }
             templateContext = request.templateContext
             maxTokens = request.maxTokens
-            self.adapter = adapter
+            adapter = request.adapter.rawValue
+            sampling = Sampling(request.sampling)
+        }
+    }
+
+    /// How the model picks tokens: each Float as Swift prints it, and the seed as text, absent
+    /// when decoding is greedy.
+    struct Sampling: Encodable {
+        let temperature: String
+        let topP: String
+        let topK: Int
+        let seed: String?
+
+        init(_ sampling: CleanupRequest.Sampling) {
+            temperature = "\(sampling.temperature)"
+            topP = "\(sampling.topP)"
+            topK = sampling.topK
+            seed = sampling.seed.map { "\($0)" }
+        }
+    }
+
+    /// How Deep runs (``DeepCleanup``).
+    struct Deep: Encodable {
+        let passes: String
+        let adapter: String
+        let thinking: Bool
+        let thinkingTokens: Int
+        let fallsBackToMedium: Bool
+        let minimumTimeoutSeconds: String
+
+        init(_ deep: DeepCleanup) {
+            passes = deep.passes.rawValue
+            adapter = deep.adapter.rawValue
+            thinking = deep.thinking
+            thinkingTokens = deep.thinkingTokens
+            fallsBackToMedium = deep.fallsBackToMedium
+            minimumTimeoutSeconds = CleanupFixtures.number(deep.minimumTimeoutSeconds)
         }
     }
 
@@ -153,6 +191,9 @@ enum CleanupFixtures {
             case .timedOut(let seconds): reason = "timedOut"; number = CleanupFixtures.number(seconds)
             case .cancelled: reason = "cancelled"
             case .generationFailed(let message): reason = "generationFailed"; text = message
+            case .thinkingUnfinished: reason = "thinkingUnfinished"
+            case .invalidRepair: reason = "invalidRepair"
+            case .layoutNotAllowed: reason = "layoutNotAllowed"
             }
         }
     }
