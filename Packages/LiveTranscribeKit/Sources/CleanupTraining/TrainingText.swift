@@ -31,15 +31,48 @@ public enum TrainingText {
         contextLimit: Int,
         tokenizer: any Tokenizer
     ) throws -> TokenizedExample {
-        let request = Prompt.request(for: example.raw, context: example.context, contextLimit: contextLimit, template: template)
+        try tokenize(TrainingItem(example, template: template, contextLimit: contextLimit), tokenizer: tokenizer)
+    }
+
+    /// Renders `item`'s request through the chat template the app uses at inference, then its
+    /// target and the end-of-turn token.
+    public static func tokenize(_ item: TrainingItem, tokenizer: any Tokenizer) throws -> TokenizedExample {
+        let request = item.request
         let messages: [[String: any Sendable]] = request.messages.map { ["role": $0.role.rawValue, "content": $0.content] }
         let context: [String: any Sendable] = request.templateContext.mapValues { $0 }
         let prompt = try tokenizer.applyChatTemplate(messages: messages, tools: nil, additionalContext: context)
         guard let end = tokenizer.convertTokenToId(endOfTurn) ?? tokenizer.eosTokenId else {
             throw Failure.noEndOfTurnToken
         }
-        let target = tokenizer.encode(text: example.target, addSpecialTokens: false)
+        let target = tokenizer.encode(text: item.target, addSpecialTokens: false)
         return TokenizedExample(tokens: prompt + target + [end], promptLength: prompt.count)
+    }
+}
+
+/// What the model is asked for one example, exactly as the app asks it, and the answer to train
+/// it towards.
+public struct TrainingItem: Sendable, Equatable {
+    public let request: CleanupRequest
+    public let target: String
+
+    public init(request: CleanupRequest, target: String) {
+        self.request = request
+        self.target = target
+    }
+
+    /// A self-correction example, on the prompt the Medium adapter is trained on.
+    public init(_ example: TrainingExample, template: PromptTemplate, contextLimit: Int) {
+        request = Prompt.request(for: example.raw, context: example.context, contextLimit: contextLimit, template: template)
+        target = example.target
+    }
+
+    /// A Deep example, asked as `executor` asks at Deep: its prompt for the example's field, on
+    /// the text left once fillers are removed.
+    public init(_ example: DeepExample, executor: CleanupExecutor) {
+        let options = CleanupOptions(level: .deep, multiline: example.multiline)
+        let input = CleanupExecutor.deterministicCleanup(of: example.raw, level: .deep)
+        request = executor.request(for: input, context: example.context, options: options)
+        target = example.target
     }
 }
 
