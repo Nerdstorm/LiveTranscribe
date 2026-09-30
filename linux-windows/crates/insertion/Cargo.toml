@@ -1,6 +1,6 @@
 [package]
 name = "lt-insertion"
-description = "Typing dictated text into the focused app: the clipboard and a paste shortcut."
+description = "Typing dictated text into the focused app: what is known about the field, the clipboard, and what an insertion did."
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true

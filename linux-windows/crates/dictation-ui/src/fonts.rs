@@ -1,5 +1,5 @@
-//! Finding the desktop's interface font for the panel: COSMIC's choice where there is one, then
-//! common sans-serif faces. Inside a toolbox, the host's fonts count too.
+//! Finding the desktop's interface font for the panel: COSMIC's choice where there is one, and
+//! Segoe UI on Windows, then common sans-serif faces. Inside a toolbox, the host's fonts count too.
 
 use std::fmt;
 use std::path::PathBuf;
@@ -47,7 +47,7 @@ pub fn load_interface_font() -> Result<Typeface, FontError> {
             database.load_fonts_dir(directory);
         }
     }
-    let configured = cosmic_interface_family();
+    let configured = interface_family();
     let names = configured.iter().map(String::as_str).chain(FALLBACK_FAMILIES);
     let families: Vec<Family<'_>> = names.map(Family::Name).chain([Family::SansSerif]).collect();
     for family in &families {
@@ -77,13 +77,21 @@ fn extra_font_directories() -> Vec<PathBuf> {
     directories
 }
 
+/// Windows' own interface font.
+#[cfg(windows)]
+fn interface_family() -> Option<String> {
+    Some("Segoe UI".to_owned())
+}
+
 /// The family in COSMIC's interface font setting, a RON record such as
 /// `(family: "Open Sans", weight: Normal, …)`.
-fn cosmic_interface_family() -> Option<String> {
+#[cfg(not(windows))]
+fn interface_family() -> Option<String> {
     let path = dirs::config_dir()?.join("cosmic/com.system76.CosmicTk/v1/interface_font");
     family_in(&std::fs::read_to_string(path).ok()?)
 }
 
+#[cfg(any(not(windows), test))]
 fn family_in(setting: &str) -> Option<String> {
     let start = setting.find("family:")? + "family:".len();
     let rest = setting[start..].trim_start().strip_prefix('"')?;

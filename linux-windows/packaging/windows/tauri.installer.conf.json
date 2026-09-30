@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "resources": {
+      "../../target/openvino-runtime": "openvino",
+      "../../target/sherpa-onnx/lib/*.dll": "",
+      "../../target/sherpa-onnx/licenses": "licenses/sherpa-onnx",
+      "../../../LICENSE": "LICENSE.txt"
+    },
+    "windows": {
+      "bundleVCRuntime": true,
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico",
+        "installerHooks": "../../packaging/windows/installer-hooks.nsh"
+      }
+    }
+  }
+}

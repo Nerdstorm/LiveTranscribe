@@ -7,8 +7,8 @@
 mod archive;
 mod downloads;
 mod fetch;
-// Settings › Models and dictation, which use all of it, are on Linux for now.
-#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+// Settings › Models and dictation, which use all of it, are on Linux and Windows.
+#[cfg_attr(not(any(target_os = "linux", windows)), allow(dead_code))]
 mod library;
 
 use std::path::{Path, PathBuf};
@@ -17,7 +17,7 @@ use lt_transcription::catalog::{Engine, SpeechModel, SpeechModelCatalog};
 
 pub(crate) use downloads::SpeechModelDownloads;
 pub(crate) use fetch::{Progress, Stage};
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 pub(crate) use library::EnsureError;
 pub(crate) use library::{DownloadState, SpeechModelLibrary};
 

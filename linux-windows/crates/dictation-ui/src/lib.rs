@@ -8,8 +8,9 @@
 //! [`PanelPlacement`] puts it by the pointer. [`MenuBarStatus`] is the tray's status line, icon
 //! and menu, and [`draw_icon`] draws the icon.
 //!
-//! Platform-free: where the pointer is, how the panel reaches the screen, and the tray itself are
-//! each platform's part (`lt-wayland` and the app on Linux).
+//! Platform-free, but for the desktop's light or dark mode and its interface font: where the
+//! pointer is, how the panel reaches the screen, and the tray itself are each platform's part
+//! (`lt-wayland` and the app on Linux, the app on Windows).
 
 mod fonts;
 mod menu_bar_status;

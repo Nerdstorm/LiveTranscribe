@@ -1,6 +1,6 @@
 [package]
 name = "lt-hotkey"
-description = "The dictation hotkey: the hold, tap and double-tap gesture, and watching the keyboard for it."
+description = "The dictation hotkey: the hold, tap and double-tap gesture, and watching the keyboard for it on Linux and Windows."
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
@@ -12,6 +12,9 @@ tracing.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 evdev.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+willhook.workspace = true
 
 [lints]
 workspace = true
