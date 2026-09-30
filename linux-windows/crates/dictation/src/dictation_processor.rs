@@ -171,7 +171,8 @@ pub fn prepare(transcript: &str, configuration: &Configuration) -> Prepared {
             .into_iter()
             .filter(|token| body.contains(token.as_str()))
             .collect(),
-        multiline: configuration.multiline,
+        // What the speaker laid out, the layout rules lay out, so the model keeps one paragraph.
+        multiline: configuration.multiline && !prepared.has_spoken_layout(&body),
     };
     Prepared::Pending(Box::new(Pending {
         raw: raw.to_owned(),
@@ -191,5 +192,43 @@ pub fn finish(transcript: &str, configuration: &Configuration) -> Output {
     match prepare(transcript, configuration) {
         Prepared::Done(output) => output,
         Prepared::Pending(pending) => pending.without_the_model(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn options(transcript: &str, multiline: bool) -> CleanupOptions {
+        let configuration = Configuration {
+            level: CleanupLevel::Deep,
+            snippets: Vec::new(),
+            vocabulary: Vec::new(),
+            vocabulary_prompt_limit: Configuration::VOCABULARY_PROMPT_LIMIT,
+            vocabulary_similarity_threshold: Configuration::VOCABULARY_SIMILARITY_THRESHOLD,
+            multiline,
+        };
+        match prepare(transcript, &configuration) {
+            Prepared::Pending(pending) => pending.options().clone(),
+            Prepared::Done(_) => panic!("{transcript:?} goes to the model at Deep"),
+        }
+    }
+
+    #[test]
+    fn deep_lays_out_only_what_the_speaker_did_not() {
+        assert!(options("we need milk eggs and bread", true).multiline);
+        assert!(
+            !options(
+                "shopping list bullet point milk bullet point eggs bullet point bread",
+                true
+            )
+            .multiline,
+            "spoken list markers are laid out by the rules, so the model keeps one paragraph"
+        );
+        assert!(
+            !options("first line new line second line", true).multiline,
+            "as are spoken line breaks"
+        );
+        assert!(!options("we need milk eggs and bread", false).multiline);
     }
 }

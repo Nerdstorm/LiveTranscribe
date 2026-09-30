@@ -267,6 +267,22 @@ struct DictationProcessorTests {
         #expect(output.text == "Hi John,\n\nSend https://cal.example.com/me please..\n\nCheers,\nJordan Lee")
     }
 
+    @Test func deepLaysOutOnlyWhatTheSpeakerDidNot() async {
+        let cleaner = ScriptedCleaner { $0 }
+        for (transcript, multiline) in [
+            ("we need milk eggs and bread", true),
+            ("shopping list bullet point milk bullet point eggs bullet point bread", true),
+            ("first line new line second line", true),
+            ("we need milk eggs and bread", false),
+        ] {
+            _ = await finish(transcript, configuration(.deep, multiline: multiline), cleaner: cleaner)
+        }
+        #expect(
+            await cleaner.requests.map(\.options.multiline) == [true, false, false, false],
+            "spoken list markers and line breaks are laid out by the rules, so the model keeps one paragraph"
+        )
+    }
+
     @Test func aParagraphBreakAfterTheGreetingAddsNoBlankLines() async {
         let output = await finish(
             "Hi John new paragraph thanks for the update cheers Sam",

@@ -134,7 +134,8 @@ public struct DictationProcessor: Sendable {
                     similarityThreshold: configuration.vocabularySimilarityThreshold
                 ).relevantTerms(for: body, limit: configuration.vocabularyPromptLimit),
                 placeholders: prepared.placeholders.filter { body.contains($0) },
-                multiline: configuration.multiline
+                // What the speaker laid out, the layout rules lay out, so the model keeps one paragraph.
+                multiline: configuration.multiline && !prepared.hasSpokenLayout(in: body)
             )
             cleaned = await cleaner.clean(segment, context: [], options: options)
         } else {

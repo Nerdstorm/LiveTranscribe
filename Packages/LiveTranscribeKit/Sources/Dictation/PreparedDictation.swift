@@ -40,6 +40,13 @@ struct PreparedDictation {
         protected.tokens
     }
 
+    /// Whether the speaker laid `body` out: it holds a line break or list marker they said, which
+    /// the layout rules lay out after cleanup. Deep's model then leaves the layout to the rules,
+    /// or both would lay out the same list.
+    func hasSpokenLayout(in body: String) -> Bool {
+        protected.placeholders.contains { $0.role != .content && body.contains($0.token) }
+    }
+
     /// The text before cleanup, which Undo AI edit puts back: phrases replaced and line breaks
     /// in place, but list markers as they were said and nothing laid out.
     var uncleaned: String {

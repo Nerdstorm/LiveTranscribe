@@ -14,9 +14,9 @@ pub struct CleanupOptions {
     /// breaks and list markers, which must come back unchanged, once each, for the output to be
     /// accepted.
     pub placeholders: Vec<String>,
-    /// The text may break across lines: the field takes several. Only Deep lays text out itself
-    /// (emails, letters and lists); at the other levels layout is spoken and comes back as
-    /// placeholders.
+    /// The model may break the text across lines: the field takes several, and the speaker didn't
+    /// lay the text out. Only Deep lays text out itself (emails, letters and lists); spoken line
+    /// breaks and list markers come back as placeholders, which the layout rules lay out.
     pub multiline: bool,
 }
 
