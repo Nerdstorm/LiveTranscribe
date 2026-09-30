@@ -95,6 +95,7 @@ struct OptionsJson {
     level: String,
     vocabulary: Vec<String>,
     placeholders: Vec<String>,
+    multiline: bool,
 }
 
 impl OptionsJson {
@@ -103,6 +104,7 @@ impl OptionsJson {
             level: level(&self.level),
             vocabulary: self.vocabulary.clone(),
             placeholders: self.placeholders.clone(),
+            multiline: self.multiline,
         }
     }
 }

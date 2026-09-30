@@ -279,9 +279,9 @@ fn only_fillers_leaves_nothing_to_clean() {
 fn options_shape_the_prompt() {
     let (executor, _) = executor(1.0, true);
     let options = CleanupOptions {
-        level: CleanupLevel::High,
         vocabulary: vec!["Nerdstorm".to_owned()],
         placeholders: vec!["⟦S1⟧".to_owned()],
+        ..options(CleanupLevel::High)
     };
     let mut model = replying("Email S1 to the Nerdstorm team.");
     let cleaned = run(&executor, "email ⟦S1⟧ to the nerd storm team", &options, &mut model);

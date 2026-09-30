@@ -215,9 +215,9 @@ mod tests {
     #[test]
     fn vocabulary_and_placeholders_come_before_the_output_rule() {
         let options = CleanupOptions {
-            level: CleanupLevel::Medium,
             vocabulary: strings(&["Nerdstorm", "GitHub"]),
             placeholders: strings(&["⟦S1⟧"]),
+            ..options(CleanupLevel::Medium)
         };
         let template = PromptBuilder::new(true).template(&options);
         let rules = lines(&template);

@@ -56,6 +56,11 @@ impl WordSet {
     pub(crate) fn contains(&self, word: &str) -> bool {
         self.0.contains(s::canonical_key(word).as_ref())
     }
+
+    /// Adds every word of `other`, as `formUnion(_:)`.
+    pub(crate) fn form_union(&mut self, other: &WordSet) {
+        self.0.extend(other.0.iter().cloned());
+    }
 }
 
 #[cfg(test)]

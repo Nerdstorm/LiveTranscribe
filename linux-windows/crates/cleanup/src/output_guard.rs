@@ -6,6 +6,7 @@ use lt_shared::{edit_distance, placeholder_token};
 use crate::content_words::ContentWords;
 use crate::dropped_words::DroppedWords;
 use crate::self_correction::SelfCorrection;
+use crate::self_repair::SelfRepair;
 use crate::spoken_names::SpokenNames;
 use crate::word_alignment::WordAlignment;
 use crate::words::{WordSet, normalized_words, starts_with};
@@ -54,6 +55,25 @@ pub enum FallbackReason {
     },
     Cancelled,
     GenerationFailed(String),
+    /// The model was still reasoning when its token budget ran out, so it never answered (Deep,
+    /// when thinking is on).
+    ThinkingUnfinished,
+    /// Deep's output can't be made from what was said by the edits a repair may make: it added,
+    /// removed or changed something else.
+    InvalidRepair,
+    /// Deep broke the text into lines for a field that takes one line.
+    LayoutNotAllowed,
+}
+
+impl FallbackReason {
+    /// Whether the model answered and the answer was turned down, rather than no answer coming in
+    /// time.
+    pub fn rejects_an_answer(&self) -> bool {
+        !matches!(
+            self,
+            Self::TimedOut { .. } | Self::Cancelled | Self::GenerationFailed(_)
+        )
+    }
 }
 
 /// What the Mac app records as the reason, word for word.
@@ -78,6 +98,9 @@ impl fmt::Display for FallbackReason {
             Self::TimedOut { seconds } => write!(f, "timed out after {seconds:.1}s"),
             Self::Cancelled => write!(f, "cancelled"),
             Self::GenerationFailed(message) => write!(f, "generation failed: {message}"),
+            Self::ThinkingUnfinished => write!(f, "ran out of tokens while thinking"),
+            Self::InvalidRepair => write!(f, "changed more than a repair may"),
+            Self::LayoutNotAllowed => write!(f, "broke a one-line field into lines"),
         }
     }
 }
@@ -106,6 +129,9 @@ pub enum GuardVerdict {
 /// (High), may not delete a run of spoken words outright. At every level, it must keep each name
 /// where the speaker said it and may not delete a word that carries meaning with nothing in its
 /// place: rewording replaces words, it does not leave them out.
+///
+/// Deep's output is checked instead as a repair of what was said, which may resolve corrections
+/// across sentences and lay the text out, and may change nothing else (`SelfRepair`).
 #[derive(Clone, Debug)]
 pub struct OutputGuard {
     policy: GuardPolicy,
@@ -113,6 +139,7 @@ pub struct OutputGuard {
     dropped_words: DroppedWords,
     spoken_names: SpokenNames,
     content_words: ContentWords,
+    self_repair: SelfRepair,
 }
 
 impl Default for OutputGuard {
@@ -128,6 +155,7 @@ impl OutputGuard {
             dropped_words: DroppedWords::new(&policy),
             spoken_names: SpokenNames::new(&policy),
             content_words: ContentWords::new(&policy),
+            self_repair: SelfRepair::new(&policy),
             policy,
         }
     }
@@ -184,6 +212,20 @@ impl OutputGuard {
 
         if self.policy.requires_intact_placeholders && !keeps_placeholders(&options.placeholders, raw, cleaned) {
             return reject(FallbackReason::PlaceholderChanged);
+        }
+
+        // Deep has its own check instead of the limits below: it may repair across sentences and
+        // lay the text out, and may change nothing else.
+        if options.level.repairs_across_sentences() {
+            if !options.multiline && s::any_character(cleaned, s::is_newline) {
+                return reject(FallbackReason::LayoutNotAllowed);
+            }
+            let placeholders = WordSet::normalized(&options.placeholders);
+            return if self.self_repair.accepts(raw, cleaned, &placeholders) {
+                GuardVerdict::Accepted(cleaned.to_owned())
+            } else {
+                reject(FallbackReason::InvalidRepair)
+            };
         }
 
         let cleaned_words = normalized_words(cleaned);

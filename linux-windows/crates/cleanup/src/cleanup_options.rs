@@ -14,15 +14,21 @@ pub struct CleanupOptions {
     /// breaks and list markers, which must come back unchanged, once each, for the output to be
     /// accepted.
     pub placeholders: Vec<String>,
+    /// The text may break across lines: the field takes several. Only Deep lays text out itself
+    /// (emails, letters and lists); at the other levels layout is spoken and comes back as
+    /// placeholders.
+    pub multiline: bool,
 }
 
 impl CleanupOptions {
-    /// The options for `level`, with no vocabulary and no placeholders.
+    /// The options for `level`, with no vocabulary and no placeholders, in a field that takes one
+    /// line.
     pub fn new(level: CleanupLevel) -> Self {
         Self {
             level,
             vocabulary: Vec::new(),
             placeholders: Vec::new(),
+            multiline: false,
         }
     }
 }

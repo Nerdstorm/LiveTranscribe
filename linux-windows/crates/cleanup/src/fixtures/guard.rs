@@ -1,5 +1,8 @@
-//! guard.jsonl: the output guard's verdict at every level, with the parts it judges by, on each
-//! raw text and what the model made of it.
+//! guard.jsonl: the output guard's verdict at every level, in a field that takes one line, and
+//! Deep's in one that takes several too, with the parts it judges by, Deep's repair included, on
+//! each raw text and what the model made of it.
+
+mod repair;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -16,9 +19,11 @@ use crate::spoken_names::SpokenNames;
 use crate::word_alignment::WordAlignment;
 use crate::words::{WordSet, normalized_words};
 use crate::{CleanupOptions, FallbackReason, GenerationOutcome, GuardPolicy, GuardVerdict, OutputGuard};
+use repair::{RepairJson, repair_differences};
 
-/// Every fallback reason, as the fixtures name them; the guard's cases must cover them all.
-const REASONS: [&str; 15] = [
+/// Every fallback reason the guard gives, as the fixtures name them; the guard's cases must cover
+/// them all. (Unfinished thinking is the executor's, and its fixture covers it.)
+const REASONS: [&str; 17] = [
     "emptyOutput",
     "thinkingLeaked",
     "preamble",
@@ -34,6 +39,8 @@ const REASONS: [&str; 15] = [
     "timedOut",
     "cancelled",
     "generationFailed",
+    "invalidRepair",
+    "layoutNotAllowed",
 ];
 
 // MARK: - Verdicts
@@ -46,7 +53,10 @@ struct GuardLine {
     placeholders: Vec<String>,
     policy: Option<PolicyJson>,
     verdicts: BTreeMap<String, VerdictJson>,
+    /// Deep's verdict in a field that takes several lines; the other levels don't read the field.
+    deep_multiline: Option<VerdictJson>,
     parts: Option<PartsJson>,
+    repair: Option<RepairJson>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -208,6 +218,9 @@ fn judged(verdict: &GuardVerdict) -> Judged {
         FallbackReason::TimedOut { seconds } => ("timedOut", None, None, Some(Exact(*seconds))),
         FallbackReason::Cancelled => ("cancelled", None, None, None),
         FallbackReason::GenerationFailed(message) => ("generationFailed", Some(message.clone()), None, None),
+        FallbackReason::ThinkingUnfinished => ("thinkingUnfinished", None, None, None),
+        FallbackReason::InvalidRepair => ("invalidRepair", None, None, None),
+        FallbackReason::LayoutNotAllowed => ("layoutNotAllowed", None, None, None),
     };
     Judged::Rejected {
         reason: name.to_owned(),
@@ -331,6 +344,8 @@ impl Parts {
     }
 }
 
+// MARK: - The fixture
+
 /// The parts of `output` for `raw`, as the guard computes them under `policy`.
 fn parts(raw: &str, output: &str, placeholders: &[String], policy: &GuardPolicy) -> Parts {
     let cleaned = s::trimming(output, CharacterSet::WhitespacesAndNewlines);
@@ -388,25 +403,41 @@ fn the_guard_verdicts_match_the_mac_apps() {
             line.placeholders,
             line.policy
         );
+        // Swift traps in Deep's search under a policy that retracts no words (see
+        // `self_repair::corrections`), so the Mac app judges no Deep case under one.
+        let judges_deep = policy.max_retracted_words > 0;
         for level in CleanupLevel::ALL {
-            let expected = line
-                .verdicts
-                .get(level.as_str())
-                .unwrap_or_else(|| panic!("{case}: no verdict at {level:?}"))
-                .judged();
-            if let Judged::Rejected { reason, .. } = &expected {
-                reasons.insert(reason.clone());
-            }
-            let options = CleanupOptions {
-                level,
-                vocabulary: Vec::new(),
-                placeholders: line.placeholders.clone(),
+            let Some(one_line) = line.verdicts.get(level.as_str()) else {
+                assert!(
+                    level.repairs_across_sentences() && !judges_deep,
+                    "{case}: no verdict at {level:?}"
+                );
+                continue;
             };
-            let actual = judged(&output_guard.review(&line.raw, &outcome, &options));
-            if actual != expected {
-                differences.push(format!(
-                    "{case}\n  at {level:?}, Mac app: {expected:?}\n  this port: {actual:?}"
-                ));
+            let multiline = if level.repairs_across_sentences() {
+                line.deep_multiline
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("{case}: no verdict at Deep in a multiline field"))
+            } else {
+                one_line
+            };
+            for (in_multiline_field, expected) in [(false, one_line), (true, multiline)] {
+                let expected = expected.judged();
+                if let Judged::Rejected { reason, .. } = &expected {
+                    reasons.insert(reason.clone());
+                }
+                let options = CleanupOptions {
+                    level,
+                    vocabulary: Vec::new(),
+                    placeholders: line.placeholders.clone(),
+                    multiline: in_multiline_field,
+                };
+                let actual = judged(&output_guard.review(&line.raw, &outcome, &options));
+                if actual != expected {
+                    differences.push(format!(
+                        "{case}\n  at {level:?} (multiline: {in_multiline_field}), Mac app: {expected:?}\n  this port: {actual:?}"
+                    ));
+                }
             }
         }
         match (&line.parts, &outcome) {
@@ -419,6 +450,19 @@ fn the_guard_verdicts_match_the_mac_apps() {
                 }
             }
             (None, GenerationOutcome::Completed(_)) => panic!("{case}: no parts for a completed generation"),
+            _ => {}
+        }
+        match (&line.repair, &outcome) {
+            (Some(recorded), GenerationOutcome::Completed(output)) => {
+                let differing = repair_differences(&line.raw, output, &line.placeholders, &policy, recorded);
+                if !differing.is_empty() {
+                    differences.push(format!("{case}\n  Deep's repair, {}", differing.join("\n  ")));
+                }
+            }
+            (None, GenerationOutcome::Completed(_)) if judges_deep => {
+                panic!("{case}: no repair for a completed generation")
+            }
+            (Some(_), _) => panic!("{case}: a repair for a generation that didn't complete"),
             _ => {}
         }
     }

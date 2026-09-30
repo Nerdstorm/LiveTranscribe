@@ -9,7 +9,8 @@
 //! - [`PromptBuilder`] and [`prompt`] compose what the model is asked ([`CleanupRequest`]),
 //!   byte for byte as the Mac app asks it.
 //! - [`OutputGuard`] decides whether the model's output may replace the text, with the checks
-//!   for self-corrections, dropped words, names and content words.
+//!   for self-corrections, dropped words, names and content words, and for Deep, whether the
+//!   output is a repair of what was said and nothing more.
 //!
 //! The fixtures in `Fixtures/cleanup` hold the Mac app's prompts, verdicts and executor traces;
 //! the tests check this port against them. Dictated text is never logged.
@@ -27,8 +28,10 @@ mod placeholder_aliases;
 pub mod prompt;
 mod prompt_builder;
 mod self_correction;
+mod self_repair;
 mod spoken_names;
 mod word_alignment;
+mod word_forms;
 mod words;
 
 #[cfg(test)]
