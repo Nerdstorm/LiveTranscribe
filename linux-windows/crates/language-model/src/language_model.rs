@@ -196,17 +196,45 @@ impl LanguageModel {
             self.model.adapter_inputs(),
             self.model.folds_adapter_scale(),
         )?;
+        Ok(self.add_adapter(adapter, folder))
+    }
+
+    /// Loads an adapter the app carries, from the bytes of its `adapter_config.json` and
+    /// `adapters.safetensors`, as [`Self::load_adapter`] loads one from a folder. `origin` names
+    /// the folder they came from, in errors and the log.
+    pub fn load_adapter_from_bytes(
+        &mut self,
+        name: &str,
+        origin: &Path,
+        config: &[u8],
+        weights: &[u8],
+    ) -> Result<&Adapter, AdapterError> {
+        if !self.takes_adapters() {
+            return Err(AdapterError::NotAdaptable);
+        }
+        let adapter = Adapter::from_bytes(
+            name,
+            origin,
+            config,
+            weights,
+            self.model.adapter_inputs(),
+            self.model.folds_adapter_scale(),
+        )?;
+        Ok(self.add_adapter(adapter, origin))
+    }
+
+    fn add_adapter(&mut self, adapter: Adapter, origin: &Path) -> &Adapter {
         tracing::info!(
-            adapter = name,
+            adapter = adapter.name(),
             rank = adapter.rank(),
             scale = adapter.scale(),
             base = adapter.base().unwrap_or("unknown"),
             "Loaded the adapter from {}",
-            folder.display()
+            origin.display()
         );
-        self.adapters.retain(|loaded| loaded.name() != name);
+        self.adapters.retain(|loaded| loaded.name() != adapter.name());
         self.adapters.push(adapter);
-        Ok(self.adapters.last().expect("just loaded"))
+        self.adapters.last().expect("just loaded")
     }
 
     /// The adapters loaded, in the order they were.

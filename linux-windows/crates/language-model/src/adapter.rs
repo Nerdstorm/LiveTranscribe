@@ -77,9 +77,8 @@ impl Adapter {
         &self.tensors
     }
 
-    /// Reads the adapter in `folder` and prepares its tensors for the model's `inputs`, with its
-    /// scale folded into B when `fold_scale`. It must have a matrix for each input, of the rank
-    /// its config gives, and none for anything else.
+    /// Reads the adapter in `folder` and prepares its tensors for the model's `inputs`, as
+    /// [`Self::from_bytes`] does.
     pub(crate) fn load(
         name: &str,
         folder: &Path,
@@ -93,13 +92,34 @@ impl Adapter {
                 problem: error.to_string(),
             })
         };
-        let config: Config = serde_json::from_slice(&read(ADAPTER_CONFIG)?).map_err(|error| AdapterError::Read {
-            path: folder.join(ADAPTER_CONFIG),
+        Self::from_bytes(
+            name,
+            folder,
+            &read(ADAPTER_CONFIG)?,
+            &read(ADAPTER_WEIGHTS)?,
+            inputs,
+            fold_scale,
+        )
+    }
+
+    /// Prepares the adapter whose `adapter_config.json` and `adapters.safetensors` are `config`
+    /// and `weights` for the model's `inputs`, with its scale folded into B when `fold_scale`. It
+    /// must have a matrix for each input, of the rank its config gives, and none for anything
+    /// else. `origin` is the folder the files are in, or would be, for errors.
+    pub(crate) fn from_bytes(
+        name: &str,
+        origin: &Path,
+        config: &[u8],
+        weights: &[u8],
+        inputs: &[AdapterInput],
+        fold_scale: bool,
+    ) -> Result<Self, AdapterError> {
+        let config: Config = serde_json::from_slice(config).map_err(|error| AdapterError::Read {
+            path: origin.join(ADAPTER_CONFIG),
             problem: error.to_string(),
         })?;
-        let weights = read(ADAPTER_WEIGHTS)?;
-        let matrices = plan(&config, &weights, inputs, fold_scale).map_err(|problem| AdapterError::Mismatch {
-            path: folder.to_owned(),
+        let matrices = plan(&config, weights, inputs, fold_scale).map_err(|problem| AdapterError::Mismatch {
+            path: origin.to_owned(),
             problem,
         })?;
         let tensors = matrices
@@ -515,6 +535,20 @@ mod tests {
         assert!(
             plan(&config(2, None), &file(&good), &columns, false).is_err(),
             "the projection's width"
+        );
+    }
+
+    #[test]
+    fn an_adapter_from_bytes_is_refused_by_the_folder_it_came_from() {
+        let origin = Path::new("Packages/LiveTranscribeKit/Sources/Cleanup/DeepAdapter");
+        let inputs = [input(A, 4), input(B, 3)];
+        let weights = file(&[(A, "F16", &[4, 2], halves(8)), (B, "F16", &[2, 3], halves(6))]);
+        let unreadable = Adapter::from_bytes("deep", origin, b"{", &weights, &inputs, false);
+        assert!(matches!(unreadable, Err(AdapterError::Read { path, .. }) if path == origin.join(ADAPTER_CONFIG)));
+        let config = br#"{"lora_parameters": {"rank": 3, "scale": 20.0}}"#;
+        let mismatched = Adapter::from_bytes("deep", origin, config, &weights, &inputs, false);
+        assert!(
+            matches!(mismatched, Err(AdapterError::Mismatch { path, problem }) if path == origin && problem.contains("at rank 3"))
         );
     }
 
