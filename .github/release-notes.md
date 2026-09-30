@@ -21,4 +21,16 @@ The first start downloads the speech model, 1.1 GB, from Hugging Face.
 
 The Linux packages carry Intel's OpenVINO runtime, under the Intel OpenVINO Distribution License (`/usr/lib/live-transcribe/openvino/licenses`).
 
+### Windows
+
+For x86-64 PCs with Windows 10 or 11. Run `live-transcribe_@VERSION@_x64-setup.exe`; it installs for your account, without administrator rights. It isn't signed yet, so SmartScreen warns about an unrecognised app: choose More info, then Run anyway.
+
+The first start downloads the speech model, 1.1 GB, from Hugging Face. With an Intel Core Ultra the model runs on its NPU (the driver comes from Windows Update or the PC's maker), otherwise on the CPU.
+
+Dictation types into any app. Apps running as administrator don't accept typing from other apps, so there the text is left on the clipboard to paste.
+
+**Password fields.** The app recognises a password field only in Windows' own controls. In browsers, Office and Electron apps it can't tell, so don't dictate while a password field has focus.
+
+The installer carries Intel's OpenVINO runtime (Apache-2.0) and Microsoft's C++ runtime.
+
 SHA256SUMS lists each download's checksum.
