@@ -5,7 +5,7 @@ import Foundation
 /// budget.
 ///
 /// The shipped values were chosen by measuring each choice on the same examples (`Train measure`,
-/// docs/cleanup.md). Tools vary them to compare; the app uses ``shipped``.
+/// docs/design-notes.md). Tools vary them to compare; the app uses ``shipped``.
 public struct DeepCleanup: Sendable, Equatable {
     public enum Passes: String, Sendable, Equatable, CaseIterable {
         /// One Deep generation of the text.
@@ -48,7 +48,7 @@ public struct DeepCleanup: Sendable, Equatable {
 
     /// What the app runs: one pass with Deep's adapter, without thinking, which was right on
     /// 108 of 114 hand-written cases, against 88 with the self-correction adapter and 52 with
-    /// none; with thinking and no adapter, 58, taking 20 times as long (docs/cleanup.md). A
+    /// none; with thinking and no adapter, 58, taking 20 times as long (docs/design-notes.md). A
     /// repair `SelfRepair` turns down gets Medium's cleanup instead.
     public static let shipped = DeepCleanup(
         passes: .one,

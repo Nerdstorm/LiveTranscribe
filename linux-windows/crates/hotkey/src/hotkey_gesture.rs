@@ -1,5 +1,5 @@
-//! The push-to-talk gesture as a pure state machine (docs/dictation.md, "Hotkey gestures"),
-//! ported from the Mac app's HotkeyGesture.swift with its tests.
+//! The push-to-talk gesture as a pure state machine, ported from the Mac app's
+//! HotkeyGesture.swift with its tests.
 //!
 //! - Hold for at least `tap_max_ms`, then release: the recording is processed.
 //! - Tap, then press again within `double_tap_window_ms`: hands-free. The second press's release

@@ -15,8 +15,8 @@ import Shared
 /// the adapter's LoRA layers are loaded alongside its weights. It is not fused into them: fusing
 /// re-quantizes each weight to 4 bits, which rounds away most of the adapter's small change
 /// (held-out self-corrections resolved: 97% unfused, 13% fused). The unfused layers add no
-/// measurable latency. If that fails, the base model is used, and ``PromptBuilder`` gives every
-/// level the strict rules.
+/// measurable latency. If that fails, the base model is used, and ``PromptBuilder`` gives Light,
+/// Medium and High the strict rules (Deep keeps its own prompt).
 ///
 /// Deep's adapter (``Configuration/deepAdapter``) has the same shape, trained on the same commit,
 /// so it shares the layers: its weights are swapped in for the requests that ask for it.

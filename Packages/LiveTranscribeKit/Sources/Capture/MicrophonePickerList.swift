@@ -3,7 +3,7 @@ import Foundation
 /// What a microphone picker lists, in order. The menu bar's *Microphone* submenu, Settings ›
 /// General and the live transcript window all show this list, so they always agree.
 ///
-/// Pure, so every rule is unit-tested (docs/dictation.md, decision M1):
+/// Pure, so every rule is unit-tested:
 /// - **System Default** comes first. It names the microphone capture would open for it at the
 ///   next start, as ``InputDevicePolicy`` picks it. That is macOS's default input, except when
 ///   the default is a virtual device and a physical microphone is connected: capture skips the

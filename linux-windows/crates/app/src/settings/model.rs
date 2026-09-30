@@ -1,5 +1,5 @@
 //! The settings, as `settings.json` keeps them. A setting the Mac app has too goes under the Mac's
-//! key (AppSettingsKey, docs/dictation.md "Settings"), with its default and its range.
+//! key (AppSettingsKey), with its default and its range.
 //!
 //! Reading is forgiving: a value that isn't valid is reported and its default used, the rest
 //! still count, and keys this version doesn't know (from a later one) are kept and written back.

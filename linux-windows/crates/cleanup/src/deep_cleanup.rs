@@ -5,7 +5,7 @@ use crate::Adapter;
 /// budget.
 ///
 /// The shipped values were chosen by measuring each choice on the same examples (the Mac app's
-/// `Train measure`, docs/cleanup.md). Tools vary them to compare; the app uses
+/// `Train measure`, docs/design-notes.md). Tools vary them to compare; the app uses
 /// [`DeepCleanup::SHIPPED`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DeepCleanup {
@@ -52,7 +52,7 @@ impl DeepPasses {
 impl DeepCleanup {
     /// What the app runs: one pass with Deep's adapter, without thinking, which was right on 108
     /// of 114 hand-written cases, against 88 with the self-correction adapter and 52 with none;
-    /// with thinking and no adapter, 58, taking 20 times as long (docs/cleanup.md). A repair
+    /// with thinking and no adapter, 58, taking 20 times as long (docs/design-notes.md). A repair
     /// `SelfRepair` turns down gets Medium's cleanup instead.
     pub const SHIPPED: Self = Self {
         passes: DeepPasses::One,

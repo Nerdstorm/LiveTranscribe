@@ -5,8 +5,8 @@ import Shared
 import SwiftUI
 
 /// Whether macOS also acts on the fn (globe) key, which clashes with fn as the dictation
-/// shortcut (docs/dictation.md, "Hotkey gestures"). Re-read whenever the app becomes active,
-/// so the warning clears as soon as the user changes the setting in System Settings.
+/// shortcut. Re-read whenever the app becomes active, so the warning clears as soon as the user
+/// changes the setting in System Settings.
 @MainActor
 @Observable
 final class GeneralSettingsFnKeyModel {
