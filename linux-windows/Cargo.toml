@@ -25,6 +25,7 @@ lt-vocabulary = { path = "crates/vocabulary" }
 lt-cleanup = { path = "crates/cleanup" }
 lt-dictation = { path = "crates/dictation" }
 lt-transcription = { path = "crates/transcription" }
+lt-language-model = { path = "crates/language-model" }
 lt-hotkey = { path = "crates/hotkey" }
 lt-capture = { path = "crates/capture" }
 lt-insertion = { path = "crates/insertion" }
