@@ -2,9 +2,10 @@
 
 ## Say it naturally, get what you meant
 
-- **Fillers disappear.** At **Medium** and **High**, "um", "uh", "er" and "hmm" are removed by a
-  fixed rule, so it happens every time, and words such as "umbrella" are never touched.
-- **Correct yourself out loud.** At Medium and High, say "fuel efficiency in cars, sorry, buses"
+- **Fillers disappear.** At **Medium**, **High** and **Deep**, "um", "uh", "er" and "hmm" are
+  removed by a fixed rule, so it happens every time, and words such as "umbrella" are never
+  touched.
+- **Correct yourself out loud.** From Medium up, say "fuel efficiency in cars, sorry, buses"
   and "fuel efficiency in buses" is typed. Cues such as "no wait", "I mean", "actually" and
   "scratch that" work too. The bundled adapter resolved all 12 corrections in the eval, though
   you should expect lower accuracy on real speech.
@@ -12,30 +13,39 @@
   and bundled with the app, resolved 97.3% of the self-corrections in a 515-example held-out
   test of synthetic sentences (the base model alone: 0.8%). It left 98.4% of look-alike
   sentences, such as "sorry I'm late", as spoken.
+- **Deep, when it matters.** At **Deep**, the model reads the whole dictation. It follows a
+  correction back into an earlier sentence, reads a garbled one as meant, fixes grammar and
+  misheard words from what the rest says, and lays out emails and lists: "I don't think he
+  actually check whether the release is tomorrow. No, sorry, the after tomorrow." becomes "I
+  don't think he actually checked whether the release is the day after tomorrow." Deep has its
+  own 10 MB adapter, and its own check that lets through only those repairs, with every name,
+  number, date and "not" kept as said. It got 108 of 114 hand-written cases right, against 52
+  for the model alone, in about 230 ms on an M4 Pro. When its check turns an answer down, you
+  get Medium's cleanup instead.
 - **Punctuation and capitals, done.** From **Light** up, the local model fixes punctuation,
   casing and misheard words.
-- **Spoken lists become lists.** At Medium or High, in any app that takes several lines, say
+- **Spoken lists become lists.** From Medium up, in any app that takes several lines, say
   "first… second… and third…", "one is… two is…", "number one… number two…" or "bullet point…
   bullet point…" and
   each item gets its own numbered or bulleted line, under a lead-in ending in a colon. The items
   keep your words.
 - **Letters and emails laid out.** Start with a greeting ("Dear sir or madam", "Hi John") and
   end with a sign-off ("Kind regards Jordan Lee", "Cheers Sam", or just "Thanks" after a few
-  sentences or a list), and at Medium or High, in any app that takes several lines, the greeting
+  sentences or a list), and from Medium up, in any app that takes several lines, the greeting
   and the sign-off each get their own lines, with any list in between laid out. The model cleans
   only the body, so it cannot move the names around.
 - **Emoji, punctuation and line breaks by voice.** At every level, say "hi emoji fireworks" for
   "hi 🎆", "thanks heart emoji" for "thanks ❤️", "is it ready question mark" for "is it ready?",
   "new line" or "new paragraph" for a line break, and "john dot smith at example dot com" for
   john.smith@example.com. See [Spoken commands](cleanup.md#spoken-commands).
-- **You choose how much it edits.** Pick **None**, **Light**, **Medium** or **High** from the
-  menu bar in two clicks, and your next dictation uses it.
+- **You choose how much it edits.** Pick **None**, **Light**, **Medium**, **High** or **Deep**
+  from the menu bar in two clicks, and your next dictation uses it.
 - **Undo the AI, keep your words.** Press ⌃⌥Z within 30 seconds, in the field you dictated
   into, and what you actually said replaces the cleaned text, with your snippets, vocabulary and
   spoken commands still applied.
 - **A safety net against rewrites.** Every edit is checked. If the model drops a "not", deletes
   words you said (below High) or rewrites too much, your own words are typed instead, with
-  fillers still removed and lists and letters still laid out at Medium and High.
+  fillers still removed and lists and letters still laid out from Medium up.
 
 ## Dictate from any app
 
@@ -157,7 +167,8 @@
   VoiceOver, and status changes are announced.
 - **Open all the way down.** MIT licensed, with more than 1,000 tests, a **Bench** tool that
   measures accuracy and speed on your own recordings, and a **Train** tool that rebuilds the
-  self-correction adapter on your Mac, in Swift (the bundled one took 30 minutes).
+  cleanup adapters on your Mac, in Swift (the bundled self-correction adapter took 30 minutes,
+  Deep's 106).
 - **Keeps itself up to date.** A downloaded release checks GitHub for a new version about once
   a day, if you let it, without interrupting what you're doing. Updates are signed and checked
   before they install.
@@ -168,7 +179,7 @@
 - **Bring your own models.** Settings also takes any other Hugging Face speech-to-text model that
   mlx-audio-swift can load, or one in a folder on your Mac, and in **Advanced**, another cleanup
   or voice-activity model. Or turn the language model off, and dictation still removes fillers
-  and lays out spoken lists and letters at Medium and High.
+  and lays out spoken lists and letters from Medium up.
 
 ## Coming next
 

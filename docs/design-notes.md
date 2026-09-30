@@ -3,11 +3,44 @@
 Why Live Transcribe is built the way it is. Its two pipelines and the layout of the code are
 in the README's [Architecture](../README.md#architecture).
 
-- **The self-correction adapter is switched on per request**, only at Medium and High, so Light
-  never resolves corrections.
-- **The adapter is loaded as separate LoRA layers**, at the exact base-model commit it was
+- **The adapters are switched per request**: the self-correction adapter at Medium and High,
+  Deep's at Deep, and none at Light, so Light never resolves corrections. Both adapt the same
+  layers, so one set of LoRA layers is loaded and the adapter a request needs has its weights
+  swapped in, in the same step as the generation.
+- **The adapters are loaded as separate LoRA layers**, at the exact base-model commit they were
   trained on, not fused into the weights. Fusing re-quantizes the adapted weights to 4 bits, and
   the fused adapter resolved only 13% of self-corrections.
+- **Deep is a level of its own, not a stronger High.** Repairs across sentences need a model that
+  may change more, and a check that knows which changes are repairs. Widening OutputGuard's
+  word-count and similarity limits would let rewording through too, so Deep's answer is checked
+  by lining up the words said with the words written (`SelfRepair`), where every difference must
+  be a repair Deep may make and names, numbers, dates, negations and placeholders are protected.
+- **Deep has its own adapter, not a longer prompt or thinking.** On the same 114 hand-written
+  cases, Deep's prompt alone got 52 right (the model copied every correction), with the
+  self-correction adapter 88, after Medium's pass 72, and with Qwen3's thinking 58, taking 20
+  times as long; with an adapter trained on Deep's prompt, 108 ([How Deep was
+  chosen](cleanup.md#how-deep-was-chosen)).
+- **Deep's prompt gives rules, not examples.** It says what to do with a dictation in general
+  terms, and the adapter learnt the rest from synthetic examples. Dictation history, which is
+  real speech, was used only to measure; no dictation of anyone's is in the prompt or the
+  training data.
+- **Deep lays out only what the speaker didn't.** A list marked in speech is laid out by the
+  rules after cleanup, from placeholders; had Deep's model laid it out too, both would have, and
+  the eval's spoken lists came out with a stray line between items. So a dictation with a spoken
+  line break or list marker goes to the model as one paragraph. Deep's check also turns down a
+  bulleted list of two things (a sentence's "the invoice and the agreement" pulled apart) and a
+  placeholder left on a line of its own (an emoji moved below its sentence), the two layouts the
+  eval found wrong.
+- **A rejected Deep answer gets Medium's pass**, not the uncleaned text, so choosing Deep never
+  shows less than Medium would. Running Medium's pass first, on every dictation with a
+  correction cue, took two passes and got fewer right (72 of the 114, against 88 in one pass).
+- **Linux and Windows run the Mac app's cleanup, not a lookalike.** The prompts, OutputGuard,
+  SelfRepair and the executor are ported to Rust (`lt-cleanup`) and held to the Swift code by
+  fixtures the Mac app's tests write (`Fixtures/cleanup`). The model is the Mac's own 4-bit
+  weights converted to OpenVINO with each adapter's matrices as inputs, so both adapters plug in
+  unchanged and one compiled model serves every level. It runs on the app's own OpenVINO runtime
+  (`lt-language-model`), since OpenVINO GenAI's bindings have no LoRA adapters and no control
+  token by token.
 - **Fillers and layout are rules, not model output.** A 1.7B model does neither reliably, and a
   rule can be tested exhaustively. Fillers are removed before the model runs; lists are laid out
   after it, only where line breaks are allowed. A letter's greeting and sign-off are found before

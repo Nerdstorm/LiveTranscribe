@@ -20,10 +20,12 @@ recognition: 31 languages as of 0.3.0, with cleanup still written for English (D
 | H1 | Default hotkey: Fn (🌐), changeable in Settings. Settings open from the menu bar. | Owner |
 | H2 | History is on by default and keeps everything until turned off or given a retention limit. It stays on this Mac and is never synced. | Owner |
 | M1 | With **System Default** selected, capture follows macOS's default input as it changes, including mid-session, so a newly connected microphone (which macOS usually makes the default) is picked up without a restart. Virtual and aggregate devices are never followed automatically. | Owner |
-| L1 | The structure of a dictation (a list, a letter) is found and laid out by deterministic rules; the D5 model only cleans the words. A new structure is one more rule in `Layout`. | Owner |
+| L1 | The structure of a dictation (a list, a letter) is found and laid out by deterministic rules; the D5 model only cleans the words. A new structure is one more rule in `Layout`. Deep (L5) is the exception the owner asked for: where the speaker marked no structure, its model may lay out an email or a list in a field that takes several lines. What the speaker marked ("new line", "bullet point", "number one") the rules lay out, and the model keeps that dictation to one paragraph, or both would lay out the same list. Deep's check still holds every word to what was said, a bulleted list to at least three items, and every placeholder to a line with words on it. | Owner |
 | L2 | List items keep the speaker's words: layout moves and punctuates, never rewords. | Owner |
 | L4 | Line breaks (lists, letters, list markers, "new line") are decided per app: every app is multi-line unless the user, or the built-in list (terminals), sets it single-line. In a multi-line app a field that is certainly single-line stays single-line: a text field or combo box of the app's own interface, never one in a web page. This replaced laying out only in fields that report `AXTextArea`, which missed chat apps' message boxes such as Slack's. | Owner |
 | L3 | At High, a dictation with a correction cue is cleaned in two passes: Medium's prompt, which the adapter was trained on, resolves the correction, then High's rewords the result within the same deadline. A rejected rewording keeps the first pass, which is not a fallback. D5 stands. | Owner |
+| L5 | Deep, a fifth level after High and never the default, repairs what needs the whole dictation: a correction that reaches back into an earlier sentence, a garbled correction phrase, grammar and misheard words, while names, negations, numbers, dates and claims stay as said. It has its own prompt (general rules, no examples), its own adapter, trained on synthetic data, and its own check (`SelfRepair`) instead of wider limits; a rejected answer gets Medium's pass. Each choice, thinking included, was measured ([How Deep was chosen](cleanup.md#how-deep-was-chosen)). D5 stands. | Owner |
+| D7 | The Linux and Windows app has the Mac app's cleanup at every level: the same prompts, checks and executor, held to the Mac's by `Fixtures/cleanup`, on the same model with the same adapters, on OpenVINO. The owner's dictation history is used to measure cleanup, never to train it or in a prompt. | Owner |
 | U1 | The HUD is a small circle that follows the mouse pointer (*The HUD*, below). It used to sit at the text caret, whose position, read through Accessibility, was unreliable and put it in seemingly random places. Ordinary dictation is wordless; only a notice that needs attention is put in words, in a bubble beside the circle (ledger LiveTranscribe-0180). | Owner |
 
 ### Assumptions made without the owner (review these)
@@ -64,7 +66,7 @@ recognition: 31 languages as of 0.3.0, with cleanup still written for English (D
   Snippets and vocabulary apply only to dictation.
 - **A chosen microphone that disconnects** falls back to the system default with a notice
   (the handoff's F6), replacing the old behaviour of stopping capture.
-- **Fillers are removed deterministically** (um, uh, er, …) before the LLM at Medium and High,
+- **Fillers are removed deterministically** (um, uh, er, …) before the LLM from Medium up,
   and **spoken lists are laid out deterministically** after it, only where line breaks are
   allowed (L4).
   A 1.7B model does neither reliably, and a rule can be tested exhaustively.
@@ -132,7 +134,13 @@ recognition: 31 languages as of 0.3.0, with cleanup still written for English (D
   field, or one element for the whole window; there only the app is checked.
 - **The self-correction adapter is on only at Medium and High.** It resolves corrections
   whatever the prompt says, so at Light (every word kept) it is switched off per request and
-  the base model cleans up.
+  the base model cleans up. Deep uses its own adapter; both are switched by **Resolve spoken
+  self-corrections**.
+- **Deep's limits.** A correction may take back up to six words, as at Medium, and its phrase
+  bring up to two new ones; one from a later sentence must share a word or a kind of fact with
+  what it corrects; Deep waits at least 8 s, since a rejected answer runs Medium's pass too; and
+  an answer that drops a later sentence's correction whole is rejected, after Deep's adapter did
+  that on a real dictation (ledger LiveTranscribe-0281).
 - **Microphone notices** (a new default, a fallback, a skipped virtual default) appear in the
   HUD once, and again only after the set of microphones changes, since dictation reopens the
   microphone on every press. A chosen microphone that reconnects is switched back to
@@ -193,7 +201,7 @@ recognition: 31 languages as of 0.3.0, with cleanup still written for English (D
   it loads.
   The interval is not shown in Settings.
 - **Cleanup turned off in Advanced is a choice, not a failure.** Like the model, the switch is
-  read at launch. Without the model, Medium and High still remove fillers and lay out spoken
+  read at launch. Without the model, Medium, High and Deep still remove fillers and lay out spoken
   lists and letters, nothing is reworded, and dictations are not marked *Cleanup didn't apply*; the live
   transcript shows the raw text. General's cleanup note describes the switches in effect since
   launch and says when a change in Advanced waits for a restart.
@@ -246,7 +254,9 @@ Changed slices:
   `DroppedWords` share one `WordAlignment` of the words said with the words returned.
   `PlaceholderAliases` shows the model a plain word for each token and swaps the tokens back
   before the guard. `CleanupExecutor` runs High in two passes when there is a correction cue
-  (L3).
+  (L3), and Deep in one, with its own adapter and `SelfRepair` in place of the limits, then
+  Medium's pass if that answer is rejected (L5). `MLXCleaner` loads one set of LoRA layers and
+  swaps in the adapter each request names: none, the self-correction adapter or Deep's.
 - **Capture**: devices report whether they are virtual; capture follows the default input (M1).
   `MicrophonePickerList` is the one rule for what the three microphone pickers (the menu bar,
   Settings › General, the live transcript window) list: virtual devices only with
@@ -276,13 +286,15 @@ Hotkey up ───▶ discard if < 300 ms
                 by name is written in directly
              ─▶ vocabulary: known spoken variants → canonical spelling
              ─▶ level None: breaks and commands put back; done
-             ─▶ remove fillers (Medium, High); a letter's greeting and sign-off laid out
+             ─▶ remove fillers (Medium+); a letter's greeting and sign-off laid out
                 (Medium+, line breaks), only its body goes on
              ─▶ LLM cleanup (level rules + vocabulary + placeholder rule + context), tokens
                 shown as words; High with a correction cue: Medium pass, then High pass;
+                Deep: Deep's adapter, then Medium's pass if SelfRepair rejects it;
                 skipped with OutputGuard when cleanup is off in Advanced (read at launch)
              ─▶ OutputGuard (level bounds, placeholders intact, names in place, no content
-                word left out) — else the pre-LLM text
+                word left out; at Deep, SelfRepair instead of the bounds) — else the
+                pre-LLM text
              ─▶ line breaks and list markers put back and tidied; lists laid out
                 (Medium+, line breaks); then snippets, emoji and addresses
              ─▶ insert at the cursor (AX, else paste, else clipboard + HUD)
@@ -436,7 +448,7 @@ they are.
 - Unit tests with fakes for every slice: gesture state machine, prompt composition per level,
   snippet matching and placeholder round trips (including a property test with random
   snippets), spoken commands, vocabulary replacement, level guard bounds, filler removal, list
-  and letter layout, placeholder aliases, two-pass High,
+  and letter layout, placeholder aliases, two-pass High, Deep's check and its passes,
   inserter ordering with a fake AX layer, pasteboard snapshot and restore, device policy and
   fallback, history pruning, the dictation controller with fake audio, transcriber, cleaner and
   inserter, and the Settings, menu and editor models.
@@ -448,6 +460,11 @@ they are.
   references, fallbacks and latency; with `--multiline` it dictates into a multi-line field and
   also counts the clips that come out with the intended lines. Snippets and vocabulary are
   covered by unit tests rather than clips.
+- Deep with the real model (`DeepModelTests`, with the other model tests under
+  `TEST_RUNNER_LT_RUN_MODEL_TESTS=1`): the acceptance case, in two casings, a correction in a
+  later sentence, and three dictations whose cue words must stay.
+- `Train measure --level deep` runs Deep's 114 hand-written cases, or any other set, through the
+  cleaner and executor as the app does ([Training/README.md](../Packages/LiveTranscribeKit/Training/README.md#deeps-adapter)).
 - Prompt probe (`PromptProbeTests`, run with `TEST_RUNNER_LT_PROMPT_PROBE=1`): prints the
   model's answers for hard cases, and compares prompts, placeholder token formats and visible
   emoji. `compareContentChecksAtHigh` cleans every cleanup example in `Training/` at High and
@@ -511,6 +528,27 @@ The lists and the "hi John … cheers Sam" letter no longer fall back: Qwen3-ASR
 itself, so the model has less to change. "great job emoji party popper see you tomorrow", which
 fell back before, no longer does, but only because both models now hear its "emoji" as "M O G",
 so there is no emoji for the model to move.
+
+Deep was measured later, on 2026-09-30, beside Medium in the same run, with the same speech
+model; this run's Medium differs a little from the tables above, since the speech model now hears
+the punctuation clip's "comma" as said:
+
+| Field | Level | WER vs said | WER vs meant | Fallbacks | p50 | p95 | Laid out as meant |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Multi-line | Medium | 22.6% | 7.6% | 2 | 288 ms | 639 ms | 65/65 |
+| Multi-line | Deep | 22.9% | 8.0% | 2 | 379 ms | 715 ms | 63/65 |
+| Single-line | Medium | 20.7% | 10.6% | 3 | 277 ms | 643 ms | |
+| Single-line | Deep | 21.3% | 11.5% | 1 | 353 ms | 721 ms | |
+
+Deep resolved the same 12 self-corrections, and in a single-line field also the long letter's,
+where Medium fell back. The two clips it lays out otherwise than the eval means do what Deep is
+for: "We need milk, eggs, and bread." as three bullets, and the three things to do before a merge
+as a numbered list. Its "plain" fallback is a two-bullet list that its check turned down; Medium's
+pass then fell back too. Deep's WER against what was meant is higher mostly because it writes the
+speech model's "MOG" (for "emoji") as "M O G". It takes about 90 ms more at p50 and stays well
+under the 1.2 s target. The first run of this eval found Deep laying out spoken lists a second
+time and moving an emoji to a line of its own, which led to the layout rules in
+[Cleanup](cleanup.md) (ledger LiveTranscribe-0282, -0283).
 
 Sinhala has no eval clips in this repository. On 24 recordings of OpenSLR 52's held-out speakers,
 8 of them with English words, dictation's WER is 28.2% at None, Medium and High alike, with no

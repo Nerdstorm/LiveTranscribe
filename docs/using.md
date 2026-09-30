@@ -66,9 +66,9 @@ without cleanup and offers **Retry**.
   When you finish, those 5 minutes are inserted and the panel says "Recording stopped at 5 min;
   the rest wasn't heard".
 - Long dictations have not been measured. Cleanup runs on the whole dictation in one call,
-  within the cleanup timeout (3 s by default). By extrapolation from the eval, a dictation longer
-  than a minute or two will likely exceed it and be inserted uncleaned, with fillers still
-  removed, and without a message.
+  within the cleanup timeout (3 s by default, and at least 8 s at Deep). By extrapolation from
+  the eval, a dictation longer than a minute or two will likely exceed it and be inserted
+  uncleaned, with fillers still removed, and without a message.
 - If the microphone stops for good partway (a Bluetooth headset disconnects on a Mac with no
   other microphone, for example), what was heard is inserted and the floating panel says so.
 - One dictation runs at a time, and none while the live transcript is listening: **Stop Live
@@ -153,7 +153,7 @@ of the open-source packages the app is built with.
 | **History** | dictation history on or off, retention, clearing |
 | **Permissions** | microphone and Accessibility status, with buttons that open the right System Settings pane, and **Reopen Live Transcribe** when macOS won't let it paste until it reopens |
 | **Models** | the speech-to-text model: models to download, switch to and remove, each with its languages, size and licence, and **Another model**, for any Hugging Face repository or a model folder on your Mac |
-| **Advanced** | for dictation and the live transcript: the cleanup model, **Clean up transcripts with the LLM**, **Resolve spoken self-corrections**, the cleanup **Timeout**, the GPU cache and capture restarts; for the live transcript only: the voice-activity model, silence, speech threshold, pre-roll and minimum speech, maximum segment length, live partials, context segments and queue capacity |
+| **Advanced** | for dictation and the live transcript: the cleanup model, **Clean up transcripts with the LLM**, **Resolve spoken self-corrections** (both adapters: Medium and High's, and Deep's), the cleanup **Timeout**, the GPU cache and capture restarts; for the live transcript only: the voice-activity model, silence, speech threshold, pre-roll and minimum speech, maximum segment length, live partials, context segments and queue capacity |
 
 Settings on every tab but **Advanced** apply immediately, to the next dictation. A speech model
 chosen in **Models** loads straight away; dictation waits the few seconds it takes, and a live

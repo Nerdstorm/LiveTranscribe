@@ -1,7 +1,7 @@
 # Development
 
 Building and running the app is in the README's [Build and run](../README.md#build-and-run).
-This covers the tests, the bench, the adapter, the licence notices and the icons.
+This covers the tests, the bench, the adapters, the licence notices and the icons.
 
 ## Tests
 
@@ -42,9 +42,10 @@ It builds the `Bench` tool and runs it. Give it options with `ARGS`, for example
 `make bench ARGS="--level high --fast"`:
 
 - `--fixtures <dir>`: a folder of `.wav` clips, each with a matching `.txt` transcript.
-- `--level <none|light|medium|high>`: the cleanup level (default: Medium).
+- `--level <none|light|medium|high|deep>`: the cleanup level (default: Medium).
 - `--no-cleanup`: speech-to-text only.
-- `--no-adapter`: clean up without the fine-tuned self-correction adapter.
+- `--no-adapter`: clean up without the fine-tuned adapters, the self-correction adapter and
+  Deep's.
 - `--fast`: feed audio as fast as possible instead of in real time. Latency numbers are then
   meaningless.
 - `--stt-model <repo or folder>`: measure another speech-to-text model instead of the default,
@@ -94,9 +95,9 @@ self-corrections resolved, commands turned into what they name), the fallbacks, 
 latency against the target of p95 under 1.2 s. Latency here is speech-to-text plus cleanup;
 stopping the recorder and inserting the text are not included. `--multiline` dictates into a
 multi-line field, where line breaks, lists and letters are laid out, and adds how many clips came
-out with the intended lines. `--level <none|light|medium|high>` (repeatable) limits the levels,
+out with the intended lines. `--level <none|light|medium|high|deep>` (repeatable) limits the levels,
 `--clips <dir>` reads other clips, `--p95-target-ms <n>` changes the target, `--no-adapter`
-cleans up without the adapter, `--stt-model <repo or folder>` measures another speech-to-text
+cleans up without the adapters, `--stt-model <repo or folder>` measures another speech-to-text
 model and `--verbose` prints every output, with the reason for each fallback. Give them with `ARGS`, as for the bench: `make eval ARGS="--multiline --verbose"`.
 
 Last run, on an M4 Pro with macOS 27 and synthetic speech, with the default speech model and
@@ -136,7 +137,11 @@ clip and Medium and High on 4 each: the same clips, and the long letter at Mediu
 where the model changed more than the self-correction. The longest clip is about 40 words, so
 these numbers say nothing about long dictations.
 
-## Training the adapter
+Deep, measured the same way beside Medium on 2026-09-30 ([Eval results](dictation.md#eval-results)):
+in a multi-line field, 8.0% against what was meant (Medium 7.6%), 2 fallbacks, p50 379 ms and
+p95 715 ms, and 63 of 65 clips laid out as meant; the other two it lays out as lists by design.
+
+## Training the adapters
 
 The self-correction adapter is trained on the Mac, in Swift, with the `Train` tool: `generate`
 builds the synthetic dataset, `validate` checks every example against the app's own OutputGuard,
@@ -146,6 +151,12 @@ kept 98.4% of look-alike sentences as spoken. On the 95 curated held-out example
 separately from the generator's templates, it resolved 39 of 40 corrections. `make train
 ARGS="evaluate"` builds the tool and runs a step. Commands and full results are in
 [Training/README.md](../Packages/LiveTranscribeKit/Training/README.md).
+
+Deep's adapter is trained the same way, on synthetic examples of its own (`generate --deep`,
+`train --deep`), and measured with `measure --level deep`, which cleans each case as the app
+does at that level. On the 114 hand-written cases in `Training/eval/deep.jsonl`, none of them
+trained on, it got 108 right, against 88 with the self-correction adapter and 52 with no
+adapter; on 599 generated test examples, 535 ([Deep's adapter](../Packages/LiveTranscribeKit/Training/README.md#deeps-adapter)).
 
 ## Licence notices
 

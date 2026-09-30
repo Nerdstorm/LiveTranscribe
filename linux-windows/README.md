@@ -6,7 +6,9 @@ behaviour through the golden cases in [`Fixtures/golden`](../Fixtures/golden/REA
 
 This is the start. The dictation text rules, ported from the Mac app, type the same text as the
 Mac app for all 9,728 golden cases, and speech to text computes Qwen3-ASR's audio features,
-prompt and decoding as the Mac app does, with the model running on OpenVINO. The app,
+prompt and decoding as the Mac app does, with the model running on OpenVINO. Cleanup runs as on
+the Mac at every level, Deep included: the same prompts, checks and executor, on the same
+language model, Qwen3-1.7B, on OpenVINO ([Cleanup](#cleanup)). The app,
 `livetranscribe`, dictates on Linux under Wayland and on Windows as the Mac app does: hold a key
 and speak, and a small circle by the mouse pointer shows the microphone's level while the text goes
 straight into the focused field.
@@ -55,7 +57,8 @@ same place in both apps:
 | `lt-spoken-commands` | `SpokenCommands` | Emoji, dictated punctuation, line breaks, email and web addresses |
 | `lt-snippets` | `Snippets` | The user's snippets |
 | `lt-vocabulary` | `Vocabulary` | The user's vocabulary |
-| `lt-cleanup` | `Cleanup` | Cleanup at each level: the rules that need no language model, the prompt, the output guard, and the executor that runs a model behind the `CleanupModel` trait under a deadline. `Fixtures/cleanup` checks it against the Mac app |
+| `lt-cleanup` | `Cleanup` | Cleanup at each level: the rules that need no language model, the prompt, the output guard, Deep's check (`SelfRepair`), and the executor that runs a model behind the `CleanupModel` trait under a deadline. `Fixtures/cleanup` checks it against the Mac app |
+| `lt-language-model` | `Cleanup`'s `MLXCleaner`, and mlx-swift-lm's Qwen3 | Cleanup's language model on OpenVINO: the Qwen3 tokenizer and chat template, greedy and seeded sampling, stopping between tokens, LoRA adapters bound per request as inputs of the model, and the pinned model's download. `examples/bench.rs` answers the Mac app's request files |
 | `lt-dictation` | `Dictation` | The dictation flow from hotkey to typed text, and a transcript to the text it types |
 | `lt-transcription` | `Transcription`, and mlx-audio-swift's Qwen3-ASR | Speech to text: the log-mel features, the encoder's chunks and windows, the prompt, greedy decoding and its limits. The model's forward passes are behind the `SpeechModel` trait; `OpenVinoModel` runs them on OpenVINO. `sherpa` runs the catalog's other models through sherpa-onnx, on the CPU. `catalog` reads the speech model catalog and checks a model's files before it's opened; `speech_to_text` opens a model with its engine |
 | `lt-hotkey` | `Hotkey` | The hold, tap and double-tap gesture; what each key means for it; reading the keyboards: evdev on Linux, a low-level keyboard hook on Windows |
@@ -96,7 +99,8 @@ are made builds them too, to try from the run's artifacts. Each carries:
   which hold-to-talk needs. **Any program that user runs can then read what they type**, as any
   X11 program always could. The AppImage can't install it; `packaging/linux/README.Linux` says how.
 
-The speech models aren't in the packages, nor in the Windows installer. The app downloads the one
+The speech models and the cleanup model aren't in the packages, nor in the Windows installer; the
+cleanup adapters are compiled into the app. The app downloads the speech model
 chosen the first time it's needed, by default Nerdstorm/Qwen3-ASR-0.6B-Sinhala-OpenVINO (1.1 GB)
 from Hugging Face, and Settings › Models downloads and removes the others, which sherpa-onnx
 publishes on GitHub as `.tar.bz2` archives. The catalog,
@@ -326,6 +330,41 @@ and Korean ones (5 and 7 s long). On longer recordings, English mostly follows t
 30 of FLEURS German's, 5.29% WER told English and 5.15% told German, and on 15 of FLEURS Mandarin's,
 23.4% and 22.2% character error rate.
 
+## Cleanup
+
+Cleanup runs as the Mac app runs it: the same prompts, OutputGuard, Deep's check and executor
+(`lt-cleanup`), on the same language model, Qwen3-1.7B, with the Mac app's two adapters, which
+are compiled into the app from `Packages/LiveTranscribeKit/Sources/Cleanup`
+(`crates/app/src/dictation/cleanup_model.rs`). While **Clean up transcripts with the LLM** is on in
+Settings › Advanced, as it is at first, the app downloads the model the first time into the
+models folder, checks each file's SHA-256, and loads it on the CPU on a thread of its own
+(`cleaner.rs`), with the adapters when the model takes them. Settings › Advanced shows how that
+goes, and then where the model runs and with which adapters. Until it's ready, or with it off,
+nothing is reworded: dictation still removes filler words and lays out spoken lists and letters
+from Medium up. Turning it off lets the model go, and turning it on loads it again, without a
+restart. A cleanup that takes longer than the **Timeout** there (3 s; for Deep, at least 8 s) is
+dropped, and the text goes in without it, as on the Mac.
+
+**The model the app downloads for now takes no adapters.** It is OpenVINO's own conversion,
+[OpenVINO/Qwen3-1.7B-int4-ov](https://huggingface.co/OpenVINO/Qwen3-1.7B-int4-ov) (1.2 GB), so
+Medium and High keep self-corrections as spoken, as the Mac app does with **Resolve spoken
+self-corrections** off, and Deep runs on the base model. `tools/export-qwen3-cleanup.py` converts
+the Mac app's own weights, mlx-community/Qwen3-1.7B-4bit, with each adapter's matrices as
+inputs of the model (0.93 GB), for publishing as Nerdstorm/Qwen3-1.7B-MLX-4bit-OpenVINO; pinning
+that in `CLEANUP_MODEL` (`crates/language-model/src/pinned_model.rs`) is all it takes for the
+app to use the adapters.
+
+Measured on the CPU of an Intel Core i5-11500 with the Mac app's 515 Medium requests and its
+scoring: with the Mac's weights and the self-correction adapter, 505 right, as on the Mac, and
+509 of the 515 answers word for word the Mac's; a cleanup took 0.58 s at p50 and 0.88 s at p95
+(the Mac: 0.15 and 0.24 s), at 30 tokens a second, and the model took 2.5 GB of memory at its
+peak. At Deep, with Deep's adapter, the same runtime on the Mac's CPU answered all 114 of
+Deep's hand-written cases character for character as the Mac app does (108 right), and 589 of
+its 599 generated test examples (531 right, against 534 for the Mac's first answers); Deep
+hasn't been timed on a desktop CPU, and its prompt is longer than Medium's. OpenVINO keeps the compiled model in its cache, which takes
+about 1.2 GB more on disk and cuts a later load to about 0.7 s. Neither the NPU nor the GPU has
+been tried with the adapters.
+
 ## Matching the Mac app
 
 The rules are written against Swift's `String`, whose characters are grapheme clusters and whose
@@ -371,6 +410,12 @@ does, before it opens it:
 LT_SHERPA_PARAKEET_DIR=/path/to/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8 cargo test -p lt-transcription --test sherpa -- --ignored
 ```
 
+Cleanup's prompts, guard verdicts and executor are held to the Mac app's by `Fixtures/cleanup`,
+which the Mac app's tests write (`make golden`) and `lt-cleanup`'s tests replay. The model's
+answers are held to the Mac's by request files: `Train requests` writes the requests the Mac app
+makes for a set of cases, `examples/bench.rs` in `lt-language-model` answers them, and `Train
+replay` scores the answers as `Train measure` scores the Mac's.
+
 Dictated text is never logged: log lines carry counts only.
 
 ## Credits
@@ -388,3 +433,6 @@ Transcribe by Cohere Labs (Apache-2.0). Settings › Models credits each with it
 
 sherpa-onnx (k2-fsa, Apache-2.0) and ONNX Runtime (Microsoft, MIT) run them; the packages carry
 their licences, and ONNX Runtime's third-party notices.
+
+The cleanup model is [Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B) by the Qwen team,
+Alibaba Cloud (Apache-2.0), as OpenVINO converts it. Its adapters are this repository's (MIT).
