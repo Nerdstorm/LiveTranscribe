@@ -16,10 +16,11 @@ import Shared
 /// - a filler, a repeated word, or a word that only holds the grammar together dropped or added
 ///   ("I going" → "I am going");
 /// - a self-correction resolved (``Corrections``): as at Medium, up to
-///   ``OutputGuard/Policy/maxRetractedWords`` words and the cue after them taken out; from a later
-///   sentence, a short correction phrase about the same thing (a word they share, or both a
-///   number, a day, a month or a name) put in place of what it corrects, with the rest of the
-///   earlier sentence kept. One may not answer a question: "Is it tomorrow? No, the day after."
+///   ``OutputGuard/Policy/maxRetractedWords`` words and the cue after them taken out, with "not"
+///   and the words taken back when the speaker says them again ("four, no, not four, five");
+///   from a later sentence, a short correction phrase about the same thing (a word they share,
+///   or both a number, a day, a month or a name) put in place of what it corrects, with the rest
+///   of the earlier sentence kept. One may not answer a question: "Is it tomorrow? No, the day after."
 ///   keeps its "No". A cue's words are taken out only with the correction they make, and never
 ///   changed ("make that" is not "made that"). Nor may a correction that opens a later sentence
 ///   be dropped whole, leaving what it corrects as said;

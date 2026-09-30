@@ -260,6 +260,67 @@ fn resolves_a_correction_within_a_sentence() {
 }
 
 #[test]
+fn a_cue_followed_by_not_and_the_corrected_words_said_again_goes_with_them() {
+    assert_accepted(&[
+        (
+            "The meeting is in room four, no, not four, five.",
+            "The meeting is in room five.",
+        ),
+        (
+            "Book the flight for Tuesday, sorry, not Tuesday, Thursday morning.",
+            "Book the flight for Thursday morning.",
+        ),
+        (
+            "Send the report to the marketing team, sorry, not marketing, sales, by Friday.",
+            "Send the report to the sales team by Friday.",
+        ),
+        (
+            "Apps like Slack, sorry, not Slack, Teams keep dropping my calls.",
+            "Apps like Teams keep dropping my calls.",
+        ),
+        (
+            "Words like Docker, sorry, not Docker, Kubernetes never come out right.",
+            "Words like Kubernetes never come out right.",
+        ),
+        (
+            "I left the keys in the kitchen. Sorry, not the kitchen, the garage.",
+            "I left the keys in the garage.",
+        ),
+        (
+            "Send the blue file to Sam, sorry, not blue, red.",
+            "Send the red file to Sam.",
+        ),
+    ]);
+}
+
+#[test]
+fn a_not_goes_with_a_correction_only_when_it_says_corrected_words_again() {
+    assert_rejected(&[
+        // Drops the contrast the speaker made.
+        ("We need three chairs, sorry, not four.", "We need four chairs."),
+        // Says again a word the correction doesn't take back.
+        (
+            "Send the blue file to Sam, sorry, not blue, red.",
+            "Send the blue file to red.",
+        ),
+        // Keeps the corrected word, or reads the correction the wrong way.
+        (
+            "Words like Docker, sorry, not Docker, Kubernetes never come out right.",
+            "Words like Docker never come out right.",
+        ),
+        (
+            "Words like Docker, sorry, not Docker, Kubernetes never come out right.",
+            "Words like Docker, not Kubernetes, never come out right.",
+        ),
+        // Answers the question.
+        (
+            "Is the demo on Tuesday? No, not Tuesday, Thursday.",
+            "Is the demo on Thursday?",
+        ),
+    ]);
+}
+
+#[test]
 fn scratch_that_takes_back_the_sentence_before() {
     assert_accepted(&[
         (

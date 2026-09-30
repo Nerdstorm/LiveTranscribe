@@ -17,11 +17,14 @@
 //! kind ([`SelfRepair::takes_back_facts`]), so a correction can't also drop "not" or "at noon",
 //! except after "scratch that", which takes back what was said whole; and inside the phrase, a
 //! repair may re-use only the words it corrects ("the Monday after" → "the Monday after next").
+//! The cues may be followed by "not" and corrected words said again, which go with them ("room
+//! four, no, not four, five"; [`SelfRepair::restates`]).
 
 use std::collections::{BTreeMap, HashMap};
 use std::ops::Range;
 
 use super::{CORRECTION_PHRASE_WORDS, SaidWord, SelfRepair, occurrences, phrase_length};
+use crate::self_correction::RESTATING_WORD;
 use crate::word_forms;
 use crate::words::{WordSet, same};
 
@@ -68,20 +71,25 @@ pub(super) fn spans(words: &[SaidWord], repair: &SelfRepair, placeholders: &Word
                 continue;
             }
             let corrected_words = WordSet::new(corrected.iter().map(|word| &word.word));
-            // A phrase starts after the whole run of cues.
-            for &end in run_ends
-                .iter()
-                .filter(|&&end| end == words.len() || !repair.is_cue(&words[end].word))
-            {
-                if !retracts_statement {
-                    let length = phrase_length(end, words).min(CORRECTION_PHRASE_WORDS);
-                    if !repair.takes_back_facts(&words[end..end + length], corrected, placeholders) {
+            // A phrase starts after the whole run of cues, and after the corrected words said
+            // again.
+            for &run_end in &run_ends {
+                for (end, restated) in phrase_starts(run_end, words, repair) {
+                    if (end < words.len() && repair.is_cue(&words[end].word))
+                        || restated.is_some_and(|restated| !repair.restates(&words[restated], corrected))
+                    {
                         continue;
                     }
-                    spans.spare[end].form_union(&corrected_words);
+                    if !retracts_statement {
+                        let length = phrase_length(end, words).min(CORRECTION_PHRASE_WORDS);
+                        if !repair.takes_back_facts(&words[end..end + length], corrected, placeholders) {
+                            continue;
+                        }
+                        spans.spare[end].form_union(&corrected_words);
+                    }
+                    spans.ends[start].push(end);
+                    spans.corrected[end].form_union(&corrected_words);
                 }
-                spans.ends[start].push(end);
-                spans.corrected[end].form_union(&corrected_words);
             }
         }
     }
@@ -148,32 +156,43 @@ fn once(words: &[SaidWord], repair: &SelfRepair, placeholders: &WordSet) -> Vec<
             .iter()
             .rposition(|word| word.ends_sentence)
             .map_or(0, |index| index + 1);
-        for end in run_ends {
-            if (answers && end - cue_start == 1) || end >= words.len() || repair.is_cue(&words[end].word) {
+        for run_end in run_ends {
+            if answers && run_end - cue_start == 1 {
                 continue;
             }
-            let longest = phrase_length(end, words);
-            if longest == 0 {
-                continue;
-            }
-            let weak = end - cue_start == 1 && WEAK_CUES.iter().any(|cue| same(&words[cue_start].word, cue));
-            for length in 1..=longest.min(CORRECTION_PHRASE_WORDS) {
-                let phrase = &words[end..end + length];
-                for start in sentence_start..cue_start {
-                    // Empty when the policy lets no words be taken back, as the prompt probe's does.
-                    for count in 1..=repair.max_retracted_words.min(cue_start - start) {
-                        let corrected = start..start + count;
-                        let replaces = || count == 1 && !weak && repair.replaces(&words[start], phrase);
-                        // Within a sentence, a phrase that stays where it is was Medium's.
-                        if !(crosses || corrected.end < cue_start)
-                            || words[corrected.clone()].iter().any(|word| word.opens_phrase > 0)
-                            || !(repair.relates(&words[start], phrase, weak) || replaces())
-                            || !(repair.relates(&words[corrected.end - 1], phrase, weak) || replaces())
-                            || !repair.takes_back_facts(phrase, &words[corrected.clone()], placeholders)
-                        {
-                            continue;
+            for (end, restated) in phrase_starts(run_end, words, repair) {
+                if end >= words.len() || repair.is_cue(&words[end].word) {
+                    continue;
+                }
+                let longest = phrase_length(end, words);
+                if longest == 0 {
+                    continue;
+                }
+                // Saying the corrected words again makes even a weak cue a correction.
+                let weak = restated.is_none()
+                    && end - cue_start == 1
+                    && WEAK_CUES.iter().any(|cue| same(&words[cue_start].word, cue));
+                for length in 1..=longest.min(CORRECTION_PHRASE_WORDS) {
+                    let phrase = &words[end..end + length];
+                    for start in sentence_start..cue_start {
+                        // Empty when the policy lets no words be taken back, as the prompt probe's does.
+                        for count in 1..=repair.max_retracted_words.min(cue_start - start) {
+                            let corrected = start..start + count;
+                            let replaces = || count == 1 && !weak && repair.replaces(&words[start], phrase);
+                            // Within a sentence, a phrase that stays where it is was Medium's.
+                            if !(crosses || corrected.end < cue_start)
+                                || words[corrected.clone()].iter().any(|word| word.opens_phrase > 0)
+                                || restated.as_ref().is_some_and(|restated| {
+                                    !repair.restates(&words[restated.clone()], &words[corrected.clone()])
+                                })
+                                || !(repair.relates(&words[start], phrase, weak) || replaces())
+                                || !(repair.relates(&words[corrected.end - 1], phrase, weak) || replaces())
+                                || !repair.takes_back_facts(phrase, &words[corrected.clone()], placeholders)
+                            {
+                                continue;
+                            }
+                            results.push(rewrite(words, corrected, cue_start..end, end..end + length));
                         }
-                        results.push(rewrite(words, corrected, cue_start..end, end..end + length));
                     }
                 }
             }
@@ -199,6 +218,25 @@ fn rewrite(words: &[SaidWord], corrected: Range<usize>, cues: Range<usize>, phra
         .chain(words[corrected.end..cues.start].iter().cloned())
         .chain(words[phrase.end..].iter().cloned())
         .collect()
+}
+
+/// Where a correction's phrase can start after a run of cues that ends at `end`: there, or, when
+/// "not" follows the cues, after the corrected words said again, in the same sentence ("Tuesday,
+/// sorry, not Tuesday, Thursday"), with the range of the words said again, which must be among the
+/// corrected words ([`SelfRepair::restates`]).
+fn phrase_starts(end: usize, words: &[SaidWord], repair: &SelfRepair) -> Vec<(usize, Option<Range<usize>>)> {
+    let mut starts = vec![(end, None)];
+    if end >= words.len() || !same(&words[end].word, RESTATING_WORD) {
+        return starts;
+    }
+    let first = end + 1;
+    let restated = words[first..]
+        .iter()
+        .take(repair.max_retracted_words)
+        .take_while(|word| !word.ends_sentence)
+        .count();
+    starts.extend((first + 1..=first + restated).map(|stop| (stop, Some(first..stop))));
+    starts
 }
 
 /// Where each run of cues can end, by where it starts, in order of start. The ends of a run
@@ -290,6 +328,26 @@ impl SelfRepair {
             return false;
         };
         is_content(&word.word) && self.fact_kind(word, false).is_none() && self.fact_kind(other, false).is_none()
+    }
+
+    /// Whether `restated`, said after a cue and "not", says again some of the `corrected` words:
+    /// its words that carry meaning, at least one, are a run of theirs ("not the kitchen" for
+    /// "kitchen", "not marketing" for "marketing team"). Only then does the "not" go with the
+    /// correction; any other keeps what it negates ("Thursday, not Friday").
+    pub(super) fn restates(&self, restated: &[SaidWord], corrected: &[SaidWord]) -> bool {
+        let content = |words: &[SaidWord]| -> Vec<String> {
+            words
+                .iter()
+                .map(|word| word.word.clone())
+                .filter(|word| !self.is_function_word(word) && !self.is_filler(word))
+                .collect()
+        };
+        let (said, taken) = (content(restated), content(corrected));
+        !said.is_empty()
+            && said.len() <= taken.len()
+            && taken
+                .windows(said.len())
+                .any(|run| run.iter().zip(&said).all(|(a, b)| same(a, b)))
     }
 
     /// Whether `phrase` takes back every fact in `corrected` with one of its own kind: a number

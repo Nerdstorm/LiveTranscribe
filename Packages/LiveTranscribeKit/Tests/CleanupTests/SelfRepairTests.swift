@@ -132,6 +132,34 @@ struct SelfRepairTests {
         #expect(review(raw, cleaned) == .accepted(cleaned))
     }
 
+    @Test("A cue followed by \"not\" and the corrected words said again goes with them", arguments: [
+        ("The meeting is in room four, no, not four, five.", "The meeting is in room five."),
+        ("Book the flight for Tuesday, sorry, not Tuesday, Thursday morning.", "Book the flight for Thursday morning."),
+        ("Send the report to the marketing team, sorry, not marketing, sales, by Friday.", "Send the report to the sales team by Friday."),
+        ("Apps like Slack, sorry, not Slack, Teams keep dropping my calls.", "Apps like Teams keep dropping my calls."),
+        ("Words like Docker, sorry, not Docker, Kubernetes never come out right.", "Words like Kubernetes never come out right."),
+        ("I left the keys in the kitchen. Sorry, not the kitchen, the garage.", "I left the keys in the garage."),
+        ("Send the blue file to Sam, sorry, not blue, red.", "Send the red file to Sam."),
+    ])
+    func resolvesARestatedCorrection(raw: String, cleaned: String) {
+        #expect(review(raw, cleaned) == .accepted(cleaned))
+    }
+
+    @Test("A \"not\" goes with a correction only when it says corrected words again", arguments: [
+        // Drops the contrast the speaker made.
+        ("We need three chairs, sorry, not four.", "We need four chairs."),
+        // Says again a word the correction doesn't take back.
+        ("Send the blue file to Sam, sorry, not blue, red.", "Send the blue file to red."),
+        // Keeps the corrected word, or reads the correction the wrong way.
+        ("Words like Docker, sorry, not Docker, Kubernetes never come out right.", "Words like Docker never come out right."),
+        ("Words like Docker, sorry, not Docker, Kubernetes never come out right.", "Words like Docker, not Kubernetes, never come out right."),
+        // Answers the question.
+        ("Is the demo on Tuesday? No, not Tuesday, Thursday.", "Is the demo on Thursday?"),
+    ])
+    func keepsANotThatSaysNothingCorrectedAgain(raw: String, cleaned: String) {
+        #expect(review(raw, cleaned) == .rejected(.invalidRepair))
+    }
+
     @Test("Scratch that takes back the end of the sentence before it", arguments: [
         ("I'll call the plumber tomorrow. Scratch that, I'll fix the tap myself this weekend.", "I'll fix the tap myself this weekend."),
         ("Okay, pay off the credit card first. Scratch that, build the emergency fund first.", "Okay, build the emergency fund first."),

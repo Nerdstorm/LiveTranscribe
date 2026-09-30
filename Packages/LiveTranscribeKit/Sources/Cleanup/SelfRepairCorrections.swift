@@ -20,7 +20,8 @@ extension SelfRepair {
     /// same kind (``phrase(_:takesBackFactsIn:placeholders:)``), so a correction can't also drop
     /// "not" or "at noon", except after "scratch that", which takes back what was said whole; and
     /// inside the phrase, a repair may re-use only the words it corrects ("the Monday after" → "the
-    /// Monday after next").
+    /// Monday after next"). The cues may be followed by "not" and corrected words said again, which
+    /// go with them ("room four, no, not four, five"; ``restates(_:_:)``).
     enum Corrections {
         /// Medium's corrections: for each start, the ends of the corrected words and cues that may
         /// be taken out from there; and for each phrase that follows, the words it may correct and,
@@ -45,17 +46,22 @@ extension SelfRepair {
                           corrected.contains(where: { !repair.isCue($0.word) }),
                           !corrected.contains(where: { placeholders.contains($0.word) })
                     else { continue }
-                    // A phrase starts after the whole run of cues.
-                    for end in runEnds where end == words.count || !repair.isCue(words[end].word) {
-                        let length = min(Alignment.phraseLength(from: end, in: words), SelfRepair.correctionPhraseWords)
-                        if !retractsStatement {
-                            guard repair.phrase(words[end..<(end + length)], takesBackFactsIn: corrected, placeholders: placeholders) else {
-                                continue
+                    // A phrase starts after the whole run of cues, and after the corrected words
+                    // said again.
+                    for runEnd in runEnds {
+                        for (end, restated) in phraseStarts(after: runEnd, in: words, repair: repair)
+                        where (end == words.count || !repair.isCue(words[end].word))
+                            && restated.map({ repair.restates(words[$0], corrected) }) ?? true {
+                            let length = min(Alignment.phraseLength(from: end, in: words), SelfRepair.correctionPhraseWords)
+                            if !retractsStatement {
+                                guard repair.phrase(words[end..<(end + length)], takesBackFactsIn: corrected, placeholders: placeholders) else {
+                                    continue
+                                }
+                                spare[end, default: []].formUnion(corrected.map(\.word))
                             }
-                            spare[end, default: []].formUnion(corrected.map(\.word))
+                            ends[start, default: []].append(end)
+                            correctedWords[end, default: []].formUnion(corrected.map(\.word))
                         }
-                        ends[start, default: []].append(end)
-                        correctedWords[end, default: []].formUnion(corrected.map(\.word))
                     }
                 }
             }
@@ -113,25 +119,30 @@ extension SelfRepair {
                 let answers = crosses && words[cueStart - 1].endsQuestion && words[cueStart].word == "no"
                 // The sentence corrected: the one before the cue's, or the cue's own up to the cue.
                 let sentenceStart = (words[..<(cueStart - 1)].lastIndex(where: \.endsSentence) ?? -1) + 1
-                for end in runEnds where !(answers && end - cueStart == 1) && end < words.count && !repair.isCue(words[end].word) {
-                    let longest = Alignment.phraseLength(from: end, in: words)
-                    guard longest > 0 else { continue }
-                    let weak = end - cueStart == 1 && weakCues.contains(words[cueStart].word)
-                    for length in 1...min(longest, SelfRepair.correctionPhraseWords) {
-                        let phrase = end..<(end + length)
-                        for start in sentenceStart..<cueStart {
-                            for count in 1...min(repair.retractionLimit, cueStart - start) {
-                                let corrected = start..<(start + count)
-                                // Within a sentence, a phrase that stays where it is was Medium's.
-                                guard crosses || corrected.upperBound < cueStart,
-                                      !words[corrected].contains(where: { $0.opensPhrase > 0 }),
-                                      repair.relates(words[start], to: words[phrase], weak: weak)
-                                        || (count == 1 && !weak && repair.replaces(words[start], with: words[phrase])),
-                                      repair.relates(words[corrected.upperBound - 1], to: words[phrase], weak: weak)
-                                        || (count == 1 && !weak && repair.replaces(words[start], with: words[phrase])),
-                                      repair.phrase(words[phrase], takesBackFactsIn: words[corrected], placeholders: placeholders)
-                                else { continue }
-                                results.append(rewrite(words, correcting: corrected, cues: cueStart..<end, phrase: phrase))
+                for runEnd in runEnds where !(answers && runEnd - cueStart == 1) {
+                    for (end, restated) in phraseStarts(after: runEnd, in: words, repair: repair)
+                    where end < words.count && !repair.isCue(words[end].word) {
+                        let longest = Alignment.phraseLength(from: end, in: words)
+                        guard longest > 0 else { continue }
+                        // Saying the corrected words again makes even a weak cue a correction.
+                        let weak = restated == nil && end - cueStart == 1 && weakCues.contains(words[cueStart].word)
+                        for length in 1...min(longest, SelfRepair.correctionPhraseWords) {
+                            let phrase = end..<(end + length)
+                            for start in sentenceStart..<cueStart {
+                                for count in 1...min(repair.retractionLimit, cueStart - start) {
+                                    let corrected = start..<(start + count)
+                                    // Within a sentence, a phrase that stays where it is was Medium's.
+                                    guard crosses || corrected.upperBound < cueStart,
+                                          !words[corrected].contains(where: { $0.opensPhrase > 0 }),
+                                          restated.map({ repair.restates(words[$0], words[corrected]) }) ?? true,
+                                          repair.relates(words[start], to: words[phrase], weak: weak)
+                                            || (count == 1 && !weak && repair.replaces(words[start], with: words[phrase])),
+                                          repair.relates(words[corrected.upperBound - 1], to: words[phrase], weak: weak)
+                                            || (count == 1 && !weak && repair.replaces(words[start], with: words[phrase])),
+                                          repair.phrase(words[phrase], takesBackFactsIn: words[corrected], placeholders: placeholders)
+                                    else { continue }
+                                    results.append(rewrite(words, correcting: corrected, cues: cueStart..<end, phrase: phrase))
+                                }
                             }
                         }
                     }
@@ -150,6 +161,20 @@ extension SelfRepair {
             moved[moved.count - 1].endsSentence = lastCorrected.endsSentence
             moved[moved.count - 1].endsQuestion = lastCorrected.endsQuestion
             return Array(words[..<corrected.lowerBound]) + moved + words[corrected.upperBound..<cues.lowerBound] + words[phrase.upperBound...]
+        }
+
+        /// Where a correction's phrase can start after a run of cues that ends at `end`: there, or,
+        /// when "not" follows the cues, after the corrected words said again, in the same sentence
+        /// ("Tuesday, sorry, not Tuesday, Thursday"), with the range of the words said again, which
+        /// must be among the corrected words (``SelfRepair/restates(_:_:)``).
+        private static func phraseStarts(after end: Int, in words: [SaidWord], repair: SelfRepair) -> [(start: Int, restated: Range<Int>?)] {
+            var starts: [(start: Int, restated: Range<Int>?)] = [(end, nil)]
+            guard end < words.count, words[end].word == SelfCorrection.restatingWord else { return starts }
+            for last in (end + 1)..<min(end + 1 + repair.retractionLimit, words.count) {
+                guard !words[last].endsSentence else { break }
+                starts.append((last + 1, (end + 1)..<(last + 1)))
+            }
+            return starts
         }
 
         /// Where each run of cues can end, by where it starts.
@@ -228,6 +253,17 @@ extension SelfRepair {
         let content = phrase.filter { isContent($0.word) }
         guard isContent(word.word), factKind(word) == nil, content.count == 1, let other = content.first else { return false }
         return factKind(other) == nil
+    }
+
+    /// Whether `restated`, said after a cue and "not", says again some of the `corrected` words:
+    /// its words that carry meaning, at least one, are a run of theirs ("not the kitchen" for
+    /// "kitchen", "not marketing" for "marketing team"). Only then does the "not" go with the
+    /// correction; any other keeps what it negates ("Thursday, not Friday").
+    func restates(_ restated: ArraySlice<SaidWord>, _ corrected: ArraySlice<SaidWord>) -> Bool {
+        let content = { (words: ArraySlice<SaidWord>) in words.map(\.word).filter { !isFunctionWord($0) && !isFiller($0) } }
+        let said = content(restated), taken = content(corrected)
+        guard !said.isEmpty, said.count <= taken.count else { return false }
+        return (0...(taken.count - said.count)).contains { taken[$0..<($0 + said.count)].elementsEqual(said) }
     }
 
     /// Whether `phrase` takes back every fact in `corrected` with one of its own kind: a number

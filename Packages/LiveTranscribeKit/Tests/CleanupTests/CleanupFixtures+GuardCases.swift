@@ -89,6 +89,16 @@ extension CleanupFixtures.Guard {
             completed("The build is green.", "The build is green."),
             completed("cars sorry buses", "Buses."),
             completed("sorry I'm late", "Sorry, I'm late."),
+            completed("the meeting is in room four no not four five", "The meeting is in room five."),
+            completed("book the flight for tuesday sorry not tuesday thursday morning", "Book the flight for Thursday morning."),
+            completed("ask priya no not priya megan to review the draft", "Ask Megan to review the draft."),
+            completed("we need three chairs sorry not three four chairs for the demo", "We need four chairs for the demo."),
+            completed("i left the keys in the kitchen sorry not the kitchen the garage", "I left the keys in the garage."),
+            completed("words like docker sorry not docker kubernetes never come out right", "Words like Kubernetes never come out right."),
+            completed("we need three chairs sorry not four", "We need four chairs."),
+            completed("send the blue file to sam sorry not blue red", "Send the blue file to red."),
+            completed("words like docker sorry not docker kubernetes never come out right", "Words like Docker never come out right."),
+            completed("the demo is on tuesday sorry thursday not friday", "The demo is on Thursday, not Friday."),
 
             // DroppedWordsTests
             completed(
