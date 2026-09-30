@@ -38,7 +38,8 @@ const MAX_REPAIR_WORDS: usize = 2;
 ///   number, a day, a month or a name) put in place of what it corrects, with the rest of the
 ///   earlier sentence kept. One may not answer a question: "Is it tomorrow? No, the day after."
 ///   keeps its "No". A cue's words are taken out only with the correction they make, and never
-///   changed ("make that" is not "made that");
+///   changed ("make that" is not "made that"). Nor may a correction that opens a later sentence
+///   be dropped whole, leaving what it corrects as said;
 /// - inside a correction phrase, up to [`MAX_REPAIR_WORDS`] new words or changed words, and the
 ///   words it corrects, which is how a garbled phrase is read as meant ("tomorrow. No, sorry, the
 ///   after tomorrow" → "the day after tomorrow");
@@ -97,6 +98,13 @@ impl SelfRepair {
         let spoken = WordSet::new(said.iter().map(|word| &word.word));
         let aligns =
             |candidate: &[SaidWord]| Alignment::new(self, candidate, &written, placeholders, &spoken).reaches_end();
+        // Re-using the words it corrects, a repaired phrase could come out as those words.
+        if corrections::dropped(&said, self)
+            .iter()
+            .any(|candidate| aligns(candidate))
+        {
+            return false;
+        }
         aligns(&said)
             || self
                 .rewrites(&said, placeholders)

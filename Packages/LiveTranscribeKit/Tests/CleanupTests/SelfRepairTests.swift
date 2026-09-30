@@ -76,6 +76,22 @@ struct SelfRepairTests {
         #expect(review(raw, dropped) == .rejected(.invalidRepair))
     }
 
+    /// Dropping a correction made in a later sentence leaves what it took back as said, however the
+    /// check could read its phrase: re-using the words it corrects, a repaired phrase can come out
+    /// as those words.
+    @Test("A correction in a later sentence can't be dropped with what it corrects kept", arguments: [
+        ("Meet me at the Old Town Hall. Actually no, the Town Hall.", "Meet me at the Town Hall."),
+        ("The parcel goes to the Melbourne office. Sorry, no, the Sydney office.", "The parcel goes to the Sydney office."),
+        ("The demo is on Tuesday at noon. Sorry, Wednesday.", "The demo is on Wednesday at noon."),
+        ("We need three servers for the launch. Sorry, four.", "We need four servers for the launch."),
+    ])
+    func keepsACorrectionInALaterSentence(raw: String, resolved: String) {
+        #expect(review(raw, resolved) == .accepted(resolved))
+        let sentences = raw.split(separator: ". ", maxSplits: 1)
+        let dropped = String(sentences[0]) + "."
+        #expect(review(raw, dropped) == .rejected(.invalidRepair), "\(dropped)")
+    }
+
     @Test func aCorrectionTakesBackNoFactItDoesNotReplace() {
         let raw = "I'm not free on Tuesday. Sorry, Wednesday."
         #expect(review(raw, "I'm not free on Wednesday.") == .accepted("I'm not free on Wednesday."))

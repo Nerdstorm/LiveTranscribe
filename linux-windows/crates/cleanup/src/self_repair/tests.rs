@@ -142,6 +142,34 @@ fn keeps_the_rest_of_the_corrected_sentence() {
     }
 }
 
+/// The Mac app's `keepsACorrectionInALaterSentence`: dropping a correction made in a later
+/// sentence leaves what it took back as said, however the check could read its phrase.
+#[test]
+fn a_correction_in_a_later_sentence_cant_be_dropped_with_what_it_corrects_kept() {
+    for (raw, resolved) in [
+        (
+            "Meet me at the Old Town Hall. Actually no, the Town Hall.",
+            "Meet me at the Town Hall.",
+        ),
+        (
+            "The parcel goes to the Melbourne office. Sorry, no, the Sydney office.",
+            "The parcel goes to the Sydney office.",
+        ),
+        (
+            "The demo is on Tuesday at noon. Sorry, Wednesday.",
+            "The demo is on Wednesday at noon.",
+        ),
+        (
+            "We need three servers for the launch. Sorry, four.",
+            "We need four servers for the launch.",
+        ),
+    ] {
+        assert_eq!(review(raw, resolved), accepted(resolved), "{raw:?}");
+        let dropped = format!("{}.", raw.split(". ").next().expect("two sentences"));
+        assert_eq!(review(raw, &dropped), INVALID, "{dropped:?}");
+    }
+}
+
 #[test]
 fn a_correction_takes_back_no_fact_it_does_not_replace() {
     let raw = "I'm not free on Tuesday. Sorry, Wednesday.";

@@ -88,6 +88,28 @@ pub(super) fn spans(words: &[SaidWord], repair: &SelfRepair, placeholders: &Word
     spans
 }
 
+/// `words` without each correction that opens a later sentence, from its cue to the end of that
+/// sentence: the text an answer would be that dropped the correction and kept what it corrects as
+/// said ("Meet me at the Old Town Hall. Actually no, the Town Hall." → "Meet me at the Old Town
+/// Hall."), which no repair gives.
+pub(super) fn dropped(words: &[SaidWord], repair: &SelfRepair) -> Vec<Vec<SaidWord>> {
+    cue_runs(words, repair)
+        .into_keys()
+        .filter(|&cue_start| cue_start > 0 && words[cue_start - 1].ends_sentence)
+        .map(|cue_start| {
+            let sentence_end = words[cue_start..]
+                .iter()
+                .position(|word| word.ends_sentence)
+                .map_or(words.len(), |offset| cue_start + offset + 1);
+            words[..cue_start]
+                .iter()
+                .chain(&words[sentence_end..])
+                .cloned()
+                .collect()
+        })
+        .collect()
+}
+
 /// The words said with the corrections whose phrase goes back applied, in every way they may be:
 /// first one, then, in each result, one more, up to [`MAX_APPLIED`]. In each result, a moved
 /// phrase opens a correction phrase ([`SaidWord::opens_phrase`]) that may re-use the words it

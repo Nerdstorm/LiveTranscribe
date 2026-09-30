@@ -21,7 +21,8 @@ import Shared
 ///   number, a day, a month or a name) put in place of what it corrects, with the rest of the
 ///   earlier sentence kept. One may not answer a question: "Is it tomorrow? No, the day after."
 ///   keeps its "No". A cue's words are taken out only with the correction they make, and never
-///   changed ("make that" is not "made that");
+///   changed ("make that" is not "made that"). Nor may a correction that opens a later sentence
+///   be dropped whole, leaving what it corrects as said;
 /// - inside a correction phrase, up to ``maxRepairWords`` new words or changed words, and the words
 ///   it corrects, which is how a garbled phrase is read as meant ("tomorrow. No, sorry, the after
 ///   tomorrow" → "the day after tomorrow");
@@ -65,9 +66,12 @@ struct SelfRepair: Sendable {
         let written = Self.writtenWords(in: cleaned)
         guard !said.isEmpty else { return written.isEmpty }
         let spoken = Set(said.map(\.word))
-        return ([said] + Corrections.applied(to: said, repair: self, placeholders: placeholders)).contains { candidate in
+        func aligns(_ candidate: [SaidWord]) -> Bool {
             Alignment(repair: self, said: candidate, written: written, placeholders: placeholders, spoken: spoken).reachesEnd()
         }
+        // Re-using the words it corrects, a repaired phrase could come out as those words.
+        guard !Corrections.dropped(from: said, repair: self).contains(where: aligns) else { return false }
+        return ([said] + Corrections.applied(to: said, repair: self, placeholders: placeholders)).contains(where: aligns)
     }
 
     /// Marks every word of every correction cue in `words`.

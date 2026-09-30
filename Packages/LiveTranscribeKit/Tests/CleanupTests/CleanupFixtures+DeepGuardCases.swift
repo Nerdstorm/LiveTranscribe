@@ -46,6 +46,10 @@ extension CleanupFixtures.Guard {
             ("We need three servers for the launch. Sorry, four.", "We need four."),
             ("Chloe is presenting at the all hands. Sorry, no, Karen.", "Karen is presenting at the all hands."),
             ("Chloe is presenting at the all hands. Sorry, no, Karen.", "Karen is presenting."),
+            // It can't be dropped with what it corrects kept.
+            ("Meet me at the Old Town Hall. Actually no, the Town Hall.", "Meet me at the Town Hall."),
+            ("Meet me at the Old Town Hall. Actually no, the Town Hall.", "Meet me at the Old Town Hall."),
+            ("The parcel goes to the Melbourne office. Sorry, no, the Sydney office.", "The parcel goes to the Melbourne office."),
             // It takes back no fact it doesn't replace; a negation only with its verb.
             ("I'm not free on Tuesday. Sorry, Wednesday.", "I'm not free on Wednesday."),
             ("I'm not free on Tuesday. Sorry, Wednesday.", "I'm free on Wednesday."),

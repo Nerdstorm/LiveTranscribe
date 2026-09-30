@@ -83,6 +83,18 @@ extension SelfRepair {
             return results
         }
 
+        /// `words` without each correction that opens a later sentence, from its cue to the end of
+        /// that sentence: the text an answer would be that dropped the correction and kept what it
+        /// corrects as said ("Meet me at the Old Town Hall. Actually no, the Town Hall." → "Meet me
+        /// at the Old Town Hall."), which no repair gives.
+        static func dropped(from words: [SaidWord], repair: SelfRepair) -> [[SaidWord]] {
+            cueRuns(in: words, repair: repair).keys.sorted().compactMap { cueStart in
+                guard cueStart > 0, words[cueStart - 1].endsSentence else { return nil }
+                let sentenceEnd = words[cueStart...].firstIndex(where: \.endsSentence).map { $0 + 1 } ?? words.count
+                return Array(words[..<cueStart] + words[sentenceEnd...])
+            }
+        }
+
         /// How many corrections whose phrase goes back one dictation may have resolved.
         static let maxApplied = 2
         /// How many ways of applying them are checked, which bounds the search.
