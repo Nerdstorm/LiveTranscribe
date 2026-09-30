@@ -1,20 +1,25 @@
 //! What dictation needs from the desktop it runs on: what the focused field is, typing into it,
 //! the clipboard, and the panel by the mouse pointer. It is one trait, so the rest of dictation (the
 //! engine and its speech model, the controller's view of the machine, the tray and Settings) is the
-//! same on every system, and each system's part is a module of its own: [`linux`], through
-//! lt-wayland.
+//! same on every system, and each system's part is a module of its own: `linux`, through
+//! lt-wayland, and `windows`, through lt-windows and a window of the app's own for the panel.
 //!
 //! Every call returns at once: the desktop types and draws on threads of its own, and says how an
 //! insertion went through its callback.
 
 #[cfg(target_os = "linux")]
 mod linux;
+#[cfg(windows)]
+mod windows;
 
 use lt_dictation_ui::{PanelContent, PanelView};
 use lt_insertion::{Inserted, InsertionConfiguration, InsertionTarget};
+use tauri::AppHandle;
 
 #[cfg(target_os = "linux")]
 pub(crate) use linux::{connect, hotkey_blocker, hotkey_problem};
+#[cfg(windows)]
+pub(crate) use windows::{connect, hotkey_blocker, hotkey_problem, panel_commands};
 
 /// What the dictation panel needs; without it, no panel shows.
 pub(crate) struct PanelConfiguration {
@@ -46,6 +51,9 @@ pub(crate) trait Desktop: Send {
 
     /// Shows the dictation panel with `content`, or hides it.
     fn show_panel(&self, content: Option<PanelContent>);
+
+    /// The app's windows are up: a desktop whose panel is one of them can show it from now on.
+    fn attach(&self, _app: &AppHandle) {}
 }
 
 /// `text` with its first letter in upper case, for an error's message at the start of a sentence.

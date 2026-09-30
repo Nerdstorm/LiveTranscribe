@@ -1,0 +1,14 @@
+/* The panel's window is transparent: only what the frames draw shows. */
+
+html,
+body {
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}

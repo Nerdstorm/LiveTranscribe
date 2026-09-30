@@ -16,6 +16,7 @@ use lt_dictation_ui::{Blocker, ModelState, PanelModel};
 use lt_hotkey::{HotkeyEvent, HotkeyWatch, display_name, key_code};
 use lt_insertion::Inserted;
 use lt_shared::CleanupLevel;
+use tauri::AppHandle;
 
 use super::configuration::{self, ModelChoice};
 use super::desktop::Desktop;
@@ -97,6 +98,11 @@ pub(crate) struct Engine {
 }
 
 impl Engine {
+    /// The app's windows are up, for a desktop that shows the panel in one of them.
+    pub(crate) fn attach(&self, app: &AppHandle) {
+        self.desktop.attach(app);
+    }
+
     /// Runs the engine on a thread of its own, telling how things stand through `status`.
     pub(crate) fn start(self, status: StatusSink) {
         let spawned = thread::Builder::new()

@@ -2354,6 +2354,7 @@ dependencies = [
  "lt-shared",
  "lt-transcription",
  "lt-wayland",
+ "lt-windows",
  "reqwest",
  "rustls",
  "serde",

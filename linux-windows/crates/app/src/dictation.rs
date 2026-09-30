@@ -173,8 +173,9 @@ pub fn run(options: &Options) -> anyhow::Result<()> {
         received,
     };
     let control = Box::new(EngineControl(messages.clone()));
-    tray::run(messages, settings, library, control, false, move |status| {
-        engine.start(status)
+    tray::run(messages, settings, library, control, false, move |app, status| {
+        engine.attach(app);
+        engine.start(status);
     })
 }
 
@@ -190,11 +191,18 @@ fn run_blocked(
     eprintln!("livetranscribe: dictation can't start: {detail}");
     let control = Box::new(EngineControl(messages.clone()));
     let service = Arc::clone(&settings);
-    tray::run(messages, settings, library, control, true, move |status: StatusSink| {
-        status(&blocked_status(&service.current().0, &blocker));
-        // Turning dictation off, or on, still shows.
-        service.subscribe(move |settings, _| status(&blocked_status(settings, &blocker)));
-    })
+    tray::run(
+        messages,
+        settings,
+        library,
+        control,
+        true,
+        move |_, status: StatusSink| {
+            status(&blocked_status(&service.current().0, &blocker));
+            // Turning dictation off, or on, still shows.
+            service.subscribe(move |settings, _| status(&blocked_status(settings, &blocker)));
+        },
+    )
 }
 
 fn blocked_status(settings: &Settings, blocker: &Blocker) -> DictationStatus {

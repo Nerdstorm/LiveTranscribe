@@ -2,7 +2,7 @@
 //! only one can be the input method.
 
 use std::fs::{File, OpenOptions, TryLockError};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, bail};
 
@@ -13,12 +13,28 @@ pub(crate) struct InstanceLock {
     _held: File,
 }
 
-/// Takes the lock in the session's runtime folder, where the desktop's other apps look too.
+/// Takes the lock, one per user.
 pub(crate) fn acquire() -> anyhow::Result<InstanceLock> {
+    acquire_at(&lock_path()?)
+}
+
+/// In the session's runtime folder, where the desktop's other apps look too.
+#[cfg(not(windows))]
+fn lock_path() -> anyhow::Result<PathBuf> {
     let folder = dirs::runtime_dir()
         .or_else(dirs::cache_dir)
         .context("neither XDG_RUNTIME_DIR nor a cache folder is set")?;
-    acquire_at(&folder.join(LOCK_FILE))
+    Ok(folder.join(LOCK_FILE))
+}
+
+/// In the app's folder in the user's local app data.
+#[cfg(windows)]
+fn lock_path() -> anyhow::Result<PathBuf> {
+    let folder = dirs::data_local_dir()
+        .context("the local app data folder is unknown")?
+        .join("live-transcribe");
+    std::fs::create_dir_all(&folder).with_context(|| format!("couldn't make {}", folder.display()))?;
+    Ok(folder.join(LOCK_FILE))
 }
 
 fn acquire_at(path: &Path) -> anyhow::Result<InstanceLock> {

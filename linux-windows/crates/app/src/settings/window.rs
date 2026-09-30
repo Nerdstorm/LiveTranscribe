@@ -490,6 +490,32 @@ mod tests {
     use super::*;
 
     #[test]
+    fn every_key_the_page_records_is_one_this_system_knows() {
+        // The page names keys as linux/input-event-codes.h does, and so do the settings, on every
+        // system: each name it can record must have a key code here.
+        let page = include_str!("../../ui/settings.js");
+        let table = &page[page.find("const KEY_NAMES").expect("the page's table of keys")..];
+        let table = &table[..table.find("})();").expect("the table's end")];
+        let mut names: Vec<String> = table
+            .split('"')
+            .skip(1)
+            .step_by(2)
+            .filter(|name| name.starts_with("KEY_"))
+            .map(str::to_owned)
+            .collect();
+        assert!(names.len() > 60, "the table was read: {names:?}");
+        // The names the page makes in loops.
+        names.extend(('A'..='Z').map(|letter| format!("KEY_{letter}")));
+        names.extend((0..=9).flat_map(|digit| [format!("KEY_{digit}"), format!("KEY_KP{digit}")]));
+        names.extend((1..=24).map(|number| format!("KEY_F{number}")));
+        let unknown: Vec<&String> = names.iter().filter(|name| key_code(name).is_none()).collect();
+        assert!(
+            unknown.is_empty(),
+            "keys the page records that this system doesn't know: {unknown:?}"
+        );
+    }
+
+    #[test]
     fn converted_models_are_the_folders_with_a_manifest_but_the_catalogs() {
         let folder = std::env::temp_dir().join(format!("lt-models-{}", std::process::id()));
         let _ = fs::remove_dir_all(&folder);

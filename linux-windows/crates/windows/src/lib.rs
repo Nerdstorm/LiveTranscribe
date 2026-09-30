@@ -1,5 +1,6 @@
 //! The app's desktop on Windows, as `lt-wayland` is on Linux: typing dictated text into the
-//! focused app, the clipboard, and what the focused field is.
+//! focused app, the clipboard, and what the focused field is; and the console a command was typed
+//! in, which a windowed program has to ask for.
 //!
 //! Text is typed as Unicode keystrokes (SendInput), so it goes in whatever the script and the
 //! keyboard layout, and the clipboard is untouched. Where nothing would take it, the text is left
@@ -25,6 +26,6 @@ mod system;
 mod text;
 
 #[cfg(windows)]
-pub use console::attach_parent_console;
+pub use console::{attach_parent_console, show_error};
 #[cfg(windows)]
 pub use session::{SessionError, TypingSession};

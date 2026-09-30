@@ -1,12 +1,16 @@
-//! `livetranscribe`, the Linux (and later Windows) app: dictation, and transcribing audio files,
-//! with the Mac app's speech to text.
+//! `livetranscribe`, the Linux and Windows app: dictation, and transcribing audio files, with the
+//! Mac app's speech to text.
 
-#[cfg(target_os = "linux")]
+// On Windows a windowed program, so the app opens no console window when it starts from the Start
+// menu; it prints to the console it was started in, if any. Debug builds stay console programs.
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
+#[cfg(any(target_os = "linux", windows))]
 mod dictation;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 mod keys;
 mod paths;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 mod settings;
 mod speech_models;
 mod transcribe;
@@ -52,10 +56,10 @@ struct ModelOptions {
 enum Command {
     /// Dictation: hold the hotkey, speak, and the text is typed into the focused app. The tray's
     /// Settings… sets it up; the options here set it for one run
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", windows))]
     Run(dictation::Options),
     /// Prints the name of each key pressed, for choosing the hotkey
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", windows))]
     Keys,
     /// Lists the speech models this app can download, and which are downloaded
     Models,
@@ -73,6 +77,8 @@ enum Command {
 }
 
 fn main() -> ExitCode {
+    #[cfg(windows)]
+    let has_console = lt_windows::attach_parent_console();
     // Quiet unless asked: LIVETRANSCRIBE_LOG=info (or debug) shows what the app does. Transcripts
     // are never logged.
     tracing_subscriber::fmt()
@@ -86,13 +92,13 @@ fn main() -> ExitCode {
     }
 
     let result = match Cli::parse().command {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", windows))]
         None => dictation::run(&dictation::Options::default()),
-        #[cfg(not(target_os = "linux"))]
-        None => Err(anyhow::anyhow!("dictation isn't here yet on this system; see --help")),
-        #[cfg(target_os = "linux")]
+        #[cfg(not(any(target_os = "linux", windows)))]
+        None => Err(anyhow::anyhow!("dictation isn't here on this system; see --help")),
+        #[cfg(any(target_os = "linux", windows))]
         Some(Command::Run(options)) => dictation::run(&options),
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", windows))]
         Some(Command::Keys) => keys::run(),
         Some(Command::Models) => transcribe::list_models(),
         Some(Command::Transcribe { model, files, json }) => transcribe::run(&model, &files, json),
@@ -101,6 +107,11 @@ fn main() -> ExitCode {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("livetranscribe: {error:#}");
+            // Started from the Start menu, there is no console to say it in.
+            #[cfg(windows)]
+            if !has_console {
+                lt_windows::show_error(&format!("{error:#}"));
+            }
             ExitCode::FAILURE
         }
     }
