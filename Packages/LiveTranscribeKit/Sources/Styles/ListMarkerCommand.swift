@@ -14,7 +14,7 @@ import Shared
 /// the release"), but not after a comma ("number one, is it ready?") or in a question ("number
 /// one is it ready?").
 ///
-/// Used only where lists are laid out: Medium and High, in fields that take several lines.
+/// Used only where lists are laid out: from Medium up, in fields that take several lines.
 /// Elsewhere the model sees the words, and text that is not laid out gets them back.
 public struct ListMarkerCommand: PhraseMatcher {
     static let numberedKeywords: Set<String> = ["number", "item", "step"]

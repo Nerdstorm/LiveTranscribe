@@ -49,7 +49,7 @@ enum GeneralSettingsCleanupNotes {
     /// What the levels do without the cleanup model. Filler removal and layout need no model
     /// (`CleanupExecutor.deterministicCleanup`, `Layout`); the live transcript runs no cleanup at
     /// all without it.
-    static let withoutModel = "nothing is reworded: dictation still removes filler words and lays out spoken lists and letters at Medium and High, and the live transcript shows what was heard."
+    static let withoutModel = "nothing is reworded: dictation still removes filler words and lays out spoken lists and letters from Medium up, and the live transcript shows what was heard."
 
     /// The cleanup model when it is off or is about to change; `nil` while it is on and stays on.
     private static func modelNote(inEffect: ModelSwitches, stored: ModelSwitches) -> String? {

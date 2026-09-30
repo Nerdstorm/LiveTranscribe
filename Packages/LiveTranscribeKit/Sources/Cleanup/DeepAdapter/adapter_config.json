@@ -1,0 +1,10 @@
+{
+  "base_model" : "mlx-community/Qwen3-1.7B-4bit",
+  "base_revision" : "3b1b1768f8f8cf8351c712464f906e86c2b8269e",
+  "fine_tune_type" : "lora",
+  "lora_parameters" : {
+    "rank" : 8,
+    "scale" : 20
+  },
+  "num_layers" : 16
+}
