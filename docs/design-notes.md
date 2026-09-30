@@ -1,7 +1,7 @@
 # Design notes
 
 Why Live Transcribe is built the way it is. Its two pipelines and the layout of the code are
-in the README's [Architecture](../README.md#architecture).
+in [Architecture](architecture.md), with diagrams.
 
 - **The adapters are switched per request**: the self-correction adapter at Medium and High,
   Deep's at Deep, and none at Light, so Light never resolves corrections. Both adapt the same

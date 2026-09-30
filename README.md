@@ -124,6 +124,7 @@ the other languages haven't been tested with cleanup. The speech model is Qwen3-
 | [Releasing](docs/releasing.md) | The Developer ID certificate, the notary credentials and the update signing key, and writing the changelog, building, notarizing, publishing and offering a release as an update |
 | [Known limitations](docs/limitations.md) | What doesn't work well yet |
 | [Development](docs/development.md) | The tests and their audio clips, the bench and the dictation eval, training the adapter, the licence notices, and the icons |
+| [Architecture](docs/architecture.md) | For contributors: how dictation and cleanup work step by step, with diagrams, where each step's code is on the Mac and on Linux and Windows, and where to make a change |
 | [Design notes](docs/design-notes.md) | Why it is built the way it is |
 | [Dictation design](docs/dictation.md) | Dictation's decisions, assumptions, architecture, settings and eval results |
 | [Training the adapters](Packages/LiveTranscribeKit/Training/README.md) | The self-correction and Deep adapters' datasets, training and evaluation |
@@ -271,8 +272,8 @@ reads and writes the settings in UserDefaults directly. Everything else depends 
 `SessionSink`, the in-memory `MemorySessionSink`. Dictation and the live transcript share one
 instance of each model; they never run at the same time.
 
-Why it is built this way: [Design notes](docs/design-notes.md) and
-[Dictation design](docs/dictation.md).
+Each step, with diagrams, and where to change what: [Architecture](docs/architecture.md). Why it
+is built this way: [Design notes](docs/design-notes.md) and [Dictation design](docs/dictation.md).
 
 ## Models and credits
 
