@@ -25,11 +25,13 @@ lt-vocabulary = { path = "crates/vocabulary" }
 lt-cleanup = { path = "crates/cleanup" }
 lt-dictation = { path = "crates/dictation" }
 lt-transcription = { path = "crates/transcription" }
+lt-language-model = { path = "crates/language-model" }
 lt-hotkey = { path = "crates/hotkey" }
 lt-capture = { path = "crates/capture" }
 lt-insertion = { path = "crates/insertion" }
 lt-dictation-ui = { path = "crates/dictation-ui" }
 lt-wayland = { path = "crates/wayland" }
+lt-windows = { path = "crates/windows" }
 
 ab_glyph = "0.2"
 anyhow = "1"
@@ -37,6 +39,10 @@ anyhow = "1"
 # already has (zip's bzip2, and sherpa-onnx-sys's tar).
 bzip2 = "0.5"
 clap = { version = "4", features = ["derive"] }
+# The Windows clipboard behind a safe API, for dictated text nothing could take: the text, and the
+# formats that keep it out of the clipboard history. BSL-1.0 (permissive, as MIT is); arboard, which
+# wraps it, would add image support and an older windows-sys. Pinned: it was read at this version.
+clipboard-win = "=5.4.1"
 cpal = "0.18"
 dirs = "6"
 evdev = "0.13"
@@ -69,6 +75,15 @@ wayland-client = "0.31"
 wayland-protocols = { version = "0.32", features = ["client", "staging", "unstable"] }
 wayland-protocols-misc = { version = "0.3", features = ["client"] }
 wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+# Win32 behind safe wrappers, for typing on Windows (SendInput, the focused window and control, and
+# whether an app runs as administrator) and attaching to the console: the windows crate's calls are
+# all unsafe, which the workspace forbids. MIT, no dependencies, released monthly. Pinned exactly:
+# its API still changes between 0.0 versions, and it was read at this one.
+winsafe = { version = "=0.0.29", features = ["advapi", "user"] }
+# Windows' low-level keyboard hook (WH_KEYBOARD_LL) behind a safe API, for the dictation hotkey: it
+# reports each key's press and release wherever the focus is, and never translates keys (as rdev
+# does, which breaks dead keys in the focused app). MIT. Pinned: it was read at this version.
+willhook = "=0.6.3"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

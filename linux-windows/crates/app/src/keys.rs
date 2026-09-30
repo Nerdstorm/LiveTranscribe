@@ -23,8 +23,7 @@ pub fn run() -> anyhow::Result<()> {
             println!("{} ({code}) on {}", key_name(code), keyboard.name);
         }
     });
-    let keyboards =
-        watching.map_err(|error| anyhow::anyhow!(hotkey_problem(&error, std::env::var_os("APPIMAGE").is_some())))?;
+    let keyboards = watching.map_err(|error| anyhow::anyhow!(hotkey_problem(&error)))?;
     let names: Vec<_> = keyboards.iter().map(|keyboard| keyboard.name.as_str()).collect();
     eprintln!(
         "Press the key you want to hold for dictation; its name is what `run --key` takes. \

@@ -1,17 +1,19 @@
-//! The controller's view of this machine: the microphone, the speech model's thread, and the
-//! Wayland session, which types the text and shows the panel. What happens is printed to
-//! standard error as it happens; what was said never is.
+//! The controller's view of this machine: the microphone, the speech model's and the cleanup
+//! model's threads, and the desktop, which types the text and shows the panel. What happens is
+//! printed to standard error as it happens; what was said never is.
 
 use std::sync::mpsc::Sender;
 use std::time::Instant;
 
 use lt_capture::Recorder;
+use lt_cleanup::{CancelFlag, CleanupExecutor, CleanupModelNotLoaded, CleanupOptions, OutputGuard, PromptBuilder};
 use lt_dictation::{Dependencies, Job, Notice, Phase, Recording};
 use lt_dictation_ui::{PanelContent, PanelModel};
 use lt_insertion::InsertionTarget;
-use lt_wayland::WaylandSession;
 
+use super::cleaner::{CleanupJob, CleanupJobs};
 use super::configuration;
+use super::desktop::Desktop;
 use super::engine::Message;
 use super::transcriber::{Clip, Jobs};
 use crate::settings::Settings;
@@ -34,9 +36,15 @@ pub(crate) struct Platform {
     recorder: Recorder,
     /// The speech model's jobs, while it is loaded.
     transcriber: Option<Jobs>,
+    /// The cleanup model's jobs, while it is loaded.
+    cleaner: Option<CleanupJobs>,
+    /// The cleanup under way, to stop if the dictation is cancelled.
+    cleaning: Option<(Job, CancelFlag)>,
+    /// How long a cleanup may take (Settings › Advanced).
+    cleanup_timeout_seconds: f64,
     /// The Language setting each recording goes to the model with.
     language: Option<String>,
-    session: WaylandSession,
+    desktop: Box<dyn Desktop>,
     messages: Sender<Message>,
     panel: PanelModel,
     /// What the panel shows now.
@@ -47,17 +55,20 @@ pub(crate) struct Platform {
 impl Platform {
     pub(crate) fn new(
         recorder: Recorder,
-        session: WaylandSession,
+        desktop: Box<dyn Desktop>,
         messages: Sender<Message>,
         panel: PanelModel,
-        language: Option<String>,
+        settings: &Settings,
         clock: Clock,
     ) -> Self {
         Self {
             recorder,
             transcriber: None,
-            language,
-            session,
+            cleaner: None,
+            cleaning: None,
+            cleanup_timeout_seconds: settings.cleanup_timeout_seconds,
+            language: configuration::language(settings),
+            desktop,
             messages,
             panel,
             shown: None,
@@ -70,13 +81,19 @@ impl Platform {
         self.transcriber = transcriber;
     }
 
+    /// Sends cleanups to `cleaner` from now on; `None` while no cleanup model is loaded.
+    pub(crate) fn set_cleaner(&mut self, cleaner: Option<CleanupJobs>) {
+        self.cleaner = cleaner;
+    }
+
     /// Records, transcribes, shows messages and pastes with `settings` from the next time each
     /// happens.
     pub(crate) fn configure(&mut self, settings: &Settings) {
         self.recorder.configure(configuration::recorder(settings));
         self.language = configuration::language(settings);
+        self.cleanup_timeout_seconds = settings.cleanup_timeout_seconds;
         self.panel.set_notice_ms(configuration::notice_ms(settings));
-        self.session.set_insertion(configuration::insertion(settings));
+        self.desktop.set_insertion(configuration::insertion(settings));
     }
 
     /// When the panel's message runs out: call [`Self::advance_panel`] then.
@@ -91,13 +108,13 @@ impl Platform {
 
     /// Puts `text` on the clipboard, for *Copy Last Dictation*.
     pub(crate) fn copy(&self, text: String) {
-        self.session.copy(text);
+        self.desktop.copy(text);
     }
 
     fn refresh_panel(&mut self) {
         let content = self.panel.content();
         if content != self.shown {
-            self.session.show_panel(content.clone());
+            self.desktop.show_panel(content.clone());
             self.shown = content;
         }
     }
@@ -135,7 +152,7 @@ impl Dependencies for Platform {
     }
 
     fn target(&mut self) -> InsertionTarget {
-        self.session.target()
+        self.desktop.target()
     }
 
     fn transcribe(&mut self, job: Job, samples: Vec<f32>) {
@@ -154,16 +171,48 @@ impl Dependencies for Platform {
         }
     }
 
+    fn clean(&mut self, job: Job, text: String, options: CleanupOptions) {
+        let cancel = CancelFlag::new();
+        self.cleaning = Some((job, cancel.clone()));
+        if let Some(cleaner) = &self.cleaner {
+            let cleanup = CleanupJob {
+                job,
+                text,
+                options,
+                timeout_seconds: self.cleanup_timeout_seconds,
+                cancel,
+            };
+            if let Err(unsent) = cleaner.send(cleanup) {
+                let CleanupJob {
+                    text, options, cancel, ..
+                } = unsent.0;
+                self.clean_without_the_model(job, &text, &options, &cancel);
+            }
+        } else {
+            self.clean_without_the_model(job, &text, &options, &cancel);
+        }
+    }
+
+    fn cancel_cleanup(&mut self, job: Job) {
+        if let Some((cleaning, cancel)) = self.cleaning.take()
+            && cleaning == job
+        {
+            cancel.cancel();
+        }
+    }
+
     fn prepare_insertion(&mut self) {
-        self.session.prepare();
+        self.desktop.prepare();
     }
 
     fn insert(&mut self, job: Job, text: String) {
         let messages = self.messages.clone();
-        self.session.insert(text, move |result| {
-            let result = result.map_err(|error| error.to_string());
-            let _ = messages.send(Message::Inserted { job, result });
-        });
+        self.desktop.insert(
+            text,
+            Box::new(move |result| {
+                let _ = messages.send(Message::Inserted { job, result });
+            }),
+        );
     }
 
     fn phase_changed(&mut self, phase: Phase) {
@@ -180,6 +229,7 @@ impl Dependencies for Platform {
     }
 
     fn end_dictation(&mut self, notices: Vec<Notice>) {
+        self.cleaning = None;
         notices.iter().for_each(print);
         self.panel.end_dictation(notices, self.clock.now_ms());
         self.refresh_panel();
@@ -189,6 +239,17 @@ impl Dependencies for Platform {
         print(&notice);
         self.panel.show_progress(notice, self.clock.now_ms());
         self.refresh_panel();
+    }
+}
+
+impl Platform {
+    /// The cleanup model isn't loaded (it's downloading, loading or failed): the level's rules
+    /// that need no model apply, and the dictation says it fell back, as the Mac app's does before
+    /// its model loads.
+    fn clean_without_the_model(&self, job: Job, text: &str, options: &CleanupOptions, cancel: &CancelFlag) {
+        let executor = CleanupExecutor::new(0, 0.0, OutputGuard::default(), PromptBuilder::new(false));
+        let cleaned = executor.run(text, &[], options, &mut CleanupModelNotLoaded, cancel);
+        let _ = self.messages.send(Message::Cleaned { job, cleaned });
     }
 }
 

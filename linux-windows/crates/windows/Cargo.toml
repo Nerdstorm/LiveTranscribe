@@ -1,0 +1,20 @@
+[package]
+name = "lt-windows"
+description = "The app's desktop on Windows: typing dictated text as Unicode keystrokes, the clipboard, and what the focused field is."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lt-insertion.workspace = true
+tracing.workspace = true
+unicode-segmentation.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+clipboard-win.workspace = true
+winsafe.workspace = true
+
+[lints]
+workspace = true

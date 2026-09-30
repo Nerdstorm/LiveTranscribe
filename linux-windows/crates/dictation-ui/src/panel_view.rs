@@ -84,6 +84,18 @@ impl Rendered {
         }
         bytes
     }
+
+    /// The pixels as a web page's canvas takes them (ImageData): R, G, B, A, not premultiplied.
+    pub fn rgba8888(&self) -> Vec<u8> {
+        self.pixmap
+            .pixels()
+            .iter()
+            .flat_map(|pixel| {
+                let color = pixel.demultiply();
+                [color.red(), color.green(), color.blue(), color.alpha()]
+            })
+            .collect()
+    }
 }
 
 pub struct PanelView {
@@ -611,5 +623,25 @@ mod tests {
             height: 1,
         };
         assert_eq!(rendered.argb8888(), [30, 20, 10, 255]);
+    }
+
+    #[test]
+    fn pixels_convert_to_a_canvas_order_without_premultiplying() {
+        let mut pixmap = Pixmap::new(2, 1).expect("two pixels");
+        pixmap.fill(Color::from_rgba8(200, 100, 50, 128));
+        let rendered = Rendered {
+            pixmap,
+            width: 2,
+            height: 1,
+        };
+        let rgba = rendered.rgba8888();
+        assert_eq!(rgba.len(), 8);
+        // Premultiplied, the red would be about 100; the canvas gets it back to about 200.
+        for pixel in rgba.chunks(4) {
+            assert!(pixel[0].abs_diff(200) <= 1, "{pixel:?}");
+            assert!(pixel[1].abs_diff(100) <= 1, "{pixel:?}");
+            assert!(pixel[2].abs_diff(50) <= 1, "{pixel:?}");
+            assert_eq!(pixel[3], 128);
+        }
     }
 }

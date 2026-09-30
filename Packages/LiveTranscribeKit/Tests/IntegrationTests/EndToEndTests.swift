@@ -15,7 +15,7 @@ extension Tag {
     @Tag static var models: Self
 }
 
-private let modelTestsEnabled = ProcessInfo.processInfo.environment["LT_RUN_MODEL_TESTS"] == "1"
+let modelTestsEnabled = ProcessInfo.processInfo.environment["LT_RUN_MODEL_TESTS"] == "1"
 
 private struct GrantedMicrophone: MicrophonePermissionProviding {
     func status() -> MicrophonePermissionStatus { .granted }

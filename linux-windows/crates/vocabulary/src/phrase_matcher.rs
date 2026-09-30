@@ -29,9 +29,11 @@ struct RankedPattern {
     order: usize,
 }
 
-/// Finds whole-word phrase matches in tokenised text: whole words only, case-insensitive,
-/// punctuation around the phrase ignored, and nothing but spaces or hyphens between its words.
-/// The last word may carry a possessive "'s".
+/// Finds whole-word phrase matches in tokenised text.
+///
+/// Shared by the replacer and the selector so both agree on what "occurs in the text" means: whole
+/// words only, case-insensitive, punctuation around the phrase ignored, and nothing but spaces or
+/// hyphens between its words. The last word may carry a possessive "'s".
 #[derive(Clone, Debug, Default)]
 pub(crate) struct PhraseMatcher {
     /// Patterns indexed by their first word, each list ordered longest first and then in the
@@ -67,6 +69,14 @@ impl PhraseMatcher {
         self.candidates(&words[start])
             .into_iter()
             .find_map(|candidate| matching(&candidate.pattern, start, words, text))
+    }
+
+    /// Every match starting at word `start`, longest first.
+    pub fn all_matches(&self, start: usize, words: &[TextWord], text: &str) -> Vec<Match> {
+        self.candidates(&words[start])
+            .into_iter()
+            .filter_map(|candidate| matching(&candidate.pattern, start, words, text))
+            .collect()
     }
 
     fn candidates(&self, word: &TextWord) -> Vec<&RankedPattern> {

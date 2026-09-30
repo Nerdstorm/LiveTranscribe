@@ -2,7 +2,8 @@
 //! status line, Start or Stop Dictation, Cancel Dictation, Copy Last Dictation, the Cleanup level,
 //! Settings and Quit. Tauri owns the main thread, the menu and the Settings window; the engine's
 //! status arrives from its thread, and the menu's choices go back to it as messages, or as changed
-//! settings. The icon is drawn for the desktop's light or dark mode each time it changes.
+//! settings. The icon is drawn for the taskbar's light or dark mode (the desktop's, on Linux) each
+//! time it changes.
 
 use std::cell::Cell;
 use std::sync::Arc;
@@ -13,19 +14,21 @@ use lt_dictation_ui::{Blocker, MenuBarIcon, MenuBarStatus, ModelState, Theme, dr
 use lt_shared::CleanupLevel;
 use serde_json::{Map, Value};
 use tauri::image::Image;
+use tauri::ipc::Invoke;
 use tauri::menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{TrayIcon, TrayIconBuilder};
 use tauri::{AppHandle, RunEvent, Wry};
 
-use super::engine::{DictationStatus, MenuCommand, Message, StatusSink};
+use super::engine::{CleanupModelStatus, DictationStatus, MenuCommand, Message, StatusSink};
 use crate::settings::{self, AppControl, BlockerView, SettingsService, StatusView, WindowState};
 use crate::speech_models::{SpeechModelLibrary, Stage};
 
 /// Pixels on a side of the tray icon; the tray scales it to fit.
 const ICON_SIZE: u32 = 64;
 
-/// Runs the app's main loop with the tray in it, calling `start` once the tray is up. Returns
-/// only if the tray can't start: quitting ends the process.
+/// Runs the app's main loop with the tray in it, calling `start` once the tray is up, with the
+/// app's handle for windows of its own. Returns only if the tray can't start: quitting ends the
+/// process.
 ///
 /// `blocked`: dictation can't start, so Settings opens at once to say why, and closing it quits,
 /// since there's nothing to leave running (and GNOME shows no tray to quit from).
@@ -35,19 +38,22 @@ pub(crate) fn run(
     library: Arc<SpeechModelLibrary>,
     control: Box<dyn AppControl>,
     blocked: bool,
-    start: impl FnOnce(StatusSink) + Send + 'static,
+    start: impl FnOnce(&AppHandle, StatusSink) + Send + 'static,
 ) -> anyhow::Result<()> {
     let app = tauri::Builder::default()
         .manage(WindowState::new(Arc::clone(&settings), Arc::clone(&library), control))
-        .invoke_handler(settings::commands())
+        .invoke_handler(commands())
         .setup(move |app| {
             settings::follow_changes(app.handle(), &settings, &library);
             let tray = Tray::build(app.handle(), messages, settings)?;
             let handle = app.handle().clone();
-            start(Box::new(move |status| {
-                tray.show(status);
-                settings::show_status(&handle, status_view(status));
-            }));
+            start(
+                app.handle(),
+                Box::new(move |status| {
+                    tray.show(status);
+                    settings::show_status(&handle, status_view(status));
+                }),
+            );
             if blocked && let Err(error) = settings::open_window(app.handle()) {
                 tracing::error!("Couldn't open the Settings window: {error}");
             }
@@ -64,6 +70,21 @@ pub(crate) fn run(
         }
     });
     Ok(())
+}
+
+/// The commands the app's pages call: the Settings window's, and on Windows the dictation
+/// panel's, which asks for the frames it shows.
+fn commands() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
+    let settings = settings::commands();
+    #[cfg(windows)]
+    let panel = super::desktop::panel_commands();
+    move |invoke: Invoke| {
+        #[cfg(windows)]
+        if invoke.message.command() == "panel_frames" {
+            return panel(invoke);
+        }
+        settings(invoke)
+    }
 }
 
 /// How dictation stands, for the Settings window.
@@ -85,6 +106,8 @@ fn status_view(status: &DictationStatus) -> StatusView {
             detail: None,
             model_id: None,
             percent: None,
+            cleanup_model: "off",
+            cleanup_detail: None,
             blocker,
         };
     }
@@ -116,12 +139,34 @@ fn status_view(status: &DictationStatus) -> StatusView {
         ),
         (ModelState::Failed(error), _) => ("failed", Some(error.clone()), None),
     };
+    let (cleanup_model, cleanup_detail) = cleanup_model_view(status.cleanup_model.as_ref());
     StatusView {
         model,
         detail,
         model_id: status.model_id.clone(),
         percent,
+        cleanup_model,
+        cleanup_detail,
         blocker: None,
+    }
+}
+
+/// How cleanup's language model stands, as Settings › Advanced shows it.
+fn cleanup_model_view(status: Option<&CleanupModelStatus>) -> (&'static str, Option<String>) {
+    let Some(status) = status else {
+        return ("off", None);
+    };
+    match (&status.state, status.download) {
+        (ModelState::Loading { .. }, Some(progress)) => {
+            let size = format!("{}% of {:.1} GB", progress.percent(), progress.total as f64 / 1e9);
+            match progress.stage {
+                Stage::Checking => ("checking", Some(size)),
+                Stage::Downloading | Stage::Unpacking => ("downloading", Some(size)),
+            }
+        }
+        (ModelState::Loading { .. }, None) => ("loading", None),
+        (ModelState::Ready, _) => ("ready", status.placement.clone()),
+        (ModelState::Failed(error), _) => ("failed", Some(error.clone())),
     }
 }
 
@@ -178,7 +223,7 @@ impl Tray {
             ],
         )?;
         let choices = levels.clone();
-        let theme = Theme::detect();
+        let theme = Theme::detect_taskbar();
         let icon = TrayIconBuilder::with_id("live-transcribe")
             .icon(icon_image(MenuBarIcon::Loading, theme))
             .tooltip("Live Transcribe, loading speech models")
@@ -239,8 +284,8 @@ impl Tray {
             self.copy.set_enabled(menu.can_copy_last_dictation),
             self.icon.set_tooltip(Some(indicator.accessibility_label())),
         ];
-        // Drawn again only when it changes, or the desktop has changed mode since.
-        let wanted = (indicator.icon(), Theme::detect());
+        // Drawn again only when it changes, or the taskbar has changed mode since.
+        let wanted = (indicator.icon(), Theme::detect_taskbar());
         if self.drawn.get() != Some(wanted) {
             results.push(self.icon.set_icon(Some(icon_image(wanted.0, wanted.1))));
             self.drawn.set(Some(wanted));
@@ -267,7 +312,7 @@ fn choose_cleanup(settings: &SettingsService, choices: &[(CleanupLevel, CheckMen
             settings.current().0.cleanup_level
         }
     };
-    // Each item ticks itself when chosen; the rest untick here, so the four read as one choice.
+    // Each item ticks itself when chosen; the rest untick here, so the levels read as one choice.
     for (other, item) in choices {
         if let Err(error) = item.set_checked(*other == level) {
             tracing::warn!("Couldn't update the Cleanup menu: {error}");
@@ -279,7 +324,7 @@ fn cleanup_id(level: CleanupLevel) -> String {
     format!("cleanup-{}", level.as_str())
 }
 
-/// `icon` for the desktop's light or dark mode.
+/// `icon` for the taskbar's light or dark mode.
 fn icon_image(icon: MenuBarIcon, theme: Theme) -> Image<'static> {
     let image = draw_icon(icon, theme, ICON_SIZE);
     Image::new_owned(image.rgba, image.width, image.height)

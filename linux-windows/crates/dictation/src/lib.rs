@@ -12,4 +12,4 @@ mod prepared_dictation;
 
 pub use dictation_controller::{ControllerConfiguration, Dependencies, DictationController, Job, Phase, Recording};
 pub use dictation_notice::Notice;
-pub use dictation_processor::{Configuration, Output, finish};
+pub use dictation_processor::{Configuration, Output, Pending, Prepared, finish, prepare};

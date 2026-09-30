@@ -1,7 +1,7 @@
 // Bench: runs fixture clips through the real pipeline and reports WER (raw vs cleaned) and
 // per-stage latency. Build with xcodebuild (MLX needs its Metal library); see docs/development.md.
 //
-//   Bench [--fixtures <dir>] [--level none|light|medium|high] [--no-cleanup] [--no-adapter] [--fast] [--stt-model <repo or folder>] [--stt-language <code>]
+//   Bench [--fixtures <dir>] [--level none|light|medium|high|deep] [--no-cleanup] [--no-adapter] [--fast] [--stt-model <repo or folder>] [--stt-language <code>]
 //   Bench --dictation [--clips <dir>] [--level <level>]... [--multiline] [--p95-target-ms <ms>] [--verbose] [--no-adapter] [--stt-model <repo or folder>] [--stt-language <code>]
 
 import Capture
@@ -95,7 +95,7 @@ enum BenchError: LocalizedError {
         case .usage(let detail):
             """
             \(detail)
-            usage: Bench [--fixtures <dir>] [--level none|light|medium|high] [--no-cleanup] [--no-adapter] [--fast] [--stt-model <repo or folder>] [--stt-language <code>]
+            usage: Bench [--fixtures <dir>] [--level none|light|medium|high|deep] [--no-cleanup] [--no-adapter] [--fast] [--stt-model <repo or folder>] [--stt-language <code>]
                    Bench --dictation [--clips <dir>] [--level <level>]... [--multiline] [--p95-target-ms <ms>] [--verbose] [--no-adapter] [--stt-model <repo or folder>] [--stt-language <code>]
             """
         case .noFixtures(let path):

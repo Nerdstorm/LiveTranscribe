@@ -73,8 +73,10 @@ sentence, a sentence the speech model broke at a hesitation, and a spoken "comma
 - **Dictate from any app.** Hold **fn (🌐)** or a shortcut of your own, or double-tap it for
   hands-free. A small circle by the mouse pointer shows what is happening, and Esc cancels.
 - **Make it yours.** Snippets insert saved text when you say their phrase, and vocabulary spells
-  your names and jargon your way. Choose how much it edits: **None**, **Light**, **Medium** or
-  **High**.
+  your names and jargon your way. Choose how much it edits: **None**, **Light**, **Medium**,
+  **High**, or **Deep**, which also follows a correction back into an earlier sentence ("…is
+  tomorrow. No, sorry, the after tomorrow." → "…is the day after tomorrow."), fixes grammar and
+  lays out emails and lists.
 - **Dependable, app after app.** Text goes in through Accessibility and is read back, or is
   pasted with your clipboard put back, so terminals, browsers and Electron apps work too. Line
   breaks go only where they belong, and nothing goes into a password field.
@@ -115,16 +117,17 @@ the other languages haven't been tested with cleanup. The speech model is Qwen3-
 |---|---|
 | [Features](docs/features.md) | Everything Live Transcribe does, in detail, and what's coming next |
 | [Using Live Transcribe](docs/using.md) | First launch, dictating, Dictation History, the live transcript, microphones, updates and every Settings tab |
-| [Cleanup and spoken commands](docs/cleanup.md) | The four cleanup levels, what OutputGuard rejects, and the phrases that become emoji, punctuation, line breaks and addresses |
+| [Cleanup and spoken commands](docs/cleanup.md) | The five cleanup levels, what OutputGuard and Deep's check reject, how Deep was chosen, and the phrases that become emoji, punctuation, line breaks and addresses |
 | [Snippets, vocabulary and apps](docs/snippets-vocabulary-apps.md) | Saved text, your names and jargon, and how each app gets its text and line breaks |
 | [Privacy](docs/privacy.md) | What is kept where, what goes over the network, and how to remove it all |
 | [Signing and Gatekeeper](docs/signing.md) | Ad-hoc signing, and keeping permissions across rebuilds |
 | [Releasing](docs/releasing.md) | The Developer ID certificate, the notary credentials and the update signing key, and writing the changelog, building, notarizing, publishing and offering a release as an update |
 | [Known limitations](docs/limitations.md) | What doesn't work well yet |
 | [Development](docs/development.md) | The tests and their audio clips, the bench and the dictation eval, training the adapter, the licence notices, and the icons |
+| [Architecture](docs/architecture.md) | For contributors: how dictation and cleanup work step by step, with diagrams, where each step's code is on the Mac and on Linux and Windows, and where to make a change |
 | [Design notes](docs/design-notes.md) | Why it is built the way it is |
 | [Dictation design](docs/dictation.md) | Dictation's decisions, assumptions, architecture, settings and eval results |
-| [Training the adapter](Packages/LiveTranscribeKit/Training/README.md) | The self-correction adapter's dataset, training and evaluation |
+| [Training the adapters](Packages/LiveTranscribeKit/Training/README.md) | The self-correction and Deep adapters' datasets, training and evaluation |
 
 ## Status
 
@@ -269,20 +272,21 @@ reads and writes the settings in UserDefaults directly. Everything else depends 
 `SessionSink`, the in-memory `MemorySessionSink`. Dictation and the live transcript share one
 instance of each model; they never run at the same time.
 
-Why it is built this way: [Design notes](docs/design-notes.md) and
-[Dictation design](docs/dictation.md).
+Each step, with diagrams, and where to change what: [Architecture](docs/architecture.md). Why it
+is built this way: [Design notes](docs/design-notes.md) and [Dictation design](docs/dictation.md).
 
 ## Models and credits
 
 The app downloads the models from Hugging Face. They are not part of this repository and not
-covered by its licence. The cleanup adapter, a 10 MB LoRA adapter for Qwen3-1.7B, is part of
-this repository.
+covered by its licence. The cleanup adapters, two 10 MB LoRA adapters for Qwen3-1.7B (one that
+resolves self-corrections at Medium and High, and Deep's), are part of this repository.
 
 | Role | Model used | Original model | Licence |
 |---|---|---|---|
 | Speech-to-text | [Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit](https://huggingface.co/Nerdstorm/Qwen3-ASR-0.6B-Sinhala-8bit) | [Qwen3-ASR-0.6B](https://huggingface.co/Qwen/Qwen3-ASR-0.6B) by the Qwen team, Alibaba Cloud, [fine-tuned for Sinhala](https://github.com/Nerdstorm/LiveTranscribe-Sinhala) by Nerdstorm on [OpenSLR 52](https://www.openslr.org/52/) (Google, CC BY-SA 4.0) | CC-BY-SA-4.0 |
 | Cleanup | [mlx-community/Qwen3-1.7B-4bit](https://huggingface.co/mlx-community/Qwen3-1.7B-4bit) | [Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B) by the Qwen team, Alibaba Cloud | Apache-2.0 |
 | Self-correction adapter | bundled (`Sources/Cleanup/Adapter`) | trained on synthetic data in this repository ([`Training/`](Packages/LiveTranscribeKit/Training/README.md)) | MIT |
+| Deep adapter | bundled (`Sources/Cleanup/DeepAdapter`) | trained on synthetic data in this repository ([`Training/`](Packages/LiveTranscribeKit/Training/README.md)) | MIT |
 | Voice activity detection | [mlx-community/silero-vad](https://huggingface.co/mlx-community/silero-vad) | [Silero VAD](https://github.com/snakers4/silero-vad) by the Silero team | MIT |
 
 **Settings › Models** offers other speech-to-text models to download and switch to, without a
@@ -300,8 +304,7 @@ uploaded. The app finds the kind of model from its config.json, listed in
 
 The cleanup and voice activity models can be changed in **Settings › Advanced** (a Hugging Face
 repository ID for each; it is downloaded on the next launch). They must be models mlx-swift-lm or
-mlx-audio-swift can load, and the self-correction adapter is used only with
-mlx-community/Qwen3-1.7B-4bit.
+mlx-audio-swift can load, and the adapters are used only with mlx-community/Qwen3-1.7B-4bit.
 
 Built with [mlx-swift](https://github.com/ml-explore/mlx-swift),
 [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm),

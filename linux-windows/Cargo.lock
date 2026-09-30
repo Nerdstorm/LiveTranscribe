@@ -581,6 +581,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c133bc6a41be0d194c306b5506d15e6feeea7b1d6604bd3f8310dfb2ca96486"
 
 [[package]]
+name = "clipboard-win"
+version = "5.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bde03770d3df201d4fb868f2c9c59e66a3e4e2bd06692a0fe701e7103c7e84d4"
+dependencies = [
+ "error-code",
+]
+
+[[package]]
 name = "colorchoice"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1139,6 +1148,12 @@ dependencies = [
  "libc",
  "windows-sys 0.61.2",
 ]
+
+[[package]]
+name = "error-code"
+version = "3.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b5343afd4a8365a643ac588dab4cf234a190c7f6c88c9f6dd6ffe00837661b7"
 
 [[package]]
 name = "evdev"
@@ -2332,13 +2347,16 @@ dependencies = [
  "dirs 6.0.0",
  "hound",
  "lt-capture",
+ "lt-cleanup",
  "lt-dictation",
  "lt-dictation-ui",
  "lt-hotkey",
  "lt-insertion",
+ "lt-language-model",
  "lt-shared",
  "lt-transcription",
  "lt-wayland",
+ "lt-windows",
  "reqwest",
  "rustls",
  "serde",
@@ -2367,6 +2385,9 @@ version = "0.1.0"
 dependencies = [
  "lt-shared",
  "lt-styles",
+ "serde",
+ "serde_json",
+ "tracing",
 ]
 
 [[package]]
@@ -2397,6 +2418,7 @@ dependencies = [
  "lt-insertion",
  "tiny-skia",
  "tracing",
+ "winsafe",
 ]
 
 [[package]]
@@ -2405,6 +2427,7 @@ version = "0.1.0"
 dependencies = [
  "evdev",
  "tracing",
+ "willhook",
 ]
 
 [[package]]
@@ -2412,6 +2435,23 @@ name = "lt-insertion"
 version = "0.1.0"
 dependencies = [
  "tracing",
+]
+
+[[package]]
+name = "lt-language-model"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "openvino",
+ "reqwest",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tracing",
+ "tracing-subscriber",
+ "unicode-normalization",
+ "unicode-properties",
 ]
 
 [[package]]
@@ -2451,6 +2491,7 @@ dependencies = [
 name = "lt-transcription"
 version = "0.1.0"
 dependencies = [
+ "lt-language-model",
  "lt-shared",
  "openvino",
  "realfft",
@@ -2481,6 +2522,17 @@ dependencies = [
  "wayland-protocols",
  "wayland-protocols-misc",
  "wayland-protocols-wlr",
+]
+
+[[package]]
+name = "lt-windows"
+version = "0.1.0"
+dependencies = [
+ "clipboard-win",
+ "lt-insertion",
+ "tracing",
+ "unicode-segmentation",
+ "winsafe",
 ]
 
 [[package]]
@@ -5430,6 +5482,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "willhook"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "984cc87572ddeee205caab3372ca4d84596c363e6c809294dc4514ef43f5e83e"
+dependencies = [
+ "once_cell",
+ "winapi",
+]
+
+[[package]]
 name = "winapi"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5788,6 +5850,12 @@ dependencies = [
  "cfg-if",
  "windows-sys 0.59.0",
 ]
+
+[[package]]
+name = "winsafe"
+version = "0.0.29"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ef0ffc427f045c0cc9ebffd6f4f91153dcd2a1547b5c3c29ee3f541e16e95c6"
 
 [[package]]
 name = "wit-bindgen"

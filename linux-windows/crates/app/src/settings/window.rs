@@ -31,6 +31,8 @@ pub(crate) trait AppControl: Send + Sync {
     fn pause_hotkey(&self, paused: bool);
     /// Loads the speech model again, after it failed.
     fn reload_model(&self);
+    /// Loads the cleanup model again, after it failed.
+    fn reload_cleanup_model(&self);
 }
 
 /// What Tauri keeps for the window's commands.
@@ -70,6 +72,11 @@ pub(crate) struct StatusView {
     pub(crate) model_id: Option<String>,
     /// How far downloading, unpacking or checking it has got.
     pub(crate) percent: Option<u8>,
+    /// Cleanup's language model: `off`, `downloading`, `checking`, `loading`, `ready` or
+    /// `failed`.
+    pub(crate) cleanup_model: &'static str,
+    /// How far its download has got, where it runs, or why it couldn't load.
+    pub(crate) cleanup_detail: Option<String>,
     /// Why dictation can't start at all, if it can't.
     pub(crate) blocker: Option<BlockerView>,
 }
@@ -149,6 +156,7 @@ pub(crate) fn commands() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         describe_hotkey,
         pause_hotkey,
         reload_model,
+        reload_cleanup_model,
         dictation_status,
     ]
 }
@@ -162,7 +170,7 @@ struct Snapshot {
     defaults: Settings,
     /// Keys the command line sets for this run: the next start sets them again.
     overridden: Vec<String>,
-    advanced_keys: [&'static str; 1],
+    advanced_keys: &'static [&'static str],
     /// The hotkey as people say it ("Right Ctrl").
     hotkey_name: String,
     cleanup_levels: Vec<CleanupChoice>,
@@ -188,7 +196,7 @@ impl Snapshot {
             settings: settings.clone(),
             defaults: Settings::default(),
             overridden: overridden.to_vec(),
-            advanced_keys: ADVANCED_KEYS,
+            advanced_keys: &ADVANCED_KEYS,
             cleanup_levels: CleanupLevel::ALL
                 .into_iter()
                 .map(|level| CleanupChoice {
@@ -477,6 +485,12 @@ async fn reload_model(state: State<'_, WindowState>) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn reload_cleanup_model(state: State<'_, WindowState>) -> Result<(), String> {
+    state.control.reload_cleanup_model();
+    Ok(())
+}
+
+#[tauri::command]
 async fn dictation_status(state: State<'_, WindowState>) -> Result<Option<StatusView>, String> {
     Ok(lock(&state.status).clone())
 }
@@ -488,6 +502,32 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_key_the_page_records_is_one_this_system_knows() {
+        // The page names keys as linux/input-event-codes.h does, and so do the settings, on every
+        // system: each name it can record must have a key code here.
+        let page = include_str!("../../ui/settings.js");
+        let table = &page[page.find("const KEY_NAMES").expect("the page's table of keys")..];
+        let table = &table[..table.find("})();").expect("the table's end")];
+        let mut names: Vec<String> = table
+            .split('"')
+            .skip(1)
+            .step_by(2)
+            .filter(|name| name.starts_with("KEY_"))
+            .map(str::to_owned)
+            .collect();
+        assert!(names.len() > 60, "the table was read: {names:?}");
+        // The names the page makes in loops.
+        names.extend(('A'..='Z').map(|letter| format!("KEY_{letter}")));
+        names.extend((0..=9).flat_map(|digit| [format!("KEY_{digit}"), format!("KEY_KP{digit}")]));
+        names.extend((1..=24).map(|number| format!("KEY_F{number}")));
+        let unknown: Vec<&String> = names.iter().filter(|name| key_code(name).is_none()).collect();
+        assert!(
+            unknown.is_empty(),
+            "keys the page records that this system doesn't know: {unknown:?}"
+        );
+    }
 
     #[test]
     fn converted_models_are_the_folders_with_a_manifest_but_the_catalogs() {

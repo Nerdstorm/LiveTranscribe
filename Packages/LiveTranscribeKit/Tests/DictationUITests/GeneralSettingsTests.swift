@@ -92,14 +92,14 @@ struct GeneralSettingsTests {
         }
     }
 
-    /// Without the model, Medium and High still remove fillers and format lists, so the levels
+    /// Without the model, the levels from Medium up still remove fillers and format lists, so they
     /// do not work like None; the note says what does happen.
     @Test func cleanupNotesSayWhatTheLevelsStillDoWithTheModelOff() {
         let off = Switches(cleanupEnabled: false, adapterEnabled: true)
         for level in CleanupLevel.allCases {
             let text = notes(level, inEffect: off)
             #expect(text.contains("The cleanup model is off in Advanced, so nothing is reworded"), "\(level)")
-            #expect(text.contains("still removes filler words and lays out spoken lists and letters at Medium and High"), "\(level)")
+            #expect(text.contains("still removes filler words and lays out spoken lists and letters from Medium up"), "\(level)")
             #expect(!text.contains("works like None"), "\(level)")
             #expect(!text.contains("Self-corrections"), "the model being off says it all (\(level))")
         }

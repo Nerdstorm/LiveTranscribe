@@ -43,18 +43,16 @@ public enum AdapterTrainer {
         container: ModelContainer,
         baseModel: String,
         baseRevision: String,
-        train: [TrainingExample],
-        valid: [TrainingExample],
-        template: PromptTemplate,
-        contextLimit: Int,
+        train: [TrainingItem],
+        valid: [TrainingItem],
         options: TrainingOptions,
         output: URL,
         log: @escaping @Sendable (String) -> Void
     ) async throws -> TrainingReport {
         try await container.perform(values: TrainingJob(train: train, valid: valid)) { context, job in
             let started = Date()
-            let tokenize = { (example: TrainingExample) in
-                try TrainingText.tokenize(example, template: template, contextLimit: contextLimit, tokenizer: context.tokenizer)
+            let tokenize = { (item: TrainingItem) in
+                try TrainingText.tokenize(item, tokenizer: context.tokenizer)
             }
             let trainSet = try job.train.map(tokenize)
             let validSet = try job.valid.map(tokenize)
@@ -181,8 +179,8 @@ public enum AdapterTrainer {
 
 /// The examples, sent into the model container's isolation.
 private struct TrainingJob: Sendable {
-    let train: [TrainingExample]
-    let valid: [TrainingExample]
+    let train: [TrainingItem]
+    let valid: [TrainingItem]
 }
 
 /// mlx's `adapter_config.json`, extended with the base model and commit.

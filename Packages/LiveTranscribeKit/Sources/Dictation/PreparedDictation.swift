@@ -18,7 +18,7 @@ import Vocabulary
 struct PreparedDictation {
     /// The transcript with phrases replaced and vocabulary applied: what cleanup starts from.
     let text: String
-    /// Lists and letters are laid out: at Medium and High, in fields that take several lines.
+    /// Lists and letters are laid out: from Medium up, in fields that take several lines.
     let laysOut: Bool
     private let protected: ProtectedText
     private let layout: Layout
@@ -38,6 +38,13 @@ struct PreparedDictation {
     /// The placeholder tokens in `text`, which cleanup must keep.
     var placeholders: [String] {
         protected.tokens
+    }
+
+    /// Whether the speaker laid `body` out: it holds a line break or list marker they said, which
+    /// the layout rules lay out after cleanup. Deep's model then leaves the layout to the rules,
+    /// or both would lay out the same list.
+    func hasSpokenLayout(in body: String) -> Bool {
+        protected.placeholders.contains { $0.role != .content && body.contains($0.token) }
     }
 
     /// The text before cleanup, which Undo AI edit puts back: phrases replaced and line breaks

@@ -38,8 +38,8 @@ impl TextFrame {
 }
 
 /// Lays out dictated text by intent: lists become numbered or bulleted lines, a letter gets its
-/// salutation and sign-off on lines of their own. Runs at Medium and High, in fields that take
-/// several lines.
+/// salutation and sign-off on lines of their own. Runs from Medium up, in fields that take several
+/// lines.
 ///
 /// Two kinds of rule, so a new structure is one more rule:
 /// - a [`FrameRule`] finds a structure in the words before cleanup and lays out the parts the

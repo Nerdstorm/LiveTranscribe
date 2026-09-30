@@ -4,7 +4,9 @@
 //! ([`Inserted`]). How each platform types is elsewhere: `lt-wayland` on Linux, which commits
 //! through the input method where the field takes it, and otherwise pastes: the text goes on the
 //! clipboard, the paste shortcut is typed, and once the app has read the text the clipboard gets
-//! back what it held. Text nothing read stays on the clipboard for the user to paste.
+//! back what it held. Text nothing read stays on the clipboard for the user to paste. `lt-windows`
+//! on Windows types the text as Unicode keystrokes, and leaves it on the clipboard when nothing
+//! that takes text has the focus.
 //!
 //! Dictated text is never logged.
 
@@ -47,6 +49,9 @@ pub enum InsertionMethod {
     InputMethod,
     /// Pasted through the clipboard.
     Paste,
+    /// Typed as Unicode keystrokes (Windows' SendInput), straight into the focused field. The
+    /// clipboard is untouched.
+    Keystrokes,
 }
 
 impl InsertionMethod {
@@ -55,6 +60,7 @@ impl InsertionMethod {
         match self {
             Self::InputMethod => "input method",
             Self::Paste => "paste",
+            Self::Keystrokes => "keystrokes",
         }
     }
 }

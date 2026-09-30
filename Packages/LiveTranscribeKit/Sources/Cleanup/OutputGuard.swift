@@ -37,6 +37,19 @@ public enum FallbackReason: Sendable, Equatable, CustomStringConvertible {
     case timedOut(seconds: Double)
     case cancelled
     case generationFailed(String)
+    /// The model was still reasoning when its token budget ran out, so it never answered (Deep,
+    /// when thinking is on).
+    case thinkingUnfinished
+    /// Deep's output can't be made from what was said by the edits a repair may make
+    /// (``SelfRepair``): it added, removed or changed something else.
+    case invalidRepair
+    /// Deep broke the text into lines for a field that takes one line.
+    case layoutNotAllowed
+    /// Deep made a bulleted list of fewer than ``SelfRepair/minBulletedItems`` items, of things
+    /// said in a sentence.
+    case shortList
+    /// Deep put a placeholder on a line of its own, such as an emoji below the sentence it ended.
+    case placeholderOnItsOwnLine
 
     public var description: String {
         switch self {
@@ -55,6 +68,20 @@ public enum FallbackReason: Sendable, Equatable, CustomStringConvertible {
         case .timedOut(let seconds): String(format: "timed out after %.1fs", seconds)
         case .cancelled: "cancelled"
         case .generationFailed(let message): "generation failed: \(message)"
+        case .thinkingUnfinished: "ran out of tokens while thinking"
+        case .invalidRepair: "changed more than a repair may"
+        case .layoutNotAllowed: "broke a one-line field into lines"
+        case .shortList: "made a bulleted list of fewer than three items"
+        case .placeholderOnItsOwnLine: "put a placeholder on a line of its own"
+        }
+    }
+
+    /// Whether the model answered and the answer was turned down, rather than no answer coming in
+    /// time.
+    public var rejectsAnAnswer: Bool {
+        switch self {
+        case .timedOut, .cancelled, .generationFailed: false
+        default: true
         }
     }
 }
@@ -180,6 +207,7 @@ public struct OutputGuard: Sendable {
     private let droppedWords: DroppedWords
     private let spokenNames: SpokenNames
     private let contentWords: ContentWords
+    private let selfRepair: SelfRepair
 
     public init(policy: Policy = .default) {
         self.policy = policy
@@ -187,6 +215,7 @@ public struct OutputGuard: Sendable {
         self.droppedWords = DroppedWords(policy: policy)
         self.spokenNames = SpokenNames(policy: policy)
         self.contentWords = ContentWords(policy: policy)
+        self.selfRepair = SelfRepair(policy: policy)
     }
 
     /// Whether `cleaned` has fewer correction cues than `raw`, so that ``review(raw:outcome:)``
@@ -228,6 +257,27 @@ public struct OutputGuard: Sendable {
 
         guard !policy.requiresIntactPlaceholders || Self.keepsPlaceholders(options.placeholders, raw: raw, cleaned: cleaned) else {
             return .rejected(.placeholderChanged)
+        }
+
+        // Deep has its own check instead of the limits below: it may repair across sentences and
+        // lay the text out, and may change nothing else.
+        if options.level.repairsAcrossSentences {
+            if !options.multiline, cleaned.contains(where: \.isNewline) {
+                return .rejected(.layoutNotAllowed)
+            }
+            let placeholders = Set(options.placeholders.map(EditDistance.normalize))
+            // Layout the model made, which the text it was given didn't have.
+            let shortLists = { (text: String) in SelfRepair.bulletedListLengths(in: text).filter { $0 < SelfRepair.minBulletedItems }.count }
+            if shortLists(cleaned) > shortLists(raw) {
+                return .rejected(.shortList)
+            }
+            if SelfRepair.placeholderLineCount(in: cleaned, placeholders: placeholders)
+                > SelfRepair.placeholderLineCount(in: raw, placeholders: placeholders) {
+                return .rejected(.placeholderOnItsOwnLine)
+            }
+            return selfRepair.accepts(raw: raw, cleaned: cleaned, placeholders: placeholders)
+                ? .accepted(cleaned)
+                : .rejected(.invalidRepair)
         }
 
         let cleanedWords = EditDistance.words(in: EditDistance.normalize(cleaned))

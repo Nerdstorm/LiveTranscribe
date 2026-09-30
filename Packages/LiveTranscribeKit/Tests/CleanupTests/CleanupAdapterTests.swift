@@ -51,12 +51,58 @@ struct CleanupAdapterTests {
         #expect(CleanupAdapter.selected(for: settings, bundled: adapter) == nil)
     }
 
-    @Test func theBundledAdapterMatchesTheDefaultModel() throws {
-        let adapter = try #require(CleanupAdapter.bundled(), "the trained adapter ships in Sources/Cleanup/Adapter")
+    @Test(arguments: [CleanupRequest.Adapter.medium, .deep])
+    func theBundledAdaptersMatchTheDefaultModel(_ kind: CleanupRequest.Adapter) throws {
+        let adapter = try #require(CleanupAdapter.bundled(kind), "the trained adapters ship in Sources/Cleanup")
         #expect(adapter.baseModel == AppSettings.defaults.llmModel)
         #expect(adapter.baseRevision.count == 40, "pinned to a commit, not a branch")
         #expect(CleanupAdapter.selected(for: .defaults, bundled: adapter) == adapter)
         _ = try adapter.loRAContainer()
+    }
+
+    @Test func theBundledAdaptersShareTheirModelAndLayers() throws {
+        #expect(CleanupAdapter.bundled(.off) == nil)
+        let medium = try #require(CleanupAdapter.bundled(.medium))
+        let deep = try #require(CleanupAdapter.bundled(.deep))
+        #expect(medium.directory != deep.directory)
+        #expect(medium.baseRevision == deep.baseRevision, "both are loaded into one pinned model")
+        #expect(AdapterLayers.shareLayers(try medium.loRAContainer(), try deep.loRAContainer()))
+        let configuration = MLXCleaner.Configuration(settings: .defaults)
+        #expect(MLXCleaner.compatibleAdapters(in: configuration) == [.medium: medium, .deep: deep])
+    }
+
+    @Test func deepsAdapterIsLeftOutWhenTrainedOnAnotherCommit() {
+        let medium = CleanupAdapter(baseModel: "m", baseRevision: commit, directory: URL(fileURLWithPath: "/medium"))
+        let deep = CleanupAdapter(baseModel: "m", baseRevision: commit, directory: URL(fileURLWithPath: "/deep"))
+        let elsewhere = CleanupAdapter(baseModel: "m", baseRevision: String(commit.reversed()), directory: URL(fileURLWithPath: "/deep"))
+        func adapters(_ medium: CleanupAdapter?, _ deep: CleanupAdapter?) -> [CleanupRequest.Adapter: CleanupAdapter] {
+            MLXCleaner.compatibleAdapters(
+                in: MLXCleaner.Configuration(modelID: "m", contextSegments: 3, timeoutSeconds: 1, adapter: medium, deepAdapter: deep)
+            )
+        }
+        #expect(adapters(medium, deep) == [.medium: medium, .deep: deep])
+        #expect(adapters(medium, elsewhere) == [.medium: medium])
+        #expect(adapters(nil, elsewhere) == [.deep: elsewhere])
+        #expect(adapters(nil, nil).isEmpty)
+    }
+
+    @Test func aRequestRunsWithAnAdapterTheModelHas() {
+        let wanted = CleanupRequest.Adapter.allCases
+        #expect(wanted.map { $0.resolved(loaded: [.medium, .deep]) } == [.off, .medium, .deep])
+        #expect(wanted.map { $0.resolved(loaded: [.medium]) } == [.off, .medium, .medium])
+        #expect(wanted.map { $0.resolved(loaded: [.deep]) } == [.off, .off, .deep])
+        #expect(wanted.map { $0.resolved(loaded: []) } == [.off, .off, .off])
+    }
+
+    @Test func deepRunsWithTheSelfCorrectionAdapterWithoutItsOwn() throws {
+        let medium = try #require(CleanupAdapter.bundled(.medium)).loRAContainer()
+        let deep = try #require(CleanupAdapter.bundled(.deep)).loRAContainer()
+        let both = AdapterLayers(adapters: [.medium: medium, .deep: deep])
+        #expect(CleanupRequest.Adapter.allCases.map(both.resolved) == [.off, .medium, .deep])
+        let mediumOnly = AdapterLayers(adapters: [.medium: medium])
+        #expect(CleanupRequest.Adapter.allCases.map(mediumOnly.resolved) == [.off, .medium, .medium])
+        let deepOnly = AdapterLayers(adapters: [.deep: deep])
+        #expect(CleanupRequest.Adapter.allCases.map(deepOnly.resolved) == [.off, .off, .deep])
     }
 
     @Test func theAdapterGetsThePromptItWasTrainedOn() throws {

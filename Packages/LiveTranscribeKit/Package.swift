@@ -126,7 +126,7 @@ let package = Package(
                 .product(name: "Tokenizers", package: "swift-transformers"),
             ],
             // The fine-tuned LoRA adapter that resolves spoken self-corrections (see Training/).
-            resources: [.copy("Adapter")],
+            resources: [.copy("Adapter"), .copy("DeepAdapter")],
             swiftSettings: strictSwift
         ),
 

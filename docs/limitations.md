@@ -15,10 +15,10 @@
   and **Settings › Permissions** now say so and offer **Reopen Live Transcribe**. That reopening
   fixes it is expected but not yet confirmed.
 - **Long dictations are untested.** The eval's longest clip is about 40 words. Cleanup runs on
-  the whole dictation under a 3 s timeout, so a dictation longer than a minute or two will likely
-  be inserted uncleaned (fillers still removed at Medium and High), without a message. Past the
-  recording limit (5 minutes by default) speech is dropped, and the panel says so only when you
-  finish.
+  the whole dictation under a 3 s timeout (8 s at Deep), so a dictation longer than a minute or
+  two will likely be inserted uncleaned (fillers still removed from Medium up), without a
+  message. Past the recording limit (5 minutes by default) speech is dropped, and the panel says
+  so only when you finish.
 - Correcting with a 1.7B model does not reliably fix homophones ("cash" → "cache"). That needs a
   larger model; in dictation, a vocabulary entry fixes a specific one. OutputGuard's similarity
   floor limits how far the model can change the text. **High** behaves close to Medium for the
@@ -34,9 +34,26 @@
 - The self-correction adapter occasionally rewrites a plain sentence (1 of 65 eval clips);
   OutputGuard catches it and inserts the raw transcript instead of the cleaned text. In
   dictation such a fallback is silent: only **Dictation History** shows it, if history is on.
+- **Deep's repairs are learnt from synthetic data**, and were checked on 114 hand-written cases
+  and on dictations of the owner's own; expect less on real speech. The model doesn't always
+  fix what it could ("the traffic were bad" can stay), and the check lets through any other form
+  of a word that was said, so a wrong tense or plural would pass as a repair. The check turns
+  down repairs that reorder words ("Friday night. Sorry, the night Saturday." → "Saturday
+  night"), or that replace a word across a sentence end with one that has nothing in common with
+  it, and then Medium's cleanup is shown. A correction inside a mention ("words like Docker,
+  sorry, not Docker, Kubernetes") the model may leave as said, or read the wrong way round, which
+  the check turns down. Deep is slower: on Medium's 515 test cases it took 0.24 s at p50 and
+  0.31 s at p95 on an M4 Pro, against 0.16 and 0.24 s for Medium, and a rejected answer adds
+  Medium's pass.
 - Spoken lists are laid out only when you say their markers ("first…", "one is…", "number
-  one…", "bullet point…"), and lists and letters only where line breaks are allowed. The model sometimes drops
-  or rewrites a list item; OutputGuard then inserts your words, still laid out.
+  one…", "bullet point…"), and lists and letters only where line breaks are allowed. The model
+  sometimes drops or rewrites a list item; OutputGuard then inserts your words, still laid out.
+  **Deep** also makes lists you didn't mark, in fields that take several lines: things you need
+  or steps to take become a list of three or more ("We need milk, eggs and bread."), which in a
+  chat box may be more than you wanted. What you mark yourself is laid out by the rules. Deep
+  doesn't yet lay out the body of a longer letter: the rules put its greeting and sign-off on
+  lines of their own and the model gets only the body, which it keeps as one paragraph, even
+  where it names a few points ("number one, … and …").
 - A text box in a web page always counts as taking several lines, so a list dictated into a
   web page's one-line field, such as a site's search box, gets line breaks the field then drops
   ("items:1. Milk"). Set that browser to single-line if it happens often.
@@ -67,7 +84,7 @@
   repetition is typed.
 - **Cleanup is written for English.** Text with Sinhala in it skips the cleanup model, which drops
   Sinhala's vowel signs when it copies them. It gets only the steps that need no model, as when
-  cleanup is turned off: snippets, spoken commands and vocabulary, and at Medium and High filler
+  cleanup is turned off: snippets, spoken commands and vocabulary, and from Medium up filler
   removal and layout, all of which listen for English words. The other languages go through the
   English cleanup, which hasn't been tested with them.
 - The speech model learnt Sinhala from read sentences (OpenSLR 52). Conversation, strong accents

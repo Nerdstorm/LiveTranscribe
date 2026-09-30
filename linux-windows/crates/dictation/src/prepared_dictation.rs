@@ -21,7 +21,7 @@ const SENTENCE_ENDERS: [&str; 3] = [".", "!", "?"];
 pub(crate) struct PreparedDictation {
     /// The transcript with phrases replaced and vocabulary applied: what cleanup starts from.
     text: String,
-    /// Lists and letters are laid out: at Medium and High, in fields that take several lines.
+    /// Lists and letters are laid out: from Medium up, in fields that take several lines.
     lays_out: bool,
     protected: ProtectedText,
     layout: Layout,
@@ -47,6 +47,21 @@ impl PreparedDictation {
 
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    /// The placeholder tokens in the text, which cleanup must keep.
+    pub fn placeholders(&self) -> Vec<String> {
+        self.protected.tokens().into_iter().map(str::to_owned).collect()
+    }
+
+    /// Whether the speaker laid `body` out: it holds a line break or list marker they said, which
+    /// the layout rules lay out after cleanup. Deep's model then leaves the layout to the rules, or
+    /// both would lay out the same list.
+    pub fn has_spoken_layout(&self, body: &str) -> bool {
+        self.protected
+            .placeholders()
+            .iter()
+            .any(|placeholder| placeholder.role != Role::Content && body.contains(placeholder.token.as_str()))
     }
 
     /// The text before cleanup, which Undo AI edit puts back: phrases replaced and line breaks in

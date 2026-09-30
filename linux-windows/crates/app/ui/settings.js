@@ -2,8 +2,8 @@
 // The Settings window. It shows the settings in effect and changes one at a time through the
 // app's commands (src/settings/window.rs), which save it, apply it to dictation and send every
 // window the settings now in effect ("settings"), so a change from the tray shows here too.
-// How dictation stands comes as "status", and how each speech model's download goes as
-// "speech-model".
+// How dictation stands, with the speech and cleanup models, comes as "status", and how each
+// speech model's download goes as "speech-model".
 
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
@@ -149,6 +149,7 @@ function render(next) {
   renderMicrophones();
   renderSpeechModels();
   renderDevices();
+  renderCleanupModel();
 }
 
 function renderCleanup(next) {
@@ -527,6 +528,10 @@ function reloadModel() {
   invoke("reload_model").catch((error) => showToast(String(error)));
 }
 
+function reloadCleanupModel() {
+  invoke("reload_cleanup_model").catch((error) => showToast(String(error)));
+}
+
 function showModelProblem(message) {
   const problem = $("#catalog-problem");
   problem.textContent = `${capitalise(message)}.`;
@@ -571,10 +576,28 @@ function renderStatus(next) {
   $("#model-detail").textContent = next?.detail ? capitalise(next.detail) : "";
   $("#reload-model").hidden = state !== "failed";
   renderSpeechModels();
+  renderCleanupModel();
   const blocker = next?.blocker;
   $("#blocker").hidden = !blocker;
   $("#blocker-title").textContent = blocker?.title ?? "";
   $("#blocker-detail").textContent = blocker?.detail ?? "";
+}
+
+/** Cleanup's language model, from the status and whether the setting has it on. */
+function renderCleanupModel() {
+  const state = status?.cleanupModel ?? "off";
+  const enabled = Boolean(snapshot?.settings.cleanupEnabled);
+  $("#cleanup-status").dataset.state = state;
+  $("#cleanup-state").textContent = {
+    off: enabled ? "The cleanup model loads once dictation can start" : "The cleanup model is off",
+    downloading: "Downloading the cleanup model…",
+    checking: "Checking the cleanup model’s files…",
+    loading: "Loading the cleanup model…",
+    ready: "The cleanup model is ready",
+    failed: "The cleanup model couldn’t load",
+  }[state];
+  $("#cleanup-detail").textContent = status?.cleanupDetail ? capitalise(status.cleanupDetail) : "";
+  $("#reload-cleanup").hidden = state !== "failed";
 }
 
 function capitalise(text) {
@@ -738,6 +761,7 @@ function bind() {
     loadSpeechModels();
   });
   $("#reload-model").addEventListener("click", reloadModel);
+  $("#reload-cleanup").addEventListener("click", reloadCleanupModel);
   $("#other-model").addEventListener("input", () => {
     $("#use-other").disabled = !$("#other-model").value.trim();
   });

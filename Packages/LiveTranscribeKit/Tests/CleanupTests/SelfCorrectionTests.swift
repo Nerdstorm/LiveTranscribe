@@ -23,6 +23,35 @@ struct SelfCorrectionTests {
         #expect(review(raw, cleaned) == .accepted(cleaned))
     }
 
+    @Test("A cue followed by \"not\" and the retracted words said again goes with them", arguments: [
+        ("the meeting is in room four no not four five", "The meeting is in room five."),
+        ("book the flight for tuesday sorry not tuesday thursday morning", "Book the flight for Thursday morning."),
+        ("ask priya no not priya megan to review the draft", "Ask Megan to review the draft."),
+        ("we need three chairs sorry not three four chairs for the demo", "We need four chairs for the demo."),
+        ("i left the keys in the kitchen sorry not the kitchen the garage", "I left the keys in the garage."),
+        ("words like docker sorry not docker kubernetes never come out right", "Words like Kubernetes never come out right."),
+    ])
+    func acceptsARestatedRetraction(raw: String, cleaned: String) {
+        #expect(review(raw, cleaned) == .accepted(cleaned))
+    }
+
+    @Test("A \"not\" that says nothing retracted again stays", arguments: [
+        // Drops the contrast the speaker made.
+        ("we need three chairs sorry not four", "We need four chairs."),
+        // Says again a word the correction doesn't retract.
+        ("send the blue file to sam sorry not blue red", "Send the blue file to red."),
+        // Keeps the retracted word.
+        ("words like docker sorry not docker kubernetes never come out right", "Words like Docker never come out right."),
+    ])
+    func keepsANotThatRestatesNothingRetracted(raw: String, cleaned: String) {
+        #expect(review(raw, cleaned) == .rejected(.invalidSelfCorrection))
+    }
+
+    @Test func keepsAContrastAfterACorrection() {
+        let cleaned = "The demo is on Thursday, not Friday."
+        #expect(review("the demo is on tuesday sorry thursday not friday", cleaned) == .accepted(cleaned))
+    }
+
     @Test func acceptsASelfCorrectionAlongsideOtherFixes() {
         let cleaned = "So we need to fix the login page."
         #expect(review("so um we need to fix the the signup sorry login page", cleaned) == .accepted(cleaned))

@@ -1,0 +1,15 @@
+<!doctype html>
+<!-- The dictation panel on Windows: a canvas the size of its window, which panel.js paints with the
+     frames the app draws (src/dictation/desktop/windows/panel.rs). The page draws nothing of its
+     own, so the panel looks as it does on Linux and the Mac. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Live Transcribe dictation</title>
+    <link rel="stylesheet" href="panel.css">
+    <script src="panel.js" defer></script>
+  </head>
+  <body>
+    <canvas aria-hidden="true"></canvas>
+  </body>
+</html>

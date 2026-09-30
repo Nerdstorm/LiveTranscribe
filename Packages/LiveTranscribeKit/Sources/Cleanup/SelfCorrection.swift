@@ -8,9 +8,17 @@ import Shared
 /// Output that drops a cue in any other way lost something the speaker meant: "we need three,
 /// sorry, four" cleaned to "we need three" keeps the retracted value, and "sorry I'm late" cleaned
 /// to "I'm late" drops an apology. ``OutputGuard`` rejects both.
+///
+/// The cue may be followed by "not" and the retracted words said again, which go with it: "room
+/// *four, no, not four,* five". The "not" goes only then, so a contrast keeps it: "Thursday, not
+/// Friday".
 struct SelfCorrection: Sendable {
+    /// The word that, after a cue, says the retracted words again: "sorry, not Tuesday".
+    static let restatingWord = "not"
+
     private let cues: [[String]]
     private let fillers: Set<String>
+    private let functionWords: Set<String>
     private let maxRetractedWords: Int
     private let minRespellingSimilarity: Double
 
@@ -19,6 +27,7 @@ struct SelfCorrection: Sendable {
             .map { EditDistance.words(in: EditDistance.normalize($0)) }
             .filter { !$0.isEmpty }
         fillers = Set(policy.fillers.map(EditDistance.normalize))
+        functionWords = Set(policy.functionWords.map(EditDistance.normalize))
         maxRetractedWords = policy.maxRetractedWords
         minRespellingSimilarity = policy.minRespellingSimilarity
     }
@@ -30,7 +39,8 @@ struct SelfCorrection: Sendable {
 
     /// Whether `cleaned` can be made from `raw` by keeping words in order and deleting:
     /// - a self-correction: up to `maxRetractedWords` retracted words followed by a cue, or by
-    ///   several cues in a row ("high street, wait, no, the shopping centre");
+    ///   several cues in a row ("high street, wait, no, the shopping centre"), and by "not" and
+    ///   the retracted words said again, if the speaker said them ("tuesday, sorry, not tuesday");
     /// - a filler word;
     /// - a word repeated straight after itself.
     ///
@@ -70,7 +80,8 @@ struct SelfCorrection: Sendable {
     }
 
     /// For each start index, the end indices (exclusive) of the self-corrections that can be
-    /// deleted from there: at least one retracted word, then one or more cues back to back.
+    /// deleted from there: at least one retracted word, then one or more cues back to back, then
+    /// perhaps "not" and the retracted words said again.
     private func correctionSpans(in words: [String]) -> [Int: [Int]] {
         var cueEnds: [Int: [Int]] = [:]
         for cue in cues {
@@ -88,9 +99,34 @@ struct SelfCorrection: Sendable {
             let ends = runEnds(from: cueStart)
             for start in max(0, cueStart - maxRetractedWords)..<cueStart {
                 spans[start, default: []].append(contentsOf: ends)
+                for end in ends {
+                    spans[start, default: []].append(contentsOf: restatedEnds(after: end, retracting: words[start..<cueStart], in: words))
+                }
             }
         }
         return spans
+    }
+
+    /// Where a self-correction whose cues end at `end` ends instead when "not" follows them and
+    /// then the `retracted` words said again ("room four, no, not four, five"), however many of
+    /// them the speaker repeats.
+    private func restatedEnds(after end: Int, retracting retracted: ArraySlice<String>, in words: [String]) -> [Int] {
+        guard end < words.count, words[end] == Self.restatingWord else { return [] }
+        let first = end + 1
+        return (0..<max(0, min(maxRetractedWords, words.count - first))).compactMap { offset in
+            let restated = first..<(first + offset + 1)
+            return restates(words[restated], retracted) ? restated.upperBound : nil
+        }
+    }
+
+    /// Whether `restated` says again some of the `retracted` words: its words that carry meaning,
+    /// at least one, are a run of theirs ("not the kitchen" for "kitchen", "not marketing" for
+    /// "marketing team").
+    private func restates(_ restated: ArraySlice<String>, _ retracted: ArraySlice<String>) -> Bool {
+        let isContent = { (word: String) in !functionWords.contains(word) && !fillers.contains(word) }
+        let said = restated.filter(isContent), taken = retracted.filter(isContent)
+        guard !said.isEmpty, said.count <= taken.count else { return false }
+        return (0...(taken.count - said.count)).contains { taken[$0..<($0 + said.count)].elementsEqual(said) }
     }
 
     private func keeps(_ rawWord: String, as cleanedWord: String, spoken: Set<String>) -> Bool {

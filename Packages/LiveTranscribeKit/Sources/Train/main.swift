@@ -2,12 +2,18 @@
 // adapter. Build with xcodebuild (MLX needs its Metal library) and run from
 // Packages/LiveTranscribeKit; see Training/README.md.
 //
-//   Train generate [--seed <n>]
-//   Train validate
-//   Train train [--output <dir>] [--revision <commit>] [--iterations <n>] [--batch-size <n>]
+//   Train generate [--deep] [--seed <n>]
+//   Train validate [--deep]
+//   Train train [--deep] [--output <dir>] [--revision <commit>] [--iterations <n>] [--batch-size <n>]
 //               [--learning-rate <x>] [--rank <n>] [--scale <x>] [--layers <n>]
 //               [--curated-repeats <n>] [--seed <n>]
 //   Train evaluate [--adapter <dir> | --no-adapter] [--data <file.jsonl>]... [--report <file>]
+//   Train measure --level <level> [--data <file.jsonl>]... [--adapter <dir> | --no-adapter] [--timeout <s>]
+//                 [--thinking | --no-thinking] [--thinking-tokens <n>] [--deep-passes one|after-medium]
+//                 [--deep-adapter none|medium|deep] [--deep-adapter-dir <dir>] [--no-medium-fallback]
+//                 [--label <text>] [--report <file>]
+//   Train requests --level <level> [--data <file.jsonl>]... [--no-adapter] [--thinking] --out <file>
+//   Train replay --level <level> [--data <file.jsonl>]... [--no-adapter] --outputs <file> [--report <file>]
 
 import Cleanup
 import CleanupTraining
@@ -20,14 +26,26 @@ setvbuf(stdout, nil, _IOLBF, 0)
 do {
     let command = try Command.parse(Array(CommandLine.arguments.dropFirst()))
     switch command {
-    case .generate(let seed):
+    case .generate(let seed, deep: false):
         try generate(seed: seed)
-    case .validate:
+    case .generate(let seed, deep: true):
+        try generateDeep(seed: seed)
+    case .validate(deep: false):
         exit(try validate() ? 0 : 1)
+    case .validate(deep: true):
+        exit(try validateDeep() ? 0 : 1)
+    case .train(let options) where options.deep:
+        try await trainDeep(options)
     case .train(let options):
         try await train(options)
     case .evaluate(let options):
         try await evaluate(options)
+    case .measure(let options):
+        try await measure(options)
+    case .requests(let options, let output):
+        try await writeRequests(options, to: output)
+    case .replay(let options, let outputs):
+        try await replay(options, outputs: outputs)
     }
 } catch {
     FileHandle.standardError.write(Data("error: \(error.localizedDescription)\n".utf8))
@@ -114,10 +132,8 @@ func train(_ options: TrainCommandOptions) async throws {
         container: container,
         baseModel: modelID,
         baseRevision: revision,
-        train: trainSet,
-        valid: validSet,
-        template: Prompt.adapted,
-        contextLimit: settings.contextSegments,
+        train: trainSet.map { TrainingItem($0, template: Prompt.adapted, contextLimit: settings.contextSegments) },
+        valid: validSet.map { TrainingItem($0, template: Prompt.adapted, contextLimit: settings.contextSegments) },
         options: options.training,
         output: options.output
     ) { message in
@@ -214,6 +230,8 @@ enum Paths {
 // MARK: - Arguments
 
 struct TrainCommandOptions {
+    /// Trains Deep's adapter on its own data instead of the self-correction adapter.
+    var deep = false
     var output = Paths.defaultAdapterOutput
     var revision: String?
     var curatedRepeats = 2
@@ -233,10 +251,13 @@ struct EvaluateCommandOptions {
 }
 
 enum Command {
-    case generate(seed: UInt64)
-    case validate
+    case generate(seed: UInt64, deep: Bool)
+    case validate(deep: Bool)
     case train(TrainCommandOptions)
     case evaluate(EvaluateCommandOptions)
+    case measure(MeasureCommandOptions)
+    case requests(MeasureCommandOptions, output: URL)
+    case replay(MeasureCommandOptions, outputs: URL)
 
     static func parse(_ arguments: [String]) throws -> Command {
         guard let name = arguments.first else { throw TrainError.usage("missing command") }
@@ -254,21 +275,29 @@ enum Command {
         switch name {
         case "generate":
             var seed: UInt64 = 1
+            var deep = false
             while let argument = iterator.next() {
                 switch argument {
                 case "--seed": seed = try number(argument)
+                case "--deep": deep = true
                 default: throw TrainError.usage("unknown argument \(argument)")
                 }
             }
-            return .generate(seed: seed)
+            return .generate(seed: seed, deep: deep)
         case "validate":
-            if let argument = iterator.next() { throw TrainError.usage("unknown argument \(argument)") }
-            return .validate
+            var deep = false
+            while let argument = iterator.next() {
+                guard argument == "--deep" else { throw TrainError.usage("unknown argument \(argument)") }
+                deep = true
+            }
+            return .validate(deep: deep)
         case "train":
             var options = TrainCommandOptions()
+            var output: URL?
             while let argument = iterator.next() {
                 switch argument {
-                case "--output": options.output = URL(fileURLWithPath: try value(argument), isDirectory: true)
+                case "--deep": options.deep = true
+                case "--output": output = URL(fileURLWithPath: try value(argument), isDirectory: true)
                 case "--revision": options.revision = try value(argument)
                 case "--iterations": options.training.iterations = try number(argument)
                 case "--batch-size": options.training.batchSize = try number(argument)
@@ -281,6 +310,7 @@ enum Command {
                 default: throw TrainError.usage("unknown argument \(argument)")
                 }
             }
+            options.output = output ?? (options.deep ? DeepPaths.defaultAdapterOutput : Paths.defaultAdapterOutput)
             return .train(options)
         case "evaluate":
             var options = EvaluateCommandOptions()
@@ -294,6 +324,26 @@ enum Command {
                 }
             }
             return .evaluate(options)
+        case "measure", "requests", "replay":
+            var options = MeasureCommandOptions()
+            var file: URL?
+            while let argument = iterator.next() {
+                if try options.parse(argument, value: { try value(argument) }) { continue }
+                switch argument {
+                case "--out" where name == "requests", "--outputs" where name == "replay":
+                    file = URL(fileURLWithPath: try value(argument))
+                default: throw TrainError.usage("unknown argument \(argument)")
+                }
+            }
+            switch name {
+            case "measure": return .measure(options)
+            case "requests":
+                guard let file else { throw TrainError.usage("requests needs --out <file>") }
+                return .requests(options, output: file)
+            default:
+                guard let file else { throw TrainError.usage("replay needs --outputs <file>") }
+                return .replay(options, outputs: file)
+            }
         default:
             throw TrainError.usage("unknown command \(name)")
         }
@@ -312,12 +362,18 @@ enum TrainError: LocalizedError {
         case .usage(let detail):
             """
             \(detail)
-            usage: Train generate [--seed <n>]
-                   Train validate
-                   Train train [--output <dir>] [--revision <commit>] [--iterations <n>] [--batch-size <n>]
+            usage: Train generate [--deep] [--seed <n>]
+                   Train validate [--deep]
+                   Train train [--deep] [--output <dir>] [--revision <commit>] [--iterations <n>] [--batch-size <n>]
                                [--learning-rate <x>] [--rank <n>] [--scale <x>] [--layers <n>]
                                [--curated-repeats <n>] [--seed <n>]
                    Train evaluate [--adapter <dir> | --no-adapter] [--data <file.jsonl>]... [--report <file>]
+                   Train measure --level <level> [--data <file.jsonl>]... [--adapter <dir> | --no-adapter] [--timeout <s>]
+                                 [--thinking | --no-thinking] [--thinking-tokens <n>] [--deep-passes one|after-medium]
+                                 [--deep-adapter none|medium|deep] [--deep-adapter-dir <dir>] [--no-medium-fallback]
+                                 [--label <text>] [--report <file>]
+                   Train requests --level <level> [--data <file.jsonl>]... [--no-adapter] [--thinking] --out <file>
+                   Train replay --level <level> [--data <file.jsonl>]... [--no-adapter] --outputs <file> [--report <file>]
             """
         case .noRevision(let model):
             "\(model) is not in the Hugging Face cache. Pass --revision <commit>, or run the model tests once to download it."

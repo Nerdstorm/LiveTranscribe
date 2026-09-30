@@ -2,9 +2,10 @@
 
 The cleanup model, Qwen3-1.7B-4bit, cannot resolve spoken self-corrections by prompting alone:
 asked to turn "fuel efficiency in cars, sorry, buses" into "fuel efficiency in buses", it got at
-most 1 in 7 right. This folder holds the data that teaches it with a LoRA adapter, and the
-`Train` tool builds the data, trains the adapter, and measures it. Everything runs on the Mac,
-in Swift, with mlx-swift-lm.
+most 1 in 7 right. This folder holds the data that teaches it with LoRA adapters, and the
+`Train` tool builds the data, trains the adapters, and measures them. Everything runs on the
+Mac, in Swift, with mlx-swift-lm. There are two adapters: the self-correction adapter, which
+Medium and High use (most of this page), and Deep's ([Deep's adapter](#deeps-adapter)).
 
 The adapter is trained on the prompt the app uses with it (`Prompt.adapted`), so training and
 inference see identical input. Only the answer tokens are trained on. The app loads the base
@@ -95,3 +96,100 @@ text; the rest respell names ("Yasmin" → "Yasmine").
 
 The adapter is loaded as separate LoRA layers, not fused into the model: fusing re-quantizes the
 adapted weights to 4 bits, and the fused adapter resolved only 13% of self-corrections.
+
+## Deep's adapter
+
+Deep (`CleanupLevel.deep`) has its own adapter, `Sources/Cleanup/DeepAdapter`, trained on Deep's
+prompt (`PromptBuilder.deepRules`), which gives general rules and no examples. It has the
+self-correction adapter's shape (rank 8, scale 20, the last 16 layers), so the app swaps one
+for the other per request. Its answers are checked by `SelfRepair`, not by OutputGuard's limits.
+
+### Data
+
+`DeepExampleGenerator` builds every example from sentence frames and word pools
+(`DeepFrames`), reproducibly from a seed, and `DeepExampleValidator` checks each one: the input
+the model sees is what the app would send, and the target must pass `SelfRepair` at Deep. **No
+example comes from anyone's dictation history**, and none from the hand-written cases below.
+
+| Category | Train examples | What it teaches |
+|---|---:|---|
+| `crossSentence` | 800 | A correction that reaches back into an earlier sentence: "…is tomorrow. No, sorry, the day after." |
+| `malformed` | 650 | A garbled correction phrase, read as meant: "the after tomorrow" → "the day after tomorrow" |
+| `sameSentence` | 450 | A correction within a sentence, in Deep's words |
+| `control` | 650 | Cue words in their ordinary sense stay: "No, it's the day after." answering a question |
+| `facts` | 300 | Names, numbers, dates and times said outside a correction stay |
+| `grammar` | 550 | Agreement and tense fixed without rewording: "he actually check" → "he actually checked" |
+| `recognition` | 450 | A misheard word fixed from the rest of the text |
+| `layout` | 500 | An email, letter or list laid out in a field that takes several lines |
+| `oneLine` | 250 | The same, kept to one paragraph in a field that doesn't |
+| `unchanged` | 250 | Text that is already right stays as it is |
+
+Validation and test get a tenth and an eighth of these. Training and validation also get 1,260
+and 126 of Medium's own examples (`ExampleGenerator`), a third of them in a field that takes
+several lines, so Deep keeps what Medium does. Examples the validator rejects are left out: the
+bundled adapter's training split has 6,043 examples, and validation 606. Some raw texts are
+lowercase and unpunctuated like a streaming recognizer's, the rest cased like Parakeet's.
+`generated/deep-*.jsonl` is not committed; `Train generate --deep` recreates it.
+
+`eval/deep.jsonl` holds 114 hand-written cases, never trained on and kept out of the generated
+data: the acceptance case twice, 18 controls, 15 cross-sentence and 14 garbled corrections, 14
+grammar, 10 each of facts, unchanged text, misheard words and layout, 8 corrections within a
+sentence and 3 one-line fields.
+
+### Commands
+
+```bash
+cd Packages/LiveTranscribeKit
+.build/xcode/Build/Products/Release/Train generate --deep
+.build/xcode/Build/Products/Release/Train validate --deep
+.build/xcode/Build/Products/Release/Train train --deep --iterations 1000
+.build/xcode/Build/Products/Release/Train measure --level deep --data Training/eval/deep.jsonl --deep-adapter-dir Training/runs/deep-adapter
+```
+
+- `train --deep` trains on `generated/deep-train.jsonl` and writes to `Training/runs/deep-adapter`;
+  the other options are `train`'s. The bundled adapter was trained with the defaults (batch 8,
+  learning rate 2e-5, seed 1) for 1,000 iterations, which took 106 minutes; validation loss was
+  lowest, 0.0045, at the last.
+- `measure --level <level>` cleans every case through `MLXCleaner` and `CleanupExecutor`, as the
+  app does at that level, and reports per category how often the shown text matches the target,
+  fell back, came out unchanged, changed a protected word, or differed, with latency. `--data`
+  picks the cases (by default Medium's 515 test examples), `--deep-adapter-dir` another Deep
+  adapter, `--deep-adapter none|medium|deep`, `--deep-passes one|after-medium`, `--thinking` and
+  `--thinking-tokens` other ways of running Deep, and `--no-medium-fallback` Deep's pass alone.
+- `requests` writes the requests the app would make, and `replay` scores another runtime's
+  answers to them, which is how the Linux and Windows runtime is checked against the Mac.
+
+To ship a new Deep adapter, copy `adapters.safetensors` and `adapter_config.json` from the run
+folder into `Sources/Cleanup/DeepAdapter/`. The Linux and Windows app compiles the same files in.
+
+### Results
+
+Measured with `Train measure` on an M4 Pro on 2026-09-30, with the bundled adapters and the
+app's executor and checks: at Deep, one pass with Deep's adapter, without thinking, and Medium's
+pass after an answer `SelfRepair` rejects. Right means the shown text is the target, ignoring
+casing and punctuation; meaning changed means an accepted answer lost a fact the case keeps or
+has one it rules out.
+
+| Cases | Level | Right | Fell back | Unchanged | Meaning changed | Other | p50 (ms) | p95 (ms) |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| Deep's 114 hand-written | Deep | 108 | 1 | 2 | 0 | 3 | 227 | 360 |
+| | Deep, without Medium's pass | 108 | 1 | 2 | 0 | 3 | 241 | 376 |
+| | Medium | 75 | 17 | 18 | 3 | 1 | 162 | 293 |
+| | High | 76 | 18 | 17 | 2 | 1 | 216 | 384 |
+| 599 generated test examples | Deep | 535 | 11 | 37 | 0 | 16 | 282 | 384 |
+| Medium's 515 test examples | Deep | 505 | 1 | 6 | 0 | 3 | 237 | 308 |
+| | Deep, without Medium's pass | 499 | 7 | 6 | 0 | 3 | 242 | 312 |
+| | Medium | 505 | 7 | 0 | 0 | 3 | 161 | 237 |
+
+The six hand-written cases it missed: a correction that reorders words ("Friday night. Sorry, the
+night Saturday.", which the check turns down), four grammar cases left partly or wholly as said
+("the traffic were bad", "feedbacks") and one where it added "the" to "next quarter". On the
+generated test examples it did worst on misheard words, fixing 22 of 56 and leaving 19 as heard,
+then on grammar (57 of 68) and layout (54 of 62); it got every control, fact, one-line and
+unchanged example right, and the check turned down 11 answers.
+
+A first adapter, trained on 4,800 examples for 800 iterations without Medium's examples, got as
+many of the hand-written cases right but only 514 of the generated test examples and, with
+Deep's pass alone, 480 of Medium's 515: it turned an intact "next week" into "the week after
+next" whenever a sentence corrected something else (ledger LiveTranscribe-0271). Medium's
+examples in training and frames that correct something beside an intact date fixed that.

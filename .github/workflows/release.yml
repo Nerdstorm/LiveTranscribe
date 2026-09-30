@@ -5,8 +5,11 @@
 #   environment, which waits for the owner's approval;
 # - the Linux app's deb, rpm and AppImage, built in Ubuntu 22.04, whose glibc (2.35) sets the
 #   oldest distributions they run on, with the OpenVINO runtime and the sherpa-onnx libraries they
-#   carry (linux-windows/packaging/linux/fetch-openvino.sh, linux-windows/packaging/fetch-sherpa-onnx.sh).
-# Every system gets the tag's version. The Windows app joins once it has an installer.
+#   carry (linux-windows/packaging/linux/fetch-openvino.sh, linux-windows/packaging/fetch-sherpa-onnx.sh);
+# - the Windows app's installer, with the same for Windows (OpenVINO's from its Python wheel, which
+#   is Apache-2.0: linux-windows/packaging/windows/fetch-openvino.sh) and the parts of Microsoft's
+#   C++ runtime that OpenVINO needs. It isn't signed.
+# Every system gets the tag's version.
 #
 # A pull request that changes how they're made builds them as test builds, to try from the run's
 # artifacts: the Mac's is ad-hoc signed and not notarized. So does a run started by hand, unless
@@ -276,10 +279,73 @@ jobs:
           path: linux-windows/target/release/packages/*
           if-no-files-found: error
 
+  windows:
+    name: Build the Windows installer
+    needs: plan
+    runs-on: windows-2025
+    defaults:
+      run:
+        # Git Bash, which the fetch scripts are written for.
+        shell: bash
+        working-directory: linux-windows
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: linux-windows
+      - name: Install the Tauri CLI
+        run: cargo install tauri-cli --version 2.12.0 --locked
+      # The installer takes the app crate's version, which is 0.0.0 outside a release.
+      - name: Give the app the release's version
+        if: needs.plan.outputs.kind == 'release'
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          sed -i "0,/^version = .*/s//version = \"$VERSION\"/" crates/app/Cargo.toml
+          grep -qx "version = \"$VERSION\"" crates/app/Cargo.toml
+      - name: Fetch the OpenVINO runtime
+        run: packaging/windows/fetch-openvino.sh
+      # The speech-only sherpa-onnx libraries, which the sherpa-onnx crate links (.cargo/config.toml).
+      - name: Fetch the sherpa-onnx libraries
+        run: packaging/fetch-sherpa-onnx.sh
+      # What the installer carries besides the app is in tauri.installer.conf.json, which only this
+      # build reads: Tauri's build script copies an app's resources beside it on every build, and
+      # the checks' builds have no OpenVINO runtime to copy. The C++ runtime comes from the Visual
+      # Studio the runner has, which Tauri finds.
+      - name: Build the installer
+        working-directory: linux-windows/crates/app
+        run: cargo tauri build --bundles nsis --config ../../packaging/windows/tauri.installer.conf.json
+      # Tauri names it after the product, "Live Transcribe", space and all.
+      - name: Name the installer as the packages are named
+        working-directory: linux-windows/target/release/bundle
+        run: |
+          mkdir -p ../packages
+          for file in nsis/*-setup.exe; do
+            name=$(basename "$file")
+            mv "$file" "../packages/${name/Live Transcribe/live-transcribe}"
+          done
+          ls -l ../packages
+      # The installer must carry the DLLs as fetched, and the app must find sherpa-onnx's, which it
+      # can't start without.
+      - name: Check the installer's DLLs, that its app starts, and that it uninstalls
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: ./packaging/windows/check-installer.ps1 -Installer "target/release/packages/live-transcribe_${env:VERSION}_x64-setup.exe"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-installer
+          path: linux-windows/target/release/packages/*
+          if-no-files-found: error
+
   release:
     name: Draft the release
     if: needs.plan.outputs.kind == 'release'
-    needs: [plan, mac, linux]
+    needs: [plan, mac, linux, windows]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -300,6 +366,10 @@ jobs:
         with:
           name: linux-packages
           path: downloads
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: windows-installer
+          path: downloads
       # The notes name the Linux packages by version, and the website links to the disk image.
       - name: Check that every download is there
         env:
@@ -307,10 +377,11 @@ jobs:
         run: |
           ls -l downloads
           for file in LiveTranscribe.dmg "live-transcribe_${VERSION}_amd64.deb" \
-            "live-transcribe-${VERSION}-1.x86_64.rpm" "live-transcribe_${VERSION}_amd64.AppImage"; do
+            "live-transcribe-${VERSION}-1.x86_64.rpm" "live-transcribe_${VERSION}_amd64.AppImage" \
+            "live-transcribe_${VERSION}_x64-setup.exe"; do
             [ -f "downloads/$file" ] || { echo "The release has no $file" >&2; exit 1; }
           done
-          [ "$(find downloads -type f | wc -l)" = 4 ] || { echo "The release has files it shouldn't" >&2; exit 1; }
+          [ "$(find downloads -type f | wc -l)" = 5 ] || { echo "The release has files it shouldn't" >&2; exit 1; }
       - name: Draft the release
         env:
           GH_TOKEN: ${{ github.token }}
