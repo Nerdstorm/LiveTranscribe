@@ -2,7 +2,7 @@ import Foundation
 import Shared
 
 /// Lays out dictated text by intent: lists become numbered or bulleted lines, a letter gets its
-/// salutation and sign-off on lines of their own. Runs at Medium and High, in fields that take
+/// salutation and sign-off on lines of their own. Runs from Medium up, in fields that take
 /// several lines.
 ///
 /// Two kinds of rule, so a new structure is one more rule in ``standardRules`` or

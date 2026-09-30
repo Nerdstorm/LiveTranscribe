@@ -11,13 +11,14 @@ import Vocabulary
 ///
 /// Snippet triggers, emoji, addresses and spoken line breaks become opaque placeholders before
 /// the language model runs, so the model can neither see nor change them (see
-/// ``PreparedDictation``). At Medium and High, in fields that take several lines, spoken lists
+/// ``PreparedDictation``). From Medium up, in fields that take several lines, spoken lists
 /// and letters are laid out; a letter's greeting and sign-off are laid out before the model
-/// runs, and only its body is cleaned. If cleanup is rejected or times out, the text before
-/// cleanup is used, with snippets, commands, vocabulary and layout still applied.
+/// runs, and only its body is cleaned. Deep's model may also lay out what was not spoken as a
+/// list or letter, which the same layout rules then tidy. If cleanup is rejected or times out,
+/// the text before cleanup is used, with snippets, commands, vocabulary and layout still applied.
 ///
 /// Without a cleaner (cleanup turned off in Settings › Advanced) each level still applies its
-/// rules that need no model, filler removal and layout at Medium and High, and nothing is
+/// rules that need no model, filler removal and layout from Medium up, and nothing is
 /// reworded. That was chosen, so it is not reported as a fallback.
 public struct DictationProcessor: Sendable {
     /// Everything that shapes one dictation's text, read fresh for each dictation.
@@ -132,7 +133,8 @@ public struct DictationProcessor: Sendable {
                     entries: configuration.vocabulary,
                     similarityThreshold: configuration.vocabularySimilarityThreshold
                 ).relevantTerms(for: body, limit: configuration.vocabularyPromptLimit),
-                placeholders: prepared.placeholders.filter { body.contains($0) }
+                placeholders: prepared.placeholders.filter { body.contains($0) },
+                multiline: configuration.multiline
             )
             cleaned = await cleaner.clean(segment, context: [], options: options)
         } else {

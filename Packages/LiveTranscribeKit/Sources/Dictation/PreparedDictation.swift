@@ -18,7 +18,7 @@ import Vocabulary
 struct PreparedDictation {
     /// The transcript with phrases replaced and vocabulary applied: what cleanup starts from.
     let text: String
-    /// Lists and letters are laid out: at Medium and High, in fields that take several lines.
+    /// Lists and letters are laid out: from Medium up, in fields that take several lines.
     let laysOut: Bool
     private let protected: ProtectedText
     private let layout: Layout

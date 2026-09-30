@@ -2,12 +2,12 @@ import Foundation
 import MLXLMCommon
 import Shared
 
-/// The fine-tuned LoRA adapter that teaches the cleanup model to resolve spoken
-/// self-corrections, and the exact base model it was trained on.
+/// A fine-tuned LoRA adapter for the cleanup model, and the exact base model it was trained on:
+/// the self-correction adapter, which Medium and High use, or Deep's.
 ///
-/// It ships in this slice's resources (`Adapter/`) as mlx's `adapters.safetensors` and
-/// `adapter_config.json`, which also records the base model and commit. It is produced by the
-/// `Train` tool; see `Training/README.md`.
+/// Both ship in this slice's resources (`Adapter/` and `DeepAdapter/`) as mlx's
+/// `adapters.safetensors` and `adapter_config.json`, which also records the base model and
+/// commit. They are produced by the `Train` tool; see `Training/README.md`.
 public struct CleanupAdapter: Sendable, Equatable {
     public static let configurationFile = "adapter_config.json"
     public static let weightsFile = "adapters.safetensors"
@@ -45,15 +45,22 @@ public struct CleanupAdapter: Sendable, Equatable {
         return CleanupAdapter(baseModel: manifest.baseModel, baseRevision: manifest.baseRevision, directory: directory)
     }
 
-    /// The adapter bundled with the app, or `nil` when none has been trained or it is unreadable.
-    public static func bundled() -> CleanupAdapter? {
-        guard let directory = Bundle.module.url(forResource: "Adapter", withExtension: nil) else {
+    /// The adapter of that kind bundled with the app, or `nil` when none has been trained or it
+    /// is unreadable.
+    public static func bundled(_ kind: CleanupRequest.Adapter = .medium) -> CleanupAdapter? {
+        let resource: String
+        switch kind {
+        case .off: return nil
+        case .medium: resource = "Adapter"
+        case .deep: resource = "DeepAdapter"
+        }
+        guard let directory = Bundle.module.url(forResource: resource, withExtension: nil) else {
             return nil
         }
         do {
             return try load(from: directory)
         } catch {
-            Log.cleanup.error("The bundled cleanup adapter is unreadable: \(error.localizedDescription, privacy: .public)")
+            Log.cleanup.error("The bundled \(resource, privacy: .public) is unreadable: \(error.localizedDescription, privacy: .public)")
             return nil
         }
     }

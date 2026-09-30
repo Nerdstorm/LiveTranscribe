@@ -8,14 +8,21 @@ struct CleanupLevelTests {
         #expect(CleanupLevel.allCases.filter { !$0.usesLanguageModel } == [.none])
     }
 
-    @Test func mediumAndHighRemoveFillersResolveCorrectionsAndLayOutText() {
+    @Test func levelsFromMediumUpRemoveFillersResolveCorrectionsAndLayOutText() {
         for level in CleanupLevel.allCases {
-            let expected = level == .medium || level == .high
+            let expected = [.medium, .high, .deep].contains(level)
             #expect(level.removesFillers == expected)
             #expect(level.resolvesSelfCorrections == expected)
             #expect(level.formatsLayout == expected)
         }
         #expect(CleanupLevel.allCases.filter(\.allowsRewording) == [.high])
+        #expect(CleanupLevel.allCases.filter(\.repairsAcrossSentences) == [.deep])
+    }
+
+    @Test func levelsAreOrderedFromLeastToMostChange() {
+        #expect(CleanupLevel.allCases == [.none, .light, .medium, .high, .deep])
+        #expect(CleanupLevel.allCases.sorted() == CleanupLevel.allCases)
+        #expect(CleanupLevel.deep > .high && CleanupLevel.medium < .high)
     }
 
     /// Snippets, vocabulary and spoken commands run before the level is looked at, so None's line
@@ -39,6 +46,7 @@ struct CleanupLevelTests {
 
     @Test func storesAsItsRawValue() throws {
         #expect(CleanupLevel(rawValue: "medium") == .medium)
+        #expect(CleanupLevel(rawValue: "deep") == .deep)
         let data = try JSONEncoder().encode([CleanupLevel.high])
         #expect(String(decoding: data, as: UTF8.self) == #"["high"]"#)
     }

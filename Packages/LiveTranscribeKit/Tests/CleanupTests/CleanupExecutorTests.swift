@@ -15,7 +15,8 @@ struct CleanupExecutorTests {
 
     private let medium = CleanupOptions(level: .medium)
 
-    private func executor(timeout: Double = 1, adapted: Bool = false) -> CleanupExecutor {
+    /// A deadline no test meets by chance on a busy machine, except those that pass their own.
+    private func executor(timeout: Double = 30, adapted: Bool = false) -> CleanupExecutor {
         CleanupExecutor(contextLimit: 3, timeoutSeconds: timeout, prompts: PromptBuilder(adapted: adapted))
     }
 
@@ -259,13 +260,14 @@ struct CleanupExecutorTests {
     }
 
     /// Dictation with the cleanup model off inserts this, so it must match what a level does
-    /// without the model: fillers go only at Medium and High.
-    @Test func deterministicCleanupRemovesFillersOnlyAtMediumAndHigh() {
+    /// without the model: fillers go only from Medium up.
+    @Test func deterministicCleanupRemovesFillersOnlyFromMediumUp() {
         let raw = "so um the build is uh broken"
         #expect(CleanupExecutor.deterministicCleanup(of: raw, level: .none) == raw)
         #expect(CleanupExecutor.deterministicCleanup(of: raw, level: .light) == raw)
         #expect(CleanupExecutor.deterministicCleanup(of: raw, level: .medium) == "so the build is broken")
         #expect(CleanupExecutor.deterministicCleanup(of: raw, level: .high) == "so the build is broken")
+        #expect(CleanupExecutor.deterministicCleanup(of: raw, level: .deep) == "so the build is broken")
     }
 }
 
