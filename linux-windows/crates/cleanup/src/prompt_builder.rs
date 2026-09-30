@@ -13,6 +13,18 @@ const UNCHANGED_RULE: &str = "If the text is already correct, return it unchange
 const OUTPUT_RULE: &str = "Output only the corrected text.";
 const RESOLVE_RULE: &str = "When the speaker corrects themselves, keep only the correction.";
 
+/// Deep's rules for reading the whole dictation, before its layout rule (see [`deep_rules`]).
+const DEEP_RULES: [&str; 6] = [
+    "The TEXT was dictated and written down by speech recognition, which can mishear words. Read all of it and work out what the speaker meant.",
+    "Correct words the recognition got wrong, using the rest of the text, and fix punctuation, casing and grammar.",
+    "When the speaker corrects themselves, keep only the correction, even when it comes in a later sentence or is worded badly.",
+    "Keep \"no\", \"sorry\", \"actually\" and similar words when they answer a question, apologise or start a new point.",
+    "Keep every name, number, date, time and negation as the speaker said it. Do not add anything they did not say, and do not summarise.",
+    "Keep the speaker's own words wherever they are right.",
+];
+const DEEP_MULTILINE_RULE: &str = "Lay the text out the way it would be written: an email or letter with its greeting, paragraphs and sign-off on separate lines; items or steps as a list, numbered when their order matters. Leave ordinary sentences as sentences.";
+const DEEP_ONE_LINE_RULE: &str = "Write it as one paragraph, without line breaks.";
+
 /// Composes the cleanup model's instruction for a request: the base rules, the level's rules, the
 /// vocabulary and the placeholder rule, each from its own function.
 ///
@@ -20,9 +32,11 @@ const RESOLVE_RULE: &str = "When the speaker corrects themselves, keep only the 
 /// [`crate::prompt::cleanup`]), so every level gets the strict keep-every-word rules; with it,
 /// Medium and High ask for the correction only. Medium with the adapter and nothing else to add is
 /// exactly [`crate::prompt::adapted`], the prompt the adapter was trained on.
+///
+/// Deep has its own instruction, with or without the adapter ([`deep_rules`]).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PromptBuilder {
-    /// Whether the model has the fine-tuned adapter.
+    /// Whether the model has the fine-tuned self-correction adapter.
     pub adapted: bool,
     /// One template for every request, for prompt experiments; `None` composes one per request.
     pub override_template: Option<PromptTemplate>,
@@ -49,12 +63,15 @@ impl PromptBuilder {
         if let Some(template) = &self.override_template {
             return template.clone();
         }
-        let mut rules: Vec<String> = BASE_RULES.iter().map(|&rule| rule.to_owned()).collect();
-        rules.extend(
-            level_rules(options.level, self.adapted)
+        let mut rules: Vec<String> = if options.level.repairs_across_sentences() {
+            deep_rules(options.multiline)
+        } else {
+            BASE_RULES
                 .iter()
-                .map(|&rule| rule.to_owned()),
-        );
+                .chain(level_rules(options.level, self.adapted))
+                .map(|&rule| rule.to_owned())
+                .collect()
+        };
         rules.push(UNCHANGED_RULE.to_owned());
         rules.extend(vocabulary_rule(&options.vocabulary));
         rules.extend(placeholder_rule(&options.placeholders));
@@ -78,6 +95,23 @@ pub(crate) fn level_rules(level: CleanupLevel, adapted: bool) -> &'static [&'sta
             RESOLVE_RULE,
         ],
     }
+}
+
+/// Deep's instruction: general rules for reading the whole dictation and writing what the speaker
+/// meant, with no worked examples. Deep's output check (`SelfRepair`) holds the answer to the same
+/// rules. In a field that takes several lines, the model lays out emails, letters and lists itself;
+/// in a one-line field it may not break lines.
+pub(crate) fn deep_rules(multiline: bool) -> Vec<String> {
+    let layout = if multiline {
+        DEEP_MULTILINE_RULE
+    } else {
+        DEEP_ONE_LINE_RULE
+    };
+    DEEP_RULES
+        .iter()
+        .chain([&layout])
+        .map(|&rule| rule.to_owned())
+        .collect()
 }
 
 /// The user's terms, in the order given; `None` when there are none.
@@ -256,6 +290,87 @@ mod tests {
         assert_eq!(
             placeholder_rule(&strings(&["⟦S1⟧", "⟦S2⟧", "⟦S1⟧"])).as_deref(),
             Some("Copy each of these tokens exactly once, unchanged: ⟦S1⟧, ⟦S2⟧.")
+        );
+    }
+
+    #[test]
+    fn deep_has_its_own_instruction_with_or_without_the_adapter() {
+        let deep = options(CleanupLevel::Deep);
+        let adapted = PromptBuilder::new(true).template(&deep).system;
+        assert_eq!(adapted, PromptBuilder::new(false).template(&deep).system);
+        assert_ne!(
+            adapted,
+            PromptBuilder::new(true).template(&options(CleanupLevel::High)).system
+        );
+        assert!(adapted.contains("later sentence"));
+        assert!(
+            adapted.ends_with("If the text is already correct, return it unchanged.\nOutput only the corrected text.")
+        );
+    }
+
+    #[test]
+    fn deeps_layout_depends_on_the_field() {
+        let builder = PromptBuilder::new(true);
+        let multiline = builder
+            .template(&CleanupOptions {
+                multiline: true,
+                ..options(CleanupLevel::Deep)
+            })
+            .system;
+        let one_line = builder.template(&options(CleanupLevel::Deep)).system;
+        assert!(multiline.contains("email or letter"));
+        assert!(!one_line.contains("email or letter"));
+        assert!(one_line.contains("without line breaks"));
+        assert_eq!(
+            lines(&PromptTemplate {
+                system: one_line,
+                examples: Vec::new()
+            })[6],
+            DEEP_ONE_LINE_RULE
+        );
+    }
+
+    #[test]
+    fn the_other_levels_ignore_the_field() {
+        let builder = PromptBuilder::new(true);
+        for level in [CleanupLevel::Light, CleanupLevel::Medium, CleanupLevel::High] {
+            let multiline = CleanupOptions {
+                multiline: true,
+                ..options(level)
+            };
+            assert_eq!(
+                builder.template(&multiline),
+                builder.template(&options(level)),
+                "{level:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn deep_has_no_worked_examples() {
+        let multiline = CleanupOptions {
+            multiline: true,
+            ..options(CleanupLevel::Deep)
+        };
+        assert!(PromptBuilder::new(true).template(&multiline).examples.is_empty());
+    }
+
+    #[test]
+    fn deep_lists_the_vocabulary_and_placeholders_too() {
+        let deep = CleanupOptions {
+            vocabulary: strings(&["Kirk"]),
+            placeholders: strings(&["⟦S1⟧"]),
+            ..options(CleanupLevel::Deep)
+        };
+        let template = PromptBuilder::new(false).template(&deep);
+        let rules = lines(&template);
+        assert_eq!(
+            rules[rules.len() - 3..],
+            [
+                "Spell these names and terms exactly as written: Kirk.",
+                "Copy each of these tokens exactly once, unchanged: ⟦S1⟧.",
+                "Output only the corrected text.",
+            ]
         );
     }
 

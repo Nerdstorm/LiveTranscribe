@@ -1,14 +1,17 @@
 //! executor.jsonl: whole cleanups with a scripted model, replayed with a clock the test controls.
 //! A step that times out moves the clock to its deadline; a step that is cancelled sets the
-//! cleanup's cancel flag while the model is generating.
+//! cleanup's cancel flag while the model is generating. Deep runs as each case says, or as
+//! shipped.
 
 use std::sync::Arc;
 
 use serde::Deserialize;
 
-use super::{OptionsJson, RequestJson, TemplateJson, assert_no_differences, number, prompts, read_lines};
+use super::{
+    DeepJson, OptionsJson, RequestJson, TemplateJson, assert_no_differences, deep, number, prompts, read_lines,
+};
 use crate::test_support::{FakeClock, ScriptedFailure, ScriptedModel};
-use crate::{CancelFlag, CleanedText, CleanupExecutor, OutputGuard};
+use crate::{CancelFlag, CleanedText, CleanupExecutor, FallbackReason, OutputGuard};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -19,6 +22,7 @@ struct ExecutorLine {
     override_template: Option<TemplateJson>,
     context_limit: usize,
     timeout_seconds: String,
+    deep: Option<DeepJson>,
     options: OptionsJson,
     raw: String,
     context: Vec<String>,
@@ -92,6 +96,7 @@ fn replay(line: &ExecutorLine) -> (Vec<RequestJson>, CleanedJson) {
         OutputGuard::default(),
         prompts(line.adapted, line.override_template.as_ref()),
     )
+    .with_deep(deep(line.deep.as_ref()))
     .with_clock(clock.clone());
     let cancel = CancelFlag::new();
     let steps: Vec<Step> = line.script.iter().map(StepJson::step).collect();
@@ -149,4 +154,12 @@ fn the_executor_traces_match_the_mac_apps() {
         }
     }
     assert_no_differences("executor.jsonl", &differences);
+    // The guard can't give this reason; only a cleanup whose model thinks can.
+    let unfinished = FallbackReason::ThinkingUnfinished.to_string();
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.result.fallback_reason.as_deref() == Some(unfinished.as_str())),
+        "executor.jsonl covers unfinished thinking"
+    );
 }

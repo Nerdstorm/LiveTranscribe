@@ -2,8 +2,8 @@
 //! app's `CleanupFixtureWriterTests` write from the Swift implementation. The prompts, the output
 //! guard's verdicts and the executor's traces here must match them exactly.
 //!
-//! Numbers other than counts are recorded as Swift prints a `Double`, the shortest text that reads
-//! back as the same value, so they are compared bit for bit.
+//! Numbers other than counts are recorded as Swift prints a `Double` or a `Float`, the shortest text
+//! that reads back as the same value, so they are compared bit for bit.
 
 mod executor;
 mod guard;
@@ -19,7 +19,7 @@ use lt_shared::CleanupLevel;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 
-use crate::{CleanupOptions, CleanupRequest, Example, PromptBuilder, PromptTemplate, Sampling};
+use crate::{Adapter, CleanupOptions, CleanupRequest, DeepCleanup, DeepPasses, Example, PromptBuilder, PromptTemplate};
 
 /// Differences shown in full when a fixture fails; the rest are counted.
 const SHOWN: usize = 10;
@@ -89,6 +89,20 @@ fn exact(text: &str) -> Exact {
     Exact(number(text))
 }
 
+/// A `Float` as the Mac app recorded it, as its bits.
+fn float_bits(text: &str) -> u32 {
+    text.parse::<f32>()
+        .unwrap_or_else(|error| panic!("{text:?} is not a number: {error}"))
+        .to_bits()
+}
+
+fn adapter(name: &str) -> Adapter {
+    Adapter::ALL
+        .into_iter()
+        .find(|adapter| adapter.as_str() == name)
+        .unwrap_or_else(|| panic!("no adapter {name:?}"))
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct OptionsJson {
@@ -107,6 +121,39 @@ impl OptionsJson {
             multiline: self.multiline,
         }
     }
+}
+
+/// How Deep runs, where a case says.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct DeepJson {
+    passes: String,
+    adapter: String,
+    thinking: bool,
+    thinking_tokens: usize,
+    falls_back_to_medium: bool,
+    minimum_timeout_seconds: String,
+}
+
+impl DeepJson {
+    fn deep(&self) -> DeepCleanup {
+        DeepCleanup {
+            passes: DeepPasses::ALL
+                .into_iter()
+                .find(|passes| passes.as_str() == self.passes)
+                .unwrap_or_else(|| panic!("no passes {:?}", self.passes)),
+            adapter: adapter(&self.adapter),
+            thinking: self.thinking,
+            thinking_tokens: self.thinking_tokens,
+            falls_back_to_medium: self.falls_back_to_medium,
+            minimum_timeout_seconds: number(&self.minimum_timeout_seconds),
+        }
+    }
+}
+
+/// How Deep runs for a case: as recorded, or as shipped.
+fn deep(recorded: Option<&DeepJson>) -> DeepCleanup {
+    recorded.map_or(DeepCleanup::SHIPPED, DeepJson::deep)
 }
 
 #[derive(Debug, Deserialize)]
@@ -148,13 +195,40 @@ fn prompts(adapted: bool, override_template: Option<&TemplateJson>) -> PromptBui
 }
 
 /// A request as the fixtures record it.
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct RequestJson {
     messages: Vec<MessageJson>,
     template_context: BTreeMap<String, bool>,
     max_tokens: usize,
-    adapter: bool,
+    adapter: String,
+    sampling: SamplingJson,
+}
+
+/// How the model picks tokens, with each `Float` as Swift prints it and the seed as text.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SamplingJson {
+    temperature: String,
+    top_p: String,
+    top_k: usize,
+    seed: Option<String>,
+}
+
+/// Numbers are equal when they read back as the same value, bit for bit.
+impl PartialEq for SamplingJson {
+    fn eq(&self, other: &Self) -> bool {
+        let seed = |recorded: &Self| {
+            recorded.seed.as_deref().map(|seed| {
+                seed.parse::<u64>()
+                    .unwrap_or_else(|error| panic!("{seed:?} is not a seed: {error}"))
+            })
+        };
+        float_bits(&self.temperature) == float_bits(&other.temperature)
+            && float_bits(&self.top_p) == float_bits(&other.top_p)
+            && self.top_k == other.top_k
+            && seed(self) == seed(other)
+    }
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
@@ -166,7 +240,7 @@ struct MessageJson {
 
 impl From<&CleanupRequest> for RequestJson {
     fn from(request: &CleanupRequest) -> Self {
-        assert_eq!(request.sampling, Sampling::Greedy, "the Mac app generates greedily");
+        let sampling = &request.sampling;
         Self {
             messages: request
                 .messages
@@ -178,7 +252,13 @@ impl From<&CleanupRequest> for RequestJson {
                 .collect(),
             template_context: request.template_context.clone(),
             max_tokens: request.max_tokens,
-            adapter: request.use_adapter,
+            adapter: request.adapter.as_str().to_owned(),
+            sampling: SamplingJson {
+                temperature: format!("{:?}", sampling.temperature),
+                top_p: format!("{:?}", sampling.top_p),
+                top_k: sampling.top_k,
+                seed: sampling.seed.map(|seed| seed.to_string()),
+            },
         }
     }
 }

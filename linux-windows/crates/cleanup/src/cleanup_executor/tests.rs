@@ -5,7 +5,7 @@ use lt_shared::CleanupLevel;
 
 use super::*;
 use crate::test_support::{FakeClock, ScriptedFailure, ScriptedModel, replying};
-use crate::{CleanupModelNotLoaded, CleanupRequest, Message, Role};
+use crate::{Adapter, CleanupModelNotLoaded, CleanupRequest, Message, Role};
 
 const RAW: &str = "i think the build is broken on main";
 const CORRECTED: &str = "meet on tuesday no wait wednesday at the office";
@@ -321,18 +321,21 @@ fn a_damaged_placeholder_falls_back_to_the_text_with_placeholders() {
     assert_eq!(cleaned.text, "email ⟦S1⟧ to the team");
 }
 
+/// Trained to resolve self-corrections whatever the prompt says, the adapter would do so at Light
+/// too, where every word must stay. Deep asks for its own (see `deep_tests`).
 #[test]
 fn the_adapter_is_on_only_at_the_levels_that_resolve_self_corrections() {
     let (executor, _) = executor(1.0, true);
     for (level, expected) in [
-        (CleanupLevel::Light, vec![false]),
-        (CleanupLevel::Medium, vec![true]),
-        (CleanupLevel::High, vec![true, true]),
+        (CleanupLevel::Light, vec![Adapter::Off]),
+        (CleanupLevel::Medium, vec![Adapter::Medium]),
+        (CleanupLevel::High, vec![Adapter::Medium, Adapter::Medium]),
     ] {
         let mut model = first_then(RESOLVED, "Let's meet on Wednesday at the office.");
         run(&executor, CORRECTED, &options(level), &mut model);
-        let used: Vec<bool> = model.requests.iter().map(|request| request.use_adapter).collect();
+        let used: Vec<Adapter> = model.requests.iter().map(|request| request.adapter).collect();
         assert_eq!(used, expected, "{level:?}");
+        assert!(model.requests.iter().all(|request| !request.thinks()), "{level:?}");
     }
 }
 
