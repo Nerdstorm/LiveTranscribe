@@ -20,16 +20,18 @@ out, the KV cache as state) it keeps, and changes three things:
            compressed by NNCF: INT4_ASYM, group 128, ratio 0.8, the rest INT8_ASYM).
   adapter  In each projection the Mac's adapters adapt (q, k, v, o, gate, up and down in the last
            16 layers) a low-rank branch is added to the projection's output,
-               y = W x + adapter_scale * (x A) B,
-           as mlx-swift-lm 3.31.4's QLoRALinear computes it (A = lora_a [in, rank],
-           B = lora_b [rank, out], adapter_scale its scale, 20, when on). A and B are inputs of the
-           model, in 16-bit floats and of any rank, named as the adapter's tensors
-           (model.layers.12.self_attn.q_proj.lora_a, ...), and adapter_scale is an input too
-           ([1], f32): the runtime binds an adapter's tensors, the Medium one or another trained
-           the same way, and its scale, request by request, or 0 for the base model. So adapters
-           stay separate files, one model serves them all, and nothing quantises them or folds
-           them into the 4-bit weights, which rounded the adapter away on the Mac. --no-adapter
-           leaves the branches out.
+               y = W x + (x A) B',
+           which is mlx-swift-lm 3.31.4's QLoRALinear, y = W x + scale * (x A) B, with the
+           adapter's scale (20) folded into B' = scale * B by the runtime (A = lora_a [in, rank],
+           B = lora_b [rank, out]). A and B' are inputs of the model, in 32-bit floats and of any
+           rank, named as the adapter's tensors (model.layers.12.self_attn.q_proj.lora_a, ...):
+           the runtime binds one adapter's, the Medium one or another trained the same way, request
+           by request, or zeros for the base model. So adapters stay separate files, one model
+           serves them all, and nothing quantises them or folds them into the 4-bit weights, which
+           rounded the adapter away on the Mac. --scale-input takes A and B in 16-bit floats and
+           the scale as an input of its own (adapter_scale, [1]), which costs a Convert of each
+           matrix and a Multiply more a projection, every pass. --no-adapter leaves the branches
+           out.
   logits   Only the last position's logits are computed (a Gather before the output layer): the
            runtime reads no others, and the published model computes the vocabulary's logits for
            every prompt position. --all-logits keeps them all.
@@ -253,26 +255,34 @@ def put_mlx_weights(model, mlx, layers):
     nodes[LM_HEAD].input(1).replace_source_output(u4_matrix(*embedding, "lm_head").output(0))
 
 
-def add_adapter_inputs(model, layers):
-    """Adds to each projection of `layers` a low-rank branch whose matrices, and whose scale, are
-    inputs of the model. Returns the inputs' names."""
+def add_adapter_inputs(model, layers, scale_input):
+    """Adds to each projection of `layers` a low-rank branch whose matrices are inputs of the
+    model: 32-bit floats, B with the adapter's scale folded in by the runtime; or, with
+    `scale_input`, 16-bit floats and the scale an input of its own, which costs a Convert of each
+    matrix and a Multiply more a projection, every pass. Returns the inputs' names."""
     nodes = nodes_by_name(model)
-    switch = ops.parameter(ov.PartialShape([1]), ov.Type.f32, name=ADAPTER_SCALE)
-    switch.output(0).get_tensor().set_names({ADAPTER_SCALE})
-    parameters = [switch]
+    element = ov.Type.f16 if scale_input else ov.Type.f32
+    parameters = []
+    if scale_input:
+        switch = ops.parameter(ov.PartialShape([1]), ov.Type.f32, name=ADAPTER_SCALE)
+        switch.output(0).get_tensor().set_names({ADAPTER_SCALE})
+        parameters.append(switch)
     for layer in layers:
         for projection, block in PROJECTIONS.items():
             prefix = f"model.layers.{layer}.{block}.{projection}"
             matmul = nodes[matmul_name(layer, projection)]
             rows, columns = matmul.input_value(1).get_partial_shape().to_shape()  # [out, in]
-            a = ops.parameter(ov.PartialShape([columns, -1]), ov.Type.f16, name=f"{prefix}.lora_a")
-            b = ops.parameter(ov.PartialShape([-1, rows]), ov.Type.f16, name=f"{prefix}.lora_b")
+            a = ops.parameter(ov.PartialShape([columns, -1]), element, name=f"{prefix}.lora_a")
+            b = ops.parameter(ov.PartialShape([-1, rows]), element, name=f"{prefix}.lora_b")
             for parameter in (a, b):
                 parameter.output(0).get_tensor().set_names({parameter.get_friendly_name()})
             targets = list(matmul.output(0).get_target_inputs())
-            down = ops.matmul(matmul.input_value(0), ops.convert(a, ov.Type.f32), False, False)
-            up = ops.matmul(down, ops.convert(b, ov.Type.f32), False, False)
-            output = ops.add(matmul.output(0), ops.multiply(up, switch), name=f"{prefix}.adapter/add")
+            if scale_input:
+                down = ops.matmul(matmul.input_value(0), ops.convert(a, ov.Type.f32), False, False)
+                branch = ops.multiply(ops.matmul(down, ops.convert(b, ov.Type.f32), False, False), switch)
+            else:
+                branch = ops.matmul(ops.matmul(matmul.input_value(0), a, False, False), b, False, False)
+            output = ops.add(matmul.output(0), branch, name=f"{prefix}.adapter/add")
             for target in targets:
                 target.replace_source_output(output.output(0))
             parameters += [a, b]
@@ -308,8 +318,11 @@ class OpenVinoChat:
         request = self.compiled.create_infer_request()
         for (layer, projection), (a, b) in adapter.items():
             prefix = f"model.layers.{layer}.{PROJECTIONS[projection]}.{projection}"
-            request.set_tensor(f"{prefix}.lora_a", ov.Tensor(a))
-            request.set_tensor(f"{prefix}.lora_b", ov.Tensor(b))
+            if ADAPTER_SCALE not in self.inputs:
+                # As the runtime binds them: in 32 bits, the scale folded into B.
+                a, b = a.astype(np.float32), b.astype(np.float32) * np.float32(scale)
+            request.set_tensor(f"{prefix}.lora_a", ov.Tensor(np.ascontiguousarray(a)))
+            request.set_tensor(f"{prefix}.lora_b", ov.Tensor(np.ascontiguousarray(b)))
         length, feed, found, tokens = 0, list(ids), [], []
         for _ in range(steps + 1):
             inputs = {
@@ -451,6 +464,11 @@ def main():
     parser.add_argument("--out", type=Path, required=True, help="the folder to write")
     parser.add_argument("--weights", choices=["mlx", "published"], default="mlx")
     parser.add_argument("--no-adapter", action="store_true", help="leave the adapter out")
+    parser.add_argument(
+        "--scale-input",
+        action="store_true",
+        help="take the adapter's matrices in 16-bit floats and its scale as an input (slower)",
+    )
     parser.add_argument("--all-logits", action="store_true", help="keep every position's logits")
     parser.add_argument("--base-ir", help=f"a folder with {BASE_IR[0]}@{BASE_IR[1][:7]}'s files")
     parser.add_argument("--mlx", help=f"a folder with {MLX_BASE[0]}@{MLX_BASE[1][:7]}'s files")
@@ -470,7 +488,7 @@ def main():
     model = ov.Core().read_model(base / "openvino_model.xml")
     if arguments.weights == "mlx":
         put_mlx_weights(model, mlx, layers)
-    inputs = add_adapter_inputs(model, adapted) if adapter else []
+    inputs = add_adapter_inputs(model, adapted, arguments.scale_input) if adapter else []
     if not arguments.all_logits:
         keep_last_logits(model)
     model.validate_nodes_and_infer_types()
@@ -495,7 +513,8 @@ def main():
         else {
             "layers": [adapted[0], adapted[-1]],
             "projections": list(PROJECTIONS),
-            "scale_input": ADAPTER_SCALE,
+            "matrices": "f16" if arguments.scale_input else "f32",
+            "scale": f"the input {ADAPTER_SCALE}" if arguments.scale_input else "folded into lora_b by the runtime",
             "inputs": len(inputs),
         },
         "adapters": {}

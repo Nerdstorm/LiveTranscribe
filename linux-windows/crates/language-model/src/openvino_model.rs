@@ -4,9 +4,10 @@
 //! and returns `logits`.
 //!
 //! A model exported with adapter inputs (`tools/export-qwen3-cleanup.py`) also takes, for each
-//! projection it adapts, the two matrices of a LoRA branch (`….lora_a` and `….lora_b`), and
-//! `adapter_scale`, the branch's factor. A reply binds an [`Adapter`]'s matrices and scale to them,
-//! or, without one, rank-1 zeros scaled by 0, which leave the base model's outputs as they are.
+//! projection it adapts, the two matrices of a LoRA branch (`….lora_a` and `….lora_b`): in 32-bit
+//! floats with the adapter's scale folded into B, or in 16-bit ones with the scale an input of its
+//! own (`adapter_scale`). A reply binds an [`Adapter`]'s matrices to them, or, without one, rank-1
+//! zeros, which leave the base model's outputs as they are.
 //!
 //! OpenVINO's C API can't empty a request's state, so on the CPU (or GPU) each reply runs on a new
 //! request, whose cache starts empty. On the NPU the model runs in the NPU's LLM mode (NPUW), which
@@ -29,7 +30,7 @@ use crate::runtime::{self, RuntimeError};
 pub const MODEL_XML: &str = "openvino_model.xml";
 pub const MODEL_BIN: &str = "openvino_model.bin";
 
-/// The input that scales the adapter's branch, in a model exported with adapter inputs.
+/// The input that scales the adapter's branch, in a model exported to take it.
 pub const ADAPTER_SCALE: &str = "adapter_scale";
 /// How the names of an adapted projection's matrices end: A, `[in, rank]`, and B, `[rank, out]`.
 pub const LORA_A: &str = ".lora_a";
@@ -150,8 +151,11 @@ impl AdapterInput {
 struct Inputs {
     position_ids: bool,
     beam_idx: bool,
-    /// The adapter inputs' matrices, when the model has them (with [`ADAPTER_SCALE`]).
+    /// The adapter inputs' matrices, when the model has them.
     adapter: Vec<AdapterInput>,
+    /// Whether it takes the adapter's scale as an input ([`ADAPTER_SCALE`]) rather than folded
+    /// into B.
+    scale: bool,
 }
 
 /// The compiled model, and the reply under way.
@@ -230,6 +234,12 @@ impl OpenVinoModel {
         &self.inputs.adapter
     }
 
+    /// Whether an adapter's scale is folded into its B matrices, as the model takes no
+    /// [`ADAPTER_SCALE`].
+    pub fn folds_adapter_scale(&self) -> bool {
+        !self.inputs.adapter.is_empty() && !self.inputs.scale
+    }
+
     /// The device it runs on.
     pub fn device(&self) -> &str {
         &self.device
@@ -264,7 +274,7 @@ impl OpenVinoModel {
                 .map_err(call("starting the language model"))?,
         };
         if let Some(adapter) = adapter
-            && let Err(error) = bind(&mut request, adapter)
+            && let Err(error) = bind(&mut request, adapter, self.inputs.scale)
         {
             if self.device == "NPU" {
                 self.npu_request = Some(request);
@@ -298,17 +308,22 @@ impl OpenVinoModel {
     }
 }
 
-/// Binds `adapter`'s matrices and scale to the request's adapter inputs, for the whole reply.
-fn bind(request: &mut InferRequest, adapter: &Adapter) -> Result<(), ModelError> {
+/// Binds `adapter`'s matrices to the request's adapter inputs for the whole reply, and its scale
+/// when the model takes it (`scale_input`).
+fn bind(request: &mut InferRequest, adapter: &Adapter, scale_input: bool) -> Result<(), ModelError> {
     for (name, matrix) in adapter.tensors() {
         request
             .set_tensor(name, matrix)
             .map_err(call("setting the adapter's matrices"))?;
     }
-    let scale = tensor(ElementType::F32, &[1], &[adapter.scale()]).map_err(call("preparing the adapter's scale"))?;
-    request
-        .set_tensor(ADAPTER_SCALE, &scale)
-        .map_err(call("setting the adapter's scale"))
+    if scale_input {
+        let scale =
+            tensor(ElementType::F32, &[1], &[adapter.scale()]).map_err(call("preparing the adapter's scale"))?;
+        request
+            .set_tensor(ADAPTER_SCALE, &scale)
+            .map_err(call("setting the adapter's scale"))?;
+    }
+    Ok(())
 }
 
 /// Runs `ids` at the positions after the reply's cache, and returns the last one's logits.
@@ -433,16 +448,26 @@ fn check_inputs(model: &Model, folder: &Path) -> Result<Inputs, ModelError> {
             return Err(problem(format!("its model takes {} without {pair}", input.name)));
         }
     }
-    if adapter.is_empty() == has(ADAPTER_SCALE) {
+    if adapter.is_empty() && has(ADAPTER_SCALE) {
         return Err(problem(format!(
-            "its model takes {} adapter matrices and {} {ADAPTER_SCALE}",
-            adapter.len(),
-            if has(ADAPTER_SCALE) { "an" } else { "no" }
+            "its model takes {ADAPTER_SCALE} without adapter matrices"
+        )));
+    }
+    // Without a scale input, the scale is folded into B, exactly only in 32-bit floats.
+    if !has(ADAPTER_SCALE)
+        && let Some(narrow) = adapter
+            .iter()
+            .find(|input| input.name.ends_with(LORA_B) && input.element != ElementType::F32)
+    {
+        return Err(problem(format!(
+            "its model takes {} in {:?} and no {ADAPTER_SCALE} to scale it by",
+            narrow.name, narrow.element
         )));
     }
     Ok(Inputs {
         position_ids: has("position_ids"),
         beam_idx: has("beam_idx"),
+        scale: has(ADAPTER_SCALE),
         adapter,
     })
 }

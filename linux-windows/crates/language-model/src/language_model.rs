@@ -190,7 +190,12 @@ impl LanguageModel {
         if !self.takes_adapters() {
             return Err(AdapterError::NotAdaptable);
         }
-        let adapter = Adapter::load(name, folder, self.model.adapter_inputs())?;
+        let adapter = Adapter::load(
+            name,
+            folder,
+            self.model.adapter_inputs(),
+            self.model.folds_adapter_scale(),
+        )?;
         tracing::info!(
             adapter = name,
             rank = adapter.rank(),

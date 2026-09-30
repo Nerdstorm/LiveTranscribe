@@ -1,8 +1,10 @@
 //! LoRA adapters, for a model exported with adapter inputs (`tools/export-qwen3-cleanup.py`).
 //!
 //! Each projection such a model adapts computes `W x + scale * (x A) B`, as mlx-swift-lm's
-//! `QLoRALinear` computes it on the Mac. A (`….lora_a`, `[in, rank]`), B (`….lora_b`,
-//! `[rank, out]`) and the scale (`adapter_scale`) are inputs of the model, not weights in it.
+//! `QLoRALinear` computes it on the Mac. A (`….lora_a`, `[in, rank]`) and B (`….lora_b`,
+//! `[rank, out]`) are inputs of the model, not weights in it. The scale is folded into B as the
+//! adapter loads, in 32-bit floats; or, for a model that takes it as an input (`adapter_scale`),
+//! bound with the matrices.
 //!
 //! An adapter is the Mac's pair of files, as mlx-lm writes them:
 //! - `adapters.safetensors`: A and B of each projection, in 16-bit floats;
@@ -18,7 +20,7 @@ use std::path::{Path, PathBuf};
 use openvino::{ElementType, InferenceError, Shape, Tensor};
 use serde::Deserialize;
 
-use crate::openvino_model::AdapterInput;
+use crate::openvino_model::{AdapterInput, LORA_B};
 
 /// An adapter's matrices, in its folder.
 pub const ADAPTER_WEIGHTS: &str = "adapters.safetensors";
@@ -75,9 +77,15 @@ impl Adapter {
         &self.tensors
     }
 
-    /// Reads the adapter in `folder` and prepares its tensors for the model's `inputs`. It must
-    /// have a matrix for each input, of the rank its config gives, and none for anything else.
-    pub(crate) fn load(name: &str, folder: &Path, inputs: &[AdapterInput]) -> Result<Self, AdapterError> {
+    /// Reads the adapter in `folder` and prepares its tensors for the model's `inputs`, with its
+    /// scale folded into B when `fold_scale`. It must have a matrix for each input, of the rank
+    /// its config gives, and none for anything else.
+    pub(crate) fn load(
+        name: &str,
+        folder: &Path,
+        inputs: &[AdapterInput],
+        fold_scale: bool,
+    ) -> Result<Self, AdapterError> {
         let read = |file: &str| {
             let path = folder.join(file);
             std::fs::read(&path).map_err(|error| AdapterError::Read {
@@ -90,7 +98,7 @@ impl Adapter {
             problem: error.to_string(),
         })?;
         let weights = read(ADAPTER_WEIGHTS)?;
-        let matrices = plan(&config, &weights, inputs).map_err(|problem| AdapterError::Mismatch {
+        let matrices = plan(&config, &weights, inputs, fold_scale).map_err(|problem| AdapterError::Mismatch {
             path: folder.to_owned(),
             problem,
         })?;
@@ -123,6 +131,7 @@ impl Adapter {
                     element: input.element,
                     dimensions: input.dimensions(1),
                     values: Values::Zeros,
+                    factor: 1.0,
                 };
                 Ok((matrix.name.clone(), matrix.tensor()?))
             })
@@ -200,6 +209,8 @@ struct Matrix<'a> {
     element: ElementType,
     dimensions: [usize; 2],
     values: Values<'a>,
+    /// What each value is multiplied by: the adapter's scale for a B it's folded into, else 1.
+    factor: f32,
 }
 
 #[derive(Debug, PartialEq)]
@@ -210,7 +221,8 @@ enum Values<'a> {
 }
 
 impl Matrix<'_> {
-    /// The tensor, in the input's element type: 16-bit floats as they are, or widened to 32.
+    /// The tensor, in the input's element type: 16-bit floats as they are, or widened to 32 and
+    /// multiplied by the factor (exactly: an f16 times a small whole number fits in an f32).
     fn tensor(&self) -> Result<Tensor, InferenceError> {
         let dimensions = self
             .dimensions
@@ -221,10 +233,11 @@ impl Matrix<'_> {
             (Values::F16(bytes), ElementType::F32) => {
                 let (halves, _) = bytes.as_chunks::<2>();
                 for (value, &half) in tensor.get_data_mut::<f32>()?.iter_mut().zip(halves) {
-                    *value = f16_to_f32(u16::from_le_bytes(half));
+                    *value = f16_to_f32(u16::from_le_bytes(half)) * self.factor;
                 }
             }
-            // The model's adapter inputs are 16- or 32-bit floats (checked when it loads).
+            // The model's adapter inputs are 16- or 32-bit floats (checked when it loads), and a
+            // factor other than 1 only goes to 32-bit ones ([`plan`]).
             (Values::F16(bytes), _) => {
                 let (halves, _) = bytes.as_chunks::<2>();
                 for (value, &half) in tensor.get_data_mut::<u16>()?.iter_mut().zip(halves) {
@@ -236,8 +249,14 @@ impl Matrix<'_> {
     }
 }
 
-/// Checks the adapter against the model's `inputs` and pairs each input with its matrix.
-fn plan<'a>(config: &Config, weights: &'a [u8], inputs: &[AdapterInput]) -> Result<Vec<Matrix<'a>>, String> {
+/// Checks the adapter against the model's `inputs` and pairs each input with its matrix, the
+/// scale folded into each B when `fold_scale`.
+fn plan<'a>(
+    config: &Config,
+    weights: &'a [u8],
+    inputs: &[AdapterInput],
+    fold_scale: bool,
+) -> Result<Vec<Matrix<'a>>, String> {
     if let Some(kind) = config.fine_tune_type.as_deref().filter(|kind| *kind != "lora") {
         return Err(format!(
             "it's a {kind} adapter, and the model computes LoRA's branch only"
@@ -263,11 +282,23 @@ fn plan<'a>(config: &Config, weights: &'a [u8], inputs: &[AdapterInput]) -> Resu
                 input.name, tensor.shape
             ));
         }
+        let factor = if fold_scale && input.name.ends_with(LORA_B) {
+            if input.element != ElementType::F32 {
+                return Err(format!(
+                    "the scale is folded into {}, which must then take 32-bit floats, not {:?}",
+                    input.name, input.element
+                ));
+            }
+            scale
+        } else {
+            1.0
+        };
         matrices.push(Matrix {
             name: input.name.clone(),
             element: input.element,
             dimensions: expected,
             values: Values::F16(tensor.data),
+            factor,
         });
     }
     if let Some(name) = tensors.keys().min() {
@@ -451,8 +482,9 @@ mod tests {
     fn pairs_each_input_with_its_matrix() {
         let bytes = file(&[(A, "F16", &[4, 2], halves(8)), (B, "F16", &[2, 3], halves(6))]);
         let inputs = [input(A, 4), input(B, 3)];
-        let matrices = plan(&config(2, Some("lora")), &bytes, &inputs).unwrap();
+        let matrices = plan(&config(2, Some("lora")), &bytes, &inputs, false).unwrap();
         assert_eq!(matrices.len(), 2);
+        assert!(matrices.iter().all(|matrix| matrix.factor == 1.0));
         assert_eq!((matrices[0].name.as_str(), matrices[0].dimensions), (A, [4, 2]));
         assert_eq!((matrices[1].name.as_str(), matrices[1].dimensions), (B, [2, 3]));
         assert_eq!(matrices[1].values, Values::F16(&bytes[bytes.len() - 12..]));
@@ -466,7 +498,7 @@ mod tests {
             (B, "F16", &[2, 3][..], halves(6)),
         ];
         let refused = |tensors: &[(&str, &str, &[usize], Vec<u8>)], config: Config| {
-            plan(&config, &file(tensors), &inputs).expect_err("refused")
+            plan(&config, &file(tensors), &inputs, false).expect_err("refused")
         };
         assert!(refused(&good[..1], config(2, None)).contains("has no"));
         let extra = [
@@ -481,8 +513,22 @@ mod tests {
         assert!(refused(&good, config(2, Some("dora"))).contains("dora"));
         let columns = [input(A, 5), input(B, 3)];
         assert!(
-            plan(&config(2, None), &file(&good), &columns).is_err(),
+            plan(&config(2, None), &file(&good), &columns, false).is_err(),
             "the projection's width"
         );
+    }
+
+    #[test]
+    fn folds_the_scale_into_b_in_32_bits() {
+        let bytes = file(&[(A, "F16", &[4, 2], halves(8)), (B, "F16", &[2, 3], halves(6))]);
+        let wide = |name: &str, fixed| AdapterInput {
+            element: ElementType::F32,
+            ..input(name, fixed)
+        };
+        let matrices = plan(&config(2, None), &bytes, &[wide(A, 4), wide(B, 3)], true).unwrap();
+        assert_eq!((matrices[0].factor, matrices[1].factor), (1.0, 20.0));
+        // Folded into a 16-bit B, the scale would be rounded: refused.
+        let narrow_b = plan(&config(2, None), &bytes, &[wide(A, 4), input(B, 3)], true);
+        assert!(narrow_b.expect_err("refused").contains("32-bit"));
     }
 }
