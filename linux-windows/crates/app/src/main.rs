@@ -27,7 +27,7 @@ use tracing_subscriber::EnvFilter;
 #[command(
     name = "livetranscribe",
     version,
-    about = "Dictation with the speech-to-text of Live Transcribe for Mac"
+    about = "Live Transcribe for Linux and Windows: dictation that runs on your computer"
 )]
 struct Cli {
     /// What to do; without one, dictation (`run`), as when the app starts from the desktop's menu
