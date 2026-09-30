@@ -50,10 +50,10 @@ impl DeepPasses {
 }
 
 impl DeepCleanup {
-    /// What the app runs: one pass with Deep's adapter, without thinking, which was right on 107
+    /// What the app runs: one pass with Deep's adapter, without thinking, which was right on 108
     /// of 114 hand-written cases, against 88 with the self-correction adapter and 52 with none;
-    /// thinking lost repairs and took 50 times as long (docs/cleanup.md). A repair the guard turns
-    /// down gets Medium's cleanup instead.
+    /// with thinking and no adapter, 58, taking 20 times as long (docs/cleanup.md). A repair
+    /// `SelfRepair` turns down gets Medium's cleanup instead.
     pub const SHIPPED: Self = Self {
         passes: DeepPasses::One,
         adapter: Adapter::Deep,
