@@ -15,15 +15,20 @@
   apply to dictation only. The Linux and Windows app has the same levels, with the same prompts,
   adapters and checks (see [Linux and Windows](#linux-and-windows)).
 - Self-correction cues are "sorry", "I mean", "I meant", "no", "wait", "rather", "actually",
-  "make that", "scratch that" and "correction". The bundled adapter resolves them at Medium and
+  "make that", "scratch that" and "correction". A cue may be followed by "not" and the words it
+  takes back, said again ("room four, no, not four, five" → "room five"); the "not" goes only
+  then, so "Thursday, not Friday" keeps it. The bundled adapter resolves them at Medium and
   High only (**Resolve spoken self-corrections** in **Settings › Advanced**, on by default).
   Deep has an adapter of its own, trained on its prompt, which the same switch turns off; without
   it Deep keeps corrections as spoken, like the other levels.
-- At Deep, in a field that takes several lines, the model lays out what you didn't: an email
-  with its greeting, paragraphs and sign-off, and things you need or steps to take as a list,
-  even when you didn't announce one ("We need milk, eggs and bread." becomes three bullets). What
-  you lay out yourself, by saying "new line", "bullet point" or "number one", the layout rules lay
-  out as at Medium, and the model keeps that dictation to one paragraph.
+- At Deep, in a field that takes several lines, the model lays out what you didn't: a short
+  email's greeting, body and sign-off, and things you need or steps to take as a list, even when
+  you didn't announce one ("We need milk, eggs and bread." becomes three bullets). It doesn't yet
+  split a longer letter's body into paragraphs or a list: the layout rules put that letter's
+  greeting and sign-off on lines of their own, and the model gets only the body (see
+  [Limitations](limitations.md)). What you lay out yourself, by saying "new line", "bullet point"
+  or "number one", the layout rules lay out as at Medium, and the model keeps that dictation to
+  one paragraph.
 - At Deep, a cue only corrects what it follows: "No" that answers a question, "sorry" that
   apologises and "actually" that starts a new point stay ("Is the release tomorrow? No, it's the
   day after." is unchanged). Names, numbers, dates, times and negations are kept as said outside
@@ -66,17 +71,17 @@
   said and the written words (`SelfRepair`). A word may be respelled, take another form of itself
   ("check" → "checked", "was" → "were"), join or split ("do not" → "don't"), or be a filler, a
   repeat or a small grammar word dropped or added ("a", "the", "is", "to", …). A correction may
-  take back up to six words before its cue, and its phrase after the cue may bring up to two new
-  words ("the after tomorrow" → "the day after tomorrow"). One that reaches back past the end of
-  a sentence must be about the same thing: a shared word, or the same kind (a number, a day, a
-  month, a time or a name). Numbers, negations, words of time and placeholders may never be
-  added, dropped or changed outside what a correction takes back, and in a one-line field Deep
-  may not break lines. In a field that takes several lines, a bulleted list Deep makes needs at
-  least three items (two things said in a sentence stay in it; a numbered list may have two, as
-  when they were counted), and no line may hold only a placeholder, such as an emoji moved below
-  the sentence it ended. When Deep's answer is turned down, Medium's pass runs in the time left, so
-  Deep never shows less than Medium would. Deep may take 8 s, or the **Timeout** when it is
-  longer.
+  take back up to six words before its cue, with a "not" after the cue that says them again, and
+  its phrase may bring up to two new words ("the after tomorrow" → "the day after tomorrow").
+  One that reaches back past the end of a sentence must be about the same thing: a shared word,
+  or the same kind (a number, a day, a month, a time or a name). Numbers, negations, words of
+  time and placeholders may never be added, dropped or changed outside what a correction takes
+  back, and in a one-line field Deep may not break lines. In a field that takes several lines, a
+  bulleted list Deep makes needs at least three items (two things said in a sentence stay in it;
+  a numbered list may have two, as when they were counted), and no line may hold only a
+  placeholder, such as an emoji moved below the sentence it ended. When Deep's answer is turned
+  down, Medium's pass runs in the time left, so Deep never shows less than Medium would. Deep may
+  take 8 s, or the **Timeout** when it is longer.
 - With **Clean up transcripts with the LLM** off in **Settings › Advanced**, nothing is reworded.
   In dictation, Medium, High and Deep still remove fillers and lay out lists and letters, and
   snippets, vocabulary and spoken commands still apply; the live transcript shows the raw text.

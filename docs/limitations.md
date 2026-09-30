@@ -40,15 +40,20 @@
   of a word that was said, so a wrong tense or plural would pass as a repair. The check turns
   down repairs that reorder words ("Friday night. Sorry, the night Saturday." → "Saturday
   night"), or that replace a word across a sentence end with one that has nothing in common with
-  it, and then Medium's cleanup is shown. Deep is slower: on Medium's 515 test cases it took
-  0.24 s at p50 and 0.31 s at p95 on an M4 Pro, against 0.16 and 0.24 s for Medium, and a
-  rejected answer adds Medium's pass.
+  it, and then Medium's cleanup is shown. A correction inside a mention ("words like Docker,
+  sorry, not Docker, Kubernetes") the model may leave as said, or read the wrong way round, which
+  the check turns down. Deep is slower: on Medium's 515 test cases it took 0.24 s at p50 and
+  0.31 s at p95 on an M4 Pro, against 0.16 and 0.24 s for Medium, and a rejected answer adds
+  Medium's pass.
 - Spoken lists are laid out only when you say their markers ("first…", "one is…", "number
   one…", "bullet point…"), and lists and letters only where line breaks are allowed. The model
   sometimes drops or rewrites a list item; OutputGuard then inserts your words, still laid out.
   **Deep** also makes lists you didn't mark, in fields that take several lines: things you need
   or steps to take become a list of three or more ("We need milk, eggs and bread."), which in a
-  chat box may be more than you wanted. What you mark yourself is laid out by the rules.
+  chat box may be more than you wanted. What you mark yourself is laid out by the rules. Deep
+  doesn't yet lay out the body of a longer letter: the rules put its greeting and sign-off on
+  lines of their own and the model gets only the body, which it keeps as one paragraph, even
+  where it names a few points ("number one, … and …").
 - A text box in a web page always counts as taking several lines, so a list dictated into a
   web page's one-line field, such as a site's search box, gets line breaks the field then drops
   ("items:1. Milk"). Set that browser to single-line if it happens often.
