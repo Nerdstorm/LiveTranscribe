@@ -267,6 +267,14 @@ mod tests {
         assert!(overrides(&[]).is_empty());
     }
 
+    /// A model folder by its full path, as this system writes one: on Windows, "/srv/models/mine"
+    /// is on whichever drive the app started from.
+    const FOLDER: &str = if cfg!(windows) {
+        r"C:\models\mine"
+    } else {
+        "/srv/models/mine"
+    };
+
     #[test]
     fn options_given_become_settings_for_the_run() {
         let given = overrides(&[
@@ -278,7 +286,7 @@ mod tests {
             "--device",
             "CPU",
             "--model",
-            "/srv/models/mine",
+            FOLDER,
             "--language",
             "German",
         ]);
@@ -286,7 +294,7 @@ mod tests {
         assert_eq!(given["handsFreeEnabled"], false);
         assert_eq!(given["cleanupLevel"], "light");
         assert_eq!(given["sttDevice"], "CPU");
-        assert_eq!(given["sttModel"], "/srv/models/mine");
+        assert_eq!(given["sttModel"], FOLDER);
         // The settings keep it by its code (Settings::changed).
         assert_eq!(given["sttLanguage"], "German");
     }
