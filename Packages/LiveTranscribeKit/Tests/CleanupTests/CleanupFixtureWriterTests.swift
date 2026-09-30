@@ -194,6 +194,8 @@ enum CleanupFixtures {
             case .thinkingUnfinished: reason = "thinkingUnfinished"
             case .invalidRepair: reason = "invalidRepair"
             case .layoutNotAllowed: reason = "layoutNotAllowed"
+            case .shortList: reason = "shortList"
+            case .placeholderOnItsOwnLine: reason = "placeholderOnItsOwnLine"
             }
         }
     }

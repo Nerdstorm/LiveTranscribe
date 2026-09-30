@@ -6,7 +6,7 @@ use lt_shared::{edit_distance, placeholder_token};
 use crate::content_words::ContentWords;
 use crate::dropped_words::DroppedWords;
 use crate::self_correction::SelfCorrection;
-use crate::self_repair::SelfRepair;
+use crate::self_repair::{self, SelfRepair};
 use crate::spoken_names::SpokenNames;
 use crate::word_alignment::WordAlignment;
 use crate::words::{WordSet, normalized_words, starts_with};
@@ -63,6 +63,10 @@ pub enum FallbackReason {
     InvalidRepair,
     /// Deep broke the text into lines for a field that takes one line.
     LayoutNotAllowed,
+    /// Deep made a bulleted list of fewer than three items, of things said in a sentence.
+    ShortList,
+    /// Deep put a placeholder on a line of its own, such as an emoji below the sentence it ended.
+    PlaceholderOnItsOwnLine,
 }
 
 impl FallbackReason {
@@ -101,6 +105,8 @@ impl fmt::Display for FallbackReason {
             Self::ThinkingUnfinished => write!(f, "ran out of tokens while thinking"),
             Self::InvalidRepair => write!(f, "changed more than a repair may"),
             Self::LayoutNotAllowed => write!(f, "broke a one-line field into lines"),
+            Self::ShortList => write!(f, "made a bulleted list of fewer than three items"),
+            Self::PlaceholderOnItsOwnLine => write!(f, "put a placeholder on a line of its own"),
         }
     }
 }
@@ -221,6 +227,21 @@ impl OutputGuard {
                 return reject(FallbackReason::LayoutNotAllowed);
             }
             let placeholders = WordSet::normalized(&options.placeholders);
+            // Layout the model made, which the text it was given didn't have.
+            let short_lists = |text: &str| {
+                self_repair::bulleted_list_lengths(text)
+                    .into_iter()
+                    .filter(|&items| items < self_repair::MIN_BULLETED_ITEMS)
+                    .count()
+            };
+            if short_lists(cleaned) > short_lists(raw) {
+                return reject(FallbackReason::ShortList);
+            }
+            if self_repair::placeholder_line_count(cleaned, &placeholders)
+                > self_repair::placeholder_line_count(raw, &placeholders)
+            {
+                return reject(FallbackReason::PlaceholderOnItsOwnLine);
+            }
             return if self.self_repair.accepts(raw, cleaned, &placeholders) {
                 GuardVerdict::Accepted(cleaned.to_owned())
             } else {

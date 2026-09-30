@@ -28,6 +28,10 @@ import Shared
 ///   tomorrow" → "the day after tomorrow");
 /// - a list's numbers or bullets put in place of the words said to mark its items.
 ///
+/// The layout is checked too (``OutputGuard``): a bulleted list has at least ``minBulletedItems``
+/// items, since two things said in a sentence stay in it, and no line holds only placeholders, as
+/// when an emoji is moved below the sentence it ended.
+///
 /// Names, numbers, negations and words of time are kept as said everywhere else: none may be
 /// added, dropped or changed, and no other new word may appear, so the model can't add a claim
 /// ("he didn't" → "he didn't answer") or turn "after" into "before".
@@ -36,6 +40,9 @@ struct SelfRepair: Sendable {
     static let correctionPhraseWords = 6
     /// Most words a repair may add to or change in one correction phrase.
     static let maxRepairWords = 2
+    /// Fewest items in a bulleted list the model makes: two things said in a sentence ("the invoice
+    /// and the agreement") stay in it. A numbered list may have two, as when they were counted.
+    static let minBulletedItems = 3
 
     private let cues: [[String]]
     private let cueWords: Set<String>
@@ -201,8 +208,7 @@ struct SelfRepair: Sendable {
     /// had one.
     static func withoutListMarker(_ line: Substring) -> (Substring, Bool) {
         let trimmed = line.drop(while: \.isWhitespace)
-        let bullets: Set<Character> = ["-", "*", "•", "‣", "◦", "▪", "–", "—", "·"]
-        if let first = trimmed.first, bullets.contains(first), trimmed.dropFirst().first?.isWhitespace == true {
+        if isBulleted(line) {
             return (trimmed.dropFirst(), true)
         }
         let digits = trimmed.prefix(while: \.isNumber)
@@ -212,6 +218,42 @@ struct SelfRepair: Sendable {
             return (afterDigits.dropFirst(), true)
         }
         return (line, false)
+    }
+
+    private static let bullets: Set<Character> = ["-", "*", "•", "‣", "◦", "▪", "–", "—", "·"]
+
+    /// Whether `line` starts with a bullet and a space.
+    private static func isBulleted(_ line: Substring) -> Bool {
+        let trimmed = line.drop(while: \.isWhitespace)
+        guard let first = trimmed.first else { return false }
+        return bullets.contains(first) && trimmed.dropFirst().first?.isWhitespace == true
+    }
+
+    /// How many items each bulleted list in `text` has: a list is a run of lines that start with
+    /// a bullet, which a blank line or any other line ends.
+    static func bulletedListLengths(in text: String) -> [Int] {
+        var lengths: [Int] = []
+        var run = 0
+        for line in text.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline) {
+            if isBulleted(line) {
+                run += 1
+            } else if run > 0 {
+                lengths.append(run)
+                run = 0
+            }
+        }
+        if run > 0 { lengths.append(run) }
+        return lengths
+    }
+
+    /// How many lines of `text` hold placeholders and nothing else, list markers and punctuation
+    /// aside. `placeholders` are normalized, as the words are.
+    static func placeholderLineCount(in text: String, placeholders: Set<String>) -> Int {
+        guard !placeholders.isEmpty else { return 0 }
+        return text.split(whereSeparator: \.isNewline).filter { line in
+            let words = EditDistance.words(in: EditDistance.normalize(String(withoutListMarker(line).0)))
+            return !words.isEmpty && words.allSatisfy(placeholders.contains)
+        }.count
     }
 
     // MARK: - Word classes

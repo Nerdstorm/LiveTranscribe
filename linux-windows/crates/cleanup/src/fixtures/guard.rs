@@ -23,7 +23,7 @@ use repair::{RepairJson, repair_differences};
 
 /// Every fallback reason the guard gives, as the fixtures name them; the guard's cases must cover
 /// them all. (Unfinished thinking is the executor's, and its fixture covers it.)
-const REASONS: [&str; 17] = [
+const REASONS: [&str; 19] = [
     "emptyOutput",
     "thinkingLeaked",
     "preamble",
@@ -41,6 +41,8 @@ const REASONS: [&str; 17] = [
     "generationFailed",
     "invalidRepair",
     "layoutNotAllowed",
+    "shortList",
+    "placeholderOnItsOwnLine",
 ];
 
 // MARK: - Verdicts
@@ -221,6 +223,8 @@ fn judged(verdict: &GuardVerdict) -> Judged {
         FallbackReason::ThinkingUnfinished => ("thinkingUnfinished", None, None, None),
         FallbackReason::InvalidRepair => ("invalidRepair", None, None, None),
         FallbackReason::LayoutNotAllowed => ("layoutNotAllowed", None, None, None),
+        FallbackReason::ShortList => ("shortList", None, None, None),
+        FallbackReason::PlaceholderOnItsOwnLine => ("placeholderOnItsOwnLine", None, None, None),
     };
     Judged::Rejected {
         reason: name.to_owned(),

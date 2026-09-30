@@ -5,8 +5,11 @@ import Testing
 struct SelfRepairTests {
     private let outputGuard = OutputGuard()
 
-    private func review(_ raw: String, _ cleaned: String, multiline: Bool = false) -> GuardVerdict {
-        outputGuard.review(raw: raw, outcome: .completed(cleaned), options: CleanupOptions(level: .deep, multiline: multiline))
+    private func review(_ raw: String, _ cleaned: String, multiline: Bool = false, placeholders: [String] = []) -> GuardVerdict {
+        outputGuard.review(
+            raw: raw, outcome: .completed(cleaned),
+            options: CleanupOptions(level: .deep, placeholders: placeholders, multiline: multiline)
+        )
     }
 
     private static let kirk = "I tried to speak with Kirk, but he didn't. I don't think he actually check whether the release is tomorrow. No, sorry, the after tomorrow."
@@ -237,7 +240,29 @@ struct SelfRepairTests {
     }
 
     @Test func rejectsAListThatDropsQuantities() {
-        let cleaned = "Buy:\n- Apples\n- Pears"
-        #expect(review("Buy three apples and two pears.", cleaned, multiline: true) == .rejected(.invalidRepair))
+        let cleaned = "Buy:\n- Apples\n- Pears\n- A melon"
+        #expect(review("Buy three apples, two pears and a melon.", cleaned, multiline: true) == .rejected(.invalidRepair))
+    }
+
+    @Test func rejectsABulletedListOfTwoThingsSaidInASentence() {
+        let bulleted = "I've attached:\n- The invoice\n- The signed agreement"
+        #expect(review("I've attached the invoice and the signed agreement.", bulleted, multiline: true) == .rejected(.shortList))
+        let numbered = "Two things:\n1. Call the bank.\n2. Email Sarah."
+        #expect(
+            review("Two things: number one, call the bank. Number two, email Sarah.", numbered, multiline: true) == .accepted(numbered),
+            "a numbered list may have two items, as when they were counted"
+        )
+    }
+
+    @Test func rejectsAPlaceholderOnALineOfItsOwn() {
+        let emoji = ["⟦E1⟧"]
+        #expect(review("Thanks so much! ⟦E1⟧", "Thanks so much!\n\n⟦E1⟧", multiline: true, placeholders: emoji) == .rejected(.placeholderOnItsOwnLine))
+        #expect(review("Thanks so much! ⟦E1⟧", "Thanks so much! ⟦E1⟧", multiline: true, placeholders: emoji) == .accepted("Thanks so much! ⟦E1⟧"))
+        let addresses = ["⟦A1⟧", "⟦A2⟧", "⟦A3⟧"]
+        #expect(
+            review("The links are ⟦A1⟧, ⟦A2⟧ and ⟦A3⟧.", "The links are:\n- ⟦A1⟧\n- ⟦A2⟧\n- ⟦A3⟧", multiline: true, placeholders: addresses)
+                == .rejected(.placeholderOnItsOwnLine),
+            "a list of placeholders alone is turned down too, and Medium's sentence shown"
+        )
     }
 }

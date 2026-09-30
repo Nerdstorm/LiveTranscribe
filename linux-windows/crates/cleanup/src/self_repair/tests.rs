@@ -11,8 +11,13 @@ fn review(raw: &str, cleaned: &str) -> GuardVerdict {
 }
 
 fn review_in(raw: &str, cleaned: &str, multiline: bool) -> GuardVerdict {
+    review_with(raw, cleaned, multiline, &[])
+}
+
+fn review_with(raw: &str, cleaned: &str, multiline: bool, placeholders: &[&str]) -> GuardVerdict {
     let options = CleanupOptions {
         multiline,
+        placeholders: placeholders.iter().map(|&token| token.to_owned()).collect(),
         ..CleanupOptions::new(CleanupLevel::Deep)
     };
     OutputGuard::default().review(raw, &GenerationOutcome::Completed(cleaned.to_owned()), &options)
@@ -455,8 +460,57 @@ fn rejects_lines_in_a_one_line_field() {
 #[test]
 fn rejects_a_list_that_drops_quantities() {
     assert_eq!(
-        review_in("Buy three apples and two pears.", "Buy:\n- Apples\n- Pears", true),
+        review_in(
+            "Buy three apples, two pears and a melon.",
+            "Buy:\n- Apples\n- Pears\n- A melon",
+            true
+        ),
         INVALID
+    );
+}
+
+#[test]
+fn rejects_a_bulleted_list_of_two_things_said_in_a_sentence() {
+    assert_eq!(
+        review_in(
+            "I've attached the invoice and the signed agreement.",
+            "I've attached:\n- The invoice\n- The signed agreement",
+            true
+        ),
+        GuardVerdict::Rejected(FallbackReason::ShortList)
+    );
+    let numbered = "Two things:\n1. Call the bank.\n2. Email Sarah.";
+    assert_eq!(
+        review_in(
+            "Two things: number one, call the bank. Number two, email Sarah.",
+            numbered,
+            true
+        ),
+        accepted(numbered),
+        "a numbered list may have two items, as when they were counted"
+    );
+}
+
+#[test]
+fn rejects_a_placeholder_on_a_line_of_its_own() {
+    let emoji = ["⟦E1⟧"];
+    assert_eq!(
+        review_with("Thanks so much! ⟦E1⟧", "Thanks so much!\n\n⟦E1⟧", true, &emoji),
+        GuardVerdict::Rejected(FallbackReason::PlaceholderOnItsOwnLine)
+    );
+    assert_eq!(
+        review_with("Thanks so much! ⟦E1⟧", "Thanks so much! ⟦E1⟧", true, &emoji),
+        accepted("Thanks so much! ⟦E1⟧")
+    );
+    assert_eq!(
+        review_with(
+            "The links are ⟦A1⟧, ⟦A2⟧ and ⟦A3⟧.",
+            "The links are:\n- ⟦A1⟧\n- ⟦A2⟧\n- ⟦A3⟧",
+            true,
+            &["⟦A1⟧", "⟦A2⟧", "⟦A3⟧"]
+        ),
+        GuardVerdict::Rejected(FallbackReason::PlaceholderOnItsOwnLine),
+        "a list of placeholders alone is turned down too, and Medium's sentence shown"
     );
 }
 

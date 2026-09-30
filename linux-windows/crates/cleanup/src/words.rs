@@ -53,6 +53,10 @@ impl WordSet {
         Self::new(words.into_iter().map(|word| edit_distance::normalize(word.as_ref())))
     }
 
+    pub(crate) fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     pub(crate) fn contains(&self, word: &str) -> bool {
         self.0.contains(s::canonical_key(word).as_ref())
     }

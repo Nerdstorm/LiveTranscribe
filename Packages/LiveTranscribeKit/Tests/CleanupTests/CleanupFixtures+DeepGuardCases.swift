@@ -154,6 +154,19 @@ extension CleanupFixtures.Guard {
             completed("the first part is done. the second part is next.", "The first part is done.\n\nThe second part is next."),
             completed("the first part is done the second part is next", "The first part is done.\n\nThe second part is next."),
             completed("Hi team\nThe build is green\nThanks", "Hi team,\nThe build is green.\nThanks"),
+            // Two things said in a sentence stay in it, unless they were counted.
+            completed("i've attached the invoice and the signed agreement", "I've attached:\n- The invoice\n- The signed agreement"),
+            completed("i've attached the invoice and the signed agreement", "I've attached:\r\n- The invoice\r\n- The signed agreement\r\n"),
+            completed("two things number one call the bank number two email sarah", "Two things:\n1. Call the bank.\n2. Email Sarah."),
+            completed("buy milk\n- eggs\n- bread", "Buy milk:\n- Eggs\n- Bread"),
+            // A placeholder alone on a line, and one in its sentence.
+            completed("thanks so much ⟦E1⟧", "Thanks so much!\n\n⟦E1⟧", placeholders: ["⟦E1⟧"]),
+            completed("thanks so much ⟦E1⟧", "Thanks so much! ⟦E1⟧", placeholders: ["⟦E1⟧"]),
+            completed("thanks so much\n⟦E1⟧", "Thanks so much!\n⟦E1⟧", placeholders: ["⟦E1⟧"]),
+            completed(
+                "the links are ⟦A1⟧ ⟦A2⟧ and ⟦A3⟧", "The links are:\n- ⟦A1⟧\n- ⟦A2⟧\n- ⟦A3⟧.",
+                placeholders: ["⟦A1⟧", "⟦A2⟧", "⟦A3⟧"]
+            ),
         ]
     }
 

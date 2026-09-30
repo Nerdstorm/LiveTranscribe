@@ -45,6 +45,11 @@ public enum FallbackReason: Sendable, Equatable, CustomStringConvertible {
     case invalidRepair
     /// Deep broke the text into lines for a field that takes one line.
     case layoutNotAllowed
+    /// Deep made a bulleted list of fewer than ``SelfRepair/minBulletedItems`` items, of things
+    /// said in a sentence.
+    case shortList
+    /// Deep put a placeholder on a line of its own, such as an emoji below the sentence it ended.
+    case placeholderOnItsOwnLine
 
     public var description: String {
         switch self {
@@ -66,6 +71,8 @@ public enum FallbackReason: Sendable, Equatable, CustomStringConvertible {
         case .thinkingUnfinished: "ran out of tokens while thinking"
         case .invalidRepair: "changed more than a repair may"
         case .layoutNotAllowed: "broke a one-line field into lines"
+        case .shortList: "made a bulleted list of fewer than three items"
+        case .placeholderOnItsOwnLine: "put a placeholder on a line of its own"
         }
     }
 
@@ -258,7 +265,17 @@ public struct OutputGuard: Sendable {
             if !options.multiline, cleaned.contains(where: \.isNewline) {
                 return .rejected(.layoutNotAllowed)
             }
-            return selfRepair.accepts(raw: raw, cleaned: cleaned, placeholders: Set(options.placeholders.map(EditDistance.normalize)))
+            let placeholders = Set(options.placeholders.map(EditDistance.normalize))
+            // Layout the model made, which the text it was given didn't have.
+            let shortLists = { (text: String) in SelfRepair.bulletedListLengths(in: text).filter { $0 < SelfRepair.minBulletedItems }.count }
+            if shortLists(cleaned) > shortLists(raw) {
+                return .rejected(.shortList)
+            }
+            if SelfRepair.placeholderLineCount(in: cleaned, placeholders: placeholders)
+                > SelfRepair.placeholderLineCount(in: raw, placeholders: placeholders) {
+                return .rejected(.placeholderOnItsOwnLine)
+            }
+            return selfRepair.accepts(raw: raw, cleaned: cleaned, placeholders: placeholders)
                 ? .accepted(cleaned)
                 : .rejected(.invalidRepair)
         }

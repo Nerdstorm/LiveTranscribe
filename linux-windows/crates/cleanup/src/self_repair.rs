@@ -17,6 +17,9 @@ use alignment::Alignment;
 const CORRECTION_PHRASE_WORDS: usize = 6;
 /// Most words a repair may add to or change in one correction phrase.
 const MAX_REPAIR_WORDS: usize = 2;
+/// Fewest items in a bulleted list the model makes: two things said in a sentence ("the invoice and
+/// the agreement") stay in it. A numbered list may have two, as when they were counted.
+pub(crate) const MIN_BULLETED_ITEMS: usize = 3;
 
 /// Checks Deep's output: that it can be made from the text the model was given by the edits a
 /// repair may make, and by no others.
@@ -44,6 +47,10 @@ const MAX_REPAIR_WORDS: usize = 2;
 ///   words it corrects, which is how a garbled phrase is read as meant ("tomorrow. No, sorry, the
 ///   after tomorrow" → "the day after tomorrow");
 /// - a list's numbers or bullets put in place of the words said to mark its items.
+///
+/// The layout is checked too (`OutputGuard`): a bulleted list has at least [`MIN_BULLETED_ITEMS`]
+/// items, since two things said in a sentence stay in it, and no line holds only placeholders, as
+/// when an emoji is moved below the sentence it ended.
 ///
 /// Names, numbers, negations and words of time are kept as said everywhere else: none may be
 /// added, dropped or changed, and no other new word may appear, so the model can't add a claim
@@ -329,9 +336,8 @@ pub(crate) fn written_words(text: &str) -> Vec<WrittenWord> {
 pub(crate) fn without_list_marker(line: &str) -> (&str, bool) {
     let trimmed = s::drop_while(line, s::is_whitespace);
     let followed_by_space = |rest: &str| s::first_character(rest).is_some_and(s::is_whitespace);
-    if let Some(first) = s::first_character(trimmed)
-        && s::is_one_of(first, &BULLETS)
-        && followed_by_space(&trimmed[first.len()..])
+    if is_bulleted(line)
+        && let Some(first) = s::first_character(trimmed)
     {
         return (&trimmed[first.len()..], true);
     }
@@ -345,6 +351,48 @@ pub(crate) fn without_list_marker(line: &str) -> (&str, bool) {
         return (&after_digits[mark.len()..], true);
     }
     (line, false)
+}
+
+/// Whether `line` starts with a bullet and a space.
+fn is_bulleted(line: &str) -> bool {
+    let trimmed = s::drop_while(line, s::is_whitespace);
+    s::first_character(trimmed).is_some_and(|first| {
+        s::is_one_of(first, &BULLETS) && s::first_character(&trimmed[first.len()..]).is_some_and(s::is_whitespace)
+    })
+}
+
+/// How many items each bulleted list in `text` has: a list is a run of lines that start with a
+/// bullet, which a blank line or any other line ends.
+pub(crate) fn bulleted_list_lengths(text: &str) -> Vec<usize> {
+    let mut lengths = Vec::new();
+    let mut run = 0;
+    for line in s::split_where(text, usize::MAX, false, s::is_newline) {
+        if is_bulleted(line) {
+            run += 1;
+        } else if run > 0 {
+            lengths.push(run);
+            run = 0;
+        }
+    }
+    if run > 0 {
+        lengths.push(run);
+    }
+    lengths
+}
+
+/// How many lines of `text` hold placeholders and nothing else, list markers and punctuation aside.
+/// `placeholders` are normalized, as the words are.
+pub(crate) fn placeholder_line_count(text: &str, placeholders: &WordSet) -> usize {
+    if placeholders.is_empty() {
+        return 0;
+    }
+    s::split_where(text, usize::MAX, true, s::is_newline)
+        .into_iter()
+        .filter(|line| {
+            let words = normalized_words(without_list_marker(line).0);
+            !words.is_empty() && words.iter().all(|word| placeholders.contains(word))
+        })
+        .count()
 }
 
 /// The runs of `line` between whitespace, each split at hyphens and dashes, as the words said
