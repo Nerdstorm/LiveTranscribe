@@ -1,5 +1,10 @@
 # Snippets, vocabulary and apps
 
+Snippets, vocabulary and per-app settings are Mac-only for now: dictation on Linux and Windows
+uses none of them, and the field itself decides how text goes in
+([Using Live Transcribe](using.md#linux-and-windows), and
+[below](#on-linux-and-windows)). Everything else on this page is about the Mac.
+
 - **Settings › Snippets**: a **Trigger phrase** and the **Text to insert**. Triggers match whole
   words, ignoring case and punctuation. The text is inserted exactly as written, line breaks
   included, at every cleanup level; the language model sees only a placeholder.
@@ -51,3 +56,13 @@ In every app, whatever its settings:
 - **Undo AI Edit stays in its field.** It works only in the app, and the field, the dictation
   went into.
 - **Apps that hide their fields** from Accessibility get paste only and no automatic space.
+
+### On Linux and Windows
+
+There are no settings per app. On Linux, a field that takes text through the desktop's input method
+says what it is: a password field is refused, a terminal or a field for one value (an address, a
+number) keeps the text on one line, and any other field takes line breaks; where no field does, the
+text is pasted on one line, and its password fields aren't recognised. On Windows, only the system's
+own edit controls say what they are (Notepad's, older programs'): their password fields are refused,
+and those with several lines take line breaks. Browsers, Electron apps, Office and newer apps are
+typed on one line, with line breaks as spaces, so that a Return never sends a message or a form.
