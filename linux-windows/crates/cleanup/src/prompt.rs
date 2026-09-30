@@ -70,6 +70,19 @@ impl Adapter {
             Self::Deep => "deep",
         }
     }
+
+    /// The adapter a request for this one runs with when the model has `loaded`: itself when
+    /// loaded; Deep's request, without Deep's adapter, with the self-correction adapter; otherwise
+    /// none. The Mac app's `CleanupRequest.Adapter.resolved(loaded:)`.
+    pub fn resolved(self, loaded: &[Self]) -> Self {
+        if self == Self::Off || loaded.contains(&self) {
+            self
+        } else if self == Self::Deep && loaded.contains(&Self::Medium) {
+            Self::Medium
+        } else {
+            Self::Off
+        }
+    }
 }
 
 /// How the model picks each token of its reply.
@@ -263,6 +276,22 @@ mod tests {
     /// A request with no adapter that answers at once.
     fn plain(text: &str, context: &[String], context_limit: usize, template: &PromptTemplate) -> CleanupRequest {
         request(text, context, context_limit, template, Adapter::Off, None)
+    }
+
+    /// The Mac app's `aRequestRunsWithAnAdapterTheModelHas`.
+    #[test]
+    fn a_request_runs_with_an_adapter_the_model_has() {
+        let resolved = |loaded: &[Adapter]| Adapter::ALL.map(|wanted| wanted.resolved(loaded));
+        assert_eq!(
+            resolved(&[Adapter::Medium, Adapter::Deep]),
+            [Adapter::Off, Adapter::Medium, Adapter::Deep]
+        );
+        assert_eq!(
+            resolved(&[Adapter::Medium]),
+            [Adapter::Off, Adapter::Medium, Adapter::Medium]
+        );
+        assert_eq!(resolved(&[Adapter::Deep]), [Adapter::Off, Adapter::Off, Adapter::Deep]);
+        assert_eq!(resolved(&[]), [Adapter::Off, Adapter::Off, Adapter::Off]);
     }
 
     #[test]

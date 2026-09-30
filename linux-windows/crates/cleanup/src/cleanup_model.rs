@@ -21,11 +21,11 @@ pub trait CleanupModel {
     /// text only, without the end-of-turn token; when the request thinks, with its reasoning, which
     /// the executor removes.
     ///
-    /// As the Mac app's `MLXCleaner` does, a model without the adapter a request names runs Deep's
-    /// requests with the self-correction adapter when it has that one, and any other on the base
-    /// model. Trained to resolve self-corrections whatever the prompt says, an adapter would
-    /// otherwise do so at Light too, where every word must stay, and the output guard would reject
-    /// the result.
+    /// As the Mac app's `MLXCleaner` does, a model without the adapter a request names runs it with
+    /// the one [`Adapter::resolved`] gives: Deep's requests with the self-correction adapter when
+    /// it has that one, and any other on the base model. Trained to resolve self-corrections
+    /// whatever the prompt says, an adapter would otherwise do so at Light too, where every word
+    /// must stay, and the output guard would reject the result.
     ///
     /// Generation must stop soon after `deadline.should_stop()` turns true, which the model checks
     /// between tokens: the time is up, or the cleanup was cancelled. What it returns then is
