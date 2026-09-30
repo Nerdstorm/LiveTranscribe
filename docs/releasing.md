@@ -19,8 +19,8 @@ The [Makefile](../Makefile) has a target for each step below that runs on your M
 
 ## One-time setup
 
-The release workflow signs and notarizes the Mac app with keys kept as secrets on GitHub. They
-start on your Mac, as below, and go to GitHub at the end.
+The workflow signs and notarizes the Mac app with keys kept as secrets on GitHub. They start on
+your Mac, as below, and go to GitHub at the end.
 
 **A Developer ID Application certificate.** Only the Account Holder of the Apple Developer team
 can create one: Xcode › Settings › Accounts › the team › Manage Certificates › + › Developer ID
@@ -30,8 +30,14 @@ Application. Another maintainer gets it from the Account Holder as a password-pr
 
 - Keep the .p12 in a password manager. A team can have five of these certificates, so a lost one
   can be replaced, but the backup saves the trouble.
+- **Export the "Developer ID Application" identity, not an Apple Development or Apple
+  Distribution one.** Before you upload the .p12, import it into a temporary keychain and run
+  `security find-identity -v -p codesigning` on that keychain: it must list
+  `Developer ID Application: …`.
 - **Never revoke it after a release.** Apple then blocks every app signed with it: it no longer
   installs, and copies already installed no longer open.
+- It expires: Keychain Access shows the date. Make a new one before then, and replace the
+  certificate and password secrets.
 
 **Notarization credentials.** In App Store Connect › Users and Access › Integrations › Team Keys,
 add a key with the Developer role (personal keys can't notarize) and download its .p8 file. To
@@ -57,14 +63,13 @@ Packages/LiveTranscribeKit/.build/artifacts/sparkle/Sparkle/bin/generate_keys --
 ```
 
 **The file is the private key itself: put it in the password manager with the certificate, then
-delete it once it's on GitHub (below).** The repository ignores files named like it, but it doesn't
-belong there. Without the key, installed copies can't be updated, and their users would have to
-download the next release by hand. On another Mac, import it with `-f` in place of `-x`. The
-keychain asks before each of Sparkle's tools first reads the key; allow it.
+delete it once it's on GitHub (below).** Without the key, installed copies can't be updated, and
+their users would have to download the next release by hand. On another Mac, import it with `-f`
+in place of `-x`. The keychain asks before each of Sparkle's tools first reads the key; allow it.
 
 **The team ID.** On your Mac, the script takes `DEVELOPMENT_TEAM` from
-`Config/Signing.local.xcconfig` (see [Signing and Gatekeeper](signing.md)), or `LT_TEAM_ID` from
-the environment.
+`Config/Signing.local.xcconfig` (see [Signing your builds](development.md#signing-your-builds)),
+or `LT_TEAM_ID` from the environment.
 
 **The release environment.** The workflow reads the keys from the secrets of a GitHub environment
 named `release`, and only the jobs that sign use it. In the repository's Settings › Environments,
@@ -86,7 +91,7 @@ make it with:
   ```
 
   `gh secret set` asks for the values it isn't given: the .p12's password, the team ID, the API
-  key's ID and its issuer.
+  key's ID and its issuer. GitHub sometimes answers HTTP 500; run the command again.
 
 **Then, in Settings › Rules › Rulesets, protect the tags `v*`, so that only you can make, move or
 delete them.** Anyone who can push a tag or change the workflow on main could otherwise have the
@@ -101,9 +106,8 @@ against the Swift runtime of an earlier macOS, which the oldest macOS SDK on you
 than Xcode's describes. Command Line Tools (`xcode-select --install`) keeps the previous macOS's
 SDK. `LT_BASELINE_SDK` names another.
 
-**For `make appcast`,** the GitHub CLI, signed in with `gh auth login`.
-
-`make doctor` checks what building on your Mac needs.
+**For `make appcast`,** the GitHub CLI, signed in with `gh auth login` (`xmllint` and `curl` come
+with macOS).
 
 ## Making a release
 
@@ -112,7 +116,7 @@ SDK. `LT_BASELINE_SDK` names another.
 2. Write the release's changelog:
 
    ```bash
-   make changelog VERSION=0.1.0
+   make changelog VERSION=x.y.z
    ```
 
    This adds the release to `CHANGELOG.md`: a line for each pull request merged since the last
@@ -124,18 +128,20 @@ SDK. `LT_BASELINE_SDK` names another.
 3. On main, up to date with origin, tag the release and push the tag:
 
    ```bash
-   make tag VERSION=0.1.0
+   make tag VERSION=x.y.z
    ```
 
    The tag starts the release workflow. It stops at once if `CHANGELOG.md` has no section for the
    release, and so does `make tag`.
 4. Approve the run: the Actions tab › the run › Review deployments › `release`. The Mac app takes
-   about half an hour, mostly waiting for Apple's notary service, which sometimes takes much
-   longer; the Linux packages about 15 minutes, and the Windows installer is built meanwhile. Then
-   the workflow drafts the release, with every download, `SHA256SUMS` and the notes.
+   about nine minutes, most of it compiling (Apple's notary service took about a minute in the
+   1.0.0 run, but sometimes takes much longer); the Linux packages about 14 and the Windows
+   installer about 6, meanwhile. Then the workflow drafts the release, with every download,
+   `SHA256SUMS` and the notes.
 
    If a job fails, nothing is public yet. Fix the problem on main, delete the tag
-   (`git push origin --delete v0.1.0` and `git tag -d v0.1.0`), and tag again.
+   (`git push origin --delete vx.y.z` and `git tag -d vx.y.z`), and tag again. **Never delete the
+   tag of a release that is published.**
 5. Try the draft's downloads:
    - the disk image, on a Mac that has never run a build of Live Transcribe, or in another user
      account. Open it, drag the app to Applications and open it. macOS should only say that it
@@ -146,15 +152,15 @@ SDK. `LT_BASELINE_SDK` names another.
      Notepad and into a browser.
 6. Publish the draft on GitHub. It becomes the latest release, which the website's Download button
    goes to.
-7. Offer it as an update: put the new appcast in `site/` and merge it into main through a pull
-   request. The website workflow publishes it, and installed copies find the update at their next
-   daily check or at **Check for Updates…**.
+7. Offer the Mac app as an update: put the new appcast in `site/` and merge it into main through a
+   pull request. The website workflow publishes it, and copies with automatic checks on find the
+   update within a day, and any copy at **Check for Updates…**.
 
    ```bash
-   make appcast VERSION=0.1.0
+   make appcast VERSION=x.y.z
    ```
 
-   It fetches what the workflow made besides the downloads into `build/release/0.1.0/`: the
+   It fetches what the workflow made besides the downloads into `build/release/x.y.z/`: the
    appcast and the app's archive (`scripts/fetch-release.sh`). Then it checks that the download
    works and copies the appcast to `site/appcast.xml`.
 
@@ -167,48 +173,29 @@ SDK. `LT_BASELINE_SDK` names another.
 
 ## Rehearsing
 
-The Actions tab › Release › Run workflow, on main, with **Rehearse** ticked, builds main's Mac app
-as a release would: signed, notarized and signed as an update, with the keys in the release
-environment, so it waits for your approval too. It builds the Linux packages and the Windows
+The Actions tab › Release › Run workflow, on main, with "Sign and notarize the Mac app as a
+release would, without releasing anything" ticked (the workflow's `rehearse` input), builds main's
+Mac app as a release would: signed, notarized and signed as an update, with the keys in the
+release environment, so it waits for your approval too. It builds the Linux packages and the Windows
 installer as well, and releases nothing. A problem with the keys shows there, not after a tag.
 
-## What the script does
+## How the Mac build works
 
-It stops at the first problem, and shows the end of that step's log.
-
-1. Checks the tag, the certificate, the notary credentials and the earlier macOS SDK.
-2. Exports the tagged commit into `build/release/<version>/source`, so uncommitted changes in
-   your checkout can't reach a release, and fetches the Swift packages.
-3. Checks that the update signing key is the one `App/Info.plist` trusts: the keychain's by its
-   public half, or, for a key in a file, by a signature it makes. Steps 1 to 3 come before the
-   build, so a missing piece costs a minute at most.
-4. Archives the app in Release, for Apple silicon, with the version from the tag and, as the build
-   number, the number of commits up to it: macOS and Sparkle compare build numbers, so they must
-   only grow. The appcast's address goes into the app, which turns updates on. Package versions
-   come from `Package.resolved` alone.
-5. Exports the app through Xcode's Developer ID distribution, and checks its signature: your
-   team's Developer ID, the Hardened Runtime, a secure timestamp, and no debugging entitlement.
-   It also checks that the app has Sparkle, the appcast's address and the update key, and that it
-   needs nothing from the Swift runtime that the earlier macOS lacks: macOS wouldn't launch it
-   there at all (`scripts/check-swift-runtime.sh`).
-6. Notarizes the app and staples its ticket, so a copy dragged out of the disk image opens
-   offline.
-7. Makes the disk image, with an Applications shortcut next to the app, then signs, notarizes and
-   staples it.
-8. Asks Gatekeeper about the disk image and about the app on it. Both must be accepted as
-   notarized Developer ID software.
-9. Signs the disk image as an update and adds it to the appcast in `site/` at the tag, which keeps
-   the three newest releases, into `build/release/<version>/appcast.xml`. The new entry must point
-   at the release's download and carry its signature.
-10. Writes the disk image's SHA-256 next to it.
+`scripts/release.sh` stops at the first problem and shows the end of that step's log. It checks the
+tag, the certificate, the notary credentials and the earlier macOS SDK, exports the tagged commit
+and fetches the Swift packages, and checks the update signing key, all before it builds, so a
+missing piece fails early. Then it archives the app in Release for Apple silicon, exports it through
+Xcode's Developer ID distribution, checks its signature and its Swift runtime, notarizes and staples
+the app, makes, signs, notarizes and staples the disk image, asks Gatekeeper about both, signs the
+disk image as an update, and writes the appcast and the disk image's SHA-256. The build number is
+the number of commits up to the tag: macOS and Sparkle compare build numbers, so they must only
+grow.
 
 Everything is in `build/release/<version>/`, with each step's output in `logs/`. When Apple
 rejects a submission, its reasons are in `logs/notary-app-findings.json` or
-`logs/notary-dmg-findings.json`.
-
-`scripts/release.sh 0.1.0 --rehearse` does the same from HEAD, for the rehearsal. The workflow
-runs the script with its keys in a keychain of its own, and gives it the notary key and the update
-signing key as files.
+`logs/notary-dmg-findings.json`. `scripts/release.sh 0.0.0 --rehearse` does the same from HEAD.
+The workflow runs the script with its keys in a keychain of its own, and gives it the notary key
+and the update signing key as files.
 
 | Environment variable | Default | What it is |
 |---|---|---|
@@ -225,18 +212,17 @@ signing key as files.
 
 ## Test builds
 
-`make release-test VERSION=0.1.0` (`scripts/release.sh 0.1.0 --test`) builds HEAD with ad-hoc
+`make release-test VERSION=0.0.0` (`scripts/release.sh 0.0.0 --test`) builds HEAD with ad-hoc
 signing, without notarization, and without signing an update or writing an appcast. It checks the
 build and the packaging without the certificate, the update signing key or Apple's service.
-Gatekeeper blocks the result on other Macs. Like a release, it checks the appcast for updates.
+Gatekeeper blocks the result on other Macs. A pull request that changes the release workflow, its
+scripts or the Linux or Windows packaging makes test builds for every system, to try from the
+run's artifacts.
 
-A pull request that changes the release workflow, its scripts or the Linux or Windows packaging
-makes test builds for every system, to try from the run's artifacts.
+### A release on your own Mac
 
-## A release on your own Mac
-
-A release is signed differently from your own builds, so macOS treats it as a different app.
-Grant Microphone and Accessibility again when you switch between a release and your own build.
+A release is signed differently from your own builds, so macOS treats it as a different app:
+grant Microphone and Accessibility again when you switch between a release and your own build.
 Your own builds never check for updates.
 
 ## What must not change
