@@ -316,6 +316,30 @@ pub fn range_of(text: &str, needle: &str) -> Option<Range<usize>> {
         })
 }
 
+/// The byte range of the last occurrence of `needle` in `text` that starts and ends on character
+/// boundaries, as `range(of:options: .backwards)`; `None` for an empty needle.
+pub fn last_range_of(text: &str, needle: &str) -> Option<Range<usize>> {
+    let wanted: Vec<&str> = characters(needle).collect();
+    if wanted.is_empty() {
+        return None;
+    }
+    let found: Vec<(usize, &str)> = character_indices(text).collect();
+    found
+        .windows(wanted.len())
+        .rev()
+        .find(|window| {
+            window
+                .iter()
+                .zip(&wanted)
+                .all(|(&(_, character), expected)| canonically_equal(character, expected))
+        })
+        .map(|window| {
+            let (start, _) = window[0];
+            let (last, character) = window[window.len() - 1];
+            start..last + character.len()
+        })
+}
+
 /// Whether `text` contains `needle` on character boundaries, as `contains(_: String)`.
 pub fn contains_string(text: &str, needle: &str) -> bool {
     range_of(text, needle).is_some()
@@ -480,6 +504,18 @@ mod tests {
         assert_eq!(range_of("abc", ""), None);
         assert!(!contains_character("x⟦\u{301}", "⟦"));
         assert!(contains_character("x⟦", "⟦"));
+    }
+
+    /// As Foundation searches backwards, checked on macOS: the last whole occurrence, so a closing
+    /// tag with a combining mark on it, or with a prepended mark before it, is not one.
+    #[test]
+    fn searching_backwards_finds_the_last_whole_occurrence() {
+        assert_eq!(last_range_of("<think>a</think>b</think>c", "</think>"), Some(17..25));
+        assert_eq!(last_range_of("a</think>b</think>\u{301}c", "</think>"), Some(1..9));
+        assert_eq!(last_range_of("a\u{600}</think>b", "</think>"), None);
+        assert_eq!(last_range_of("x</think>", "</think>"), Some(1..9));
+        assert_eq!(last_range_of("<THINK>a</THINK>", "</think>"), None);
+        assert_eq!(last_range_of("abc", ""), None);
     }
 
     #[test]
