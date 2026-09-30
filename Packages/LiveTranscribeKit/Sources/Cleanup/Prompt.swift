@@ -27,6 +27,15 @@ public struct CleanupRequest: Sendable, Equatable {
         case medium
         /// Deep's adapter, trained on Deep's prompts.
         case deep
+
+        /// The adapter a request for this one runs with when the model has `loaded`: itself when
+        /// loaded; Deep's request, without Deep's adapter, with the self-correction adapter;
+        /// otherwise none.
+        public func resolved(loaded: Set<Adapter>) -> Adapter {
+            if self == .off || loaded.contains(self) { return self }
+            if self == .deep, loaded.contains(.medium) { return .medium }
+            return .off
+        }
     }
 
     public let messages: [Message]

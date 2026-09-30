@@ -103,6 +103,8 @@ public actor MLXCleaner: Cleaner {
 
     /// Sees every generation: the request, the model's whole output (reasoning included) and how
     /// long it took. For evaluation tools; the app passes none.
+    /// Told of each generation: the request, with the adapter it ran with; the output; and how long
+    /// it took.
     public typealias GenerationObserver = @Sendable (CleanupRequest, String, Duration) -> Void
 
     private let configuration: Configuration
@@ -193,7 +195,11 @@ public actor MLXCleaner: Cleaner {
             guard let container else { throw CleanupModelNotLoaded() }
             let started = ContinuousClock.now
             let output = try await Self.generate(with: container, request: request, adapter: adapter)
-            observer?(request, output, started.duration(to: .now))
+            if let observer {
+                var ran = request
+                ran.adapter = adapter?.resolved(request.adapter) ?? .off
+                observer(ran, output, started.duration(to: .now))
+            }
             return output
         }
     }
@@ -225,7 +231,7 @@ public actor MLXCleaner: Cleaner {
 
     /// The configured adapters that can be loaded together: trained on the configured model, and
     /// Deep's only on the self-correction adapter's commit, since they share the pinned model.
-    static func compatibleAdapters(in configuration: Configuration) -> [CleanupRequest.Adapter: CleanupAdapter] {
+    public static func compatibleAdapters(in configuration: Configuration) -> [CleanupRequest.Adapter: CleanupAdapter] {
         var adapters: [CleanupRequest.Adapter: CleanupAdapter] = [:]
         if let medium = configuration.adapter {
             adapters[.medium] = medium
@@ -336,12 +342,9 @@ final class AdapterLayers: Sendable {
             && a.loraParameters.keys == b.loraParameters.keys
     }
 
-    /// The adapter a request for `wanted` runs with: itself when loaded; Deep's request, without
-    /// Deep's adapter, with the self-correction adapter; otherwise none.
+    /// The adapter a request for `wanted` runs with (``CleanupRequest/Adapter/resolved(loaded:)``).
     func resolved(_ wanted: CleanupRequest.Adapter) -> CleanupRequest.Adapter {
-        if wanted == .off || adapters[wanted] != nil { return wanted }
-        if wanted == .deep, adapters[.medium] != nil { return .medium }
-        return .off
+        wanted.resolved(loaded: Set(adapters.keys))
     }
 
     /// Loads the layers the first time; after that, swaps in the wanted adapter's weights when

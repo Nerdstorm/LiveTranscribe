@@ -50,7 +50,8 @@ func writeRequests(_ options: MeasureCommandOptions, to output: URL) async throw
     let settings = AppSettings.defaults
     let cases = try options.cases()
     let executor = options.executor(settings: settings)
-    let lines = await CleanupMeasurement.requests(cases, executor: executor, level: options.level)
+    let adapters = Set(MLXCleaner.compatibleAdapters(in: options.configuration(settings: settings)).keys)
+    let lines = await CleanupMeasurement.requests(cases, executor: executor, level: options.level, adapters: adapters)
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     let text = try lines.map { String(decoding: try encoder.encode($0), as: UTF8.self) }.joined(separator: "\n") + "\n"

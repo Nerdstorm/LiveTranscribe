@@ -144,8 +144,11 @@ public enum CleanupMeasurement {
     }
 
     /// The request the app's first pass sends for each case, as JSON Lines in the format other
-    /// runtimes read (see Training/README.md).
-    public static func requests(_ cases: [EvalCase], executor: CleanupExecutor, level: CleanupLevel) async -> [RequestLine] {
+    /// runtimes read (see Training/README.md), naming the adapter it runs with when the model has
+    /// `adapters` loaded, as ``MLXCleaner`` chooses it.
+    public static func requests(
+        _ cases: [EvalCase], executor: CleanupExecutor, level: CleanupLevel, adapters: Set<CleanupRequest.Adapter>
+    ) async -> [RequestLine] {
         var lines: [RequestLine] = []
         for evalCase in cases {
             let segment = Segment(id: UUID(), sessionID: UUID(), startMs: 0, endMs: 1_000, rawText: evalCase.raw)
@@ -155,7 +158,8 @@ public enum CleanupMeasurement {
                 captured.withLock { $0 = $0 ?? request }
                 throw ReplayHasNoSecondPass()
             }
-            if let request = captured.withLock({ $0 }) {
+            if var request = captured.withLock({ $0 }) {
+                request.adapter = request.adapter.resolved(loaded: adapters)
                 lines.append(RequestLine(id: evalCase.id, request: request))
             }
         }

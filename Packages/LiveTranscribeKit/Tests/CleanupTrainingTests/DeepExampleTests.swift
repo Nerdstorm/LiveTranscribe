@@ -150,6 +150,18 @@ struct CleanupMeasurementTests {
         #expect(list.judge(shown: "I need: milk, eggs", fellBack: false, input: list.raw, level: .deep) == .different)
     }
 
+    /// Another runtime follows the file, so a request names the adapter the Mac would run it with.
+    @Test func requestsNameTheAdapterTheyRunWith() async {
+        let executor = CleanupExecutor(contextLimit: 3, timeoutSeconds: 30, prompts: PromptBuilder(adapted: false), deep: .shipped)
+        let correction = EvalCase(id: "jane", category: "correction", raw: "send it to john i mean jane", target: "Send it to Jane.")
+        let strict = await CleanupMeasurement.requests([correction], executor: executor, level: .medium, adapters: [])
+        #expect(strict.map(\.adapter) == [.off])
+        let adapted = await CleanupMeasurement.requests([correction], executor: executor, level: .medium, adapters: [.medium, .deep])
+        #expect(adapted.map(\.adapter) == [.medium])
+        let deepWithoutItsOwn = await CleanupMeasurement.requests([deepCase], executor: executor, level: .deep, adapters: [.medium])
+        #expect(deepWithoutItsOwn.map(\.adapter) == [.medium])
+    }
+
     @Test func replayScoresRecordedOutputsThroughTheGuard() async {
         let executor = CleanupExecutor(contextLimit: 3, timeoutSeconds: 30, prompts: PromptBuilder(adapted: true), deep: .shipped)
         let report = await CleanupMeasurement.replay(

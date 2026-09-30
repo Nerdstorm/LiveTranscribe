@@ -86,6 +86,14 @@ struct CleanupAdapterTests {
         #expect(adapters(nil, nil).isEmpty)
     }
 
+    @Test func aRequestRunsWithAnAdapterTheModelHas() {
+        let wanted = CleanupRequest.Adapter.allCases
+        #expect(wanted.map { $0.resolved(loaded: [.medium, .deep]) } == [.off, .medium, .deep])
+        #expect(wanted.map { $0.resolved(loaded: [.medium]) } == [.off, .medium, .medium])
+        #expect(wanted.map { $0.resolved(loaded: [.deep]) } == [.off, .off, .deep])
+        #expect(wanted.map { $0.resolved(loaded: []) } == [.off, .off, .off])
+    }
+
     @Test func deepRunsWithTheSelfCorrectionAdapterWithoutItsOwn() throws {
         let medium = try #require(CleanupAdapter.bundled(.medium)).loRAContainer()
         let deep = try #require(CleanupAdapter.bundled(.deep)).loRAContainer()
