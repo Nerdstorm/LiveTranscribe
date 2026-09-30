@@ -120,6 +120,8 @@ fn the_text_path_matches_the_golden_cases() {
                     snippets: snippets.clone(),
                     vocabulary: vocabulary.clone(),
                     multiline,
+                    vocabulary_prompt_limit: Configuration::VOCABULARY_PROMPT_LIMIT,
+                    vocabulary_similarity_threshold: Configuration::VOCABULARY_SIMILARITY_THRESHOLD,
                 };
                 let output = finish(transcript, &configuration);
                 let produced = GoldenOutput {

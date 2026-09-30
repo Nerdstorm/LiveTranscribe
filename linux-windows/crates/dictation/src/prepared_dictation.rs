@@ -49,6 +49,11 @@ impl PreparedDictation {
         &self.text
     }
 
+    /// The placeholder tokens in the text, which cleanup must keep.
+    pub fn placeholders(&self) -> Vec<String> {
+        self.protected.tokens().into_iter().map(str::to_owned).collect()
+    }
+
     /// The text before cleanup, which Undo AI edit puts back: phrases replaced and line breaks in
     /// place, but list markers as they were said and nothing laid out.
     pub fn uncleaned(&self) -> String {

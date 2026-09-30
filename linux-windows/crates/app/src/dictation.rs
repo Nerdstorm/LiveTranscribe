@@ -10,6 +10,8 @@
 //! desktop ([`desktop`]): all the rest is the same everywhere. What was said is never printed or
 //! logged: only counts.
 
+mod cleaner;
+mod cleanup_model;
 mod configuration;
 mod desktop;
 mod engine;
@@ -219,6 +221,7 @@ fn blocked_status(settings: &Settings, blocker: &Blocker) -> DictationStatus {
         hotkey: settings.dictation_enabled.then_some(hotkey),
         has_last_dictation: false,
         cleanup: settings.cleanup_level,
+        cleanup_model: None,
         blocker: Some(blocker.clone()),
     }
 }
@@ -229,6 +232,10 @@ struct EngineControl(Sender<Message>);
 impl AppControl for EngineControl {
     fn pause_hotkey(&self, paused: bool) {
         let _ = self.0.send(Message::PauseHotkey(paused));
+    }
+
+    fn reload_cleanup_model(&self) {
+        let _ = self.0.send(Message::ReloadCleanupModel);
     }
 
     fn reload_model(&self) {

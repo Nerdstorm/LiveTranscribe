@@ -65,8 +65,9 @@
             <!-- A row per level, from the app's own names and summaries. -->
           </div>
           <p class="footnote">
-            Light, High and Deep need the cleanup model, which this app doesn’t have yet: for now
-            Light works as None, and High and Deep as Medium.
+            Every level but None uses the cleanup model, which downloads the first time (see
+            Advanced). Until it’s ready, or with it off, nothing is reworded: dictation still
+            removes filler words and lays out spoken lists and letters from Medium up.
           </p>
           <span class="override" data-override="cleanupLevel" hidden></span>
         </div>
@@ -197,6 +198,39 @@
             model again once no dictation is under way.
           </p>
         </div>
+
+        <div class="group">
+          <h2>Cleanup</h2>
+          <div class="list">
+            <label class="row">
+              <span class="text">
+                <span class="title">Clean up transcripts with the LLM</span>
+                <span class="subtitle">Off, nothing is reworded; filler words and layout still apply from Medium up.</span>
+              </span>
+              <input type="checkbox" class="switch" data-setting="cleanupEnabled">
+            </label>
+            <label class="row">
+              <span class="text">
+                <span class="title">Timeout</span>
+                <span class="subtitle">A cleanup that takes longer is dropped, and the text goes in without it. Deep takes at least 8 s.</span>
+              </span>
+              <span class="number"><input type="number" data-setting="cleanupTimeoutSeconds" min="0.5" max="30" step="0.5"><span class="unit">s</span></span>
+            </label>
+            <div class="row status" id="cleanup-status" aria-live="polite">
+              <span class="light" aria-hidden="true"></span>
+              <span class="text">
+                <span class="title" id="cleanup-state">The cleanup model is off</span>
+                <span class="subtitle" id="cleanup-detail"></span>
+              </span>
+              <button class="plain" id="reload-cleanup" hidden>Try Again</button>
+            </div>
+          </div>
+          <p class="footnote">
+            The model is Qwen3-1.7B with the Mac app’s adapters, about 0.9 GB. It downloads into
+            the models folder the first time and runs on the CPU.
+          </p>
+        </div>
+
         <div class="actions">
           <button class="plain" id="restore-advanced">Restore Defaults</button>
         </div>

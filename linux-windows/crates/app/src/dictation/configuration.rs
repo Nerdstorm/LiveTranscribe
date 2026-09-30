@@ -29,9 +29,12 @@ pub(crate) fn controller(settings: &Settings) -> ControllerConfiguration {
             level: settings.cleanup_level,
             snippets: Vec::new(),
             vocabulary: Vec::new(),
+            vocabulary_prompt_limit: Configuration::VOCABULARY_PROMPT_LIMIT,
+            vocabulary_similarity_threshold: Configuration::VOCABULARY_SIMILARITY_THRESHOLD,
             // Each field says whether it takes line breaks.
             multiline: false,
         },
+        cleans_with_model: settings.cleanup_enabled,
     }
 }
 

@@ -34,7 +34,9 @@ tracing-subscriber.workspace = true
 
 # Dictation, with its panel and tray, runs on Linux and Windows; each has its desktop's crate.
 [target.'cfg(any(target_os = "linux", windows))'.dependencies]
+lt-cleanup.workspace = true
 lt-dictation-ui.workspace = true
+lt-language-model.workspace = true
 serde.workspace = true
 tauri.workspace = true
 

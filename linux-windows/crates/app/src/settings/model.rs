@@ -42,6 +42,12 @@ pub struct Settings {
     pub stt_language: Option<String>,
     /// Where a Qwen3-ASR model runs: one of [`DEVICES`]. The catalog's other models run on the CPU.
     pub stt_device: String,
+    /// Cleanup's language model cleans the text at the levels that use it (the Mac's "Clean up
+    /// transcripts with the LLM"). Off, each level applies only its rules that need no model:
+    /// fillers removed and lists and letters laid out from Medium up.
+    pub cleanup_enabled: bool,
+    /// How long one cleanup may take before the text goes in without it; Deep takes at least 8 s.
+    pub cleanup_timeout_seconds: f64,
     /// Keys this version doesn't know, kept for the version that wrote them.
     #[serde(flatten)]
     pub unknown: Map<String, Value>,
@@ -65,6 +71,8 @@ impl Default for Settings {
             stt_model: None,
             stt_language: None,
             stt_device: "auto".to_owned(),
+            cleanup_enabled: true,
+            cleanup_timeout_seconds: 3.0,
             unknown: Map::new(),
         }
     }
@@ -72,7 +80,7 @@ impl Default for Settings {
 
 /// The settings on the Advanced tab, which its Restore Defaults resets, as the Mac's does. The
 /// model is chosen in the Models tab.
-pub const ADVANCED_KEYS: [&str; 1] = ["sttDevice"];
+pub const ADVANCED_KEYS: [&str; 3] = ["sttDevice", "cleanupEnabled", "cleanupTimeoutSeconds"];
 
 impl Settings {
     /// Every key the settings have.
@@ -178,6 +186,11 @@ impl Settings {
         } else {
             defaults.dictation_notice_seconds
         };
+        self.cleanup_timeout_seconds = if self.cleanup_timeout_seconds.is_finite() {
+            self.cleanup_timeout_seconds.clamp(0.5, 30.0)
+        } else {
+            defaults.cleanup_timeout_seconds
+        };
         problems
     }
 }
@@ -265,6 +278,8 @@ mod tests {
                 "sttModel": null,
                 "sttLanguage": null,
                 "sttDevice": "auto",
+                "cleanupEnabled": true,
+                "cleanupTimeoutSeconds": 3.0,
             })
         );
     }
@@ -331,7 +346,7 @@ mod tests {
         let (settings, problems) = Settings::read(
             r#"{"hotkeyTapMaxMs": 5, "dictationMaxRecordingSeconds": 100000, "dictationNoticeSeconds": 0.1,
                 "pasteRestoreDelayMs": 0, "dictationHotkey": "rightalt", "sttDevice": "npu",
-                "inputDeviceId": " ", "sttModel": ""}"#,
+                "inputDeviceId": " ", "sttModel": "", "cleanupTimeoutSeconds": 120}"#,
         )
         .unwrap();
         assert!(problems.is_empty(), "{problems:?}");
@@ -339,6 +354,7 @@ mod tests {
         assert_eq!(settings.dictation_max_recording_seconds, 1_800);
         assert!((settings.dictation_notice_seconds - 0.5).abs() < f64::EPSILON);
         assert_eq!(settings.paste_restore_delay_ms, 50);
+        assert!((settings.cleanup_timeout_seconds - 30.0).abs() < f64::EPSILON);
         assert_eq!(settings.dictation_hotkey, "KEY_RIGHTALT");
         assert_eq!(settings.stt_device, "NPU");
         assert_eq!((settings.input_device_id, settings.stt_model), (None, None));

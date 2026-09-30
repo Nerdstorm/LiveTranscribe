@@ -2,7 +2,8 @@
 //! hotkey, the menu, changed settings, the workers' results) in the order it happens, with times
 //! from one clock, and runs the gesture's and the panel's timers. It loads the speech model, and
 //! loads another when Settings chooses one, once no dictation is under way: at once if the model
-//! it was loading is still downloading, which carries on in Settings › Models.
+//! it was loading is still downloading, which carries on in Settings › Models. It loads cleanup's
+//! language model too while Settings › Advanced has it on, and lets it go when it's turned off.
 //! After each, the tray and the Settings window hear how things stand, when that has changed.
 
 use std::sync::Arc;
@@ -11,6 +12,7 @@ use std::thread;
 use std::time::Duration;
 
 use lt_capture::Recorder;
+use lt_cleanup::CleanedText;
 use lt_dictation::{DictationController, Job, Phase};
 use lt_dictation_ui::{Blocker, ModelState, PanelModel};
 use lt_hotkey::{HotkeyEvent, HotkeyWatch, display_name, key_code};
@@ -18,6 +20,7 @@ use lt_insertion::Inserted;
 use lt_shared::CleanupLevel;
 use tauri::AppHandle;
 
+use super::cleaner::CleanupModelSlot;
 use super::configuration::{self, ModelChoice};
 use super::desktop::Desktop;
 use super::platform::{Clock, Platform};
@@ -47,6 +50,22 @@ pub(crate) enum Message {
     Transcribed {
         job: Job,
         result: Result<String, String>,
+    },
+    /// Settings asks for the cleanup model to be loaded again, after it failed.
+    ReloadCleanupModel,
+    /// How far downloading (or checking) the cleanup model has got, before it loads.
+    CleanupDownload {
+        generation: u64,
+        progress: Progress,
+    },
+    /// The cleanup model loaded (where it runs, and with which adapters), or couldn't.
+    CleanupLoaded {
+        generation: u64,
+        result: Result<String, String>,
+    },
+    Cleaned {
+        job: Job,
+        cleaned: CleanedText,
     },
     Inserted {
         job: Job,
@@ -79,8 +98,20 @@ pub(crate) struct DictationStatus {
     pub(crate) hotkey: Option<String>,
     pub(crate) has_last_dictation: bool,
     pub(crate) cleanup: CleanupLevel,
+    /// Cleanup's language model: `None` while it's turned off in Settings › Advanced.
+    pub(crate) cleanup_model: Option<CleanupModelStatus>,
     /// Why dictation can't start at all; the engine never runs then.
     pub(crate) blocker: Option<Blocker>,
+}
+
+/// How cleanup's language model stands.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct CleanupModelStatus {
+    pub(crate) state: ModelState,
+    /// How far its download (or checking) has got, while that's under way.
+    pub(crate) download: Option<Progress>,
+    /// Where it runs, and with which adapters, once loaded.
+    pub(crate) placement: Option<String>,
 }
 
 /// Where the engine tells how things stand.
@@ -120,7 +151,7 @@ impl Engine {
             self.desktop,
             self.messages.clone(),
             PanelModel::new(configuration::notice_ms(&self.settings)),
-            configuration::language(&self.settings),
+            &self.settings,
             clock,
         );
         let mut running = Running {
@@ -136,12 +167,14 @@ impl Engine {
             },
             generation: 0,
             reload: false,
+            cleanup: CleanupModelSlot::default(),
             messages: self.messages,
             status,
             shown: None,
             clock,
         };
         running.load_model();
+        running.load_cleanup_model_if_changed();
         running.dictate(&self.received);
     }
 }
@@ -212,6 +245,7 @@ struct Running {
     generation: u64,
     /// Load the model again even if the settings still choose it.
     reload: bool,
+    cleanup: CleanupModelSlot,
     messages: Sender<Message>,
     status: StatusSink,
     /// What the tray was last told.
@@ -254,6 +288,7 @@ impl Running {
             };
             self.handle(message);
             self.load_model_if_changed();
+            self.load_cleanup_model_if_changed();
         }
     }
 
@@ -306,6 +341,14 @@ impl Running {
             }
             Message::ModelLoaded { generation, result } => self.model_loaded(generation, result),
             Message::Transcribed { job, result } => self.controller.transcribed(job, result),
+            Message::ReloadCleanupModel => self.cleanup.try_again(),
+            Message::CleanupDownload { generation, progress } => self.cleanup.downloading(generation, progress),
+            Message::CleanupLoaded { generation, result } => {
+                if let Some(jobs) = self.cleanup.loaded(generation, result) {
+                    self.controller.dependencies_mut().set_cleaner(Some(jobs));
+                }
+            }
+            Message::Cleaned { job, cleaned } => self.controller.cleaned(job, cleaned),
             Message::Inserted { job, result } => self.controller.inserted(job, result, now),
         }
     }
@@ -341,6 +384,13 @@ impl Running {
         }
         if before.cleanup_level != after.cleanup_level {
             eprintln!("Cleanup: {}", after.cleanup_level.display_name());
+        }
+        if before.cleanup_enabled != after.cleanup_enabled {
+            if after.cleanup_enabled {
+                eprintln!("Cleanup's language model is on");
+            } else {
+                eprintln!("Cleanup's language model is off: each level applies only its rules that need no model");
+            }
         }
         if before.stt_language != after.stt_language {
             let catalog = self.library.catalog();
@@ -480,6 +530,19 @@ impl Running {
         self.load_model();
     }
 
+    /// Loads cleanup's language model while the settings have it on, and lets it go once they
+    /// don't, when no dictation is under way.
+    fn load_cleanup_model_if_changed(&mut self) {
+        if !self.controller.is_idle() {
+            return;
+        }
+        let wanted = self.settings.cleanup_enabled;
+        // The platform's sender goes before the model's thread is waited for, which ends only
+        // once every sender has.
+        let platform = self.controller.dependencies_mut();
+        self.cleanup.want(wanted, &self.messages, || platform.set_cleaner(None));
+    }
+
     /// Tells the tray how things stand, when that has changed.
     fn report(&mut self) {
         let choice = self.model.choice();
@@ -499,6 +562,7 @@ impl Running {
             hotkey: self.settings.dictation_enabled.then(|| self.hotkey_name.clone()),
             has_last_dictation: self.controller.last_text().is_some(),
             cleanup: self.controller.cleanup_level(),
+            cleanup_model: self.cleanup.status(),
             blocker: None,
         };
         if self.shown.as_ref() != Some(&status) {

@@ -2,9 +2,10 @@
 //! menu) drives the recording, and each recording is transcribed, put through the text rules and
 //! typed into the focused field, one dictation at a time.
 //!
-//! Platform-free and synchronous. The recorder, the speech model, the focused field and typing
-//! sit behind [`Dependencies`]; transcription and typing finish later, and their results come back
-//! through [`DictationController::transcribed`] and [`DictationController::inserted`]. The caller
+//! Platform-free and synchronous. The recorder, the speech model, cleanup's model, the focused
+//! field and typing sit behind [`Dependencies`]; transcription, cleanup and typing finish later,
+//! and their results come back through [`DictationController::transcribed`],
+//! [`DictationController::cleaned`] and [`DictationController::inserted`]. The caller
 //! owns the clock, passing milliseconds from one monotonic clock with every call, and runs the
 //! timers the gesture asks for ([`DictationController::next_timer`]).
 //!
@@ -12,12 +13,13 @@
 
 use std::collections::VecDeque;
 
+use lt_cleanup::{CleanedText, CleanupOptions};
 use lt_hotkey::{HotkeyAction, HotkeyEvent, HotkeyGesture, HotkeyGestureConfiguration, HotkeyInput};
 use lt_insertion::{Inserted, InsertionTarget};
 use lt_shared::CleanupLevel;
 use lt_shared::audio_format::milliseconds_for_samples;
 
-use crate::{Configuration, Notice, finish, insertion_spacing};
+use crate::{Configuration, Notice, Output, Pending, Prepared, insertion_spacing, prepare};
 
 /// A recording, as the recorder hands it over.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -42,7 +44,7 @@ pub enum Phase {
     Recording {
         hands_free: bool,
     },
-    /// Transcribing what was said, then typing it.
+    /// Transcribing what was said, cleaning it up, then typing it.
     Processing {
         audio_ms: usize,
     },
@@ -60,6 +62,11 @@ pub trait Dependencies {
     fn target(&mut self) -> InsertionTarget;
     /// Starts transcribing; the result comes back through [`DictationController::transcribed`].
     fn transcribe(&mut self, job: Job, samples: Vec<f32>);
+    /// Starts cleaning `text` up with cleanup's model, as `options` say; the result comes back
+    /// through [`DictationController::cleaned`].
+    fn clean(&mut self, job: Job, text: String, options: CleanupOptions);
+    /// The cleanup of `job` is no longer wanted: stop it, and its result is dropped.
+    fn cancel_cleanup(&mut self, job: Job);
     /// A dictation is on its way: whatever typing needs beforehand, such as saving the
     /// clipboard, can start while the model works.
     fn prepare_insertion(&mut self);
@@ -83,6 +90,9 @@ pub struct ControllerConfiguration {
     pub max_recording_seconds: u32,
     /// The text rules. Whether the text may break across lines is decided per field.
     pub text: Configuration,
+    /// Cleanup's language model is on (Settings › Advanced). Off, each level applies only its
+    /// rules that need no model.
+    pub cleans_with_model: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -90,6 +100,11 @@ enum State {
     Idle,
     Recording,
     Transcribing {
+        job: Job,
+        dictation: Dictation,
+    },
+    /// Cleanup's model is cleaning the transcript; what it needs afterwards is in `pending`.
+    Cleaning {
         job: Job,
         dictation: Dictation,
     },
@@ -122,6 +137,8 @@ pub struct DictationController<D: Dependencies> {
     started_from_menu: bool,
     next_job: u64,
     last_text: Option<String>,
+    /// While cleaning, what turns the model's result into the text to insert.
+    pending: Option<Box<Pending>>,
 }
 
 impl<D: Dependencies> DictationController<D> {
@@ -135,6 +152,7 @@ impl<D: Dependencies> DictationController<D> {
             started_from_menu: false,
             next_job: 1,
             last_text: None,
+            pending: None,
         }
     }
 
@@ -152,7 +170,9 @@ impl<D: Dependencies> DictationController<D> {
             State::Recording => Phase::Recording {
                 hands_free: self.started_from_menu || self.gesture.is_hands_free(),
             },
-            State::Transcribing { dictation, .. } | State::Inserting { dictation, .. } => Phase::Processing {
+            State::Transcribing { dictation, .. }
+            | State::Cleaning { dictation, .. }
+            | State::Inserting { dictation, .. } => Phase::Processing {
                 audio_ms: dictation.audio_ms,
             },
         }
@@ -208,11 +228,14 @@ impl<D: Dependencies> DictationController<D> {
             // One dictation at a time: a recording started now would lose its first words
             // waiting for this one's text to go in.
             match (&self.state, input) {
-                (State::Transcribing { .. }, HotkeyInput::Escape) => return self.cancel(),
-                (State::Transcribing { .. } | State::Inserting { .. }, HotkeyInput::Pressed) => {
+                (State::Transcribing { .. } | State::Cleaning { .. }, HotkeyInput::Escape) => return self.cancel(),
+                (
+                    State::Transcribing { .. } | State::Cleaning { .. } | State::Inserting { .. },
+                    HotkeyInput::Pressed,
+                ) => {
                     return self.dependencies.show_progress(Notice::StillProcessing);
                 }
-                (State::Transcribing { .. } | State::Inserting { .. }, _) => return,
+                (State::Transcribing { .. } | State::Cleaning { .. } | State::Inserting { .. }, _) => return,
                 // A dictation started from the menu is hands-free: Esc cancels it and the
                 // hotkey finishes it.
                 (State::Recording, HotkeyInput::Escape) if self.started_from_menu => return self.cancel(),
@@ -239,7 +262,7 @@ impl<D: Dependencies> DictationController<D> {
                 self.gesture.reset();
                 self.finish_recording(now_ms);
             }
-            State::Transcribing { .. } | State::Inserting { .. } => {}
+            State::Transcribing { .. } | State::Cleaning { .. } | State::Inserting { .. } => {}
         }
     }
 
@@ -253,6 +276,10 @@ impl<D: Dependencies> DictationController<D> {
             }
             // The late result is recognised by its job and dropped.
             State::Transcribing { .. } => self.end(vec![Notice::Cancelled]),
+            State::Cleaning { job, .. } => {
+                self.dependencies.cancel_cleanup(job);
+                self.end(vec![Notice::Cancelled]);
+            }
             State::Idle | State::Inserting { .. } => {}
         }
     }
@@ -352,7 +379,43 @@ impl<D: Dependencies> DictationController<D> {
             multiline: dictation.multiline,
             ..self.configuration.text.clone()
         };
-        let output = finish(&transcript, &configuration);
+        match prepare(&transcript, &configuration) {
+            Prepared::Done(output) => self.insert_output(job, dictation, &transcript, output),
+            Prepared::Pending(pending) if !self.configuration.cleans_with_model => {
+                self.insert_output(job, dictation, &transcript, pending.without_the_model());
+            }
+            Prepared::Pending(pending) => {
+                let (text, options) = (pending.text().to_owned(), pending.options().clone());
+                self.pending = Some(pending);
+                self.state = State::Cleaning { job, dictation };
+                self.dependencies.clean(job, text, options);
+            }
+        }
+    }
+
+    /// Cleanup's model has finished `job`: what it made of the text, or the text it was given
+    /// when it fell back.
+    pub fn cleaned(&mut self, job: Job, cleaned: CleanedText) {
+        let dictation = match &self.state {
+            State::Cleaning {
+                job: current,
+                dictation,
+            } if *current == job => dictation.clone(),
+            _ => return,
+        };
+        let Some(pending) = self.pending.take() else {
+            return;
+        };
+        if let Some(reason) = &cleaned.fallback_reason {
+            tracing::info!("Cleanup fell back to the text before it: {reason}");
+        }
+        let transcript = pending.text().to_owned();
+        self.insert_output(job, dictation, &transcript, pending.finish(cleaned));
+    }
+
+    /// Types `output`'s text into the field, unless there is nothing to type or the field is now
+    /// one nothing may be typed into.
+    fn insert_output(&mut self, job: Job, dictation: Dictation, transcript: &str, output: Output) {
         tracing::debug!(
             "The text rules made {} characters of {}",
             output.text.chars().count(),
@@ -400,6 +463,7 @@ impl<D: Dependencies> DictationController<D> {
     /// Back to idle, however the dictation ended, with what to say about it.
     fn end(&mut self, notices: Vec<Notice>) {
         self.state = State::Idle;
+        self.pending = None;
         self.started_from_menu = false;
         self.dependencies.end_dictation(notices);
     }
@@ -428,6 +492,7 @@ mod tests {
     use lt_shared::audio_format::samples_for_milliseconds;
 
     use super::*;
+    use crate::finish;
 
     /// Records what the flow asked of the platform.
     #[derive(Default)]
@@ -443,6 +508,9 @@ mod tests {
         /// The focused field, as each read of it finds it.
         target: InsertionTarget,
         transcribing: Vec<(Job, usize)>,
+        /// What cleanup's model was asked to clean.
+        cleaning: Vec<(Job, String, CleanupOptions)>,
+        cleanups_cancelled: Vec<Job>,
         prepared: usize,
         inserted: Vec<(Job, String)>,
         phases: Vec<Phase>,
@@ -476,6 +544,14 @@ mod tests {
 
         fn transcribe(&mut self, job: Job, samples: Vec<f32>) {
             self.transcribing.push((job, samples.len()));
+        }
+
+        fn clean(&mut self, job: Job, text: String, options: CleanupOptions) {
+            self.cleaning.push((job, text, options));
+        }
+
+        fn cancel_cleanup(&mut self, job: Job) {
+            self.cleanups_cancelled.push(job);
         }
 
         fn prepare_insertion(&mut self) {
@@ -513,8 +589,11 @@ mod tests {
                     level: CleanupLevel::Medium,
                     snippets: Vec::new(),
                     vocabulary: Vec::new(),
+                    vocabulary_prompt_limit: Configuration::VOCABULARY_PROMPT_LIMIT,
+                    vocabulary_similarity_threshold: Configuration::VOCABULARY_SIMILARITY_THRESHOLD,
                     multiline: false,
                 },
+                cleans_with_model: false,
             },
             Fake {
                 recording_ms: 500,
@@ -856,6 +935,120 @@ mod tests {
         c.transcribed(job, Ok("Ship it.".to_owned()));
         assert_eq!(c.dependencies().inserted, [(job, " Ship it.".to_owned())]);
         assert_eq!(c.last_text(), Some("Ship it."), "copied without the space");
+    }
+
+    /// A controller whose levels clean up with the model.
+    fn cleaning_controller() -> DictationController<Fake> {
+        let mut c = controller();
+        let configuration = ControllerConfiguration {
+            cleans_with_model: true,
+            ..c.configuration.clone()
+        };
+        c.set_configuration(configuration);
+        c
+    }
+
+    fn accepted(text: &str) -> CleanedText {
+        CleanedText {
+            text: text.to_owned(),
+            fallback_reason: None,
+            latency_ms: 240,
+        }
+    }
+
+    #[test]
+    fn the_model_cleans_the_transcript_before_it_is_typed() {
+        let mut c = cleaning_controller();
+        let job = dictate(&mut c, 0, 500);
+        c.transcribed(job, Ok("um ship it on friday no wait monday".to_owned()));
+        assert!(
+            c.dependencies().inserted.is_empty(),
+            "nothing is typed while the model works"
+        );
+        assert_eq!(c.phase(), Phase::Processing { audio_ms: 500 });
+        let (cleaning, text, options) = c.dependencies().cleaning.last().cloned().expect("a cleanup");
+        assert_eq!(cleaning, job);
+        assert_eq!(
+            text, "um ship it on friday no wait monday",
+            "fillers go in the model's own step"
+        );
+        assert_eq!(options.level, CleanupLevel::Medium);
+        assert!(!options.multiline);
+
+        c.cleaned(job, accepted("Ship it on Monday."));
+        assert_eq!(c.dependencies().inserted, [(job, "Ship it on Monday.".to_owned())]);
+        c.inserted(job, Ok(pasted(18)), 1_200);
+        assert!(c.is_idle());
+    }
+
+    #[test]
+    fn a_fallback_types_the_text_the_model_was_given() {
+        let mut c = cleaning_controller();
+        let job = dictate(&mut c, 0, 500);
+        c.transcribed(job, Ok("um ship it on friday".to_owned()));
+        c.cleaned(
+            job,
+            CleanedText {
+                text: "ship it on friday".to_owned(),
+                fallback_reason: Some(lt_cleanup::FallbackReason::TimedOut { seconds: 3.0 }),
+                latency_ms: 3_000,
+            },
+        );
+        assert_eq!(c.dependencies().inserted, [(job, "ship it on friday".to_owned())]);
+    }
+
+    #[test]
+    fn levels_without_the_model_and_the_model_turned_off_type_at_once() {
+        let mut c = cleaning_controller();
+        c.set_cleanup_level(CleanupLevel::None);
+        let job = dictate(&mut c, 0, 500);
+        c.transcribed(job, Ok("Um, ship it on Friday.".to_owned()));
+        assert!(c.dependencies().cleaning.is_empty());
+        assert_eq!(c.dependencies().inserted, [(job, "Um, ship it on Friday.".to_owned())]);
+
+        let mut c = controller();
+        let job = dictate(&mut c, 0, 500);
+        c.transcribed(job, Ok("Um, ship it on Friday.".to_owned()));
+        assert!(c.dependencies().cleaning.is_empty());
+        assert_eq!(c.dependencies().inserted, [(job, "Ship it on Friday.".to_owned())]);
+    }
+
+    #[test]
+    fn escape_while_cleaning_stops_the_model_and_drops_its_result() {
+        let mut c = cleaning_controller();
+        let job = dictate(&mut c, 0, 500);
+        c.transcribed(job, Ok("ship it on friday".to_owned()));
+        c.hotkey(HotkeyEvent::Pressed, 600);
+        assert_eq!(c.dependencies().progress, [Notice::StillProcessing]);
+        c.hotkey(HotkeyEvent::Escape, 700);
+        assert!(c.is_idle());
+        assert_eq!(c.dependencies().cleanups_cancelled, [job]);
+        assert_eq!(last_ending(&c), [Notice::Cancelled]);
+        c.cleaned(job, accepted("Ship it on Friday."));
+        assert!(c.dependencies().inserted.is_empty());
+    }
+
+    #[test]
+    fn a_letter_s_body_is_cleaned_and_its_greeting_and_sign_off_kept() {
+        let mut c = cleaning_controller();
+        c.dependencies_mut().target.allows_line_breaks = true;
+        let job = dictate(&mut c, 0, 500);
+        c.transcribed(
+            job,
+            // Names are known by the capitals speech to text gives them.
+            Ok("hi John thanks for the update I will review it tomorrow cheers Sam".to_owned()),
+        );
+        let (_, text, options) = c.dependencies().cleaning.last().cloned().expect("a cleanup");
+        assert_eq!(text, "thanks for the update I will review it tomorrow");
+        assert!(options.multiline);
+        c.cleaned(job, accepted("Thanks for the update. I will review it tomorrow."));
+        assert_eq!(
+            c.dependencies().inserted,
+            [(
+                job,
+                "Hi John,\n\nThanks for the update. I will review it tomorrow.\n\nCheers,\nSam".to_owned()
+            )]
+        );
     }
 
     #[test]

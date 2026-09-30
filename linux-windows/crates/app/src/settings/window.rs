@@ -31,6 +31,8 @@ pub(crate) trait AppControl: Send + Sync {
     fn pause_hotkey(&self, paused: bool);
     /// Loads the speech model again, after it failed.
     fn reload_model(&self);
+    /// Loads the cleanup model again, after it failed.
+    fn reload_cleanup_model(&self);
 }
 
 /// What Tauri keeps for the window's commands.
@@ -70,6 +72,11 @@ pub(crate) struct StatusView {
     pub(crate) model_id: Option<String>,
     /// How far downloading, unpacking or checking it has got.
     pub(crate) percent: Option<u8>,
+    /// Cleanup's language model: `off`, `downloading`, `checking`, `loading`, `ready` or
+    /// `failed`.
+    pub(crate) cleanup_model: &'static str,
+    /// How far its download has got, where it runs, or why it couldn't load.
+    pub(crate) cleanup_detail: Option<String>,
     /// Why dictation can't start at all, if it can't.
     pub(crate) blocker: Option<BlockerView>,
 }
@@ -149,6 +156,7 @@ pub(crate) fn commands() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         describe_hotkey,
         pause_hotkey,
         reload_model,
+        reload_cleanup_model,
         dictation_status,
     ]
 }
@@ -162,7 +170,7 @@ struct Snapshot {
     defaults: Settings,
     /// Keys the command line sets for this run: the next start sets them again.
     overridden: Vec<String>,
-    advanced_keys: [&'static str; 1],
+    advanced_keys: &'static [&'static str],
     /// The hotkey as people say it ("Right Ctrl").
     hotkey_name: String,
     cleanup_levels: Vec<CleanupChoice>,
@@ -188,7 +196,7 @@ impl Snapshot {
             settings: settings.clone(),
             defaults: Settings::default(),
             overridden: overridden.to_vec(),
-            advanced_keys: ADVANCED_KEYS,
+            advanced_keys: &ADVANCED_KEYS,
             cleanup_levels: CleanupLevel::ALL
                 .into_iter()
                 .map(|level| CleanupChoice {
@@ -473,6 +481,12 @@ async fn pause_hotkey(state: State<'_, WindowState>, paused: bool) -> Result<(),
 #[tauri::command]
 async fn reload_model(state: State<'_, WindowState>) -> Result<(), String> {
     state.control.reload_model();
+    Ok(())
+}
+
+#[tauri::command]
+async fn reload_cleanup_model(state: State<'_, WindowState>) -> Result<(), String> {
+    state.control.reload_cleanup_model();
     Ok(())
 }
 

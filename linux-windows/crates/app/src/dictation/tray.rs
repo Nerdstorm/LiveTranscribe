@@ -19,7 +19,7 @@ use tauri::menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem,
 use tauri::tray::{TrayIcon, TrayIconBuilder};
 use tauri::{AppHandle, RunEvent, Wry};
 
-use super::engine::{DictationStatus, MenuCommand, Message, StatusSink};
+use super::engine::{CleanupModelStatus, DictationStatus, MenuCommand, Message, StatusSink};
 use crate::settings::{self, AppControl, BlockerView, SettingsService, StatusView, WindowState};
 use crate::speech_models::{SpeechModelLibrary, Stage};
 
@@ -106,6 +106,8 @@ fn status_view(status: &DictationStatus) -> StatusView {
             detail: None,
             model_id: None,
             percent: None,
+            cleanup_model: "off",
+            cleanup_detail: None,
             blocker,
         };
     }
@@ -137,12 +139,34 @@ fn status_view(status: &DictationStatus) -> StatusView {
         ),
         (ModelState::Failed(error), _) => ("failed", Some(error.clone()), None),
     };
+    let (cleanup_model, cleanup_detail) = cleanup_model_view(status.cleanup_model.as_ref());
     StatusView {
         model,
         detail,
         model_id: status.model_id.clone(),
         percent,
+        cleanup_model,
+        cleanup_detail,
         blocker: None,
+    }
+}
+
+/// How cleanup's language model stands, as Settings › Advanced shows it.
+fn cleanup_model_view(status: Option<&CleanupModelStatus>) -> (&'static str, Option<String>) {
+    let Some(status) = status else {
+        return ("off", None);
+    };
+    match (&status.state, status.download) {
+        (ModelState::Loading { .. }, Some(progress)) => {
+            let size = format!("{}% of {:.1} GB", progress.percent(), progress.total as f64 / 1e9);
+            match progress.stage {
+                Stage::Checking => ("checking", Some(size)),
+                Stage::Downloading | Stage::Unpacking => ("downloading", Some(size)),
+            }
+        }
+        (ModelState::Loading { .. }, None) => ("loading", None),
+        (ModelState::Ready, _) => ("ready", status.placement.clone()),
+        (ModelState::Failed(error), _) => ("failed", Some(error.clone())),
     }
 }
 
