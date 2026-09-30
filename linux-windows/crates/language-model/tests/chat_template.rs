@@ -16,7 +16,7 @@
 //! model's):
 //!
 //! ```text
-//! LT_QWEN3_DIR=/path/to/qwen3-1.7b-int4-ov cargo test -p lt-language-model -- --ignored
+//! LT_QWEN3_DIR=/path/to/qwen3-1.7b-mlx-4bit-ov cargo test -p lt-language-model -- --ignored
 //! ```
 
 use std::path::PathBuf;

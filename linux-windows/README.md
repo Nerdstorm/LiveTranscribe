@@ -345,14 +345,14 @@ from Medium up. Turning it off lets the model go, and turning it on loads it aga
 restart. A cleanup that takes longer than the **Timeout** there (3 s; for Deep, at least 8 s) is
 dropped, and the text goes in without it, as on the Mac.
 
-**The model the app downloads for now takes no adapters.** It is OpenVINO's own conversion,
-[OpenVINO/Qwen3-1.7B-int4-ov](https://huggingface.co/OpenVINO/Qwen3-1.7B-int4-ov) (1.2 GB), so
-Medium and High keep self-corrections as spoken, as the Mac app does with **Resolve spoken
-self-corrections** off, and Deep runs on the base model. `tools/export-qwen3-cleanup.py` converts
-the Mac app's own weights, mlx-community/Qwen3-1.7B-4bit, with each adapter's matrices as
-inputs of the model (0.93 GB), for publishing as Nerdstorm/Qwen3-1.7B-MLX-4bit-OpenVINO; pinning
-that in `CLEANUP_MODEL` (`crates/language-model/src/pinned_model.rs`) is all it takes for the
-app to use the adapters.
+The model it downloads is
+[Nerdstorm/Qwen3-1.7B-MLX-4bit-OpenVINO](https://huggingface.co/Nerdstorm/Qwen3-1.7B-MLX-4bit-OpenVINO)
+(0.93 GB), pinned in `CLEANUP_MODEL` (`crates/language-model/src/pinned_model.rs`). It is the Mac
+app's own weights, mlx-community/Qwen3-1.7B-4bit, which `tools/export-qwen3-cleanup.py` puts in
+OpenVINO's graph for Qwen3-1.7B with each adapter's matrices as inputs of the model, so Medium and
+High resolve self-corrections and Deep runs with its adapter, as on the Mac. To convert it again,
+run the script in a Python environment with the packages it names and the OpenVINO the app ships
+(2026.2.1), publish the folder it writes, and pin the new commit.
 
 Measured on the CPU of an Intel Core i5-11500 with the Mac app's 515 Medium requests and its
 scoring: with the Mac's weights and the self-correction adapter, 505 right, as on the Mac, and

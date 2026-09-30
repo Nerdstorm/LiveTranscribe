@@ -145,9 +145,8 @@ tests write fixtures of every prompt, verdict and executor trace that the port m
 (`Fixtures/cleanup`). The model is the same Qwen3-1.7B, run on OpenVINO on the CPU, with the Mac
 app's two adapters compiled into the app. With the Mac's weights, 509 of its answers to Medium's
 515 test cases were word for word the Mac app's, and all 114 of its answers to Deep's
-hand-written cases were character for character the same. The model it downloads for now takes
-no adapters, so there Medium and High keep self-corrections as spoken and Deep runs without its
-adapter, until the Mac's weights with adapter inputs are published
+hand-written cases were character for character the same. It downloads those weights,
+[Nerdstorm/Qwen3-1.7B-MLX-4bit-OpenVINO](https://huggingface.co/Nerdstorm/Qwen3-1.7B-MLX-4bit-OpenVINO)
 ([linux-windows/README.md](../linux-windows/README.md#cleanup)). A cleanup takes about four times
 as long on a desktop CPU as on the Mac.
 
