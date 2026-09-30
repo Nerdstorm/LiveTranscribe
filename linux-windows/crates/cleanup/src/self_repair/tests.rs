@@ -432,10 +432,8 @@ fn rejects_a_list_that_drops_quantities() {
     );
 }
 
-// MARK: - Beyond the Mac app's tests
-
-/// Swift's `Corrections.applied` counts from 1 to the retraction limit, which traps when the limit
-/// is 0; here the range is empty, so a policy that retracts nothing resolves no correction.
+/// The prompt probe's policy lets no words be taken back: no correction is resolved then, and the
+/// check still runs (the Mac app's `resolvesNothingWhenNoWordsMayBeTakenBack`).
 #[test]
 fn a_policy_that_retracts_nothing_resolves_no_correction() {
     let policy = crate::GuardPolicy {
@@ -456,6 +454,8 @@ fn a_policy_that_retracts_nothing_resolves_no_correction() {
     let kept = "The meeting is on Tuesday. Sorry, Wednesday.";
     assert_eq!(review(kept, kept), accepted(kept));
 }
+
+// MARK: - Beyond the Mac app's tests
 
 /// Words are compared as Swift compares strings: an accent written as a combining mark is the
 /// same word.

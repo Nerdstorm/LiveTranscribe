@@ -103,7 +103,7 @@ extension CleanupFixtures {
             /// By level, in a field that takes one line.
             let verdicts: [String: Verdict]
             /// Deep's verdict in a field that takes several lines, which only Deep reads.
-            let deepMultiline: Verdict?
+            let deepMultiline: Verdict
             /// For a completed generation only.
             let parts: Parts?
             /// Deep's check of a completed generation (``SelfRepair``).
@@ -238,18 +238,15 @@ extension CleanupFixtures {
         private static func line(for testCase: Case) -> Line {
             let policy = testCase.policy?.applied ?? .default
             let outputGuard = OutputGuard(policy: policy)
-            // SelfRepair's search counts `1...min(retractionLimit, …)`, which traps when the policy
-            // retracts no words, so Deep is not judged under such a policy.
-            let judgesDeep = policy.maxRetractedWords > 0
             func verdict(at level: CleanupLevel, multiline: Bool) -> Verdict {
                 let options = CleanupOptions(level: level, placeholders: testCase.placeholders, multiline: multiline)
                 return Verdict(outputGuard.review(raw: testCase.raw, outcome: testCase.outcome, options: options))
             }
             var verdicts: [String: Verdict] = [:]
-            for level in CleanupLevel.allCases where judgesDeep || !level.repairsAcrossSentences {
+            for level in CleanupLevel.allCases {
                 verdicts[level.rawValue] = verdict(at: level, multiline: false)
             }
-            let deepMultiline = judgesDeep ? verdict(at: .deep, multiline: true) : nil
+            let deepMultiline = verdict(at: .deep, multiline: true)
             var outcome = Outcome()
             var parts: Parts?
             var repair: Repair?
@@ -257,9 +254,7 @@ extension CleanupFixtures {
             case .completed(let output):
                 outcome.completed = output
                 parts = Self.parts(raw: testCase.raw, output: output, placeholders: testCase.placeholders, policy: policy)
-                if judgesDeep {
-                    repair = Self.repair(raw: testCase.raw, output: output, placeholders: testCase.placeholders, policy: policy)
-                }
+                repair = Self.repair(raw: testCase.raw, output: output, placeholders: testCase.placeholders, policy: policy)
             case .timedOut(let seconds): outcome.timedOut = number(seconds)
             case .cancelled: outcome.cancelled = true
             case .failed(let message): outcome.failed = message

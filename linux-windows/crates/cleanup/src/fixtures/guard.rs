@@ -54,7 +54,7 @@ struct GuardLine {
     policy: Option<PolicyJson>,
     verdicts: BTreeMap<String, VerdictJson>,
     /// Deep's verdict in a field that takes several lines; the other levels don't read the field.
-    deep_multiline: Option<VerdictJson>,
+    deep_multiline: VerdictJson,
     parts: Option<PartsJson>,
     repair: Option<RepairJson>,
 }
@@ -403,21 +403,13 @@ fn the_guard_verdicts_match_the_mac_apps() {
             line.placeholders,
             line.policy
         );
-        // Swift traps in Deep's search under a policy that retracts no words (see
-        // `self_repair::corrections`), so the Mac app judges no Deep case under one.
-        let judges_deep = policy.max_retracted_words > 0;
         for level in CleanupLevel::ALL {
-            let Some(one_line) = line.verdicts.get(level.as_str()) else {
-                assert!(
-                    level.repairs_across_sentences() && !judges_deep,
-                    "{case}: no verdict at {level:?}"
-                );
-                continue;
-            };
+            let one_line = line
+                .verdicts
+                .get(level.as_str())
+                .unwrap_or_else(|| panic!("{case}: no verdict at {level:?}"));
             let multiline = if level.repairs_across_sentences() {
-                line.deep_multiline
-                    .as_ref()
-                    .unwrap_or_else(|| panic!("{case}: no verdict at Deep in a multiline field"))
+                &line.deep_multiline
             } else {
                 one_line
             };
@@ -459,7 +451,7 @@ fn the_guard_verdicts_match_the_mac_apps() {
                     differences.push(format!("{case}\n  Deep's repair, {}", differing.join("\n  ")));
                 }
             }
-            (None, GenerationOutcome::Completed(_)) if judges_deep => {
+            (None, GenerationOutcome::Completed(_)) => {
                 panic!("{case}: no repair for a completed generation")
             }
             (Some(_), _) => panic!("{case}: a repair for a generation that didn't complete"),

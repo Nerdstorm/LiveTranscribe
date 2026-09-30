@@ -24,8 +24,7 @@ sampling is repeatable.
 `options.multiline` is whether the field takes several lines; only Deep reads it, and in a one-line
 field it turns down output with a line break. `deep`, in `prompts.jsonl` and `executor.jsonl`, is
 how Deep was set up for the case; absent, it runs as it ships. A word in `guard.jsonl`'s `repair`
-records only the flags that are set. Under a policy that retracts no words (`maxRetractedWords: 0`)
-Deep has no verdict and no repair: the Swift search traps on it.
+records only the flags that are set.
 
 Numbers other than counts (word ratios, similarities, seconds, Deep's minimum timeout) are strings,
 as Swift prints a `Double`, and `sampling`'s as it prints a `Float`: the shortest text that reads

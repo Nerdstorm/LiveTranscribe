@@ -138,7 +138,7 @@ fn once(words: &[SaidWord], repair: &SelfRepair, placeholders: &WordSet) -> Vec<
             for length in 1..=longest.min(CORRECTION_PHRASE_WORDS) {
                 let phrase = &words[end..end + length];
                 for start in sentence_start..cue_start {
-                    // Swift's `1...min(limit, …)` traps when the limit is 0; here it is empty.
+                    // Empty when the policy lets no words be taken back, as the prompt probe's does.
                     for count in 1..=repair.max_retracted_words.min(cue_start - start) {
                         let corrected = start..start + count;
                         let replaces = || count == 1 && !weak && repair.replaces(&words[start], phrase);
