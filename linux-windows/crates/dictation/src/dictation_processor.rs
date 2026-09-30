@@ -50,12 +50,12 @@ impl Output {
 
 /// Everything after speech-to-text, with cleanup's language model turned off: snippets, spoken
 /// commands and vocabulary at every level, then the level's rules that need no model, filler
-/// removal and layout at Medium and High. Nothing is reworded, and that was chosen, so it is not
+/// removal and layout from Medium up. Nothing is reworded, and that was chosen, so it is not
 /// reported as a fallback.
 ///
 /// Snippet triggers, emoji, addresses and spoken line breaks become opaque placeholders first (see
-/// `PreparedDictation`), as they do before the model, so the two paths share every rule. At
-/// Medium and High, in fields that take several lines, spoken lists and letters are laid out.
+/// `PreparedDictation`), as they do before the model, so the two paths share every rule. From
+/// Medium up, in fields that take several lines, spoken lists and letters are laid out.
 pub fn finish(transcript: &str, configuration: &Configuration) -> Output {
     let raw = s::trimming(transcript, CharacterSet::WhitespacesAndNewlines);
     if raw.is_empty() {

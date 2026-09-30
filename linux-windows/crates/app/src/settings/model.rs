@@ -210,7 +210,7 @@ fn canonical_language(text: &str) -> Result<String, String> {
     ))
 }
 
-/// A cleanup level as its name: `none`, `light`, `medium` or `high`.
+/// A cleanup level as its name: `none`, `light`, `medium`, `high` or `deep`.
 mod cleanup_level {
     use lt_shared::CleanupLevel;
     use serde::{Deserialize, Deserializer, Serializer};
@@ -224,7 +224,7 @@ mod cleanup_level {
         CleanupLevel::ALL
             .into_iter()
             .find(|level| level.as_str() == name)
-            .ok_or_else(|| serde::de::Error::custom(format!("{name} isn't one of none, light, medium or high")))
+            .ok_or_else(|| serde::de::Error::custom(format!("{name} isn't one of none, light, medium, high or deep")))
     }
 }
 

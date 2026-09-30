@@ -449,9 +449,9 @@ fn one_pass_without_a_correction_cue_at_high_and_at_medium_with_one() {
 }
 
 /// Dictation with the cleanup model off inserts this, so it must match what a level does without
-/// the model: fillers go only at Medium and High.
+/// the model: fillers go only from Medium up.
 #[test]
-fn deterministic_cleanup_removes_fillers_only_at_medium_and_high() {
+fn deterministic_cleanup_removes_fillers_only_from_medium_up() {
     let raw = "so um the build is uh broken";
     assert_eq!(deterministic_cleanup(raw, CleanupLevel::None), raw);
     assert_eq!(deterministic_cleanup(raw, CleanupLevel::Light), raw);
@@ -460,5 +460,6 @@ fn deterministic_cleanup_removes_fillers_only_at_medium_and_high() {
         "so the build is broken"
     );
     assert_eq!(deterministic_cleanup(raw, CleanupLevel::High), "so the build is broken");
+    assert_eq!(deterministic_cleanup(raw, CleanupLevel::Deep), "so the build is broken");
     assert_eq!(deterministic_cleanup("Um, hi", CleanupLevel::Medium), "Hi");
 }

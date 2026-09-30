@@ -14,7 +14,7 @@ use crate::{
 #[derive(Clone, Debug, PartialEq)]
 pub struct CleanedText {
     /// The model's output, when the guard accepted it. Otherwise the text the model was given:
-    /// the raw text, less fillers at Medium and High.
+    /// the raw text, less fillers from Medium up.
     pub text: String,
     /// Why the model's output was not used; `None` when it was, or when the model had nothing to
     /// do.
@@ -44,9 +44,9 @@ impl CleanedText {
 /// Model-agnostic: the model is passed in, so the policy (levels, timeout, cancellation,
 /// fallback) is testable without loading one.
 ///
-/// The text the model sees is the raw transcript with fillers removed at Medium and High. When
-/// the guard rejects the output, that text is the result: fillers stay removed, so a fallback
-/// differs from a success only in what the model would have corrected.
+/// The text the model sees is the raw transcript with fillers removed from Medium up. When the
+/// guard rejects the output, that text is the result: fillers stay removed, so a fallback differs
+/// from a success only in what the model would have corrected.
 ///
 /// High runs in two passes when the text has a correction cue ("sorry", "no", "I mean"): the
 /// Medium prompt resolves the self-correction, as the adapter was trained to, then the High prompt
@@ -225,7 +225,7 @@ impl CleanupExecutor {
     }
 }
 
-/// What `level` does without the model: fillers removed at Medium and High, otherwise the text
+/// What `level` does without the model: fillers removed from Medium up, otherwise the text
 /// unchanged. It is what the model is given, what a fallback returns, and what dictation inserts
 /// when the cleanup model is turned off, so all three agree.
 pub fn deterministic_cleanup(text: &str, level: CleanupLevel) -> String {

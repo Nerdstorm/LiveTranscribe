@@ -57,8 +57,8 @@ pub struct Options {
     /// Don't turn a double tap into hands-free recording
     #[arg(long)]
     no_hands_free: bool,
-    /// How much the text rules may change what was said: none, light, medium or high [default:
-    /// Settings', at first medium]
+    /// How much the text rules may change what was said: none, light, medium, high or deep
+    /// [default: Settings', at first medium]
     #[arg(long, value_parser = parse_cleanup)]
     cleanup: Option<CleanupLevel>,
 }
@@ -106,7 +106,7 @@ fn parse_cleanup(name: &str) -> Result<CleanupLevel, String> {
     CleanupLevel::ALL
         .into_iter()
         .find(|level| level.as_str() == name)
-        .ok_or_else(|| "one of none, light, medium or high".to_owned())
+        .ok_or_else(|| "one of none, light, medium, high or deep".to_owned())
 }
 
 pub fn run(options: &Options) -> anyhow::Result<()> {
