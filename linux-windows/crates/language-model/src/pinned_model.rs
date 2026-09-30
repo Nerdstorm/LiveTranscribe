@@ -306,6 +306,10 @@ fn download(
     for file in model.files {
         let url = format!("{host}/{}/resolve/{}/{}", model.repository, model.revision, file.name);
         let path = staging.join(file.name);
+        // A file may sit in a subfolder of the repository (adapters/medium/…).
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|source| disk(parent, source))?;
+        }
         fetch_file(&url, file, &path, &mut reporter)?;
         let metadata = fs::metadata(&path).map_err(|source| disk(&path, source))?;
         stamp
@@ -680,6 +684,32 @@ mod tests {
         let _ = fs::remove_dir_all(&folder);
         fs::create_dir_all(&folder).unwrap();
         folder
+    }
+
+    #[test]
+    fn puts_a_file_in_the_subfolder_its_name_gives() {
+        const ADAPTER: &[u8] = &[3; 1_000];
+        let files: &'static [PinnedFile] = Box::leak(Box::new([PinnedFile {
+            name: "adapters/medium/adapters.safetensors",
+            bytes: ADAPTER.len() as u64,
+            sha256: Box::leak(sha256_hex(ADAPTER).into_boxed_str()),
+        }]));
+        let model = Box::leak(Box::new(PinnedModel {
+            id: "nested",
+            repository: "Owner/nested",
+            revision: "8298d9b2d532965800b2c0c64b81965ededb03a3",
+            files,
+        }));
+        let server = Server::start(HashMap::from([("adapters.safetensors", ADAPTER.to_vec())]));
+        let root = scratch("nested");
+        let folder = prepare_from(&server.base, model, &root, &mut |_| true).unwrap();
+        assert_eq!(
+            fs::read(folder.join("adapters/medium/adapters.safetensors")).unwrap(),
+            ADAPTER
+        );
+        // The second time, the stamp is trusted: nothing is requested again.
+        prepare_from(&server.base, model, &root, &mut |_| true).unwrap();
+        assert_eq!(server.requests().len(), 1);
     }
 
     #[test]
