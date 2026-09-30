@@ -90,6 +90,8 @@ extension SelfRepair {
 
         /// Every way of applying one correction whose phrase goes back to `words`.
         private static func once(_ words: [SaidWord], repair: SelfRepair, placeholders: Set<String>) -> [[SaidWord]] {
+            // A policy may let no words be taken back, as the prompt probe's does.
+            guard repair.retractionLimit > 0 else { return [] }
             var results: [[SaidWord]] = []
             for (cueStart, runEnds) in cueRuns(in: words, repair: repair).sorted(by: { $0.key < $1.key }) {
                 guard cueStart > 0, words[cueStart].opensPhrase == 0 else { continue }

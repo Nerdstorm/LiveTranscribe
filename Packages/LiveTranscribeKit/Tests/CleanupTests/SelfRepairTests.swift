@@ -34,6 +34,20 @@ struct SelfRepairTests {
         #expect(review(Self.kirk, cleaned) == .rejected(.invalidRepair))
     }
 
+    /// The prompt probe's policy lets no words be taken back: no correction is resolved then, and
+    /// the check still runs.
+    @Test func resolvesNothingWhenNoWordsMayBeTakenBack() {
+        var policy = OutputGuard.Policy.default
+        policy.maxRetractedWords = 0
+        let strict = OutputGuard(policy: policy)
+        let options = CleanupOptions(level: .deep)
+        for raw in ["The meeting is on Tuesday. Sorry, Wednesday.", "we need three sorry four servers"] {
+            #expect(strict.review(raw: raw, outcome: .completed(raw), options: options) == .accepted(raw))
+        }
+        let resolved = strict.review(raw: "The meeting is on Tuesday. Sorry, Wednesday.", outcome: .completed("The meeting is on Wednesday."), options: options)
+        #expect(resolved == .rejected(.invalidRepair))
+    }
+
     @Test("A correction in a later sentence is resolved", arguments: [
         ("The meeting is on Tuesday. Sorry, Wednesday.", "The meeting is on Wednesday."),
         ("Send the invoice to Sarah. No wait, Priya.", "Send the invoice to Priya."),
