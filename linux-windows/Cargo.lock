@@ -2468,6 +2468,7 @@ dependencies = [
 name = "lt-transcription"
 version = "0.1.0"
 dependencies = [
+ "lt-language-model",
  "lt-shared",
  "openvino",
  "realfft",
