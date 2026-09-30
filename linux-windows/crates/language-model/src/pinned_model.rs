@@ -43,13 +43,15 @@ pub struct PinnedFile {
     pub sha256: &'static str,
 }
 
-/// The cleanup model: Qwen3-1.7B as OpenVINO publishes it, with its weights compressed by NNCF
-/// (INT4_ASYM, group size 128, ratio 0.8; the rest INT8_ASYM), and the files the runtime reads
-/// (not OpenVINO's tokenizer models, which this crate doesn't use). Apache-2.0, as Qwen3 is.
+/// The cleanup model: the Mac app's own Qwen3-1.7B weights (mlx-community/Qwen3-1.7B-4bit at
+/// 3b1b176) in OpenVINO's graph for it, with each adapter's matrices as inputs of the model, as
+/// `tools/export-qwen3-cleanup.py` converts them, and the files the runtime reads (not its
+/// `config.json`, `export.json` or model card). The tokenizer's files are OpenVINO's own
+/// conversion's, byte for byte. Apache-2.0, as Qwen3 is.
 pub const CLEANUP_MODEL: PinnedModel = PinnedModel {
-    id: "qwen3-1.7b-int4-ov",
-    repository: "OpenVINO/Qwen3-1.7B-int4-ov",
-    revision: "6f32d81e9deebeca30bb5490a7176cf4fa8c79e3",
+    id: "qwen3-1.7b-mlx-4bit-ov",
+    repository: "Nerdstorm/Qwen3-1.7B-MLX-4bit-OpenVINO",
+    revision: "1d7c4b40b288b628596f82242557f9f4958c5594",
     files: &[
         PinnedFile {
             name: "generation_config.json",
@@ -73,13 +75,13 @@ pub const CLEANUP_MODEL: PinnedModel = PinnedModel {
         },
         PinnedFile {
             name: "openvino_model.xml",
-            bytes: 2_881_902,
-            sha256: "8d5e2cd13e046009835c488c2005d8f477ae8a0302e3e999cbd430ba0af9af19",
+            bytes: 3_202_689,
+            sha256: "012c5db186aa5a8a7d9e64c2e2a82dbea2cda6b90e37fd622f918c1017575c0e",
         },
         PinnedFile {
             name: "openvino_model.bin",
-            bytes: 1_181_738_708,
-            sha256: "2f15d719cab2e475444ff84d77d432ecf757e0ec5b93dc1b48710802f96ef34f",
+            bytes: 927_926_884,
+            sha256: "5efcd749922add16446b857106ff32e59ce7753f5a8985bc1699375a402ae767",
         },
     ],
 };
