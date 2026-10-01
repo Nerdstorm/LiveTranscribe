@@ -125,7 +125,7 @@ func train(_ options: TrainCommandOptions) async throws {
         guard try validatePreparedData(directory: directory, deep: false, report: directory.appending(path: "audit.json")) else {
             throw TrainError.invalidData
         }
-        trainSet = try TrainingData.read(from: directory.appending(path: "train.jsonl"))
+        trainSet = try expandPreparedData(TrainingData.read(from: directory.appending(path: "train.jsonl")), directory: directory, split: .train)
         validSet = try TrainingData.read(from: directory.appending(path: "valid.jsonl"))
         try recordPreparedData(directory, output: options.output)
     } else {

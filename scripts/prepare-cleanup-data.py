@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Prepare synthetic cleanup inputs and optionally replace them with measured ASR.
 
-Only input punctuation/casing is augmented. Targets, words, context and field flags
-stay intact. Private dictation history is not a training-data source.
+Prepare speech seeds, reconcile measured speech-to-text pairs, and score exact text.
+Private dictation history is not a training-data source.
 """
 
 import argparse
@@ -10,12 +10,17 @@ from collections import Counter, defaultdict
 import copy
 import hashlib
 import json
+import math
 from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unicodedata
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from cleanup_data_rules import TOKEN, canonical, reconcile, units
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -28,6 +33,12 @@ PROTECTED = re.compile(
     r"\b\d+(?:[.,:/\-]\d+)+\b|\b(?:[A-Za-z]\.){2,}"
 )
 PLACEHOLDER = re.compile(r"⟦[^⟧]+⟧|\b[STU]\d+\b")
+RULES = TRAINING / "speech-to-text-rules.json"
+
+
+def policy_for(options):
+    path = getattr(options, "rules", RULES)
+    return json.loads(path.read_text()), path
 
 
 def digest(value):
@@ -138,6 +149,7 @@ def check_splits(data, held_out=()):
 def report(data, extra=None):
     result = {"schema_version": 1, "stage": "candidate-data", "splits": {}}
     for split, rows in data.items():
+        word_count = sum(len(TOKEN.findall(row["raw"])) for row in rows)
         result["splits"][split] = {
             "examples": len(rows),
             "families": len({row["family_id"] for row in rows}),
@@ -146,6 +158,12 @@ def report(data, extra=None):
             "colon_inputs": sum(":" in row["raw"] for row in rows),
             "question_inputs": sum("?" in row["raw"] for row in rows),
             "review_required": sum(row.get("review_required", False) for row in rows),
+            "training_weighted_examples": sum(row.get("training_weight", 1) for row in rows),
+            "capital_start_inputs": sum(row["raw"].strip()[:1].isupper() for row in rows),
+            "lowercase_start_inputs": sum(row["raw"].strip()[:1].islower() for row in rows),
+            "mean_words": round(word_count / max(1, len(rows)), 2),
+            "commas_per_100_words": round(100 * sum(row["raw"].count(",") for row in rows) / max(1, word_count), 3),
+            "colons_per_100_words": round(100 * sum(row["raw"].count(":") for row in rows) / max(1, word_count), 3),
         }
     result.update(extra or {})
     return result
@@ -162,6 +180,9 @@ def save_dataset(output, data, metadata):
 
 
 def prepare(options):
+    policy, policy_path = policy_for(options)
+    stress = getattr(options, "stress_profiles", False)
+    profiles = PROFILES if stress else ("original",)
     prefix = "deep-" if options.kind == "deep" else ""
     data = {split: [] for split in SPLITS}
     sources = []
@@ -187,7 +208,7 @@ def prepare(options):
                     "letterBody": original.get("letterBody", False),
                 })[:24]
                 seen = set()
-                for profile in PROFILES:
+                for profile in profiles:
                     raw = transform(original["raw"], profile)
                     if raw in seen:
                         continue
@@ -196,13 +217,26 @@ def prepare(options):
                     row.update({
                         "raw": raw, "id": f"{family}-{digest(raw)[:12]}",
                         "family_id": family, "split": split, "profile": profile,
+                        "training_weight": 2 if split == "train" and path.parent.parent.name == "curated" else 1,
                         "source": f"prepared:{path.name}:{line_number}:{profile}",
                         "provenance": {"file": path.name, "line": line_number,
                                        "source": original.get("source", ""), "kind": "synthetic"},
                     })
                     data[split].append(row)
+    if options.kind == "deep" and options.input_dir.resolve() == (TRAINING / "generated").resolve():
+        for split in SPLITS:
+            for index, seed in enumerate(policy.get("context_seeds", {}).get(split, []), 1):
+                row = dict(seed, category=seed.get("category", "recognition"), context=[], multiline=False, letterBody=False)
+                family = digest({"raw": normalize(row["raw"]), "target": row["target"], "context": [],
+                                 "multiline": False, "letterBody": False})[:24]
+                row.update(id=f"{family}-{digest(row['raw'])[:12]}", family_id=family, split=split,
+                           profile="original", training_weight=1, source=f"phonetic-context:{split}:{index}",
+                           provenance={"kind": "synthetic-context", "file": policy_path.name, "case": index})
+                data[split].append(row)
     check_splits(data, excluded)
-    save_dataset(options.output, data, {"kind": options.kind, "profiles": list(PROFILES), "sources": sources})
+    save_dataset(options.output, data, {"kind": options.kind, "stage": "stress-data" if stress else "speech-seeds",
+                                      "profiles": list(profiles), "sources": sources,
+                                      "rules_sha256": file_digest(policy_path), "curated_train_weight": 2})
     print(json.dumps({"output": str(options.output), "splits": {k: len(v) for k, v in data.items()}}))
 
 
@@ -241,7 +275,8 @@ def audio(options):
     if not shutil.which("say") or not shutil.which("afconvert"):
         raise ValueError("audio generation needs macOS say and afconvert")
     data = read_dataset(options.dataset)
-    selected, skipped = select_audio(data, options.limit)
+    limit = sum(len(rows) for rows in data.values()) if getattr(options, "all", False) else options.limit
+    selected, skipped = select_audio(data, limit)
     options.output.mkdir(parents=True, exist_ok=True)
     manifest, table = [], []
     with tempfile.TemporaryDirectory(prefix="lt-cleanup-tts-") as scratch:
@@ -271,7 +306,9 @@ def audio(options):
 
 
 def merge_asr(options):
+    policy, policy_path = policy_for(options)
     source_data = read_dataset(options.dataset)
+    source_report = json.loads((options.dataset / "preparation-report.json").read_text())
     data = source_data if options.include_synthetic else {split: [] for split in SPLITS}
     audio_rows = read_rows(options.audio_manifest)
     clips = {row["id"]: row for row in audio_rows}
@@ -280,15 +317,16 @@ def merge_asr(options):
     families = {row["family_id"]: row for rows in source_data.values() for row in rows if row["profile"] == "original"}
     models = []
     transcripts = []
+    excluded = []
     for path in options.transcripts:
         rows = read_rows(path)
         if len({row.get("id") for row in rows}) != len(rows):
             raise ValueError(f"duplicate transcript ids in {path}")
         if {row.get("id") for row in rows} != set(clips):
             raise ValueError(f"{path} must contain exactly the audio manifest's clip ids")
-        identities = {(row.get("model"), row.get("model_config_sha256"), row.get("language", "auto")) for row in rows}
+        identities = {(row.get("model"), row.get("model_config_sha256"), row.get("model_weights_sha256"), row.get("language", "auto")) for row in rows}
         if len(identities) != 1 or not all(all(identity) for identity in identities):
-            raise ValueError(f"{path} needs one recorded model identity and config hash")
+            raise ValueError(f"{path} needs one recorded model identity, config/weights hashes and language")
         models.extend(sorted(identities))
         transcripts.append({"path": str(path.resolve()), "sha256": file_digest(path)})
         for transcript in rows:
@@ -302,36 +340,142 @@ def merge_asr(options):
             if not isinstance(transcript.get("raw"), str) or not transcript["raw"].strip():
                 raise ValueError(f"empty ASR transcript for clip {clip['id']}")
             row = copy.deepcopy(original)
+            target, reconciliation = reconcile(original, clip["spoken"], transcript["raw"], policy)
             row.update({"raw": transcript["raw"], "profile": "measured-asr",
+                        "target": target, "reconciliation": reconciliation,
                         "id": f"{original['family_id']}-asr-{digest(transcript)[:12]}",
                         "source": f"asr:{digest(transcript['model'])[:12]}:{clip['id']}",
-                        "review_required": normalize(transcript["raw"]) != normalize(clip["spoken"]),
+                        "review_required": bool(reconciliation["unresolved"]),
                         "provenance": {"kind": "tts-asr", "tts": clip["tts"],
                                        "model": transcript["model"],
                                        "model_config_sha256": transcript["model_config_sha256"],
+                                       "model_weights_sha256": transcript["model_weights_sha256"],
                                        "language": transcript.get("language", "auto"),
                                        "audio_sha256": clip["audio_sha256"], "clip_id": clip["id"]}})
-            data[row["split"]].append(row)
+            if source_report.get("kind") == "deep" and original["category"] in ("facts", "unchanged", "series") and any(
+                change["rule"] == "sound-alike-retain-target" for change in reconciliation["changes"]
+            ):
+                row.update(category="recognition", source_category=original["category"])
+            if reconciliation["exclude_reason"]:
+                excluded.append(row)
+            else:
+                data[row["split"]].append(row)
+
+    # Rehearse post-command tokens at their source-family rate, including in small pilots.
+    # At full size this restores every placeholder family (800 in the original Deep train set).
+    for split in SPLITS:
+        originals = [row for row in source_data[split] if row["profile"] == "original"]
+        placeholders = [row for row in originals if PLACEHOLDER.search(row["raw"])]
+        selected_families = {clip["example"]["family_id"] for clip in clips.values() if clip["example"]["split"] == split}
+        count = min(len(placeholders), math.ceil(len(selected_families) * len(placeholders) / max(1, len(originals) - len(placeholders))))
+        for original in sorted(placeholders, key=lambda row: digest(row["family_id"]))[:count]:
+            row = copy.deepcopy(original)
+            row.update(id=f"{row['family_id']}-placeholder", profile="placeholder-rehearsal",
+                       review_required=False, training_weight=original.get("training_weight", 1) * len(models) if split == "train" else 1)
+            data[split].append(row)
+
+    phonetic_rate = getattr(options, "sound_alike_rate", 0.1) if source_report.get("kind") == "deep" else 0
+    known_names = {name.lower() for name in policy.get("names", [])}
+    eligible = []
+    for split in SPLITS:
+        for original in data[split]:
+            if original["profile"] != "measured-asr" or original["review_required"]:
+                continue
+            if original["category"] not in ("facts", "unchanged", "series"):
+                continue
+            if canonical(original["raw"], policy) != canonical(original["target"], policy):
+                continue
+            for unit in units(original["raw"], policy):
+                if unit.key in known_names:
+                    continue
+                group = next((g for g in policy["sound_alikes"] if unit.key in g), None)
+                if group is None:
+                    continue
+                eligible.append((split, original, unit, group))
+                break
+    # Choose whole families before expansion across recognizers; enforce the configured cap.
+    eligible_families = sorted({row["family_id"] for _, row, _, _ in eligible}, key=digest)
+    chosen = set(eligible_families[:math.floor(len(eligible_families) * phonetic_rate)])
+    for split, original, unit, group in eligible:
+        if original["family_id"] not in chosen:
+            continue
+        replacement = next(value for value in group if value != unit.key)
+        if unit.text[:1].isupper():
+            replacement = replacement[:1].upper() + replacement[1:]
+        row = copy.deepcopy(original)
+        row.update(raw=original["raw"][:unit.start] + replacement + original["raw"][unit.end:],
+                   id=original["id"] + "-sound-alike", category="recognition", profile="sound-alike",
+                   provenance={"kind": "synthetic-sound-alike", "parent_id": original["id"],
+                               "from": unit.text, "to": replacement, "rules_sha256": file_digest(policy_path)})
+        data[split].append(row)
     save_dataset(options.output, data, {"stage": "candidate-data", "asr_models": models,
+                                      "kind": source_report.get("kind"), "excluded_pairs": len(excluded),
+                                      "sound_alike_rate": phonetic_rate, "rules_sha256": file_digest(policy_path),
                                       "includes_synthetic": options.include_synthetic,
                                       "source_dataset_sha256": {split: file_digest(options.dataset / f"{split}.jsonl") for split in SPLITS},
                                       "transcripts": transcripts,
                                       "audio_manifest_sha256": file_digest(options.audio_manifest)})
+    write_rows(options.output / "excluded.jsonl", excluded)
     print(json.dumps({"output": str(options.output), "asr_rows": len(clips) * len(options.transcripts),
+                      "excluded_pairs": len(excluded), "candidate_rows": sum(map(len, data.values())),
                       "review_required": sum(row.get("review_required", False) for rows in data.values() for row in rows)}))
+
+
+def score(options):
+    data = read_rows(options.data)
+    if any(row.get("review_required") for row in data):
+        raise ValueError("resolve or quarantine review-required held-out pairs before scoring")
+    expected_ids = {row["id"] for row in data}
+    measurements = json.loads(options.measurements.read_text())
+    rows = measurements["results"]
+    if len(expected_ids) != len(data) or len({row["id"] for row in rows}) != len(rows) or {row["id"] for row in rows} != expected_ids:
+        raise ValueError("scoring needs exactly one result for every held-out example id")
+    sources = {row["id"]: row for row in data}
+
+    def text(value):
+        return unicodedata.normalize("NFC", value.replace("\r\n", "\n")).strip()
+
+    def marks(value, mark):
+        tokens = list(TOKEN.finditer(value))
+        return [sum(token.end() <= index for token in tokens) for index, char in enumerate(value) if char == mark]
+
+    scored = []
+    for row in rows:
+        if row["raw"] != sources[row["id"]]["raw"]:
+            raise ValueError("measurement inputs do not match the held-out dataset")
+        target, shown = text(row["target"]), text(row["shown"])
+        scored.append({"id": row["id"], "category": row["category"],
+                       "exact_text": shown == target,
+                       "case_sensitive_words": [m.group() for m in TOKEN.finditer(shown)] == [m.group() for m in TOKEN.finditer(target)],
+                       "question_marks": marks(shown, "?") == marks(target, "?"),
+                       "colons": marks(shown, ":") == marks(target, ":")})
+    metrics = ("exact_text", "case_sensitive_words", "question_marks", "colons")
+    def counts(rows):
+        return dict(total=len(rows), **{metric: sum(row[metric] for row in rows) for metric in metrics})
+    result = {"scoring_version": 1, "dataset_sha256": file_digest(options.data),
+              "measurement_sha256": file_digest(options.measurements), "overall": counts(scored),
+              "categories": {category: counts([row for row in scored if row["category"] == category]) for category in sorted({row["category"] for row in scored})},
+              "results": scored}
+    options.output.parent.mkdir(parents=True, exist_ok=True)
+    options.output.write_text(json.dumps(result, indent=2) + "\n")
+    print(json.dumps(result["overall"]))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    prepare_parser = commands.add_parser("prepare", help="augment synthetic inputs, preserving clean targets")
+    prepare_parser = commands.add_parser("prepare", help="prepare speech seeds with optional diagnostic stress variants")
     prepare_parser.add_argument("--kind", choices=("deep", "medium"), default="deep")
     prepare_parser.add_argument("--input-dir", type=Path, default=TRAINING / "generated")
     prepare_parser.add_argument("--output", type=Path, required=True)
+    prepare_parser.add_argument("--stress-profiles", action="store_true", help="optional bulk punctuation stress variants; not the default training mix")
+    prepare_parser.add_argument("--rules", type=Path, default=RULES)
     audio_parser = commands.add_parser("audio", help="speak original dictations, not cleaned targets")
     audio_parser.add_argument("--dataset", type=Path, required=True)
     audio_parser.add_argument("--output", type=Path, required=True)
-    audio_parser.add_argument("--limit", type=int, default=60)
+    audio_size = audio_parser.add_mutually_exclusive_group()
+    audio_size.add_argument("--limit", type=int, default=60)
+    audio_size.add_argument("--all", action="store_true", help="synthesize every non-placeholder source family")
     audio_parser.add_argument("--voice", default="Samantha")
     audio_parser.add_argument("--rate", type=int, default=180)
     merge_parser = commands.add_parser("merge-asr", help="import measured transcripts with audio/model provenance")
@@ -339,13 +483,21 @@ def main():
     merge_parser.add_argument("--audio-manifest", type=Path, required=True)
     merge_parser.add_argument("--transcripts", type=Path, action="append", required=True)
     merge_parser.add_argument("--include-synthetic", action="store_true",
-                              help="also include the synthetic stress variants; default is measured ASR only")
+                              help="also include the source bank; default is measured speech, placeholder rehearsal and bounded sound-alike inputs")
     merge_parser.add_argument("--output", type=Path, required=True)
+    merge_parser.add_argument("--rules", type=Path, default=RULES)
+    merge_parser.add_argument("--sound-alike-rate", type=float, default=0.1)
+    score_parser = commands.add_parser("score", help="score casing, punctuation, question marks and colons before comparing adapters")
+    score_parser.add_argument("--data", type=Path, required=True)
+    score_parser.add_argument("--measurements", type=Path, required=True)
+    score_parser.add_argument("--output", type=Path, required=True)
     options = parser.parse_args()
     if options.command == "audio" and (options.limit <= 0 or options.rate <= 0):
         parser.error("--limit and --rate must be positive")
+    if options.command == "merge-asr" and not 0 <= options.sound_alike_rate <= 0.2:
+        parser.error("--sound-alike-rate must be between 0 and 0.2")
     try:
-        {"prepare": prepare, "audio": audio, "merge-asr": merge_asr}[options.command](options)
+        {"prepare": prepare, "audio": audio, "merge-asr": merge_asr, "score": score}[options.command](options)
     except (ValueError, OSError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"error: {error}\n")
 

@@ -133,7 +133,9 @@ func trainDeep(_ options: TrainCommandOptions) async throws {
     )
     let trainFile = options.dataDirectory?.appending(path: "train.jsonl") ?? DeepPaths.generated(.train)
     let validFile = options.dataDirectory?.appending(path: "valid.jsonl") ?? DeepPaths.generated(.valid)
-    let train = try DeepExample.read(from: trainFile).map { TrainingItem($0, executor: executor) }
+    let examples = try DeepExample.read(from: trainFile)
+    let weighted = try options.dataDirectory.map { try expandPreparedData(examples, directory: $0, split: .train) } ?? examples
+    let train = weighted.map { TrainingItem($0, executor: executor) }
     let valid = try DeepExample.read(from: validFile).map { TrainingItem($0, executor: executor) }
     print("Training Deep's adapter on \(train.count) examples; validating on \(valid.count)")
 

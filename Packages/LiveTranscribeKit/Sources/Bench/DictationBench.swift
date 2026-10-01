@@ -121,6 +121,7 @@ enum DictationBench {
             SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         }
         let configHash = sha256(try Data(contentsOf: model.appending(path: "config.json")))
+        let weightsHash = try weightsFingerprint(in: model)
         let language = options.sttLanguage
         let transcriber = MLXTranscriber(modelID: model.path, language: { language })
         print("Loading speech model for \(clips.count) synthetic inputs")
@@ -132,7 +133,7 @@ enum DictationBench {
             let samples = try FileAudioSource.readSamples(from: clip.audio)
             let raw = try await transcriber.transcribe(samples, sampleRate: AudioFormat.sampleRate)
             let row = ASRInput(
-                id: clip.id, raw: raw, model: model.path, modelConfigSHA256: configHash,
+                id: clip.id, raw: raw, model: model.path, modelConfigSHA256: configHash, modelWeightsSHA256: weightsHash,
                 language: language ?? "auto",
                 audioSHA256: sha256(try Data(contentsOf: clip.audio))
             )
@@ -149,14 +150,38 @@ enum DictationBench {
         let raw: String
         let model: String
         let modelConfigSHA256: String
+        let modelWeightsSHA256: String
         let language: String
         let audioSHA256: String
 
         enum CodingKeys: String, CodingKey {
             case id, raw, model, language
             case modelConfigSHA256 = "model_config_sha256"
+            case modelWeightsSHA256 = "model_weights_sha256"
             case audioSHA256 = "audio_sha256"
         }
+    }
+
+    /// Hash actual weight bytes in bounded chunks; a config hash cannot identify model weights.
+    private static func weightsFingerprint(in folder: URL) throws -> String {
+        guard let files = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil) else {
+            throw BenchError.usage("cannot read model weights in \(folder.path)")
+        }
+        var hashes: [String: String] = [:]
+        for case let file as URL in files where ["safetensors", "npz"].contains(file.pathExtension) {
+            let handle = try FileHandle(forReadingFrom: file)
+            defer { try? handle.close() }
+            var hash = SHA256()
+            while let chunk = try handle.read(upToCount: 4 * 1024 * 1024), !chunk.isEmpty {
+                hash.update(data: chunk)
+            }
+            let name = String(file.path.dropFirst(folder.path.count + 1))
+            hashes[name] = hash.finalize().map { String(format: "%02x", $0) }.joined()
+        }
+        guard !hashes.isEmpty else { throw BenchError.usage("model folder has no safetensors or npz weights") }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        return SHA256.hash(data: try encoder.encode(hashes)).map { String(format: "%02x", $0) }.joined()
     }
 
     private static func configuration(

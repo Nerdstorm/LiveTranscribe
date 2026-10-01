@@ -1,0 +1,293 @@
+{
+  "version": 1,
+  "names": [
+    "Alice",
+    "Ben",
+    "Chloe",
+    "Daniel",
+    "Emma",
+    "Felix",
+    "Grace",
+    "Hannah",
+    "Isaac",
+    "Jack",
+    "Karen",
+    "Liam",
+    "Maya",
+    "Noah",
+    "Olivia",
+    "Peter",
+    "Rachel",
+    "Sam",
+    "Tara",
+    "Oscar",
+    "Uma",
+    "Victor",
+    "Wendy",
+    "Xavier",
+    "Yasmin",
+    "Zoe",
+    "Adrian",
+    "Bianca",
+    "Colin",
+    "Delia",
+    "Ava",
+    "Eli",
+    "Ivy",
+    "Otto",
+    "Ines",
+    "Anya",
+    "Kofi",
+    "Amara",
+    "Nia",
+    "Ravi",
+    "Arjun",
+    "Mei",
+    "Yuki",
+    "Kenji",
+    "Lena",
+    "Mateo",
+    "Sofia",
+    "Omar",
+    "Leila",
+    "Tariq",
+    "Zara",
+    "Ingrid",
+    "Siobhan",
+    "Niamh",
+    "Aoife",
+    "Ewan",
+    "Rhys",
+    "Aroha",
+    "Nikhil",
+    "Divya",
+    "Kiri",
+    "Hemi",
+    "Ula",
+    "Edda",
+    "Ada",
+    "Ida",
+    "Ona",
+    "Ari",
+    "Ezra",
+    "Uri",
+    "Oda",
+    "Pia",
+    "Teo",
+    "Juno",
+    "Rafe",
+    "Cleo",
+    "Nuno",
+    "Ilse",
+    "Bea",
+    "Kai",
+    "Lior",
+    "Suki",
+    "Dara",
+    "Tove",
+    "Imre",
+    "Asha",
+    "Enzo",
+    "Femi",
+    "Gita",
+    "Hana",
+    "Silva",
+    "Smith",
+    "Nguyen",
+    "Kowalski",
+    "Brown",
+    "Fernando",
+    "Taylor",
+    "Walsh",
+    "Moreno",
+    "Chen",
+    "Jayasuriya",
+    "Okafor",
+    "Moreau",
+    "Lindqvist",
+    "Haddad",
+    "Max",
+    "Madge",
+    "Foxhill"
+  ],
+  "spelling_variants": [
+    [
+      "centre",
+      "center"
+    ],
+    [
+      "grey",
+      "gray"
+    ],
+    [
+      "colour",
+      "color"
+    ],
+    [
+      "favour",
+      "favor"
+    ],
+    [
+      "organise",
+      "organize"
+    ],
+    [
+      "realise",
+      "realize"
+    ],
+    [
+      "licence",
+      "license"
+    ],
+    [
+      "travelling",
+      "traveling"
+    ]
+  ],
+  "sound_alikes": [
+    [
+      "macs",
+      "max"
+    ],
+    [
+      "merge",
+      "madge"
+    ],
+    [
+      "right",
+      "write",
+      "rite"
+    ],
+    [
+      "hear",
+      "here"
+    ],
+    [
+      "meet",
+      "meat"
+    ],
+    [
+      "their",
+      "there",
+      "they're"
+    ],
+    [
+      "your",
+      "you're"
+    ],
+    [
+      "its",
+      "it's"
+    ],
+    [
+      "then",
+      "than"
+    ],
+    [
+      "affect",
+      "effect"
+    ],
+    [
+      "loose",
+      "lose"
+    ],
+    [
+      "flour",
+      "flower"
+    ],
+    [
+      "mail",
+      "male"
+    ],
+    [
+      "week",
+      "weak"
+    ],
+    [
+      "whole",
+      "hole"
+    ],
+    [
+      "weather",
+      "whether"
+    ],
+    [
+      "whetstone",
+      "wet stone"
+    ],
+    [
+      "readme",
+      "read me"
+    ]
+  ],
+  "context_seeds": {
+    "train": [
+      {
+        "raw": "The max need a restart before the demo.",
+        "target": "The Macs need a restart before the demo."
+      },
+      {
+        "raw": "Please madge the branch after the checks pass.",
+        "target": "Please merge the branch after the checks pass."
+      },
+      {
+        "raw": "Can you review the p r and update the a p i notes?",
+        "target": "Can you review the PR and update the API notes?"
+      },
+      {
+        "raw": "Max sent the notes before lunch.",
+        "target": "Max sent the notes before lunch.",
+        "category": "facts"
+      },
+      {
+        "raw": "Madge will chair the planning meeting.",
+        "target": "Madge will chair the planning meeting.",
+        "category": "facts"
+      }
+    ],
+    "valid": [
+      {
+        "raw": "Both max have enough memory for the workshop.",
+        "target": "Both Macs have enough memory for the workshop."
+      },
+      {
+        "raw": "We can madge the patch this afternoon.",
+        "target": "We can merge the patch this afternoon."
+      },
+      {
+        "raw": "I asked Max to review the draft.",
+        "target": "I asked Max to review the draft.",
+        "category": "facts"
+      },
+      {
+        "raw": "Madge arrives on Thursday.",
+        "target": "Madge arrives on Thursday.",
+        "category": "facts"
+      }
+    ],
+    "test": [
+      {
+        "raw": "The lab's max are ready for the training session.",
+        "target": "The lab's Macs are ready for the training session."
+      },
+      {
+        "raw": "Could you madge the fix before the next release?",
+        "target": "Could you merge the fix before the next release?"
+      },
+      {
+        "raw": "The p r changes the a p i used by the mobile client.",
+        "target": "The PR changes the API used by the mobile client."
+      },
+      {
+        "raw": "Max booked the room for the workshop.",
+        "target": "Max booked the room for the workshop.",
+        "category": "facts"
+      },
+      {
+        "raw": "Please send the agenda to Madge.",
+        "target": "Please send the agenda to Madge.",
+        "category": "facts"
+      }
+    ]
+  }
+}

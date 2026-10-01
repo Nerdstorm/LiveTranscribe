@@ -4,6 +4,7 @@
 import argparse
 import copy
 import importlib.util
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -85,6 +86,29 @@ class PreparationTests(unittest.TestCase):
                     self.assertEqual(row["context"], ["Earlier sentence."])
                     self.assertTrue(row["letterBody"])
                     self.assertEqual(row["provenance"]["line"], 2)
+                self.assertEqual(len(prep.read_rows(root / "first" / f"{split}.jsonl")), 1)
+
+    def test_stress_profiles_are_opt_in(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+            for split in prep.SPLITS:
+                prep.write_rows(root / f"deep-{split}.jsonl", [example(f"A {split} zebra, not a horse?", split, split)])
+            prep.prepare(argparse.Namespace(kind="deep", input_dir=root, output=root / "stress", stress_profiles=True))
+            self.assertEqual(len(prep.read_rows(root / "stress/train.jsonl")), 4)
+            self.assertEqual(json.loads((root / "stress/preparation-report.json").read_text())["stage"], "stress-data")
+
+    def test_curated_training_keeps_the_shipped_double_weight(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+            source, training = root / "source", root / "training"
+            for split in prep.SPLITS:
+                prep.write_rows(source / f"{split}.jsonl", [example(f"A unique {split} zebra.", split, split, category="cleanup")])
+            prep.write_rows(training / "curated/train/work.jsonl", [{"raw": "A carefully curated sentence.", "target": "A carefully curated sentence.", "category": "cleanup"}])
+            with patch.object(prep, "TRAINING", training):
+                prep.prepare(argparse.Namespace(kind="medium", input_dir=source, output=root / "out"))
+            rows = prep.read_rows(root / "out/train.jsonl")
+            self.assertEqual(sorted(row["training_weight"] for row in rows), [1, 2])
+            self.assertEqual(json.loads((root / "out/preparation-report.json").read_text())["splits"]["train"]["training_weighted_examples"], 3)
 
     def test_held_out_eval_is_excluded_even_after_punctuation_change(self):
         with tempfile.TemporaryDirectory() as root:
@@ -120,13 +144,13 @@ class MeasuredASRTests(unittest.TestCase):
         self.addCleanup(self.scratch.cleanup)
         self.root = Path(self.scratch.name)
         self.data = {split: [example(f"A {split} zebra.", split, split)] for split in prep.SPLITS}
-        prep.save_dataset(self.root / "dataset", self.data, {})
+        prep.save_dataset(self.root / "dataset", self.data, {"kind": "deep"})
         self.original = self.data["train"][0]
         self.clip = {"id": "clip", "example": self.original, "spoken": self.original["raw"],
                      "audio_sha256": "audio", "tts": {"voice": "Samantha", "rate": 180}}
         prep.write_rows(self.root / "audio.jsonl", [self.clip])
         self.transcript = {"id": "clip", "raw": "a train zebra?", "model": "/pinned/model",
-                           "model_config_sha256": "model-config", "audio_sha256": "audio"}
+                           "model_config_sha256": "model-config", "model_weights_sha256": "model-weights", "audio_sha256": "audio"}
 
     def merge(self, transcripts, include_synthetic=False):
         prep.write_rows(self.root / "asr.jsonl", transcripts)
@@ -174,6 +198,131 @@ class MeasuredASRTests(unittest.TestCase):
         prep.write_rows(self.root / "audio.jsonl", [self.clip])
         with self.assertRaisesRegex(ValueError, "different dataset"):
             self.merge([self.transcript])
+
+    def test_placeholder_rehearsal_returns_at_the_source_family_rate(self):
+        token = example("Please send ⟦S1⟧ to the team.", "token", category="placeholder")
+        self.data["train"].append(token)
+        prep.save_dataset(self.root / "dataset", self.data, {"kind": "deep"})
+        self.merge([self.transcript])
+        rows = prep.read_rows(self.root / "merged/train.jsonl")
+        self.assertEqual(sum(row["profile"] == "placeholder-rehearsal" for row in rows), 1)
+        self.assertTrue(any(row["raw"] == token["raw"] and row["target"] == token["target"] for row in rows))
+
+    def test_sound_alike_inputs_are_whole_sentences_and_capped_by_family(self):
+        adjectives = "amber blue crimson dusty emerald frosted green hazel indigo jade".split()
+        originals = [example(f"Please merge the {adjective} patch.", f"sound-{i}", category="facts") for i, adjective in enumerate(adjectives)]
+        originals += [example(f"Max sent the {adjective} draft.", f"name-{i}", category="facts") for i, adjective in enumerate(adjectives)]
+        self.data["train"] = originals
+        prep.save_dataset(self.root / "dataset", self.data, {"kind": "deep"})
+        clips = [dict(self.clip, id=f"clip-{i}", example=row, spoken=row["raw"]) for i, row in enumerate(originals)]
+        transcripts = [dict(self.transcript, id=clip["id"], raw=clip["spoken"]) for clip in clips]
+        prep.write_rows(self.root / "audio.jsonl", clips)
+        self.merge(transcripts)
+        rows = prep.read_rows(self.root / "merged/train.jsonl")
+        phonetic = [row for row in rows if row["profile"] == "sound-alike"]
+        self.assertEqual(len(phonetic), 1)
+        self.assertTrue(phonetic[0]["raw"].startswith("Please madge the "))
+        self.assertTrue(phonetic[0]["target"].startswith("Please merge the "))
+        self.assertEqual(phonetic[0]["split"], "train")
+        self.assertEqual(phonetic[0]["provenance"]["kind"], "synthetic-sound-alike")
+
+
+class ReconciliationTests(unittest.TestCase):
+    def setUp(self):
+        self.policy = json.loads(prep.RULES.read_text())
+
+    def reconcile(self, spoken, heard, target=None, category="unchanged"):
+        return prep.reconcile({"raw": spoken, "target": target or spoken, "category": category}, spoken, heard, self.policy)
+
+    def test_name_spelling_adapts_target_without_guessing_the_name(self):
+        target, trail = self.reconcile("Siobhan sent the draft.", "Shavon sent the draft.")
+        self.assertEqual(target, "Shavon sent the draft.")
+        self.assertEqual(trail["status"], "automatic")
+        target, trail = self.reconcile("Foxhill Rovers won the final.", "Fox Hill Rovers won the final.")
+        self.assertEqual(target, "Fox Hill Rovers won the final.")
+        self.assertFalse(trail["unresolved"])
+
+    def test_name_to_pronoun_or_different_known_name_stays_unresolved(self):
+        for source, heard in (("Ewan", "You"), ("John", "Sam"), ("Mateo", "Maya"), ("Max", "Macs")):
+            _, trail = self.reconcile(f"{source} sent the draft.", f"{heard} sent the draft.")
+            self.assertEqual(trail["status"], "review")
+
+    def test_name_spelling_changes_only_the_matching_retained_occurrence(self):
+        target, trail = self.reconcile("Siobhan spoke to Siobhan.", "Shavon spoke to Siobhan.")
+        self.assertEqual(target, "Shavon spoke to Siobhan.")
+        self.assertFalse(trail["unresolved"])
+        target, trail = self.reconcile("Siobhan, sorry, Siobhan sent the draft.",
+                                       "Shavon, sorry, Siobhan sent the draft.",
+                                       target="Siobhan sent the draft.", category="same-sentence")
+        self.assertEqual(target, "Siobhan sent the draft.")
+        self.assertFalse(trail["unresolved"])
+
+    def test_digit_number_and_time_forms_preserve_values(self):
+        target, trail = self.reconcile("We need twenty laptops by two pm.", "We need 20 laptops by 2 p.m.")
+        self.assertEqual(target, "We need 20 laptops by 2 p.m.")
+        self.assertFalse(trail["unresolved"])
+        target, trail = self.reconcile("The meeting starts at two pm.", "The meeting starts at 2:00 p.m.")
+        self.assertEqual(target, "The meeting starts at 2:00 p.m.")
+        self.assertFalse(trail["unresolved"])
+        for source, heard in (("twenty two", "22"), ("twelfth", "12th"), ("seven thirty", "7:30"), ("1000th", "1,000th")):
+            _, trail = self.reconcile(f"It is {source}.", f"It is {heard}.")
+            self.assertFalse(trail["unresolved"], (source, heard, trail))
+
+    def test_number_change_is_never_reconciled_as_formatting(self):
+        _, trail = self.reconcile("We need twenty laptops.", "We need 21 laptops.")
+        self.assertEqual(trail["status"], "review")
+        for source, heard in (("001", "1"), ("-001", "-1"), ("v1.20", "v1.2"), ("v1.20", "v12.0"), ("123456789012345678901234567890", "123456789012345678901234567891")):
+            _, trail = self.reconcile(f"The identifier is {source}.", f"The identifier is {heard}.")
+            self.assertEqual(trail["status"], "review", (source, heard))
+
+    def test_changed_address_is_not_hidden_by_punctuation_normalization(self):
+        _, trail = self.reconcile("Visit https://example.com/ab.c today.", "Visit https://example.com/a.bc today.")
+        self.assertEqual(trail["status"], "review")
+
+    def test_spelling_and_contraction_forms_keep_the_recognizers_choice(self):
+        target, trail = self.reconcile("There's a grey sign at the centre.", "There is a gray sign at the center.")
+        self.assertEqual(target, "There is a gray sign at the center.")
+        self.assertFalse(trail["unresolved"])
+
+    def test_sound_alike_common_word_keeps_its_clean_target_in_context(self):
+        target, trail = self.reconcile("Please merge the patch after testing.", "Please Madge the patch after testing.")
+        self.assertEqual(target, "Please merge the patch after testing.")
+        self.assertFalse(trail["unresolved"])
+        self.assertTrue(any(change["rule"] == "sound-alike-retain-target" for change in trail["changes"]))
+
+    def test_recognizer_repair_of_a_planted_error_is_excluded(self):
+        target, trail = self.reconcile("Your right about the minutes.", "You're right about the minutes.", target="You're right about the minutes.", category="recognition")
+        self.assertEqual(trail["exclude_reason"], "planted-error-already-corrected")
+        self.assertEqual(target, "You're right about the minutes.")
+
+    def test_target_list_numbers_keep_their_layout(self):
+        target, trail = self.reconcile("Number one restart the phone then wait twenty seconds.", "Number 1 restart the phone then wait 20 seconds.", target="1. Restart the phone.\n2. Wait twenty seconds.", category="list-many")
+        self.assertEqual(target, "1. Restart the phone.\n2. Wait 20 seconds.")
+        self.assertFalse(trail["unresolved"])
+
+
+class ScoringTests(unittest.TestCase):
+    def test_word_normalized_match_cannot_hide_case_and_question_errors(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+            source = example("Are the Macs ready?", "case", "test", target="Are the Macs ready?")
+            prep.write_rows(root / "test.jsonl", [source])
+            measurement = {"results": [{"id": "case", "category": "unchanged", "raw": source["raw"], "target": source["target"], "shown": "are the macs ready."}]}
+            (root / "measured.json").write_text(json.dumps(measurement))
+            options = argparse.Namespace(data=root / "test.jsonl", measurements=root / "measured.json", output=root / "score.json")
+            prep.score(options)
+            counts = json.loads(options.output.read_text())["overall"]
+            self.assertEqual(counts["exact_text"], 0)
+            self.assertEqual(counts["case_sensitive_words"], 0)
+            self.assertEqual(counts["question_marks"], 0)
+            measurement["results"] = []
+            (root / "measured.json").write_text(json.dumps(measurement))
+            with self.assertRaisesRegex(ValueError, "exactly one"):
+                prep.score(options)
+            source["review_required"] = True
+            prep.write_rows(root / "test.jsonl", [source])
+            with self.assertRaisesRegex(ValueError, "review-required"):
+                prep.score(options)
 
 
 if __name__ == "__main__":

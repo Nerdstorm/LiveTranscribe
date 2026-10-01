@@ -28,8 +28,7 @@ optionally earlier lines as read-only context, exactly as the app sends them.
 | `cleanup` | Ordinary cleanup: casing and punctuation, and a doubled word may go | "the the build is green" → "The build is green." |
 
 - `curated/train/*.jsonl`: conversational examples from work, incidents, sales, cooking, teaching,
-  travel and daily life, in both a streaming style (lowercase, unpunctuated) and Parakeet's cased
-  style, trained on. They were drafted with an AI assistant and each one passes the validator.
+  travel and daily life, with historical lowercase punctuation stress inputs and cased inputs, trained on. They were drafted with an AI assistant and each one passes the validator.
 - `curated/test/*.jsonl`: examples written the same way and held out for evaluation only.
 - `generated/{train,valid,test}.jsonl` (not committed; `Train generate` recreates them): examples
   built from sentence frames and word pools by `ExampleGenerator`, reproducibly from a seed. The
@@ -41,118 +40,6 @@ optionally earlier lines as read-only context, exactly as the app sends them.
 `OutputGuard` (so the adapter is never taught output the app would reject), and each category
 may change the text only in its own way. The unit tests run the validator over the curated files
 and the generator's output.
-
-## ASR-style input preparation
-
-`make prepare-data` generates both existing synthetic datasets, prepares input variants in
-`Training/prepared/{medium,deep}`, and audits them with the current validators. It does not train
-or replace an adapter. Medium's dataset teaches the self-correction adapter used by High too.
-All prepared files, reports and audio are git-ignored.
-
-The expected output stays exactly as authored. Four input profiles keep the original, remove
-commas/colons/semicolons, replace separators with different marks, or lowercase text. They leave
-words, contractions, decimal numbers, times, dates, addresses, links, placeholder tokens and
-question marks intact. These are **synthetic stress variants**, not measured ASR errors. No word
-substitutions are invented. Variants stay with their source family in the original split; the
-script rejects normalized input overlap across splits or with held-out evaluation data.
-
-The report describes the category/profile mix and fingerprints the source files. The audit
-checks every candidate against the app's current guard and category rules and records each
-blocked row and dataset file hashes in `audit.json`. A nonzero exit means the data needs
-attention, not that generation failed: all candidates remain for inspection. The two-item-list checks
-require a colon and can reject a correct target when only input punctuation changes. Do not
-silently discard those examples or call the dataset ready to train.
-
-These profiles deliberately stress the model; their frequency is not an estimate of real ASR.
-LiveTranscribe-0300 found that actual ASR punctuation/casing is mostly sensible and the existing
-synthetic data overuses colons and unpunctuated inputs. Use measured transcripts to choose the
-training mix, including acronyms, questions and longer dictations. Expanding a stress corpus
-alone does not establish a more realistic training distribution.
-
-### Measured speech-to-text inputs
-
-Use the prepared original dictations as the **spoken** column. Do not speak their clean targets:
-that would remove the fillers and corrections the model needs to learn. The script selects a
-reproducible sample spread across categories and splits. Post-command placeholder tokens are
-not spoken to TTS; their text variants remain in the dataset.
-
-```bash
-python3 scripts/prepare-cleanup-data.py audio \
-  --dataset Packages/LiveTranscribeKit/Training/prepared/deep \
-  --output Packages/LiveTranscribeKit/Training/prepared/audio --limit 60 --voice Samantha
-```
-
-Build the package's `Bench` scheme with `xcodebuild`, as for `Train` below. From the package
-folder, export ASR output before any dictation rules or cleanup run:
-
-```bash
-.build/xcode/Build/Products/Release/Bench --dictation \
-  --clips Training/prepared/audio --stt-model /absolute/path/to/a/pinned/model-folder \
-  --asr-output Training/prepared/asr.jsonl
-```
-
-A local model folder is required to avoid a changing repository `main` or an older-download
-fallback. Use each speech model the app supports, in separate runs; another voice/rate can be
-another audio batch. Exported rows record the resolved model folder, configuration hash,
-language setting and audio hash. Keep the pinned model snapshot itself with the run: its config hash
-does not identify its weights.
-
-From the repository root:
-
-```bash
-python3 scripts/prepare-cleanup-data.py merge-asr \
-  --dataset Packages/LiveTranscribeKit/Training/prepared/deep \
-  --audio-manifest Packages/LiveTranscribeKit/Training/prepared/audio/audio-manifest.jsonl \
-  --transcripts Packages/LiveTranscribeKit/Training/prepared/asr.jsonl \
-  --output Packages/LiveTranscribeKit/Training/prepared/deep-asr
-```
-
-Import defaults to **measured ASR rows only**, separate from the synthetic stress corpus. Repeat
-`--transcripts` for another model's export of the same clips. `--include-synthetic` deliberately
-mixes in the stress variants for an experiment; it is not the default training distribution.
-
-Import keeps every ASR mark and capital, uses the original clean target, and retains the family
-split, context and field flags. It rejects missing/duplicate clip ids, mixed model identities,
-stale audio and audio from a different dataset. Word changes are marked `review_required`:
-inspect the spoken text, transcript and target, then set that flag to false only for a verified
-training pair. The current guard can still block that pair; audit reports both kinds of problem.
-
-Private Dictation History stays evaluation-only (LiveTranscribe-0243). The script rejects its
-`rawText`/`cleanedText` schema. Use independently reviewed intended outputs for private evaluation;
-the app's historical cleaned output is not automatically a correct answer.
-
-### Audit, baseline, then train
-
-From the package folder:
-
-```bash
-.build/xcode/Build/Products/Release/Train validate --deep \
-  --data-dir Training/prepared/deep-asr --report Training/prepared/deep-asr/audit.json
-.build/xcode/Build/Products/Release/Train measure --level deep \
-  --data Training/prepared/deep-asr/test.jsonl --report Training/prepared/deep-asr/baseline-deep.json
-.build/xcode/Build/Products/Release/Train measure --level high \
-  --data Training/prepared/deep-asr/test.jsonl --report Training/prepared/deep-asr/baseline-high.json
-```
-
-Keep held-out tests fixed across comparisons, include the existing Deep/layout and Medium
-regression sets, and inspect punctuation and question intent as well as word/layout scores.
-Exact punctuation isn't measured by the existing word-normalized matching alone. TTS is useful
-for repeatability, but real speech and private evaluation are needed to establish usefulness.
-
-After the audit passes, an explicit prepared directory can be trained without overwriting the
-original generated files:
-
-```bash
-.build/xcode/Build/Products/Release/Train train --deep \
-  --data-dir Training/prepared/deep-asr --revision <the-pinned-base-commit> \
-  --output Training/runs/deep-asr-candidate
-```
-
-Prepared-data training requires the full 40-character base commit, reruns the audit, loads that
-base and creates a fresh LoRA adapter; it does not resume the shipped adapter. It writes dataset
-file hashes beside the training report. Medium's prepared data uses the same commands without `--deep`; curated
-examples are already included once, so `--curated-repeats` does not apply to a prepared directory.
-Measure the candidate on the same holdouts before copying any weights into the app.
 
 ## Commands
 
@@ -246,7 +133,8 @@ example comes from anyone's dictation history**, and none from the hand-written 
 Validation and test get a tenth and an eighth of these. Training and validation also get 1,260 and
 126 of Medium's own examples (`ExampleGenerator`), a third of them in a field that takes several
 lines, so Deep keeps what Medium does. Examples the validator rejects are left out. Some raw texts
-are lowercase and unpunctuated like a streaming recognizer's, the rest cased like Parakeet's.
+are historical lowercase/punctuation stress cases; these are not a description of current
+speech-to-text output. The measured preparation workflow below replaces that input assumption.
 `generated/deep-*.jsonl` is not committed; `Train generate --deep` recreates it.
 
 The layout categories use `DeepLayoutFrames` (lists as packs of items with their intros, series
@@ -303,3 +191,171 @@ folder into `Sources/Cleanup/DeepAdapter/`. The Linux and Windows app compiles t
 
 Deep's measured results, and how the design was chosen, are in
 [Design notes](../../../docs/design-notes.md#how-deep-was-chosen); `measure` reproduces them.
+
+## Preparing speech-to-text training data
+
+The next recipe preserves the speech model's punctuation and capitals. The proposed choices
+are None, Standard and Deep; until that rename lands, the CLI calls Standard `high` and its
+self-correction adapter `medium`. `--kind medium` prepares that adapter's data.
+
+### Seeds and the candidate mix
+
+`make prepare-data` **regenerates** `Training/generated/` and writes speech seeds to
+`Training/prepared/{standard,deep}`. Seeds contain each original dictation once, including its
+fillers and self-corrections; the Deep seeds also include whole sentences for Macs/max,
+merge/Madge and spelled acronyms. Seeds are not the final training data: speak them and pass
+the audio through the app's speech models first. `Train --data-dir` refuses a seed or stress
+directory. All generated data, audio, exports and reports stay git-ignored.
+
+The default candidate recipe is:
+
+- One untouched measured transcript per clip per chosen speech model. Related inputs keep
+  their original family's training, validation or test split.
+- Placeholder rehearsal at the original pool's family rate, selected reproducibly. A full
+  audio run restores every placeholder family, including the 800 original Deep training
+  examples for emoji, snippets and list-marker tokens. No placeholder is spoken to TTS.
+  Training weights compensate for the number of speech models; a pilot gets a proportional
+  sample instead of being overwhelmed by all 800 rows.
+- Extra whole-sentence sound-alike inputs from the versioned allowlist, for at most 10% of
+  eligible Deep families. Clean controls remain. This is explicit synthetic augmentation,
+  labelled separately from measured transcripts; `--sound-alike-rate 0` disables it.
+- Curated self-correction training pairs retain their shipped **x2** weight through
+  `training_weight`; other pairs have x1. Validation and test pairs have x1. The first
+  preparation version included curated pairs once and changed that recipe; it is corrected.
+
+There is no default lowercasing or blanket comma removal. `make prepare-stress-data` is an
+optional diagnostic set with bulk punctuation/casing variants; it is separate from this
+recipe and must not be substituted for measured training data. `preparation-report.json`
+reports category/profile counts, weights, capitals, sentence lengths and separator rates.
+Inspect these before selecting a production mix: the old seed frames themselves are not a
+frequency fit to real dictation, and a small TTS pilot does not prove that they are.
+
+### Speak and transcribe
+
+From the repository root, synthesize a pilot; use `--all` instead of `--limit 60` for all
+non-placeholder families. Speak the original dictation, not its cleaned target, so fillers
+and corrections survive.
+
+```bash
+python3 scripts/prepare-cleanup-data.py audio \
+  --dataset Packages/LiveTranscribeKit/Training/prepared/deep \
+  --output Packages/LiveTranscribeKit/Training/prepared/audio --limit 60 --voice Samantha
+```
+
+Build the package's `Bench` scheme with `xcodebuild`, as for `Train` above. Use a pinned local
+speech-model snapshot from the app's cache:
+`~/.cache/huggingface/hub/models--OWNER--MODEL/snapshots/<full-commit>/`. For the default model,
+the directory starts with `models--Nerdstorm--Qwen3-ASR-0.6B-Sinhala-8bit`. Choose an actual
+installed snapshot, not its mutable `refs/main` file or the `mlx-audio` convenience alias.
+
+From `Packages/LiveTranscribeKit`, export speech output before dictation commands or cleanup:
+
+```bash
+.build/xcode/Build/Products/Release/Bench --dictation \
+  --clips Training/prepared/audio --stt-model /absolute/path/to/the/snapshot \
+  --asr-output Training/prepared/speech-default.jsonl
+```
+
+Repeat for each chosen recognizer on the same clips. Another voice/rate can be another batch.
+Exports fingerprint the actual weight bytes, model configuration, language setting and audio;
+the folder path or configuration alone cannot identify weights. Keep the audio manifest and
+exports with the run. The importer rejects mixed identities, duplicate/missing clips and stale
+audio or source examples.
+
+From the repository root:
+
+```bash
+python3 scripts/prepare-cleanup-data.py merge-asr \
+  --dataset Packages/LiveTranscribeKit/Training/prepared/deep \
+  --audio-manifest Packages/LiveTranscribeKit/Training/prepared/audio/audio-manifest.jsonl \
+  --transcripts Packages/LiveTranscribeKit/Training/prepared/speech-default.jsonl \
+  --output Packages/LiveTranscribeKit/Training/prepared/deep-measured
+```
+
+Repeat `--transcripts` for other recognizers. `--include-synthetic` explicitly adds the seed or
+stress bank for an experiment; it is outside the default mix above.
+
+### Reconcile targets automatically
+
+`speech-to-text-rules.json` versions the rules and synthetic context seeds. Import never edits
+the measured input. It changes the target only for these supported, auditable cases:
+
+| Speech output change | Target rule |
+|---|---|
+| A known synthetic name's spelling, such as Siobhan → Shavon | Keep the recognized spelling. A pronoun/common word or a different known name stays unresolved; Ewan → you and John → Sam are not safe spelling changes. |
+| Number/time representation, such as twenty → 20 or two pm → 2 p.m. | Require the same value, then use the recognized representation in retained prose. Keep target list numbering. A different value, sign or unsupported form needs review. |
+| Allowed regional spelling or contraction, such as centre → center or there's → there is | Use the speech model's form consistently in retained target text. |
+| An allowlisted sound-alike common word in context, such as merge → Madge | Keep the intended clean target; this is the word-repair signal. Preserve the original category in metadata when classifying a newly misheard sentence as recognition. |
+| The recognizer already fixed every planted grammar/word error | Exclude the pair and record it in `excluded.jsonl`; do not teach a word-fix category with no remaining word to fix. |
+| Any other insertion, deletion, changed fact or ambiguous name | Keep the pair visible with `review_required`; do not guess its target. |
+
+Every pair records its original `source_target`, rules version, changes and unresolved spans.
+Routine changes do not need hand editing. For an unresolved pair, inspect the synthetic spoken
+text/audio, transcript and intended output; edit its `target` only with evidence, add a review
+note to its reconciliation record, clear `review_required`, then re-audit. Exclusions remain
+inspectable rather than disappearing silently. Context, field flags and family splits stay fixed.
+
+Private Dictation History is **evaluation only**, read into the local scratchpad and never
+committed or used for training. The importer rejects its `rawText`/`cleanedText` schema. Its
+historical cleaned output is not automatically a correct expected answer.
+
+### Guard prerequisites, baseline and training
+
+**The current Deep checks are a prerequisite, not something retraining can overcome.** They
+require a colon before a two-item list. The first stress audit rejected 1,177 pairs, with
+901 output-guard failures and 736 colon-rule failures; those counts overlap. Deep's short-list
+policy must allow an unambiguous two-item lead without a colon in Swift and Rust, with matching
+guard/layout fixtures, before those pairs can train. Other sound-alike, number and acronym
+cases must also pass the runtime guard and the training category checks. The preparation tools
+do not widen those runtime rules or filter such failures away.
+
+From the package folder, audit the **merged** directory. A nonzero result writes every blocked
+row and dataset hash to `audit.json` and prevents training:
+
+```bash
+.build/xcode/Build/Products/Release/Train validate --deep \
+  --data-dir Training/prepared/deep-measured --report Training/prepared/deep-measured/audit.json
+.build/xcode/Build/Products/Release/Train measure --level deep \
+  --data Training/prepared/deep-measured/test.jsonl --report Training/prepared/deep-measured/baseline-deep.json
+```
+
+**An exact text score is required before comparing adapters.** The existing word-normalized
+verdict can count `Macs?` and `macs.` as equal. Score every held-out result, including fallbacks,
+with the additional tool; it reports exact text, case-sensitive words, and the positions of
+question marks and colons, by category. Missing or duplicate results fail scoring. Resolve or
+explicitly quarantine ambiguous pairs before freezing the test file; scoring refuses any
+remaining `review_required` label. Keep approved guard-failure cases in that held-out suite.
+
+```bash
+python3 scripts/prepare-cleanup-data.py score \
+  --data Packages/LiveTranscribeKit/Training/prepared/deep-measured/test.jsonl \
+  --measurements Packages/LiveTranscribeKit/Training/prepared/deep-measured/baseline-deep.json \
+  --output Packages/LiveTranscribeKit/Training/prepared/deep-measured/baseline-deep-exact.json
+```
+
+That scoring command runs from the repository root. Measure Standard with the current
+`--level high` flag and score it too. Keep the merged test file/hash fixed for baseline and
+candidate, include the existing Deep/layout and self-correction regression sets, and require
+no regression in names, negation, values, token preservation or questions. TTS gives repeatable
+inputs; held-out real speech and private evaluation are still needed before shipping.
+
+After the audit passes, start a **fresh LoRA from the pinned base**, not the shipped adapter.
+Find the base's full commit in `base_revision` in
+`Sources/Cleanup/DeepAdapter/adapter_config.json` (or `Sources/Cleanup/Adapter/adapter_config.json`
+for the self-correction adapter). From the package folder:
+
+```bash
+.build/xcode/Build/Products/Release/Train train --deep \
+  --data-dir Training/prepared/deep-measured --revision <full-base_revision-commit> \
+  --output Training/runs/deep-speech-candidate
+```
+
+Training reruns the audit and writes dataset hashes beside its report. The Standard adapter
+uses the same procedure without `--deep`, with `standard` seeds and the corresponding merged
+directory. `--curated-repeats` is replaced by each prepared row's recorded weight; its default
+recipe keeps curated training x2. Measure and exactly score the candidate on the unchanged
+holdouts before copying any weights into either app.
+
+Choose iterations from the report's weighted training count and batch size. Keeping 1,500
+iterations after adding another recognizer would reduce the passes over the data; the shipped
+Deep run was about 1.3 passes. Record that choice and the full recipe with each comparison.

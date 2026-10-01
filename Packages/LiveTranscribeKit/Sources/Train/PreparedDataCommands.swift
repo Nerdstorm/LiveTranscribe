@@ -12,11 +12,13 @@ func validatePreparedData(directory: URL, deep: Bool, report: URL?) throws -> Bo
         let split: String?
         let raw: String
         let reviewRequired: Bool?
+        let trainingWeight: Int?
 
         enum CodingKeys: String, CodingKey {
             case id, split, raw
             case familyID = "family_id"
             case reviewRequired = "review_required"
+            case trainingWeight = "training_weight"
         }
     }
     struct Issue: Encodable {
@@ -38,6 +40,13 @@ func validatePreparedData(directory: URL, deep: Bool, report: URL?) throws -> Bo
     var families: [String: String] = [:]
     var inputs: [String: String] = [:]
     var ids: Set<String> = []
+    let metadataFile = directory.appending(path: "preparation-report.json")
+    if FileManager.default.fileExists(atPath: metadataFile.path) {
+        let metadata = try JSONSerialization.jsonObject(with: Data(contentsOf: metadataFile)) as? [String: Any]
+        if let stage = metadata?["stage"] as? String, ["speech-seeds", "stress-data"].contains(stage) {
+            issues.append(Issue(file: metadataFile.path, line: 0, reasons: ["\(stage) is not a reconciled training dataset; synthesize and transcribe speech seeds first"]))
+        }
+    }
     let heldOut: Set<String>
     if deep {
         heldOut = try heldOutRaws().union(mediumTestRaws())
@@ -77,6 +86,7 @@ func validatePreparedData(directory: URL, deep: Bool, report: URL?) throws -> Bo
             } else { reasons.append("missing family_id") }
             if header.split != name { reasons.append("wrong split metadata") }
             if header.reviewRequired == true { reasons.append("ASR changed words; this pair needs a reviewed target") }
+            if !(1...10).contains(header.trainingWeight ?? 1) { reasons.append("training_weight must be an integer from 1 to 10") }
             let normalized = EditDistance.normalize(header.raw)
             if let previous = inputs[normalized], previous != name {
                 reasons.append("normalized input also occurs in \(previous)")
@@ -93,6 +103,19 @@ func validatePreparedData(directory: URL, deep: Bool, report: URL?) throws -> Bo
     if let report { try writeJSON(audit, to: report) }
     print(issues.isEmpty ? "Prepared data passes all checks." : "\(issues.count) rows need attention; candidates have not been removed.")
     return issues.isEmpty
+}
+
+private struct PreparedWeight: Decodable { let training_weight: Int? }
+
+/// Preserve the shipped curated x2 recipe and the placeholder family's contribution when
+/// multiple recognizers supply an input for each spoken source. Validation/test rows stay x1.
+func expandPreparedData<T>(_ examples: [T], directory: URL, split: DataSplit) throws -> [T] {
+    let file = directory.appending(path: "\(split.rawValue).jsonl")
+    let lines = try String(contentsOf: file, encoding: .utf8).components(separatedBy: "\n")
+        .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    let weights = try lines.map { try JSONDecoder().decode(PreparedWeight.self, from: Data($0.utf8)).training_weight ?? 1 }
+    guard weights.count == examples.count, weights.allSatisfy({ (1...10).contains($0) }) else { throw TrainError.invalidData }
+    return zip(examples, weights).flatMap { Array(repeating: $0.0, count: $0.1) }
 }
 
 /// Fingerprint the exact candidate files used by a prepared-data training run.
