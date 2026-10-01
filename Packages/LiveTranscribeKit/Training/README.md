@@ -42,6 +42,118 @@ optionally earlier lines as read-only context, exactly as the app sends them.
 may change the text only in its own way. The unit tests run the validator over the curated files
 and the generator's output.
 
+## ASR-style input preparation
+
+`make prepare-data` generates both existing synthetic datasets, prepares input variants in
+`Training/prepared/{medium,deep}`, and audits them with the current validators. It does not train
+or replace an adapter. Medium's dataset teaches the self-correction adapter used by High too.
+All prepared files, reports and audio are git-ignored.
+
+The expected output stays exactly as authored. Four input profiles keep the original, remove
+commas/colons/semicolons, replace separators with different marks, or lowercase text. They leave
+words, contractions, decimal numbers, times, dates, addresses, links, placeholder tokens and
+question marks intact. These are **synthetic stress variants**, not measured ASR errors. No word
+substitutions are invented. Variants stay with their source family in the original split; the
+script rejects normalized input overlap across splits or with held-out evaluation data.
+
+The report describes the category/profile mix and fingerprints the source files. The audit
+checks every candidate against the app's current guard and category rules and records each
+blocked row and dataset file hashes in `audit.json`. A nonzero exit means the data needs
+attention, not that generation failed: all candidates remain for inspection. The two-item-list checks
+require a colon and can reject a correct target when only input punctuation changes. Do not
+silently discard those examples or call the dataset ready to train.
+
+These profiles deliberately stress the model; their frequency is not an estimate of real ASR.
+LiveTranscribe-0300 found that actual ASR punctuation/casing is mostly sensible and the existing
+synthetic data overuses colons and unpunctuated inputs. Use measured transcripts to choose the
+training mix, including acronyms, questions and longer dictations. Expanding a stress corpus
+alone does not establish a more realistic training distribution.
+
+### Measured speech-to-text inputs
+
+Use the prepared original dictations as the **spoken** column. Do not speak their clean targets:
+that would remove the fillers and corrections the model needs to learn. The script selects a
+reproducible sample spread across categories and splits. Post-command placeholder tokens are
+not spoken to TTS; their text variants remain in the dataset.
+
+```bash
+python3 scripts/prepare-cleanup-data.py audio \
+  --dataset Packages/LiveTranscribeKit/Training/prepared/deep \
+  --output Packages/LiveTranscribeKit/Training/prepared/audio --limit 60 --voice Samantha
+```
+
+Build the package's `Bench` scheme with `xcodebuild`, as for `Train` below. From the package
+folder, export ASR output before any dictation rules or cleanup run:
+
+```bash
+.build/xcode/Build/Products/Release/Bench --dictation \
+  --clips Training/prepared/audio --stt-model /absolute/path/to/a/pinned/model-folder \
+  --asr-output Training/prepared/asr.jsonl
+```
+
+A local model folder is required to avoid a changing repository `main` or an older-download
+fallback. Use each speech model the app supports, in separate runs; another voice/rate can be
+another audio batch. Exported rows record the resolved model folder, configuration hash,
+language setting and audio hash. Keep the pinned model snapshot itself with the run: its config hash
+does not identify its weights.
+
+From the repository root:
+
+```bash
+python3 scripts/prepare-cleanup-data.py merge-asr \
+  --dataset Packages/LiveTranscribeKit/Training/prepared/deep \
+  --audio-manifest Packages/LiveTranscribeKit/Training/prepared/audio/audio-manifest.jsonl \
+  --transcripts Packages/LiveTranscribeKit/Training/prepared/asr.jsonl \
+  --output Packages/LiveTranscribeKit/Training/prepared/deep-asr
+```
+
+Import defaults to **measured ASR rows only**, separate from the synthetic stress corpus. Repeat
+`--transcripts` for another model's export of the same clips. `--include-synthetic` deliberately
+mixes in the stress variants for an experiment; it is not the default training distribution.
+
+Import keeps every ASR mark and capital, uses the original clean target, and retains the family
+split, context and field flags. It rejects missing/duplicate clip ids, mixed model identities,
+stale audio and audio from a different dataset. Word changes are marked `review_required`:
+inspect the spoken text, transcript and target, then set that flag to false only for a verified
+training pair. The current guard can still block that pair; audit reports both kinds of problem.
+
+Private Dictation History stays evaluation-only (LiveTranscribe-0243). The script rejects its
+`rawText`/`cleanedText` schema. Use independently reviewed intended outputs for private evaluation;
+the app's historical cleaned output is not automatically a correct answer.
+
+### Audit, baseline, then train
+
+From the package folder:
+
+```bash
+.build/xcode/Build/Products/Release/Train validate --deep \
+  --data-dir Training/prepared/deep-asr --report Training/prepared/deep-asr/audit.json
+.build/xcode/Build/Products/Release/Train measure --level deep \
+  --data Training/prepared/deep-asr/test.jsonl --report Training/prepared/deep-asr/baseline-deep.json
+.build/xcode/Build/Products/Release/Train measure --level high \
+  --data Training/prepared/deep-asr/test.jsonl --report Training/prepared/deep-asr/baseline-high.json
+```
+
+Keep held-out tests fixed across comparisons, include the existing Deep/layout and Medium
+regression sets, and inspect punctuation and question intent as well as word/layout scores.
+Exact punctuation isn't measured by the existing word-normalized matching alone. TTS is useful
+for repeatability, but real speech and private evaluation are needed to establish usefulness.
+
+After the audit passes, an explicit prepared directory can be trained without overwriting the
+original generated files:
+
+```bash
+.build/xcode/Build/Products/Release/Train train --deep \
+  --data-dir Training/prepared/deep-asr --revision <the-pinned-base-commit> \
+  --output Training/runs/deep-asr-candidate
+```
+
+Prepared-data training requires the full 40-character base commit, reruns the audit, loads that
+base and creates a fresh LoRA adapter; it does not resume the shipped adapter. It writes dataset
+file hashes beside the training report. Medium's prepared data uses the same commands without `--deep`; curated
+examples are already included once, so `--curated-repeats` does not apply to a prepared directory.
+Measure the candidate on the same holdouts before copying any weights into the app.
+
 ## Commands
 
 From the repository root, `make train ARGS="<command>"` builds the tool and runs one command, for

@@ -34,7 +34,7 @@ check-version = @echo '$(VERSION)' | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$$' \
 	|| { echo 'Set VERSION to the release, for example: make $@ VERSION=0.1.0' >&2; exit 2; }
 
 .PHONY: help build run resolve test test-integration prompt-probe golden audio dictation-audio bench eval \
-	train doctor release-test changelog tag appcast acknowledgements icons logs site clean
+	train prepare-data doctor release-test changelog tag appcast acknowledgements icons logs site clean
 
 help: ## List the targets
 	@echo 'Usage: make <target> [VERSION=x.y.z] [ARGS="..."]'
@@ -67,6 +67,7 @@ test: ## Unit tests, which need no models
 	scripts/tests/release-notes-tests.sh
 	scripts/tests/fetch-release-tests.sh
 	scripts/tests/check-swift-runtime-tests.sh
+	python3 scripts/tests/prepare-cleanup-data-tests.py
 
 test-integration: audio ## End-to-end tests with the real models, which they download (about 2 GB)
 	cd $(PACKAGE) && TEST_RUNNER_LT_RUN_MODEL_TESTS=1 $(PACKAGE_TESTS) -only-testing:IntegrationTests
@@ -105,6 +106,17 @@ train: ## Run the adapter's Train tool (ARGS="generate", "validate", "train" or 
 	@[ -n "$(ARGS)" ] || { echo 'Say what to run, for example: make train ARGS="evaluate --no-adapter"' >&2; exit 2; }
 	$(call build-tool,Train)
 	cd $(PACKAGE) && $(TOOLS)/Train $(ARGS)
+
+prepare-data: ## Prepare synthetic ASR-style inputs and report rows needing attention; no model training
+	$(call build-tool,Train)
+	cd $(PACKAGE) && $(TOOLS)/Train generate
+	cd $(PACKAGE) && $(TOOLS)/Train generate --deep
+	python3 scripts/prepare-cleanup-data.py prepare --kind medium --output $(PACKAGE)/Training/prepared/medium
+	python3 scripts/prepare-cleanup-data.py prepare --kind deep --output $(PACKAGE)/Training/prepared/deep
+	@status=0; \
+	  (cd $(PACKAGE) && $(TOOLS)/Train validate --data-dir Training/prepared/medium --report Training/prepared/medium/audit.json) || status=1; \
+	  (cd $(PACKAGE) && $(TOOLS)/Train validate --deep --data-dir Training/prepared/deep --report Training/prepared/deep/audit.json) || status=1; \
+	  exit $$status
 
 ##@ Release (docs/releasing.md)
 

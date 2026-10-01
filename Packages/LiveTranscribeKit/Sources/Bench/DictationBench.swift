@@ -1,5 +1,6 @@
 import Capture
 import Cleanup
+import CryptoKit
 import Dictation
 import Foundation
 import Shared
@@ -71,6 +72,10 @@ enum DictationBench {
     static func run(options: BenchOptions, settings: AppSettings) async throws {
         let clips = try Clip.load(from: options.clipsDirectory)
         guard !clips.isEmpty else { throw BenchError.noFixtures(options.clipsDirectory.path) }
+        if let output = options.asrOutput {
+            try await exportTranscripts(clips, options: options, settings: settings, to: output)
+            return
+        }
         let levels = options.levels ?? CleanupLevel.allCases
 
         let language = options.sttLanguage
@@ -101,6 +106,57 @@ enum DictationBench {
             }
         }
         report(results, levels: levels, clips: clips.count, options: options)
+    }
+
+    /// TTS clips are synthetic. Preserve ASR's words, punctuation and casing before any of
+    /// DictationProcessor's commands, vocabulary, layout rules or LLM cleanup run.
+    private static func exportTranscripts(
+        _ clips: [Clip], options: BenchOptions, settings: AppSettings, to output: URL
+    ) async throws {
+        guard case .folder(let folder) = try SpeechModelLocation(setting: settings.sttModel) else {
+            throw BenchError.usage("ASR export needs a local pinned model folder")
+        }
+        let model = folder.resolvingSymlinksInPath().standardizedFileURL
+        func sha256(_ data: Data) -> String {
+            SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        }
+        let configHash = sha256(try Data(contentsOf: model.appending(path: "config.json")))
+        let language = options.sttLanguage
+        let transcriber = MLXTranscriber(modelID: model.path, language: { language })
+        print("Loading speech model for \(clips.count) synthetic inputs")
+        try await transcriber.load { _ in }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        var lines: [String] = []
+        for (index, clip) in clips.enumerated() {
+            let samples = try FileAudioSource.readSamples(from: clip.audio)
+            let raw = try await transcriber.transcribe(samples, sampleRate: AudioFormat.sampleRate)
+            let row = ASRInput(
+                id: clip.id, raw: raw, model: model.path, modelConfigSHA256: configHash,
+                language: language ?? "auto",
+                audioSHA256: sha256(try Data(contentsOf: clip.audio))
+            )
+            lines.append(String(decoding: try encoder.encode(row), as: UTF8.self))
+            if (index + 1) % 10 == 0 { print("Transcribed \(index + 1)/\(clips.count) inputs") }
+        }
+        try FileManager.default.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try (lines.joined(separator: "\n") + "\n").write(to: output, atomically: true, encoding: .utf8)
+        print("Saved \(lines.count) ASR inputs to \(output.path)")
+    }
+
+    private struct ASRInput: Encodable {
+        let id: String
+        let raw: String
+        let model: String
+        let modelConfigSHA256: String
+        let language: String
+        let audioSHA256: String
+
+        enum CodingKeys: String, CodingKey {
+            case id, raw, model, language
+            case modelConfigSHA256 = "model_config_sha256"
+            case audioSHA256 = "audio_sha256"
+        }
     }
 
     private static func configuration(
