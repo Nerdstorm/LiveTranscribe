@@ -63,7 +63,8 @@ pub enum FallbackReason {
     InvalidRepair,
     /// Deep broke the text into lines for a field that takes one line.
     LayoutNotAllowed,
-    /// Deep made a bulleted list of fewer than three items, of things said in a sentence.
+    /// Deep made a bulleted list of fewer than three items, of things said in a sentence; two items
+    /// after a colon the speaker said are allowed.
     ShortList,
     /// Deep put a placeholder on a line of its own, such as an emoji below the sentence it ended.
     PlaceholderOnItsOwnLine,
@@ -229,12 +230,17 @@ impl OutputGuard {
             let placeholders = WordSet::normalized(&options.placeholders);
             // Layout the model made, which the text it was given didn't have.
             let short_lists = |text: &str| {
-                self_repair::bulleted_list_lengths(text)
+                self_repair::bulleted_lists(text)
                     .into_iter()
-                    .filter(|&items| items < self_repair::MIN_BULLETED_ITEMS)
-                    .count()
+                    .filter(|list| list.items.len() < self_repair::MIN_BULLETED_ITEMS)
+                    .collect::<Vec<_>>()
             };
-            if short_lists(cleaned) > short_lists(raw) {
+            // Two things the speaker set off with a colon are a list, as in "a few things: A and B".
+            let new_short_lists = short_lists(cleaned)
+                .into_iter()
+                .filter(|list| !(list.items.len() == 2 && self_repair::is_set_off_by_colon(list, raw)))
+                .count();
+            if new_short_lists > short_lists(raw).len() {
                 return reject(FallbackReason::ShortList);
             }
             if self_repair::placeholder_line_count(cleaned, &placeholders)

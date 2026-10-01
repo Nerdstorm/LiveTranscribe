@@ -10,7 +10,7 @@ use lt_shared::swift_string::{self as s};
 
 use crate::GuardPolicy;
 use crate::word_forms;
-use crate::words::{WordSet, normalized_words, same};
+use crate::words::{WordSet, normalized_words, same, starts_with};
 use alignment::Alignment;
 
 /// Longest correction phrase after a cue, and the stretch in which a garbled one may be repaired.
@@ -18,7 +18,8 @@ const CORRECTION_PHRASE_WORDS: usize = 6;
 /// Most words a repair may add to or change in one correction phrase.
 const MAX_REPAIR_WORDS: usize = 2;
 /// Fewest items in a bulleted list the model makes: two things said in a sentence ("the invoice and
-/// the agreement") stay in it. A numbered list may have two, as when they were counted.
+/// the agreement") stay in it, unless the speaker's text set them off with a colon
+/// ([`is_set_off_by_colon`]). A numbered list may have two, as when they were counted.
 pub(crate) const MIN_BULLETED_ITEMS: usize = 3;
 
 /// Checks Deep's output: that it can be made from the text the model was given by the edits a
@@ -50,8 +51,9 @@ pub(crate) const MIN_BULLETED_ITEMS: usize = 3;
 /// - a list's numbers or bullets put in place of the words said to mark its items.
 ///
 /// The layout is checked too (`OutputGuard`): a bulleted list has at least [`MIN_BULLETED_ITEMS`]
-/// items, since two things said in a sentence stay in it, and no line holds only placeholders, as
-/// when an emoji is moved below the sentence it ended.
+/// items, since two things said in a sentence stay in it, unless what was said already set them
+/// off with a colon ("a few things we need: getting feeds working and releasing the fix"), and no
+/// line holds only placeholders, as when an emoji is moved below the sentence it ended.
 ///
 /// Names, numbers, negations and words of time are kept as said everywhere else: none may be
 /// added, dropped or changed, and no other new word may appear, so the model can't add a claim
@@ -362,23 +364,74 @@ fn is_bulleted(line: &str) -> bool {
     })
 }
 
-/// How many items each bulleted list in `text` has: a list is a run of lines that start with a
-/// bullet, which a blank line or any other line ends.
-pub(crate) fn bulleted_list_lengths(text: &str) -> Vec<usize> {
-    let mut lengths = Vec::new();
-    let mut run = 0;
+/// A bulleted list in a text: a run of lines that start with a bullet, which a blank line or any
+/// other line ends.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct BulletedList {
+    /// The last line with text before the list, `None` at the start of the text.
+    pub(crate) lead: Option<String>,
+    /// The text of each item, bullet and space taken off.
+    pub(crate) items: Vec<String>,
+}
+
+/// The bulleted lists in `text`.
+pub(crate) fn bulleted_lists(text: &str) -> Vec<BulletedList> {
+    let mut lists = Vec::new();
+    let mut lead: Option<String> = None;
+    let mut list_lead: Option<String> = None;
+    let mut items: Vec<String> = Vec::new();
     for line in s::split_where(text, usize::MAX, false, s::is_newline) {
         if is_bulleted(line) {
-            run += 1;
-        } else if run > 0 {
-            lengths.push(run);
-            run = 0;
+            if items.is_empty() {
+                list_lead = lead.clone();
+            }
+            let trimmed = s::drop_while(line, s::is_whitespace);
+            let after_bullet = s::drop_first(trimmed, 1);
+            items.push(s::drop_while(after_bullet, s::is_whitespace).to_owned());
+            lead = Some(line.to_owned());
+        } else {
+            if !items.is_empty() {
+                lists.push(BulletedList {
+                    lead: list_lead.clone(),
+                    items: std::mem::take(&mut items),
+                });
+            }
+            if !s::characters(line).all(s::is_whitespace) {
+                lead = Some(line.to_owned());
+            }
         }
     }
-    if run > 0 {
-        lengths.push(run);
+    if !items.is_empty() {
+        lists.push(BulletedList { lead: list_lead, items });
     }
-    lengths
+    lists
+}
+
+/// Whether the speaker's text `said` already set the list off with a colon: the list's lead line
+/// ends with one, and the words that end the lead (up to three) come right before a colon in `said`.
+/// So the model laid out what was said ("…focus on: getting feeds working and releasing the fix")
+/// and did not make a list of two things in a sentence. A word fixed inside the items doesn't
+/// matter, only the words that lead into them.
+pub(crate) fn is_set_off_by_colon(list: &BulletedList, said: &str) -> bool {
+    let Some(lead) = list
+        .lead
+        .as_deref()
+        .map(|lead| s::trimming(lead, s::CharacterSet::Whitespaces))
+        .filter(|lead| s::has_suffix(lead, ":"))
+    else {
+        return false;
+    };
+    let words = normalized_words(lead);
+    let ending = &words[words.len().saturating_sub(3)..];
+    if ending.is_empty() {
+        return false;
+    }
+    s::character_indices(said)
+        .filter(|&(_, character)| s::canonically_equal(character, ":"))
+        .any(|(index, _)| {
+            let before = normalized_words(&said[..index]);
+            before.len() >= ending.len() && starts_with(&before[before.len() - ending.len()..], ending)
+        })
 }
 
 /// How many lines of `text` hold placeholders and nothing else, list markers and punctuation aside.

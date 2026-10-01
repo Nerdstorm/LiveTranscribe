@@ -1,4 +1,4 @@
-import Cleanup
+@testable import Cleanup
 import Testing
 
 @Suite("OutputGuard: Deep's repairs")
@@ -280,6 +280,40 @@ struct SelfRepairTests {
             review("Two things: number one, call the bank. Number two, email Sarah.", numbered, multiline: true) == .accepted(numbered),
             "a numbered list may have two items, as when they were counted"
         )
+    }
+
+    @Test func allowsABulletedListOfTwoThingsTheSpeakerSetOffWithAColon() {
+        let said = "few things we need to focus on: getting active feeds working and releasing the hot fix before end of the week"
+        let cleaned = "A few things we need to focus on:\n- Getting active feeds working\n- Releasing the hot fix before end of the week"
+        #expect(review(said, cleaned, multiline: true) == .accepted(cleaned))
+        let spaced = cleaned.replacingOccurrences(of: "on:\n", with: "on:\n\n")
+        #expect(review(said, spaced, multiline: true) == .accepted(spaced), "a blank line between the lead and the list is fine")
+        #expect(
+            review(said.replacingOccurrences(of: "on:", with: "on"), cleaned, multiline: true) == .rejected(.shortList),
+            "with no colon said, they stay in the sentence"
+        )
+        #expect(
+            review("reminder: i've attached the invoice and the signed agreement", "Reminder: I've attached:\n- The invoice\n- The signed agreement", multiline: true)
+                == .rejected(.shortList),
+            "a colon elsewhere in the text doesn't set the list off"
+        )
+        #expect(
+            review("two things: call the bank and email sarah", "Two things:\n- Call the bank", multiline: true) == .rejected(.shortList),
+            "one item is never a list"
+        )
+    }
+
+    @Test func eachBulletedListHasTheLineBeforeIt() {
+        let lists = SelfRepair.bulletedLists(in: "Two things:\n- a\n- b\n\n- c\n- d\nAnd also:\n- e")
+        #expect(lists.map(\.lead) == ["Two things:", "- b", "And also:"], "a second list doesn't take the first one's lead")
+        #expect(lists.map(\.items) == [["a", "b"], ["c", "d"], ["e"]])
+        #expect(SelfRepair.bulletedLists(in: "- a\n- b").map(\.lead) == [nil])
+    }
+
+    @Test func aListSetOffByAColonIsMatchedAsTextNotAsBytes() {
+        let said = "we need the cafe\u{301} menu: soup and bread"
+        let cleaned = "We need the caf\u{E9} menu:\n- Soup\n- Bread"
+        #expect(review(said, cleaned, multiline: true) == .accepted(cleaned), "an accent written either way is the same word")
     }
 
     @Test func rejectsAPlaceholderOnALineOfItsOwn() {

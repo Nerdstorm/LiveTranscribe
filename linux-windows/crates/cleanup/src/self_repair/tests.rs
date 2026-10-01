@@ -553,6 +553,27 @@ fn rejects_a_bulleted_list_of_two_things_said_in_a_sentence() {
 }
 
 #[test]
+fn each_bulleted_list_has_the_line_before_it() {
+    let lists = super::bulleted_lists("Two things:\n- a\n- b\n\n- c\n- d\nAnd also:\n- e");
+    let leads: Vec<Option<&str>> = lists.iter().map(|list| list.lead.as_deref()).collect();
+    assert_eq!(leads, [Some("Two things:"), Some("- b"), Some("And also:")]);
+    let items: Vec<&[String]> = lists.iter().map(|list| list.items.as_slice()).collect();
+    assert_eq!(items, [&["a", "b"][..], &["c", "d"][..], &["e"][..]]);
+    assert_eq!(super::bulleted_lists("- a\n- b")[0].lead, None);
+}
+
+#[test]
+fn a_list_set_off_by_a_colon_is_matched_as_text_not_as_bytes() {
+    let said = "we need the cafe\u{301} menu: soup and bread";
+    let cleaned = "We need the caf\u{E9} menu:\n- Soup\n- Bread";
+    assert_eq!(
+        review_in(said, cleaned, true),
+        accepted(cleaned),
+        "an accent written either way is the same word"
+    );
+}
+
+#[test]
 fn rejects_a_placeholder_on_a_line_of_its_own() {
     let emoji = ["⟦E1⟧"];
     assert_eq!(
