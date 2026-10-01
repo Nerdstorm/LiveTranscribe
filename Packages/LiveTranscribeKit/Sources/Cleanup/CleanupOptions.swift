@@ -17,11 +17,21 @@ public struct CleanupOptions: Sendable, Equatable {
     /// lay the text out. Only Deep lays text out itself (emails, letters and lists); spoken line
     /// breaks and list markers come back as placeholders, which the layout rules lay out.
     public var multiline: Bool
+    /// The text is the body of a letter or email, whose greeting and sign-off the app lays out
+    /// itself (``LetterFrame``), so Deep writes neither.
+    public var letterBody: Bool
 
-    public init(level: CleanupLevel, vocabulary: [String] = [], placeholders: [String] = [], multiline: Bool = false) {
+    public init(
+        level: CleanupLevel,
+        vocabulary: [String] = [],
+        placeholders: [String] = [],
+        multiline: Bool = false,
+        letterBody: Bool = false
+    ) {
         self.level = level
         self.vocabulary = vocabulary
         self.placeholders = placeholders
         self.multiline = multiline
+        self.letterBody = letterBody
     }
 }

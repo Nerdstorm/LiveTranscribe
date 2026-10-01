@@ -80,6 +80,22 @@ struct PromptBuilderTests {
         #expect(PromptBuilder.placeholderRule(["⟦S1⟧", "⟦S2⟧", "⟦S1⟧"]) == "Copy each of these tokens exactly once, unchanged: ⟦S1⟧, ⟦S2⟧.")
     }
 
+    @Test func deepIsToldWhenTheTextIsAnEmailsBody() {
+        let body = lines(adapted.template(for: CleanupOptions(level: .deep, multiline: true, letterBody: true)))
+        let email = lines(adapted.template(for: CleanupOptions(level: .deep, multiline: true)))
+        #expect(body.contains { $0.hasPrefix("The TEXT is the body of an email; its greeting and sign-off are added separately") })
+        #expect(!body.contains { $0.hasPrefix("Lay the text out the way it would be written") })
+        #expect(email.contains { $0.hasPrefix("Lay the text out the way it would be written") })
+        #expect(body.count == 9 && email.count == 9)
+        #expect(body[6] != email[6], "only the layout rule differs")
+        #expect(body.prefix(6) == email.prefix(6) && body.dropFirst(7) == email.dropFirst(7))
+
+        let oneLine = adapted.template(for: CleanupOptions(level: .deep, letterBody: true))
+        #expect(oneLine == adapted.template(for: CleanupOptions(level: .deep)), "where lines are not allowed the flag changes nothing")
+        #expect(adapted.template(for: CleanupOptions(level: .medium, multiline: true, letterBody: true))
+            == adapted.template(for: CleanupOptions(level: .medium, multiline: true)), "and so does it below Deep")
+    }
+
     @Test func anOverrideIsUsedForEveryLevel() {
         let fixed = PromptTemplate(system: "Fix it.", examples: [])
         let builder = PromptBuilder(adapted: true, override: fixed)

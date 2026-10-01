@@ -55,7 +55,8 @@ vocabulary (Linux and Windows have none yet).
   care", "Talk soon") counts before a name, or
   with no name after a body of two sentences or more or a spoken list, so a one-line chat message
   ("Hi John, can you send it? Thanks") stays as it is. The greeting and the sign-off get lines of
-  their own, and only the body goes to the model.
+  their own, and only the body goes to the model; Deep, in a field that takes several lines, is
+  told that it is an email's body, which has no greeting or sign-off to write.
 - **Where line breaks are allowed.** Lists, letters and "new line" get line breaks only in a
   field that takes several lines. In a field that takes one line, and on the Mac in an app you set
   to single-line, they stay in the sentence

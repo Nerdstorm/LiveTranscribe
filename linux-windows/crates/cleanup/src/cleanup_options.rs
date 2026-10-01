@@ -18,6 +18,9 @@ pub struct CleanupOptions {
     /// lay the text out. Only Deep lays text out itself (emails, letters and lists); spoken line
     /// breaks and list markers come back as placeholders, which the layout rules lay out.
     pub multiline: bool,
+    /// The text is the body of a letter or email, whose greeting and sign-off the app lays out
+    /// itself (`LetterFrame`), so Deep writes neither.
+    pub letter_body: bool,
 }
 
 impl CleanupOptions {
@@ -29,6 +32,7 @@ impl CleanupOptions {
             vocabulary: Vec::new(),
             placeholders: Vec::new(),
             multiline: false,
+            letter_body: false,
         }
     }
 }

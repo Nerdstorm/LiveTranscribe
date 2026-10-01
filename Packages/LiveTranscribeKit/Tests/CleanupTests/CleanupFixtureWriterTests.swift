@@ -83,12 +83,15 @@ enum CleanupFixtures {
         let vocabulary: [String]
         let placeholders: [String]
         let multiline: Bool
+        /// Written only when set, so the cases before the flag are unchanged.
+        let letterBody: Bool?
 
         init(_ options: CleanupOptions) {
             level = options.level.rawValue
             vocabulary = options.vocabulary
             placeholders = options.placeholders
             multiline = options.multiline
+            letterBody = options.letterBody ? true : nil
         }
     }
 

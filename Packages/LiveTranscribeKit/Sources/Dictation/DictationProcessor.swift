@@ -135,7 +135,8 @@ public struct DictationProcessor: Sendable {
                 ).relevantTerms(for: body, limit: configuration.vocabularyPromptLimit),
                 placeholders: prepared.placeholders.filter { body.contains($0) },
                 // What the speaker laid out, the layout rules lay out, so the model keeps one paragraph.
-                multiline: configuration.multiline && !prepared.hasSpokenLayout(in: body)
+                multiline: configuration.multiline && !prepared.hasSpokenLayout(in: body),
+                letterBody: frame != nil
             )
             cleaned = await cleaner.clean(segment, context: [], options: options)
         } else {

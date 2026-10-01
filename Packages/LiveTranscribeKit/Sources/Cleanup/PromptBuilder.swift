@@ -10,7 +10,7 @@ import Shared
 /// the adapter and nothing else to add is exactly ``Prompt/adapted``, the prompt the adapter was
 /// trained on.
 ///
-/// Deep has its own instruction, with or without the adapter (``deepRules(multiline:)``).
+/// Deep has its own instruction, with or without the adapter (``deepRules(multiline:letterBody:)``).
 public struct PromptBuilder: Sendable, Equatable {
     /// Whether the fine-tuned adapter is loaded alongside the model.
     public let adapted: Bool
@@ -27,7 +27,7 @@ public struct PromptBuilder: Sendable, Equatable {
     public func template(for options: CleanupOptions) -> PromptTemplate {
         if let override { return override }
         let levelRules = options.level.repairsAcrossSentences
-            ? Self.deepRules(multiline: options.multiline)
+            ? Self.deepRules(multiline: options.multiline, letterBody: options.letterBody)
             : Self.baseRules + Self.levelRules(for: options.level, adapted: adapted)
         let rules = levelRules
             + [Self.unchangedRule]
@@ -67,8 +67,10 @@ public struct PromptBuilder: Sendable, Equatable {
     /// Deep's instruction: general rules for reading the whole dictation and writing what the
     /// speaker meant, with no worked examples. ``SelfRepair`` checks the answer against the same
     /// rules. In a field that takes several lines, the model lays out emails, letters and lists
-    /// itself; in a one-line field it may not break lines.
-    static func deepRules(multiline: Bool) -> [String] {
+    /// itself; in a one-line field it may not break lines. When the text is an email's body, whose
+    /// greeting and sign-off the app has laid out already, it is told so and lays out only the
+    /// lists.
+    static func deepRules(multiline: Bool, letterBody: Bool = false) -> [String] {
         let rules = [
             "The TEXT was dictated and written down by speech recognition, which can mishear words. Read all of it and work out what the speaker meant.",
             "Correct words the recognition got wrong, using the rest of the text, and fix punctuation, casing and grammar.",
@@ -77,9 +79,14 @@ public struct PromptBuilder: Sendable, Equatable {
             "Keep every name, number, date, time and negation as the speaker said it. Do not add anything they did not say, and do not summarise.",
             "Keep the speaker's own words wherever they are right.",
         ]
-        let layout = multiline
-            ? "Lay the text out the way it would be written: an email or letter with its greeting, paragraphs and sign-off on separate lines; items or steps as a list, numbered when their order matters. Leave ordinary sentences as sentences."
-            : "Write it as one paragraph, without line breaks."
+        let layout = switch (multiline, letterBody) {
+        case (false, _):
+            "Write it as one paragraph, without line breaks."
+        case (true, false):
+            "Lay the text out the way it would be written: an email or letter with its greeting, paragraphs and sign-off on separate lines; items or steps as a list, numbered when their order matters. Leave ordinary sentences as sentences."
+        case (true, true):
+            "The TEXT is the body of an email; its greeting and sign-off are added separately, so do not write any. Keep the body as it is written, with items or steps laid out as a list, numbered when their order matters, and ordinary sentences left as sentences."
+        }
         return rules + [layout]
     }
 
