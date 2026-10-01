@@ -33,20 +33,24 @@
 - **Deep's repairs are learnt from synthetic data**, and were checked on 114 hand-written cases and
   on dictations of the owner's own; expect less on real speech. The model doesn't always fix what it
   could, and the check lets through any other form of a word that was said, so a wrong tense or
-  plural would pass as a repair. The check turns down repairs that reorder words ("Friday night.
-  Sorry, the night Saturday." → "Saturday night"), or that replace a word across a sentence end with
-  one that has nothing in common with it, and then Medium's cleanup is shown. A correction inside a
-  mention ("words like Docker, sorry, not Docker, Kubernetes") the model may leave as said, or read
-  the wrong way round, which the check turns down. Deep is slower than Medium (379 ms against 288 ms
-  at p50, speech-to-text plus cleanup, on an M4 Pro; [Development](development.md#bench-and-eval)),
-  and a rejected answer adds Medium's pass.
+  plural would pass as a repair. Nor can the check tell a misheard word from a name except by its
+  capital: a word speech-to-text capitalised may be respelled into a similar one at the start of a
+  list item ("First, Madge the PR" → "1. Merge the PR"), and so, in principle, may a name ("John" →
+  "Joan"). A misheard word that doesn't look like the right one ("Max" for "Macs", "Russell" for
+  "Rust") stays as speech-to-text wrote it. The check turns down repairs that reorder words ("Friday
+  night. Sorry, the night Saturday." → "Saturday night"), or that replace a word across a sentence
+  end with one that has nothing in common with it, and then Medium's cleanup is shown. A correction
+  inside a mention ("words like Docker, sorry, not Docker, Kubernetes") the model may leave as said,
+  or read the wrong way round, which the check turns down. Deep is slower than Medium (379 ms
+  against 288 ms at p50, speech-to-text plus cleanup, on an M4 Pro;
+  [Development](development.md#bench-and-eval)), and a rejected answer adds Medium's pass.
 - Spoken lists are laid out only when you say their markers ("first…", "one is…", "number one…" with
   the later numbers said bare, "bullet point…"), and lists and letters only where line breaks are
   allowed. The model sometimes drops or rewrites a list item; the check then inserts your words,
   still laid out. **Deep** also makes lists you didn't mark, in fields that take several lines:
   things you need or steps to take become a list of three or more ("We need milk, eggs and bread."),
-  and it may do the same for two after a colon you said ("A few things: fixing the feeds and
-  releasing the patch."), which in a chat box may be more than you wanted. For a longer
+  and it may do the same for two you set off with a colon or a pause ("A few things: fixing the
+  feeds and releasing the patch."), which in a chat box may be more than you wanted. For a longer
   letter, the rules put the greeting and sign-off on lines of their own and the model gets only
   the body, with a line saying so: Deep lays out the lists in it, but doesn't split it into
   paragraphs.

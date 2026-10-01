@@ -173,6 +173,7 @@ extension CleanupFixtures {
             var isName: Bool?
             var isCapitalised: Bool?
             var mayBeName: Bool?
+            var startsSentence: Bool?
             var isCue: Bool?
             var opensPhrase: Int?
             var spare: [String]?
@@ -184,6 +185,7 @@ extension CleanupFixtures {
                 isName = said.isName ? true : nil
                 isCapitalised = said.isCapitalised ? true : nil
                 mayBeName = said.mayBeName ? true : nil
+                startsSentence = said.startsSentence ? true : nil
                 isCue = said.isCue ? true : nil
                 opensPhrase = said.opensPhrase > 0 ? said.opensPhrase : nil
                 spare = said.spare.isEmpty ? nil : said.spare

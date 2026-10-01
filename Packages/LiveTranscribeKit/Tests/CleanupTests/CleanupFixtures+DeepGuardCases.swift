@@ -8,10 +8,11 @@ extension CleanupFixtures.Guard {
     private static let kirk = "I tried to speak with Kirk, but he didn't. I don't think he actually check whether the release is tomorrow. No, sorry, the after tomorrow."
 
     /// SelfRepairTests' cases, then each kind of edit a repair may make and may not: layout,
-    /// numbers, contractions, names, cues, corrections across sentences and the search's limits.
+    /// numbers, letters spelled out, contractions, names, cues, corrections across sentences and
+    /// the search's limits.
     static var deepCases: [Case] {
-        selfRepairTestCases + layoutCases + numberRepairCases + contractionCases + repairNameCases + cueCases
-            + crossSentenceCases + repairEdgeCases
+        selfRepairTestCases + layoutCases + numberRepairCases + acronymCases + contractionCases + repairNameCases
+            + cueCases + crossSentenceCases + repairEdgeCases
     }
 
     /// SelfRepairTests, every input.
@@ -103,6 +104,32 @@ extension CleanupFixtures.Guard {
             ("delia i mean uma left the keys at reception", "Dela, I mean Uma, left the keys at reception."),
             ("remind xavier about the dentist no sorry uma", "Remind Xavier about the dentist. No, sorry, um..."),
             ("that is kirk car", "That is Kirk's car."),
+            ("Uma will bring the cake.", "Una will bring the cake."),
+            ("Can you ask Madge to review it?", "Can you ask Marge to review it?"),
+            // A word speech-to-text took for a name, fixed where its capital says nothing.
+            ("Can you Madge the PR before lunch?", "Can you merge the PR before lunch?"),
+            ("Can you review the P R before lunch?", "Can you review the PR before lunch?"),
+            ("The A P I is down again.", "The API is down again."),
+            (
+                "Action summary to get done tomorrow. First, Madge, P R twenty two, Max get the update once the website has deployed. Two follow up for the go ahead. Three, emoji parsing needs a revisit. Four, Russell cleanup should work best.",
+                "Action summary to get done tomorrow. First, merge PR 22, Max get the update once the website has deployed. Two, follow up for the go-ahead. Three, emoji parsing needs a revisit. Four, Russell cleanup should work best."
+            ),
+            ("Two things for today. First, Madge the PR. Second, John updates the website.", "Two things for today:\n1. Merge the PR.\n2. John updates the website."),
+            ("Two things for today. First, Madge the PR. Second, John updates the website.", "Two things for today:\n1. Merge the PR.\n2. Pete updates the website."),
+            ("Can you review the P R before lunch?", "Can you review the RP before lunch?"),
+            ("Can you review the P R before lunch?", "Can you review the PRs before lunch?"),
+            ("Can you review the P R before lunch?", "Can you review the P before lunch?"),
+            // A correction speech-to-text broke into sentences.
+            ("My shift starts on Sunday. No, sorry, not Sunday. Thursday.", "My shift starts on Thursday."),
+            ("My shift starts on Sunday. No, sorry, not Sunday. Thursday.", "My shift starts on Sunday. Thursday."),
+            (
+                "For the overnight trek, we'll need compasses. Sorry, not compasses. Stoves and plenty of water.",
+                "For the overnight trek we'll need stoves and plenty of water."
+            ),
+            (
+                "For the overnight trek, we'll need compasses. Sorry, not compasses. Stoves and plenty of water.",
+                "For the overnight trek, we'll need compasses. Stoves and plenty of water."
+            ),
             // A cue that starts a new thought stays.
             ("Is the release tomorrow? No, it's the day after.", "Is the release the day after?"),
             ("Is the release tomorrow? No, it's the day after.", "Is the release tomorrow? It's the day after."),
@@ -140,6 +167,13 @@ extension CleanupFixtures.Guard {
             ("hi sam thanks for sending the report i'll review it tomorrow cheers priya", "Hi Sam,\n\nThanks for sending the report. I'll review it tomorrow.\n\nCheers,\nPriya"),
             ("Buy milk and eggs.", "Buy:\n- Milk\n- Eggs"),
             ("Buy three apples and two pears.", "Buy:\n- Apples\n- Pears"),
+            ("Two things. Call the bank and email Sarah.", "Two things:\n- Call the bank\n- Email Sarah"),
+            ("Two things, call the bank and email Sarah.", "Two things:\n- Call the bank\n- Email Sarah"),
+            ("I've attached, the invoice and the signed agreement.", "I've attached:\n- The invoice\n- The signed agreement"),
+            (
+                "Reminder. I've attached the invoice and the signed agreement.",
+                "Reminder. I've attached:\n- The invoice\n- The signed agreement"
+            ),
         ]
         return kirkCleaned.map { completed(kirk, $0) } + pairs.map { completed($0.0, $0.1) }
     }
@@ -196,6 +230,17 @@ extension CleanupFixtures.Guard {
             completed("i've attached the invoice and the signed agreement", "I've attached:\n- The invoice\n- The signed agreement"),
             completed("i've attached the invoice and the signed agreement", "I've attached:\r\n- The invoice\r\n- The signed agreement\r\n"),
             completed("two things number one call the bank number two email sarah", "Two things:\n1. Call the bank.\n2. Email Sarah."),
+            // Two things set off with the full stop speech-to-text writes for a pause, or counted
+            // ahead of a comma.
+            completed("two things. call the bank and email sarah", "Two things:\n- Call the bank\n- Email Sarah"),
+            completed("two things! call the bank and email sarah", "Two things:\n- Call the bank\n- Email Sarah"),
+            completed("two things, call the bank and email sarah", "Two things:\n- Call the bank\n- Email Sarah"),
+            completed("a couple of things, call the bank and email sarah", "A couple of things:\n- Call the bank\n- Email Sarah"),
+            completed("both of these, call the bank and email sarah", "Both of these:\n- Call the bank\n- Email Sarah"),
+            completed("the plan, call the bank and email sarah", "The plan:\n- Call the bank\n- Email Sarah"),
+            completed("two things today, call the bank and email sarah", "Two things today:\n- Call the bank\n- Email Sarah"),
+            completed("reminder. i've attached the invoice and the signed agreement", "Reminder. I've attached:\n- The invoice\n- The signed agreement"),
+            completed("we need to talk. two things. call the bank and email sarah", "We need to talk. Two things:\n- Call the bank\n- Email Sarah"),
             completed("buy milk\n- eggs\n- bread", "Buy milk:\n- Eggs\n- Bread"),
             // A placeholder alone on a line, and one in its sentence.
             completed("thanks so much ⟦E1⟧", "Thanks so much!\n\n⟦E1⟧", placeholders: ["⟦E1⟧"]),
@@ -241,6 +286,29 @@ extension CleanupFixtures.Guard {
             completed("it's ٣ o'clock", "It's 3 o'clock."),
             completed("the first item", "The 1st item."),
             completed("the first item", "The first item."),
+        ]
+    }
+
+    /// Letters spelled out and written as one word, and letters that change.
+    private static var acronymCases: [Case] {
+        [
+            completed("review the p r today", "Review the PR today."),
+            completed("review the P R today", "Review the PR today."),
+            completed("review the P R today", "Review the pr today."),
+            completed("the a p i is down", "The API is down."),
+            completed("the A. P. I. is down", "The API is down."),
+            completed("p r twenty two is merged", "PR 22 is merged."),
+            completed("p r twenty two is merged", "PR22 is merged."),
+            completed("the p r is merged", "The RP is merged."),
+            completed("the p r is merged", "The PRs are merged."),
+            completed("the p r is merged", "The P is merged."),
+            completed("a b c d e f", "ABCDEF."),
+            completed("a b c d e f g", "ABCDEFG."),
+            completed("send it to p r sorry q a", "Send it to QA."),
+            completed("send it to p r sorry q a", "Send it to PR."),
+            completed("pick plan a. i think it's best", "Pick plan AI think it's best."),
+            completed("the u r l is wrong", "The URL is wrong."),
+            completed("the U R L is wrong", "The U.R.L. is wrong."),
         ]
     }
 
@@ -294,6 +362,20 @@ extension CleanupFixtures.Guard {
             completed("tell Jean-Luc about it", "Tell Jean Luc about it."),
             completed("José is here", "Jose\u{301} is here."),
             completed("i'll call mum", "I'll call Mum."),
+            // A capital speech-to-text gave a word it took for a name.
+            completed("can you Madge it", "Can you merge it?"),
+            completed("can you Madge it", "Can you Merge it?"),
+            completed("Madge the PR", "Merge the PR."),
+            completed("ok so Madge the PR", "OK, so merge the PR."),
+            completed("first, Madge the PR", "1. Merge the PR."),
+            completed("first, Madge the PR. second, ship it", "1. Merge the PR.\n2. Ship it."),
+            completed("first, John ships it. second, Sam tests it", "1. Joan ships it.\n2. Sam tests it."),
+            completed("first, John ships it. second, Sam tests it", "1. Pete ships it.\n2. Sam tests it."),
+            completed("i asked Uma. she said yes", "I asked uma. She said yes."),
+            completed("i asked Uma. she said yes", "I asked um. She said yes."),
+            completed("i asked uma. Una said yes", "I asked Una. Una said yes."),
+            completed("we use Jura daily", "We use jira daily."),
+            completed("we use jura daily", "We use Jira daily."),
         ]
     }
 
@@ -352,8 +434,22 @@ extension CleanupFixtures.Guard {
                 "Meet on Monday. Sorry, Tuesday. Bring two chairs. No, three. Invite Sam. Sorry, Priya. Book room one. Sorry, room two. It starts at nine. Sorry, ten.",
                 "Meet on Tuesday. Bring three chairs. Invite Priya. Book room two. It starts at ten."
             ),
-            // At most two corrections from later sentences.
+            // At most two corrections whose phrase goes back into a sentence before; one that only
+            // replaces the end of it is taken out where it is.
             completed("Meet on Monday. Sorry, Tuesday. Bring two chairs. No, three. Invite Sam. Sorry, Priya.", "Meet on Tuesday. Bring three chairs. Invite Priya."),
+            completed(
+                "Meet on Monday at noon. Sorry, Tuesday. Bring two chairs. No, three. Invite Sam to lunch. Sorry, Priya.",
+                "Meet on Tuesday at noon. Bring three chairs. Invite Priya to lunch."
+            ),
+            // The end of the sentence before, corrected after a full stop speech-to-text wrote where
+            // the speaker paused; not a whole sentence, a new thought or a number for more.
+            completed("I left my charger in the garage. Actually, the lobby.", "I left my charger in the lobby."),
+            completed("The alert came from the billing service. Sorry, the database.", "The alert came from the database."),
+            completed("The team is replacing the laptop. No, the printer next week.", "The team is replacing the printer next week."),
+            completed("Bring two chairs. No, three.", "Bring three."),
+            completed("I finished the report. Sorry, I was late.", "I finished. I was late."),
+            completed("It works. Actually, it's quite fast.", "It's quite fast."),
+            completed("We shipped version two. Actually, we shipped it a week early.", "We shipped it a week early."),
             completed(
                 "Meet on Monday. Sorry, Tuesday. Bring two chairs. No, three. Invite Sam. Sorry, Priya.",
                 "Meet on Tuesday. Bring three chairs. Invite Sam. Sorry, Priya."

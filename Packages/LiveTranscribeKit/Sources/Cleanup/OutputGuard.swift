@@ -46,7 +46,7 @@ public enum FallbackReason: Sendable, Equatable, CustomStringConvertible {
     /// Deep broke the text into lines for a field that takes one line.
     case layoutNotAllowed
     /// Deep made a bulleted list of fewer than ``SelfRepair/minBulletedItems`` items, of things
-    /// said in a sentence; two items after a colon the speaker said are allowed.
+    /// said in a sentence; two items the speaker set off with a colon or a full stop are allowed.
     case shortList
     /// Deep put a placeholder on a line of its own, such as an emoji below the sentence it ended.
     case placeholderOnItsOwnLine
@@ -270,8 +270,9 @@ public struct OutputGuard: Sendable {
             let shortLists = { (text: String) in
                 SelfRepair.bulletedLists(in: text).filter { $0.items.count < SelfRepair.minBulletedItems }
             }
-            // Two things the speaker set off with a colon are a list, as in "a few things: A and B".
-            let newShortLists = shortLists(cleaned).filter { !($0.items.count == 2 && SelfRepair.isSetOffByColon($0, in: raw)) }
+            // Two things the speaker set off are a list, as in "a few things: A and B" or "a few
+            // things. A and B".
+            let newShortLists = shortLists(cleaned).filter { !($0.items.count == 2 && SelfRepair.isSetOff($0, in: raw)) }
             if newShortLists.count > shortLists(raw).count {
                 return .rejected(.shortList)
             }
