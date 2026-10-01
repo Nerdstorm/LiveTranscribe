@@ -53,6 +53,53 @@ struct ListMarkerCommandTests {
         #expect(protector.protect(text).text == "⟦S1⟧ is it ready? ⟦S2⟧ is it tested?")
     }
 
+    @Test func laterNumbersMayBeSaidBare() {
+        let protected = protector.protect(
+            "A few things. Number one, the registration form can be shortened. Two, the Google sign-in failed. Three, the emails were late."
+        )
+        #expect(protected.text
+            == "A few things. ⟦S1⟧ the registration form can be shortened. ⟦S2⟧ the Google sign-in failed. ⟦S3⟧ the emails were late.")
+        #expect(protected.placeholders.map(\.expansion) == ["\n1. ", "\n2. ", "\n3. "])
+        #expect(protected.placeholders.map(\.spoken) == ["Number one,", "Two,", "Three,"], "unlaid text gets these back")
+    }
+
+    @Test("A bare number continues a run that said its first number", arguments: [
+        ("Step one, open the app. Two, tap save. Three, close it.", ["1. ", "\n2. ", "\n3. "]),
+        ("Item one: apples. Two: pears.", ["1. ", "\n2. "]),
+        ("Number one is speed. Two is cost.", ["1. ", "\n2. "]),
+        ("Number 1, speed. 2, cost. 3, price.", ["1. ", "\n2. ", "\n3. "]),
+        ("Number one, speed. Number two, cost. Three, price.", ["1. ", "\n2. ", "\n3. "]),
+        ("Number one speed. Two. cost.", ["1. ", "\n2. "]),
+    ])
+    func bareNumbersContinueARun(text: String, expansions: [String]) {
+        #expect(protector.protect(text).placeholders.map(\.expansion) == expansions)
+    }
+
+    @Test("A bare number alone, out of order or not starting a clause is not a marker", arguments: [
+        "Number one, speed. Two people came. Three, cost.",
+        "Number one, speed. Three, cost.",
+        "Number one, speed. We have two, cost and speed.",
+        "Number one, speed and two, cost.",
+        "Number one, speed. Two is it ready?",
+        "Two, cost. Three, speed.",
+        "Number one, speed. Two",
+        "One, speed. Two, cost.",
+        "Choose from number one, two, three or four.",
+        "Number one, two, three, go!",
+        "Number one, two. Three, four.",
+    ])
+    func bareNumbersThatAreNotMarkers(text: String) {
+        let protected = protector.protect(text)
+        #expect(protected.placeholders.isEmpty)
+        #expect(protected.text == text, "the speaker's words are all still there")
+    }
+
+    @Test func aBareNumberContinuesTheRunOfTheNearestKeyword() {
+        let protected = protector.protect("Item one, apples. Number one, speed. Two, cost.")
+        #expect(protected.placeholders.map(\.spoken) == ["Number one,", "Two,"])
+        #expect(protected.text.hasPrefix("Item one, apples. ⟦S1⟧"), "an item run of one is not a list")
+    }
+
     @Test("Leaves numbers and bullets that are not a list", arguments: [
         "we're number one",
         "the number one priority is speed and number two is cost",

@@ -40,14 +40,15 @@
   the wrong way round, which the check turns down. Deep is slower than Medium (379 ms against 288 ms
   at p50, speech-to-text plus cleanup, on an M4 Pro; [Development](development.md#bench-and-eval)),
   and a rejected answer adds Medium's pass.
-- Spoken lists are laid out only when you say their markers ("first…", "one is…", "number
-  one…", "bullet point…"), and lists and letters only where line breaks are allowed. The model
-  sometimes drops or rewrites a list item; the check then inserts your words, still laid out.
-  **Deep** also makes lists you didn't mark, in fields that take several lines: things you need
-  or steps to take become a list of three or more ("We need milk, eggs and bread."), which in a
-  chat box may be more than you wanted. Deep doesn't yet lay out the body of a longer letter: the
-  rules put its greeting and sign-off on lines of their own and the model gets only the body,
-  which it keeps as one paragraph, even where it names a few points.
+- Spoken lists are laid out only when you say their markers ("first…", "one is…", "number one…" with
+  the later numbers said bare, "bullet point…"), and lists and letters only where line breaks are
+  allowed. The model sometimes drops or rewrites a list item; the check then inserts your words,
+  still laid out. **Deep** also makes lists you didn't mark, in fields that take several lines:
+  things you need or steps to take become a list of three or more ("We need milk, eggs and bread."),
+  and it may do the same for two after a colon you said ("A few things: fixing the feeds and
+  releasing the patch."), which in a chat box may be more than you wanted. Deep doesn't yet lay out the body of a longer
+  letter: the rules put its greeting and sign-off on lines of their own and the model gets only the
+  body, which it keeps as one paragraph, even where it names a few points.
 
 ## Mac
 

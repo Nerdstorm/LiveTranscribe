@@ -6,13 +6,17 @@ import Shared
 /// start of a list line, "1. " or "- ", which ``MarkedListLayout`` then lays out.
 ///
 /// Numbered markers count only in a run that starts at one and goes up by one, with the same
-/// word, at least two of them, so "we're number one" stays as said. Bullets need two markers
-/// too. Every marker needs words after it. A marker is talked about, not said, after a
-/// determiner ("the number one priority", "a bullet point"), after a form of "be" ("speed is
-/// number one and cost is number two"), and, for bullets, after an ordinal ("the second bullet
-/// point is wrong"). An "is" straight after a number belongs to the marker ("number one is ship
-/// the release"), but not after a comma ("number one, is it ready?") or in a question ("number
-/// one is it ready?").
+/// word ("number", "item" or "step"), at least two of them, so "we're number one" stays as said.
+/// After "number one", the later numbers may be said bare, as people do: "Number one, the form is
+/// too long. Two, the sign-in failed." A bare number counts only as a marker of a run already
+/// begun, with an item between it and the marker before, starting its clause and followed by a
+/// comma, a colon, a full stop or "is" ("Two people came" and "number one, two, three" stay as
+/// said). Bullets need two markers too. Every marker needs words after it. A marker is talked
+/// about, not said, after a determiner ("the number one priority", "a bullet point"), after a form
+/// of "be" ("speed is number one and cost is number two"), and, for bullets, after an ordinal
+/// ("the second bullet point is wrong"). An "is" straight after a number belongs to the marker
+/// ("number one is ship the release"), but not after a comma ("number one, is it ready?") or in a
+/// question ("number one is it ready?").
 ///
 /// Used only where lists are laid out: from Medium up, in fields that take several lines.
 /// Elsewhere the model sees the words, and text that is not laid out gets them back.
@@ -28,6 +32,8 @@ public struct ListMarkerCommand: PhraseMatcher {
     static let copulas: Set<String> = ["is", "was", "are", "were", "be", "been", "being", "am", "isn't", "wasn't", "aren't", "weren't"]
     /// Words after a number that introduce its item: "number one is ship the release".
     static let itemCopulas: Set<String> = ["is", "was"]
+    /// Marks after a bare number that make it a list number: "Two, …", "Three: …", "Four. …".
+    private static let bareEnders: Set<Character> = [",", ":", "."]
     private static let sentenceEnders: Set<Character> = [".", "!", "?"]
     /// Endings of contracted copulas: "we're", "I'm".
     static let copulaContractions = ["'re", "'m"]
@@ -46,7 +52,8 @@ public struct ListMarkerCommand: PhraseMatcher {
 
     private struct Candidate {
         let words: Range<Int>
-        let keyword: String
+        /// The word said before the number; `nil` for a bare number ("Two, …").
+        let keyword: String?
         let number: Int
     }
 
@@ -65,22 +72,66 @@ public struct ListMarkerCommand: PhraseMatcher {
             candidates.append(Candidate(words: words, keyword: text.words[position].text, number: number))
         }
 
+        let bare = bareNumbers(in: text)
+        var taken = Set<Int>()
         var runs: [[Candidate]] = []
-        for keyword in Self.numberedKeywords {
+        for keyword in Self.numberedKeywords.sorted() {
             var run: [Candidate] = []
-            for candidate in candidates where candidate.keyword == keyword {
-                if candidate.number == run.count + 1 {
+            func close() {
+                guard run.count >= 2 else { return }
+                runs.append(run)
+                taken.formUnion(run.filter { $0.keyword == nil }.map(\.words.lowerBound))
+            }
+            let ordered = (candidates.filter { $0.keyword == keyword } + bare.filter { !taken.contains($0.words.lowerBound) })
+                .sorted { $0.words.lowerBound < $1.words.lowerBound }
+            /// A keyworded number continues its run. A bare one does when there is an item between
+            /// it and the run's last marker, and no other keyword's marker.
+            func continues(_ candidate: Candidate) -> Bool {
+                if candidate.keyword != nil { return true }
+                guard let last = run.last else { return false }
+                return candidate.words.lowerBound > last.words.upperBound
+                    && !candidates.contains {
+                        $0.keyword != keyword && $0.words.lowerBound > last.words.lowerBound
+                            && $0.words.lowerBound < candidate.words.lowerBound
+                    }
+            }
+            for candidate in ordered {
+                if candidate.number == run.count + 1, continues(candidate) {
                     run.append(candidate)
-                } else if candidate.number == 1 {
-                    runs.append(run)
+                } else if candidate.number == 1, candidate.keyword != nil {
+                    close()
                     run = [candidate]
                 }
             }
-            runs.append(run)
+            close()
         }
-        return runs.filter { $0.count >= 2 }.flatMap { run in
-            run.map { marker(at: $0.words, text: "\($0.number). ", trigger: "\($0.keyword) \($0.number)", in: text) }
+        return runs.flatMap { run in
+            run.map { candidate in
+                let trigger = candidate.keyword.map { "\($0) \(candidate.number)" } ?? "\(candidate.number)"
+                return marker(at: candidate.words, text: "\(candidate.number). ", trigger: trigger, in: text)
+            }
         }
+    }
+
+    /// Numbers said without "number" before them: "Two, …", "Three: …", "Four. …", "Five is …". Each
+    /// starts a clause, so "we have two, …" is not one, and has words after it.
+    private func bareNumbers(in text: TokenizedText) -> [Candidate] {
+        text.words.indices.dropFirst().compactMap { position in
+            let word = text.words[position]
+            guard let number = Self.number(word.text),
+                  text.coversWholeTokens(position..<(position + 1)),
+                  Self.startsClause(position, in: text)
+            else { return nil }
+            let said = Self.includingItemCopula(position..<(position + 1), in: text)
+            let marked = said.count > 1 || TokenEdges.trailing(of: text.token(word.token)).contains { Self.bareEnders.contains($0) }
+            guard marked, said.upperBound < text.words.count else { return nil }
+            return Candidate(words: said, keyword: nil, number: number)
+        }
+    }
+
+    private static func startsClause(_ position: Int, in text: TokenizedText) -> Bool {
+        let previous = text.words[position - 1]
+        return previous.endsToken && PhraseGrammar.endsClause(text.token(previous.token))
     }
 
     private func bulletMarkers(in text: TokenizedText) -> [PhraseMatch] {

@@ -1217,3 +1217,20 @@ Number one 买牛奶, number two 买鸡蛋
 Bonjour à tous, voici le résumé de la réunion
 Straße, Größe und Übermaß new paragraph danke
 ¿Dónde está la estación? new line gracias
+Hey Matt, launch is awesome. We raised many sign-ups over the last couple of weeks, but a few things I noted down that may need some attention. Number one, the registration form or the onboarding wizard can be shortened. Two, during the sign-up, the Google sign-in didn't work well. That's about it. Keep in touch. Get back to me when you get a chance. Kind regards, Jaden.
+A few things. Number one, the registration form can be shortened. Two, the Google sign-in failed. Three, the emails were late.
+Step one, open the app. Two, tap save. Three, close it.
+Item one: apples. Two: pears.
+Number one is speed. Two is cost.
+number 1 speed 2 cost 3 price
+Number one, speed. Number two, cost. Three, price.
+Number one, speed. Two people came. Three, cost.
+Number one, speed. Three, cost.
+Number one, speed. We have two, cost and speed.
+Number one, speed. Two is it ready?
+Two, cost. Three, speed.
+Number one, speed. Two
+Hi Sam, number one, the demo is ready. Two, the slides need work. Thanks, Priya
+Choose from number one, two, three or four.
+Number one, two, three, go!
+Item one, apples. Number one, speed. Two, cost.

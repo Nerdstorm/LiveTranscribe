@@ -167,7 +167,32 @@ extension CleanupFixtures.Guard {
             completed("the first part is done. the second part is next.", "The first part is done.\n\nThe second part is next."),
             completed("the first part is done the second part is next", "The first part is done.\n\nThe second part is next."),
             completed("Hi team\nThe build is green\nThanks", "Hi team,\nThe build is green.\nThanks"),
-            // Two things said in a sentence stay in it, unless they were counted.
+            // Two things said in a sentence stay in it, unless they were counted or set off with a colon.
+            completed(
+                "few things we need to focus on: getting active feeds working and releasing the hot fix",
+                "A few things we need to focus on:\n- Getting active feeds working\n- Releasing the hot fix"
+            ),
+            completed(
+                "few things we need to focus on: getting active feeds working and releasing the hot fix",
+                "A few things we need to focus on:\n\n- Getting active feeds working\n- Releasing the hot fix"
+            ),
+            completed(
+                "few things we need to focus on getting active feeds working and releasing the hot fix",
+                "A few things we need to focus on:\n- Getting active feeds working\n- Releasing the hot fix"
+            ),
+            completed(
+                "reminder i've attached: the invoice and the signed agreement",
+                "Reminder: I've attached:\n- The invoice\n- The signed agreement"
+            ),
+            completed(
+                "reminder: i've attached the invoice and the signed agreement",
+                "Reminder: I've attached:\n- The invoice\n- The signed agreement"
+            ),
+            completed("two things: call the bank and email sarah", "Two things:\n- Call the bank\n- Email Sarah"),
+            completed("we need the cafe\u{301} menu: soup and bread", "We need the caf\u{E9} menu:\n- Soup\n- Bread"),
+            completed("two things: call the bank and email sarah", "Two things:\n- Call the bank\n- Email Sarah\n\n- Phone Uma\n- Book the room"),
+            completed("two things: call the bank and email sarah", "Two things:\n- Call the bank"),
+            completed("two things: call the bank and email sarah", "Two things:\n- Phone the bank\n- Email Sarah"),
             completed("i've attached the invoice and the signed agreement", "I've attached:\n- The invoice\n- The signed agreement"),
             completed("i've attached the invoice and the signed agreement", "I've attached:\r\n- The invoice\r\n- The signed agreement\r\n"),
             completed("two things number one call the bank number two email sarah", "Two things:\n1. Call the bank.\n2. Email Sarah."),

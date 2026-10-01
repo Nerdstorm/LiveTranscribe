@@ -30,8 +30,9 @@ import Shared
 /// - a list's numbers or bullets put in place of the words said to mark its items.
 ///
 /// The layout is checked too (``OutputGuard``): a bulleted list has at least ``minBulletedItems``
-/// items, since two things said in a sentence stay in it, and no line holds only placeholders, as
-/// when an emoji is moved below the sentence it ended.
+/// items, since two things said in a sentence stay in it, unless what was said already set them
+/// off with a colon ("a few things we need: getting feeds working and releasing the fix"), and
+/// no line holds only placeholders, as when an emoji is moved below the sentence it ended.
 ///
 /// Names, numbers, negations and words of time are kept as said everywhere else: none may be
 /// added, dropped or changed, and no other new word may appear, so the model can't add a claim
@@ -42,7 +43,8 @@ struct SelfRepair: Sendable {
     /// Most words a repair may add to or change in one correction phrase.
     static let maxRepairWords = 2
     /// Fewest items in a bulleted list the model makes: two things said in a sentence ("the invoice
-    /// and the agreement") stay in it. A numbered list may have two, as when they were counted.
+    /// and the agreement") stay in it, unless the speaker's text set them off with a colon
+    /// (``isSetOffByColon(_:in:)``). A numbered list may have two, as when they were counted.
     static let minBulletedItems = 3
 
     private let cues: [[String]]
@@ -230,21 +232,50 @@ struct SelfRepair: Sendable {
         return bullets.contains(first) && trimmed.dropFirst().first?.isWhitespace == true
     }
 
-    /// How many items each bulleted list in `text` has: a list is a run of lines that start with
-    /// a bullet, which a blank line or any other line ends.
-    static func bulletedListLengths(in text: String) -> [Int] {
-        var lengths: [Int] = []
-        var run = 0
+    /// A bulleted list in a text: a run of lines that start with a bullet, which a blank line or
+    /// any other line ends.
+    struct BulletedList: Equatable {
+        /// The last line with text before the list, `nil` at the start of the text.
+        let lead: String?
+        /// The text of each item, bullet and space taken off.
+        let items: [String]
+    }
+
+    /// The bulleted lists in `text`.
+    static func bulletedLists(in text: String) -> [BulletedList] {
+        var lists: [BulletedList] = []
+        var lead: String?
+        var listLead: String?
+        var items: [String] = []
         for line in text.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline) {
             if isBulleted(line) {
-                run += 1
-            } else if run > 0 {
-                lengths.append(run)
-                run = 0
+                if items.isEmpty { listLead = lead }
+                items.append(String(line.drop(while: \.isWhitespace).dropFirst().drop(while: \.isWhitespace)))
+                lead = String(line)
+            } else {
+                if !items.isEmpty {
+                    lists.append(BulletedList(lead: listLead, items: items))
+                    items = []
+                }
+                if !line.allSatisfy(\.isWhitespace) { lead = String(line) }
             }
         }
-        if run > 0 { lengths.append(run) }
-        return lengths
+        if !items.isEmpty { lists.append(BulletedList(lead: listLead, items: items)) }
+        return lists
+    }
+
+    /// Whether the speaker's text `said` already set the list off with a colon: the list's lead
+    /// line ends with one, and the words that end the lead (up to three) come right before a colon
+    /// in `said`. So the model laid out what was said ("…focus on: getting feeds working and
+    /// releasing the fix") and did not make a list of two things in a sentence. A word fixed
+    /// inside the items doesn't matter, only the words that lead into them.
+    static func isSetOffByColon(_ list: BulletedList, in said: String) -> Bool {
+        guard let lead = list.lead?.trimmingCharacters(in: .whitespaces), lead.hasSuffix(":") else { return false }
+        let ending = EditDistance.words(in: EditDistance.normalize(lead)).suffix(3)
+        guard !ending.isEmpty else { return false }
+        return said.indices.contains { index in
+            said[index] == ":" && EditDistance.words(in: EditDistance.normalize(String(said[..<index]))).suffix(ending.count) == ending
+        }
     }
 
     /// How many lines of `text` hold placeholders and nothing else, list markers and punctuation

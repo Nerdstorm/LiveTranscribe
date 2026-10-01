@@ -39,14 +39,16 @@ vocabulary (Linux and Windows have none yet).
   ("first", "second", … to "tenth", or "firstly", …; "finally" or "lastly" may end it), by the
   numbers one, two, … to ten in order, each starting a clause and followed by "is" or "was", a
   comma, a colon or a full stop ("one is the launch, two, the marketing"), by "number", "item" or
-  "step" with the numbers one, two, … to twenty in order, or by "bullet point". A marker that is
-  talked about stays as said: after a determiner or possessive ("the", "my", "Apple's") or a form
-  of "be" ("cost is number two", "we're number one"), and a bullet marker also after an ordinal or
-  "last", "next", "previous", "final" or "other" ("the second bullet point is wrong"). The markers
-  become "1." or "-", each item starts with a
-  capital, the line before the list ends with a colon, text after the list starts a new
-  paragraph, and items keep their full stops only if every item is a sentence of four words or
-  more. No other words change.
+  "step" with the numbers one, two, … to twenty in order (after "number one", the later numbers may
+  be said bare: "Number one, the form. Two, the sign-in."; each then starts a clause after an item
+  and is followed by a comma, colon, full stop or "is", so "number one, two, three" stays as said),
+  or by "bullet point". A marker that is talked about stays as said: after a determiner or
+  possessive ("the", "my", "Apple's") or a form of "be" ("cost is number two", "we're number one"),
+  and a bullet marker also after an ordinal or "last", "next", "previous", "final" or "other" ("the
+  second bullet point is wrong"). The markers become "1." or "-", each item starts with a capital,
+  the line before the list ends with a colon, text after the list starts a new paragraph, and items
+  keep their full stops only if every item is a sentence of four words or more. No other words
+  change.
 - **Letters.** A letter needs a greeting at the start ("Dear…", "Hi…", "Hello…", "Hey…", "Good
   morning…", "To whom it may concern") and a sign-off at the end ("Kind regards", "Sincerely",
   "Best wishes", …). An everyday sign-off ("Thanks", "Thank you", "Cheers", "Best", "Love", "Take
@@ -79,8 +81,10 @@ vocabulary (Linux and Windows have none yet).
   what was said must be one of the repairs Deep may make, numbers, negations, words of time and
   placeholders may never be added, dropped or changed outside what a correction takes back, and no
   other new word may appear. It also turns down a line break in a field that takes one line, a
-  bulleted list of fewer than three items, and a placeholder alone on a line. When Deep's answer is
-  turned down, Medium's pass runs in the time left, so Deep never shows less than Medium would.
+  bulleted list of fewer than three items (two are a list only when you set them off with a colon,
+  "a few things we need: getting the feeds working and releasing the fix"), and a placeholder alone
+  on a line. When Deep's answer is turned down, Medium's pass runs in the time left, so Deep never
+  shows less than Medium would.
 - **With the language model off**, nothing is reworded. Medium, High and Deep still remove fillers
   and lay out lists and letters in dictation, and snippets, vocabulary and spoken commands still
   apply. The switch is **Clean up transcripts with the LLM** in **Settings › Advanced**; on the
