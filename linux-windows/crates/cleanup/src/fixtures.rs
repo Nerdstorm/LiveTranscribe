@@ -110,6 +110,8 @@ struct OptionsJson {
     vocabulary: Vec<String>,
     placeholders: Vec<String>,
     multiline: bool,
+    #[serde(default, rename = "letterBody")]
+    letter_body: bool,
 }
 
 impl OptionsJson {
@@ -119,6 +121,7 @@ impl OptionsJson {
             vocabulary: self.vocabulary.clone(),
             placeholders: self.placeholders.clone(),
             multiline: self.multiline,
+            letter_body: self.letter_body,
         }
     }
 }

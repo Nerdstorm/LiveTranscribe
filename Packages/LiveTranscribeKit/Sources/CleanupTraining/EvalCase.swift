@@ -1,3 +1,4 @@
+import Cleanup
 import Foundation
 import Shared
 
@@ -16,6 +17,8 @@ public struct EvalCase: Codable, Sendable, Equatable {
     public var alternatives: [String]
     /// The field takes several lines, so Deep may lay the text out.
     public var multiline: Bool
+    /// The text is the body of an email: the app lays out its greeting and sign-off itself.
+    public var letterBody: Bool
     /// Words or phrases a right answer keeps (a name, a number, "don't"). An accepted answer
     /// without one changed the meaning.
     public var keep: [String]
@@ -31,6 +34,7 @@ public struct EvalCase: Codable, Sendable, Equatable {
         target: String,
         alternatives: [String] = [],
         multiline: Bool = false,
+        letterBody: Bool = false,
         keep: [String] = [],
         avoid: [String] = []
     ) {
@@ -41,12 +45,13 @@ public struct EvalCase: Codable, Sendable, Equatable {
         self.target = target
         self.alternatives = alternatives
         self.multiline = multiline
+        self.letterBody = letterBody
         self.keep = keep
         self.avoid = avoid
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, category, context, raw, target, alternatives, multiline, keep, avoid
+        case id, category, context, raw, target, alternatives, multiline, letterBody, keep, avoid
     }
 
     public init(from decoder: any Decoder) throws {
@@ -58,8 +63,15 @@ public struct EvalCase: Codable, Sendable, Equatable {
         target = try container.decodeIfPresent(String.self, forKey: .target) ?? ""
         alternatives = try container.decodeIfPresent([String].self, forKey: .alternatives) ?? []
         multiline = try container.decodeIfPresent(Bool.self, forKey: .multiline) ?? false
+        letterBody = try container.decodeIfPresent(Bool.self, forKey: .letterBody) ?? false
         keep = try container.decodeIfPresent([String].self, forKey: .keep) ?? []
         avoid = try container.decodeIfPresent([String].self, forKey: .avoid) ?? []
+    }
+
+    /// What the app sends with this case at `level`: the field, whether the text is an email's
+    /// body, and the placeholder tokens (`⟦S1⟧`, …) the raw text holds.
+    public func options(level: CleanupLevel) -> CleanupOptions {
+        CleanupOptions(level: level, placeholders: PlaceholderToken.tokens(in: raw), multiline: multiline, letterBody: letterBody)
     }
 
     /// Reads JSON Lines of eval cases, or of ``TrainingExample``s, which become cases with their
@@ -90,7 +102,11 @@ public struct EvalCase: Codable, Sendable, Equatable {
         let normalized = EditDistance.normalize(shown)
         if EditDistance.normalize(input) == normalized { return .unchanged }
         let missing = keep.first { !Self.contains(normalized, EditDistance.normalize($0)) }
-        let added = avoid.first { Self.contains(normalized, EditDistance.normalize($0)) }
+        // A phrase with no words in it (a bare line break) says nothing about the answer's words.
+        let added = avoid.first { phrase in
+            let words = EditDistance.normalize(phrase)
+            return !words.isEmpty && Self.contains(normalized, words)
+        }
         if missing != nil || added != nil { return .changedMeaning }
         return .different
     }

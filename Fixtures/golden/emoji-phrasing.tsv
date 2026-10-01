@@ -1,0 +1,156 @@
+# How people may ask for an emoji, and what dictation makes of it at the no-cleanup level.
+# Columns: id, what was said, the text the speaker wants, insert or keep (the speaker talks about emoji),
+# a note on the phrasing, and status: works (dictation makes the wanted text) or gap (it does not, yet).
+# A gap row is a phrasing to decide about, not a promise; when a rule change makes one work, set its status
+# to works. Both apps run these rows (GoldenDictationFixtureTests and lt-dictation's golden test).
+id	spoken	expected	intent	note	status
+emoji-001	Thanks so much for your help. Emoji smiley.	Thanks so much for your help. 🙂	insert	emoji then name, own sentence at end	works
+emoji-002	The tests are all green, emoji check mark	The tests are all green, ✅	insert	emoji then name, at end	works
+emoji-003	The fire emoji is my favourite.	The fire emoji is my favourite.	keep	determiner then name then emoji, talked about	works
+emoji-004	Happy birthday, Sarah! Emoji birthday cake.	Happy birthday, Sarah! 🎂	insert	emoji then name, own sentence after exclamation	works
+emoji-005	that meeting was painful emoji skull	that meeting was painful 💀	insert	emoji then name, at end	works
+emoji-006	What does the heart emoji mean?	What does the heart emoji mean?	keep	asking what an emoji means	works
+emoji-007	I'll bring the snacks. Emoji pizza.	I'll bring the snacks. 🍕	insert	emoji then name, own sentence at end	works
+emoji-008	good luck with the interview emoji crossed fingers	good luck with the interview 🤞	insert	emoji then two-word name, at end	works
+emoji-009	I sent her a heart emoji yesterday.	I sent her a heart emoji yesterday.	keep	past tense, reporting	works
+emoji-010	Off for a walk with Max, emoji dog	Off for a walk with Max, 🐶	insert	emoji then name, at end	works
+emoji-011	sorry i broke the build emoji facepalm	sorry i broke the build 🤦	insert	emoji then name, at end	works
+emoji-012	Emoji support is broken in the app.	Emoji support is broken in the app.	keep	emoji as a noun adjunct	works
+emoji-013	Well, that went badly. Emoji poop.	Well, that went badly. 💩	insert	emoji then name, own sentence at end	works
+emoji-014	spooky season is here emoji ghost	spooky season is here 👻	insert	emoji then name, at end	works
+emoji-015	We need to add emoji support before the release.	We need to add emoji support before the release.	keep	add emoji support, a feature	works
+emoji-016	We won the contract, emoji trophy, so lunch is on me.	We won the contract, 🏆, so lunch is on me.	insert	emoji then name, mid sentence between commas	works
+emoji-017	the flight lands at noon emoji plane so i will grab a taxi	the flight lands at noon ✈️ so i will grab a taxi	insert	emoji then name, mid sentence	works
+emoji-018	Emojis are banned in the style guide.	Emojis are banned in the style guide.	keep	plural emojis as subject	works
+emoji-019	Great work team, emoji fire, the launch went perfectly.	Great work team, 🔥, the launch went perfectly.	insert	emoji then name, mid sentence between commas	works
+emoji-020	thanks for dinner emoji heart-eyes it was delicious	thanks for dinner 😍 it was delicious	insert	emoji then hyphenated name, mid sentence	works
+emoji-021	Have you tried the emoji keyboard on the new phone?	Have you tried the emoji keyboard on the new phone?	keep	the emoji keyboard, keyboard is a name	works
+emoji-022	I am so happy emoji smile today that I could dance.	I am so happy 😊 today that I could dance.	insert	emoji then name, between words	works
+emoji-023	feeling rough today emoji sick and it's only monday	feeling rough today 🤢 and it's only monday	insert	emoji then name, between words	works
+emoji-024	She uses the thumbs up emoji too much.	She uses the thumbs up emoji too much.	keep	determiner then name then emoji	works
+emoji-025	Emoji fireworks, we finally did it.	🎆, we finally did it.	insert	emoji then name, at start	works
+emoji-026	emoji coffee i need one right now	☕ i need one right now	insert	emoji then name, at start	works
+emoji-027	Use emoji sparingly in work emails.	Use emoji sparingly in work emails.	keep	advice about emoji	works
+emoji-028	Emoji rocket, the build is live.	🚀, the build is live.	insert	emoji then name, at start	works
+emoji-029	emoji warning do not deploy on fridays	⚠️ do not deploy on fridays	insert	emoji then name, at start	works
+emoji-030	No emoji in the subject line, please.	No emoji in the subject line, please.	keep	no emoji rule	works
+emoji-031	Emoji face with thermometer, I'm staying home today.	🤒, I'm staying home today.	insert	emoji then long name, at start	works
+emoji-032	emoji key i found the spare	🔑 i found the spare	insert	emoji then name, at start	works
+emoji-033	A smiley emoji at the end of every message annoys me.	A smiley emoji at the end of every message annoys me.	keep	complaint about emoji	works
+emoji-034	That was hilarious, tears of joy emoji	That was hilarious, 😂	insert	name then emoji, at end	works
+emoji-035	so sorry about the news cry emoji	so sorry about the news 😢	insert	name then emoji, at end	works
+emoji-036	Don't put a fire emoji there.	Don't put a fire emoji there.	keep	negated instruction	works
+emoji-037	Good morning everyone, sun emoji, let's get started.	Good morning everyone, ☀️, let's get started.	insert	name then emoji, mid sentence	works
+emoji-038	the files are encrypted lock emoji and uploaded	the files are encrypted 🔒 and uploaded	insert	name then emoji, mid sentence	works
+emoji-039	Is that a peace sign emoji?	Is that a peace sign emoji?	keep	question about an emoji	works
+emoji-040	Congratulations on the new job, clapping hands emoji, you earned it.	Congratulations on the new job, 👏, you earned it.	insert	name then emoji, mid sentence	works
+emoji-041	see you soon waving hand emoji	see you soon 👋	insert	name then emoji, at end	works
+emoji-042	He replied with an emoji and nothing else.	He replied with an emoji and nothing else.	keep	reported reply	works
+emoji-043	Payday at last, money bag emoji	Payday at last, 💰	insert	name then emoji, at end	works
+emoji-044	all good on my side ok hand emoji	all good on my side 👌	insert	name then emoji, at end	works
+emoji-045	Emoji pack v2 is out now.	Emoji pack v2 is out now.	keep	emoji pack, a product	works
+emoji-046	Expect showers tomorrow, rain emoji	Expect showers tomorrow, 🌧️	insert	name then emoji, at end	works
+emoji-047	we got the keys today house emoji	we got the keys today 🏠	insert	name then emoji, at end	works
+emoji-048	The word emoji comes from Japanese.	The word emoji comes from Japanese.	keep	the word itself	works
+emoji-049	working from home today laptop emoji	working from home today 💻	insert	name then emoji, at end	works
+emoji-050	Thanks for the lift, insert a smiley face emoji	Thanks for the lift, 🙂	insert	insert a <name> emoji	gap
+emoji-051	Why does my laptop show the emoji as an empty box?	Why does my laptop show the emoji as an empty box?	keep	the emoji as an object	works
+emoji-052	ring me tonight insert a phone emoji	ring me tonight 📱	insert	insert a <name> emoji	gap
+emoji-053	Happy anniversary, insert a kiss emoji	Happy anniversary, 😘	insert	insert a <name> emoji	gap
+emoji-054	That emoji is rude, please don't use it.	That emoji is rude, please don't use it.	keep	that emoji, a judgement	works
+emoji-055	gym was brutal today insert a muscle emoji i am sore	gym was brutal today 💪 i am sore	insert	insert a <name> emoji, mid sentence	gap
+emoji-056	Insert an angry face emoji, this is unacceptable.	😠, this is unacceptable.	insert	insert an <name> emoji, at start	gap
+emoji-057	Sam says the skull emoji means laughing now.	Sam says the skull emoji means laughing now.	keep	meaning of an emoji	works
+emoji-058	Well done everyone, add a raised hands emoji here	Well done everyone, 🙌	insert	add a <name> emoji here	gap
+emoji-059	it's raining again add a cloud emoji here	it's raining again ☁️	insert	add a <name> emoji here	gap
+emoji-060	The client asked us to stop using emojis in invoices.	The client asked us to stop using emojis in invoices.	keep	policy about emojis	works
+emoji-061	I passed the exam, add a champagne emoji here, and I'm buying drinks.	I passed the exam, 🍾, and I'm buying drinks.	insert	add a <name> emoji here, mid sentence	gap
+emoji-062	Great seeing you today, put a red heart emoji at the end	Great seeing you today, ❤️	insert	put a <name> emoji at the end	gap
+emoji-063	Our emoji picker needs a search box.	Our emoji picker needs a search box.	keep	our emoji picker, a feature	works
+emoji-064	i will pick you up at eight put a car emoji at the end	i will pick you up at eight 🚗	insert	put a <name> emoji at the end	gap
+emoji-065	Sorry I'm late, traffic was awful, put a shrug emoji at the end	Sorry I'm late, traffic was awful, 🤷	insert	put a <name> emoji at the end	gap
+emoji-066	I can't remember which emoji is the prayer one.	I can't remember which emoji is the prayer one.	keep	which emoji, a question	works
+emoji-067	i don't like the new logo with a thumbs down emoji	i don't like the new logo 👎	insert	with a <name> emoji	gap
+emoji-068	Thanks again, see you Monday with a wink emoji	Thanks again, see you Monday 😉	insert	with a <name> emoji	gap
+emoji-069	Ethan's emoji reactions are hilarious.	Ethan's emoji reactions are hilarious.	keep	possessive then emoji	works
+emoji-070	happy friday everyone with a grinning emoji	happy friday everyone 😀	insert	with a <name> emoji	gap
+emoji-071	Great job today, followed by a star emoji	Great job today, ⭐	insert	followed by a <name> emoji	gap
+emoji-072	My mum thinks the crying laughing emoji means she is crying.	My mum thinks the crying laughing emoji means she is crying.	keep	determiner then long name then emoji	gap
+emoji-073	happy birthday mum followed by a gift emoji	happy birthday mum 🎁	insert	followed by a <name> emoji	gap
+emoji-074	Good night, followed by a moon emoji	Good night, 🌙	insert	followed by a <name> emoji	gap
+emoji-075	We should not send a party popper emoji to customers.	We should not send a party popper emoji to customers.	keep	negated advice	works
+emoji-076	Thank you so much, and then a folded hands emoji	Thank you so much, 🙏	insert	and then a <name> emoji	gap
+emoji-077	happy new year and then a sparkle emoji	happy new year ✨	insert	and then a <name> emoji	gap
+emoji-078	emoji support is missing on the old android version	emoji support is missing on the old android version	keep	emoji as a noun adjunct	works
+emoji-079	the build failed and then a crying laughing emoji	the build failed 😂	insert	and then a <name> emoji	gap
+emoji-080	Here is my new pet, emoji of a cat	Here is my new pet, 🐱	insert	emoji of a <name>; doubtful	gap
+emoji-081	the heart emoji looks different on every phone	the heart emoji looks different on every phone	keep	determiner then name then emoji	works
+emoji-082	i have an idea emoji of a light bulb	i have an idea 💡	insert	emoji of a <name>; doubtful	gap
+emoji-083	Reminder for tomorrow, bell emoji please	Reminder for tomorrow, 🔔	insert	name then emoji then please	gap
+emoji-084	i think the thumbs up emoji is passive aggressive	i think the thumbs up emoji is passive aggressive	keep	opinion about an emoji	works
+emoji-085	see you there sunglasses emoji please	see you there 😎	insert	name then emoji then please	gap
+emoji-086	thanks a lot smiley face	thanks a lot 🙂	insert	bare smiley face, no emoji word; doubtful	gap
+emoji-087	she always ends her emails with a smiley emoji	she always ends her emails with a smiley emoji	keep	habit of a third person	works
+emoji-088	Got it, winking face	Got it, 😉	insert	bare winking face, no emoji word; doubtful	gap
+emoji-089	i miss you so much crying face	i miss you so much 😢	insert	bare crying face, no emoji word; doubtful	gap
+emoji-090	do not use emojis in the commit messages	do not use emojis in the commit messages	keep	negated instruction	works
+emoji-091	Not happy with this at all. Angry face	Not happy with this at all. 😠	insert	bare angry face after a sentence; doubtful	gap
+emoji-092	good night sleeping face	good night 😴	insert	bare sleeping face, no emoji word; doubtful	gap
+emoji-093	how many emojis are there in unicode	how many emojis are there in unicode	keep	question about emojis	works
+emoji-094	See you later, smiley emoticon	See you later, 🙂	insert	name then emoticon	gap
+emoji-095	emoticon winking that was a joke	😉 that was a joke	insert	emoticon then name, at start	gap
+emoji-096	the emoji for a rocket is overused these days	the emoji for a rocket is overused these days	keep	the emoji for something	works
+emoji-097	I'm off to bed, emoticon sleeping	I'm off to bed, 😴	insert	emoticon then name	gap
+emoji-098	Two hearts emoji, I love you both.	💕, I love you both.	insert	plural, two hearts; doubtful	works
+emoji-099	what is the name of the shrug emoji	what is the name of the shrug emoji	keep	asking the name of an emoji	works
+emoji-100	Well done, three thumbs up emoji	Well done, 👍👍👍	insert	count then name then emoji	gap
+emoji-101	two fire emojis for that performance	🔥🔥 for that performance	insert	count with plural emojis	gap
+emoji-102	he said my emoji game is weak	he said my emoji game is weak	keep	my emoji, possessive	works
+emoji-103	Amazing work, fire emojis	Amazing work, 🔥	insert	plural emojis, no count; doubtful	gap
+emoji-104	thank you all hearts emoji	thank you all ❤️	insert	plural hearts emoji; doubtful	works
+emoji-105	my emoji keyboard keeps crashing	my emoji keyboard keeps crashing	keep	my emoji keyboard, keyboard is a name	works
+emoji-106	Three clapping hands emoji for the whole team.	👏👏👏 for the whole team.	insert	count then name then emoji, at start	gap
+emoji-107	Great job, fire emoji fire emoji fire emoji	Great job, 🔥 🔥 🔥	insert	repeated three times	gap
+emoji-108	the ghost emoji is not showing on windows	the ghost emoji is not showing on windows	keep	bug report about an emoji	works
+emoji-109	look at the ceiling pointing up emoji pointing up emoji	look at the ceiling 👆 👆	insert	repeated twice	gap
+emoji-110	I love you so much, emoji heart emoji heart emoji heart	I love you so much, ❤️ ❤️ ❤️	insert	repeated three times, keyword first	works
+emoji-111	we are building an emoji search feature	we are building an emoji search feature	keep	an emoji feature	works
+emoji-112	Nailed it, emoji 100 emoji fire	Nailed it, 💯 🔥	insert	two different emoji in a row	works
+emoji-113	thank you so much emoji folded hands emoji red heart	thank you so much 🙏 ❤️	insert	two different emoji in a row	works
+emoji-114	she asked whether the fire emoji was too aggressive for work email	she asked whether the fire emoji was too aggressive for work email	keep	determiner then name then emoji	works
+emoji-115	spring has finally arrived emoji flower emoji tree	spring has finally arrived 🌸 🌳	insert	two different emoji in a row	works
+emoji-116	We're done for the week, beer emoji pizza emoji	We're done for the week, 🍺 🍕	insert	two in a row, name then emoji; doubtful	gap
+emoji-117	i never use the clapping hands emoji because it looks sarcastic	i never use the clapping hands emoji because it looks sarcastic	keep	opinion about an emoji	works
+emoji-118	great job emoji thumbs up exclamation mark	great job 👍!	insert	emoji then spoken exclamation mark	works
+emoji-119	Sounds good, emoji wink full stop	Sounds good, 😉.	insert	emoji then spoken full stop	works
+emoji-120	that party popper emoji in the slack channel was so annoying	that party popper emoji in the slack channel was so annoying	keep	that then name then emoji	works
+emoji-121	are you coming emoji eyes question mark	are you coming 👀?	insert	emoji then spoken question mark	works
+emoji-122	thanks emoji handshake comma see you tomorrow	thanks 🤝, see you tomorrow	insert	emoji then spoken comma; doubtful	works
+emoji-123	these emoji are too small on my screen	these emoji are too small on my screen	keep	these emoji, plural talk	works
+emoji-124	Hmm, let me check, um, emoji thinking face	Hmm, let me check, um, 🤔	insert	hesitation before keyword	works
+emoji-125	let me check the diary um emoji calendar	let me check the diary um 📅	insert	hesitation before keyword	works
+emoji-126	some people read the winking face emoji as flirting	some people read the winking face emoji as flirting	keep	interpretation of an emoji	works
+emoji-127	Congratulations, emoji, party popper	Congratulations, 🎉	insert	pause between keyword and name; doubtful	gap
+emoji-128	So sorry to hear that, emojis broken heart	So sorry to hear that, 💔	insert	STT plural emojis as keyword	gap
+emoji-129	the emoji unicode standard adds new ones every year	the emoji unicode standard adds new ones every year	keep	the emoji standard	works
+emoji-130	see you there emoji's smiley	see you there 🙂	insert	STT emoji's as keyword; doubtful	gap
+emoji-131	Woohoo, party-popper emoji	Woohoo, 🎉	insert	hyphenated name then emoji	works
+emoji-132	my daughter drew the poop emoji on the whiteboard	my daughter drew the poop emoji on the whiteboard	keep	reported action	works
+emoji-133	nice work thumbs-up emoji	nice work 👍	insert	hyphenated name then emoji	works
+emoji-134	I can't breathe, emoji laughing	I can't breathe, 😂	insert	emoji then name, at end	works
+emoji-135	remind me to ask about the emoji font	remind me to ask about the emoji font	keep	the emoji font	works
+emoji-136	Brilliant, emoji thumbs up medium skin tone	Brilliant, 👍🏽	insert	skin tone variant; doubtful	gap
+emoji-137	Thanks again, a moji heart eyes	Thanks again, 😍	insert	misheard a moji	gap
+emoji-138	i read that the crying face emoji is the most used one	i read that the crying face emoji is the most used one	keep	statistic about an emoji	works
+emoji-139	catch you later e moji peace sign	catch you later ✌️	insert	misheard e moji	gap
+emoji-140	That's wrong, e moji cross mark	That's wrong, ❌	insert	misheard e moji	gap
+emoji-141	people overuse the skull emoji nowadays	people overuse the skull emoji nowadays	keep	opinion about an emoji	works
+emoji-142	what a view a moji rainbow	what a view 🌈	insert	misheard a moji	gap
+emoji-143	that pasta was perfect emoji chefs kiss	that pasta was perfect 🤌	insert	slang name not in Unicode; doubtful	gap
+emoji-144	he keeps sending me a thumbs down emoji every time i ask	he keeps sending me a thumbs down emoji every time i ask	keep	reported habit	works
+emoji-145	the race starts at two flag emoji	the race starts at two 🏁	insert	bare flag, several flag emoji exist; doubtful	gap
+emoji-146	it's almost time clock emoji	it's almost time 🕐	insert	bare clock, several clock emoji exist; doubtful	gap
+emoji-147	why did they remove the pistol emoji from the keyboard	why did they remove the pistol emoji from the keyboard	keep	the emoji removed from a keyboard	works
+emoji-148	Cool, emoji sunglasses face	Cool, 😎	insert	sunglasses face, not a listed name; doubtful	gap
+emoji-149	that was smooth cool face emoji	that was smooth 😎	insert	cool face, not a listed name; doubtful	gap
+emoji-150	i wish there was an emoji for every meeting	i wish there was an emoji for every meeting	keep	wish about emoji	works

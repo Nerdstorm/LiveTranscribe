@@ -46,9 +46,10 @@
   still laid out. **Deep** also makes lists you didn't mark, in fields that take several lines:
   things you need or steps to take become a list of three or more ("We need milk, eggs and bread."),
   and it may do the same for two after a colon you said ("A few things: fixing the feeds and
-  releasing the patch."), which in a chat box may be more than you wanted. Deep doesn't yet lay out the body of a longer
-  letter: the rules put its greeting and sign-off on lines of their own and the model gets only the
-  body, which it keeps as one paragraph, even where it names a few points.
+  releasing the patch."), which in a chat box may be more than you wanted. For a longer
+  letter, the rules put the greeting and sign-off on lines of their own and the model gets only
+  the body, with a line saying so: Deep lays out the lists in it, but doesn't split it into
+  paragraphs.
 
 ## Mac
 

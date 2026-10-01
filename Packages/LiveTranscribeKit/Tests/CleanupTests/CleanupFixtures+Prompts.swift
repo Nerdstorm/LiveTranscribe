@@ -112,6 +112,12 @@ extension CleanupFixtures {
                     lines.append(try line(builder: builder, deep: deep, options: options, input: inputs[variant % inputs.count]))
                 }
             }
+            // Deep on an email's body, whose greeting and sign-off the app lays out itself, with and
+            // without placeholders, and in a field that takes one line, where the flag changes nothing.
+            for (multiline, placeholders) in [(true, []), (true, ["⟦S1⟧"]), (false, ["⟦S1⟧", "⟦S2⟧"])] as [(Bool, [String])] {
+                let options = CleanupOptions(level: .deep, placeholders: placeholders, multiline: multiline, letterBody: true)
+                lines.append(try line(builder: PromptBuilder(adapted: true), deep: deeps[0], options: options, input: inputs[0]))
+            }
             // The other levels' requests depend on neither.
             for level in CleanupLevel.allCases where !level.repairsAcrossSentences {
                 let options = CleanupOptions(level: level, vocabulary: ["Nerdstorm"], placeholders: ["⟦S1⟧"], multiline: true)

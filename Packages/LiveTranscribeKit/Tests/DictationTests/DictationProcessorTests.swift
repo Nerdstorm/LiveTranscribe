@@ -60,6 +60,19 @@ struct DictationProcessorTests {
         #expect(!output.fellBack)
     }
 
+    @Test func deepIsToldWhenTheModelGetsAnEmailsBody() async {
+        let cleaner = ScriptedCleaner(reply: Self.tidy)
+        let letter = "Hi Sam, thanks for the report. I'll review it tomorrow. Cheers, Priya"
+        _ = await finish(letter, configuration(.deep, multiline: true), cleaner: cleaner)
+        _ = await finish("thanks for the report i'll review it tomorrow", configuration(.deep, multiline: true), cleaner: cleaner)
+        _ = await finish(letter, configuration(.deep, multiline: false), cleaner: cleaner)
+        let requests = await cleaner.requests
+        #expect(requests.map(\.text) == [
+            "thanks for the report. I'll review it tomorrow.", "thanks for the report i'll review it tomorrow", letter,
+        ], "only the body of a letter whose frame is laid out goes to the model")
+        #expect(requests.map(\.options.letterBody) == [true, false, false])
+    }
+
     @Test func aDamagedPlaceholderFallsBackWithSnippetsStillExpanded() async {
         let cleaner = ScriptedCleaner { text in Self.tidy(text.replacingOccurrences(of: "S1", with: "S 1")) }
         let output = await finish("um send my calendar link to nerd storm", configuration(.medium), cleaner: cleaner)

@@ -173,6 +173,8 @@ pub fn prepare(transcript: &str, configuration: &Configuration) -> Prepared {
             .collect(),
         // What the speaker laid out, the layout rules lay out, so the model keeps one paragraph.
         multiline: configuration.multiline && !prepared.has_spoken_layout(&body),
+        // The greeting and sign-off are laid out already; Deep must write neither.
+        letter_body: frame.is_some(),
     };
     Prepared::Pending(Box::new(Pending {
         raw: raw.to_owned(),
@@ -230,5 +232,16 @@ mod tests {
             "as are spoken line breaks"
         );
         assert!(!options("we need milk eggs and bread", false).multiline);
+    }
+
+    #[test]
+    fn deep_is_told_when_the_text_is_an_emails_body() {
+        let letter = "Hi Sam, thanks for the report. I'll review it tomorrow. Cheers, Priya";
+        assert!(options(letter, true).letter_body);
+        assert!(!options("thanks for the report i'll review it tomorrow", true).letter_body);
+        assert!(
+            !options(letter, false).letter_body,
+            "a one-line field lays out no letter"
+        );
     }
 }

@@ -29,7 +29,12 @@ public struct DeepExampleValidator: Sendable {
         if example.context.contains(where: { words($0).isEmpty }) {
             problems.append("blank context line")
         }
-        let options = CleanupOptions(level: .deep, multiline: example.multiline)
+        let options = CleanupOptions(
+            level: .deep,
+            placeholders: PlaceholderToken.tokens(in: input),
+            multiline: example.multiline,
+            letterBody: example.letterBody
+        )
         if outputGuard.review(raw: input, outcome: .completed(example.target), options: options) != .accepted(example.target) {
             problems.append("Deep's output guard rejects the target")
         }
@@ -67,6 +72,37 @@ public struct DeepExampleValidator: Sendable {
         case .oneLine:
             if example.multiline || laidOut {
                 problems.append("must stay on one line in a one-line field")
+            }
+        case .listTwo, .listMany:
+            // Laid out where lines are allowed, and kept as said (casing and punctuation aside)
+            // where they are not; a list of two needs the colon the speaker said.
+            if example.multiline != laidOut {
+                problems.append(example.multiline ? "must lay the list out" : "must stay on one line in a one-line field")
+            }
+            if !laidOut, targetWords != inputWords {
+                problems.append("a list that stays keeps every word")
+            }
+            if example.category == .listTwo, laidOut, !input.contains(":") {
+                problems.append("two things are a list only after a colon the speaker said")
+            }
+        case .series:
+            if laidOut || targetWords != inputWords {
+                problems.append("a series stays in its sentence, every word kept")
+            }
+        case .body:
+            if !example.letterBody || !example.multiline {
+                problems.append("an email body is sent with the letter flag, in a field that takes several lines")
+            }
+        case .placeholder:
+            if PlaceholderToken.tokens(in: example.raw).isEmpty {
+                problems.append("must contain a placeholder token")
+            }
+            if example.letterBody, !example.multiline, laidOut {
+                problems.append("text with spoken layout stays one paragraph")
+            }
+        case .mention:
+            if cuesWritten > cuesSaid {
+                problems.append("a correction takes its cue out; it doesn't add one")
             }
         }
         return problems

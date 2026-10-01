@@ -427,6 +427,7 @@ fn the_guard_verdicts_match_the_mac_apps() {
                     vocabulary: Vec::new(),
                     placeholders: line.placeholders.clone(),
                     multiline: in_multiline_field,
+                    letter_body: false,
                 };
                 let actual = judged(&output_guard.review(&line.raw, &outcome, &options));
                 if actual != expected {

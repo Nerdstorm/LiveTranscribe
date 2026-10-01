@@ -1,6 +1,7 @@
 import Cleanup
 import Foundation
 import MLXLMCommon
+import Shared
 
 /// An example as model tokens: the prompt exactly as the app sends it, then the target and the
 /// end-of-turn token.
@@ -67,12 +68,19 @@ public struct TrainingItem: Sendable, Equatable {
     }
 
     /// A Deep example, asked as `executor` asks at Deep: its prompt for the example's field, on
-    /// the text left once fillers are removed.
+    /// the text left once fillers are removed, with its placeholder tokens as the words the model
+    /// sees (``CleanupExecutor/trainingPair(input:target:context:options:)``).
     public init(_ example: DeepExample, executor: CleanupExecutor) {
-        let options = CleanupOptions(level: .deep, multiline: example.multiline)
+        let options = CleanupOptions(
+            level: .deep,
+            placeholders: PlaceholderToken.tokens(in: example.raw),
+            multiline: example.multiline,
+            letterBody: example.letterBody
+        )
         let input = CleanupExecutor.deterministicCleanup(of: example.raw, level: .deep)
-        request = executor.request(for: input, context: example.context, options: options)
-        target = example.target
+        let pair = executor.trainingPair(input: input, target: example.target, context: example.context, options: options)
+        request = pair.request
+        target = pair.target
     }
 }
 

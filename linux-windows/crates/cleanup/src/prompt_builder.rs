@@ -23,6 +23,7 @@ const DEEP_RULES: [&str; 6] = [
     "Keep the speaker's own words wherever they are right.",
 ];
 const DEEP_MULTILINE_RULE: &str = "Lay the text out the way it would be written: an email or letter with its greeting, paragraphs and sign-off on separate lines; items or steps as a list, numbered when their order matters. Leave ordinary sentences as sentences.";
+const DEEP_LETTER_BODY_RULE: &str = "The TEXT is the body of an email; its greeting and sign-off are added separately, so do not write any. Keep the body as it is written, with items or steps laid out as a list, numbered when their order matters, and ordinary sentences left as sentences.";
 const DEEP_ONE_LINE_RULE: &str = "Write it as one paragraph, without line breaks.";
 
 /// Composes the cleanup model's instruction for a request: the base rules, the level's rules, the
@@ -64,7 +65,7 @@ impl PromptBuilder {
             return template.clone();
         }
         let mut rules: Vec<String> = if options.level.repairs_across_sentences() {
-            deep_rules(options.multiline)
+            deep_rules(options.multiline, options.letter_body)
         } else {
             BASE_RULES
                 .iter()
@@ -100,12 +101,13 @@ pub(crate) fn level_rules(level: CleanupLevel, adapted: bool) -> &'static [&'sta
 /// Deep's instruction: general rules for reading the whole dictation and writing what the speaker
 /// meant, with no worked examples. Deep's output check (`SelfRepair`) holds the answer to the same
 /// rules. In a field that takes several lines, the model lays out emails, letters and lists itself;
-/// in a one-line field it may not break lines.
-pub(crate) fn deep_rules(multiline: bool) -> Vec<String> {
-    let layout = if multiline {
-        DEEP_MULTILINE_RULE
-    } else {
-        DEEP_ONE_LINE_RULE
+/// in a one-line field it may not break lines. When the text is an email's body, whose greeting and
+/// sign-off the app has laid out already, it is told so and lays out only the lists.
+pub(crate) fn deep_rules(multiline: bool, letter_body: bool) -> Vec<String> {
+    let layout = match (multiline, letter_body) {
+        (false, _) => DEEP_ONE_LINE_RULE,
+        (true, false) => DEEP_MULTILINE_RULE,
+        (true, true) => DEEP_LETTER_BODY_RULE,
     };
     DEEP_RULES
         .iter()

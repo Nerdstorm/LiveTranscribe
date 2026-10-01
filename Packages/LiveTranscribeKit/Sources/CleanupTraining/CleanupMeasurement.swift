@@ -100,7 +100,7 @@ public enum CleanupMeasurement {
         var report = MeasurementReport(level: level.rawValue, configuration: configuration)
         for (index, evalCase) in cases.enumerated() {
             let segment = Segment(id: UUID(), sessionID: UUID(), startMs: 0, endMs: 1_000, rawText: evalCase.raw)
-            let options = CleanupOptions(level: level, multiline: evalCase.multiline)
+            let options = evalCase.options(level: level)
             _ = recorder?.take()
             let cleaned = await cleaner.clean(segment, context: evalCase.context, options: options)
             report.add(evalCase, cleaned: cleaned, level: level, generations: recorder?.take() ?? [])
@@ -127,7 +127,7 @@ public enum CleanupMeasurement {
         for evalCase in cases {
             guard let output = outputs[evalCase.id] else { continue }
             let segment = Segment(id: UUID(), sessionID: UUID(), startMs: 0, endMs: 1_000, rawText: evalCase.raw)
-            let options = CleanupOptions(level: level, multiline: evalCase.multiline)
+            let options = evalCase.options(level: level)
             let calls = OSAllocatedUnfairLock(initialState: 0)
             let cleaned = await executor.run(segment, context: evalCase.context, options: options) { _ in
                 let call = calls.withLock { count in
@@ -152,7 +152,7 @@ public enum CleanupMeasurement {
         var lines: [RequestLine] = []
         for evalCase in cases {
             let segment = Segment(id: UUID(), sessionID: UUID(), startMs: 0, endMs: 1_000, rawText: evalCase.raw)
-            let options = CleanupOptions(level: level, multiline: evalCase.multiline)
+            let options = evalCase.options(level: level)
             let captured = OSAllocatedUnfairLock<CleanupRequest?>(initialState: nil)
             _ = await executor.run(segment, context: evalCase.context, options: options) { request in
                 captured.withLock { $0 = $0 ?? request }
