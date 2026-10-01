@@ -142,11 +142,11 @@ Each row is one run, so latencies from different rows are only roughly comparabl
   ([Training/README.md](../Packages/LiveTranscribeKit/Training/README.md#deeps-adapter)), it
   fixed what the prompt alone could not: the model copied every correction without it.
 - **Medium's pass after a rejected answer**, so Deep shows at least what Medium would: on
-  Medium's own 515 test cases, Deep got 505 right, as many as Medium, where Deep's answer alone
-  got 499.
+  Medium's own 515 test cases, Deep got 508 right, three more than Medium, where Deep's answer
+  alone got 501.
 
-Deep was also run on 246 dictations from the owner's history on the Mac. They were used only to
-measure: never trained on, never in a prompt, never committed. Their target is the text the app
+Deep was also run, with its first adapter, on 246 dictations from the owner's history on the Mac.
+They were used only to measure: never trained on, never in a prompt, never committed. Their target is the text the app
 inserted at the time, which is not always right, so this measures how much Deep changes more than
 how right it is. Deep's text matched it on 198, Medium's on 214, and neither changed a protected
 fact. Of Deep's other 48 answers, many differ only in what this run leaves out (spoken emoji, and

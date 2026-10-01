@@ -172,10 +172,10 @@ cd Packages/LiveTranscribeKit
 
 - `train --deep` trains on `generated/deep-train.jsonl` and writes to `Training/runs/deep-adapter`;
   the other options are `train`'s, except `--curated-repeats`, which Deep ignores. The bundled
-  adapter was trained with the defaults (batch 8, learning rate 2e-5, seed 1) for 1,000
-  iterations on 6,043 examples; the data above has 9,345, so the same number of passes over it
-  is about 1,500. The prompt it is trained on includes the email-body line (`letterBody`), so
-  that adapter and the app's prompt ship together.
+  adapter was trained with the defaults (batch 8, learning rate 2e-5, seed 1) for 1,500
+  iterations on the 9,345 examples above (about 4 hours on an M4 Pro; the best validation loss, at
+  iteration 1,400, is the adapter kept). The prompt it is trained on includes the email-body line
+  (`letterBody`), so the adapter and the app's prompt go together.
 - `measure --level <level>` cleans every case through `MLXCleaner` and `CleanupExecutor`, as the app
   does at that level, and reports per category how often the shown text matches the target, fell
   back, came out unchanged, changed the meaning (lost a word the case keeps, or has one it rules
