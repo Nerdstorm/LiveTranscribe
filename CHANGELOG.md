@@ -4,6 +4,15 @@ What changed in each release of Live Transcribe, newest first. Before a release,
 `make changelog VERSION=x.y.z` summarises what was merged since the last one
 ([Releasing](docs/releasing.md)).
 
+## 1.1.0 - 2026-10-01
+
+- Deep lays out spoken lists more often and more reliably, on every system. In our 229 hand-written layout cases (lists, email bodies, and the emoji, snippets and line breaks said around them), Deep now gets 216 right; it got 181 before. It was retrained for this on lists, email bodies and the placeholders for emoji, snippets and addresses, and is told that it gets only an email's body, which has no greeting or sign-off to write. It still doesn't split a longer email's body into paragraphs ([#46](https://github.com/Nerdstorm/LiveTranscribe/pull/46))
+- Deep lays out two things as a list when you set them off with a colon ("A few things we need: getting the feeds working and releasing the fix"), where it used to want three ([#45](https://github.com/Nerdstorm/LiveTranscribe/pull/45))
+- Count the numbers said bare after "number one" as list markers, at Medium, High and Deep: "Number one, the form. Two, the sign-in." is now a two-item list, where the "Two" stayed in the sentence. "Number one, two, three" is still left as said ([#45](https://github.com/Nerdstorm/LiveTranscribe/pull/45))
+- Update the README, the guides and the website for the Mac, Linux and Windows apps, and the Linux and Windows `--help` and package text ([#44](https://github.com/Nerdstorm/LiveTranscribe/pull/44))
+
+[Every commit since v1.0.0](https://github.com/Nerdstorm/LiveTranscribe/compare/v1.0.0...v1.1.0)
+
 ## 1.0.0 - 2026-09-30
 
 - Live Transcribe for Linux and Windows, in the same release and at the same version as the Mac app. Hold a key to talk, or double-tap it for hands-free, and the text is typed where you're typing. The speech model runs on the NPU of an Intel Core Ultra, or on the CPU. Cleanup is the Mac app's, with its model at every level. It runs on the CPU, where it takes about four times as long as on a Mac. On Linux, dictation types on COSMIC, and should on Sway and Hyprland; GNOME, KDE Plasma and X11 desktops come later ([#31](https://github.com/Nerdstorm/LiveTranscribe/pull/31), [#33](https://github.com/Nerdstorm/LiveTranscribe/pull/33), [#40](https://github.com/Nerdstorm/LiveTranscribe/pull/40), [#41](https://github.com/Nerdstorm/LiveTranscribe/pull/41))
