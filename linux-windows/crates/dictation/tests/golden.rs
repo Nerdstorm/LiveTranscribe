@@ -152,3 +152,43 @@ fn the_text_path_matches_the_golden_cases() {
         }
     );
 }
+
+/// The ways people ask for an emoji (Fixtures/golden/emoji-phrasing.tsv): a row marked `works` must
+/// make the text the speaker wants, a row marked `gap` must not yet, so the day a rule change
+/// closes a gap this test says so and the row is set to `works`.
+#[test]
+fn every_emoji_phrasing_does_what_its_status_says() {
+    let directory = golden_directory();
+    let rows = read(&directory.join("emoji-phrasing.tsv"));
+    let rows: Vec<Vec<&str>> = rows
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+        .skip(1) // the header
+        .map(|line| line.split('\t').collect())
+        .collect();
+    assert!(rows.len() >= 100, "the rows were read");
+
+    let mut wrong = Vec::new();
+    for row in &rows {
+        assert_eq!(row.len(), 6, "{}: six columns", row[0]);
+        let (id, spoken, expected, intent, status) = (row[0], row[1], row[2], row[3], row[5]);
+        let configuration = Configuration {
+            level: CleanupLevel::None,
+            snippets: Vec::new(),
+            vocabulary: Vec::new(),
+            multiline: false,
+            vocabulary_prompt_limit: Configuration::VOCABULARY_PROMPT_LIMIT,
+            vocabulary_similarity_threshold: Configuration::VOCABULARY_SIMILARITY_THRESHOLD,
+        };
+        let text = finish(spoken, &configuration).text;
+        if intent == "keep" && expected != spoken {
+            wrong.push(format!("{id}: a keep row wants its words as said"));
+        }
+        if (text == expected) != (status == "works") {
+            wrong.push(format!(
+                "{id} is marked {status}, but dictation made {text:?} of {spoken:?}"
+            ));
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
