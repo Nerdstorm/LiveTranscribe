@@ -5,6 +5,7 @@ import Foundation
 /// which decides whether Deep may lay the text out.
 ///
 /// Its JSON is also an ``EvalCase``'s, so `Train measure` can score the generated test split.
+/// Placeholder tokens (`⟦S1⟧`) in the raw text are the ones the app passes with it.
 public struct DeepExample: Codable, Sendable, Equatable {
     public enum Category: String, Codable, Sendable, CaseIterable {
         /// A correction that takes back words in an earlier sentence.
@@ -27,6 +28,24 @@ public struct DeepExample: Codable, Sendable, Equatable {
         case oneLine = "one-line"
         /// Text that is already right.
         case unchanged
+        // The categories below are the ones of `Training/eval/layout.jsonl`, so the generated test
+        // split and the hand-written cases report in the same rows.
+        /// Two things set off with a colon ("two things I need: A and B"): a list in a field that
+        /// takes several lines, a sentence in one that takes one.
+        case listTwo = "list-two"
+        /// Three to six items, bulleted or numbered, with an opening sentence, a greeting or a
+        /// closing sentence around them.
+        case listMany = "list-many"
+        /// A series said inside a sentence, or a colon that introduces no list, which stay as said
+        /// in any field.
+        case series
+        /// The body of an email, whose greeting and sign-off the app lays out itself.
+        case body = "email-body"
+        /// Placeholder tokens (emoji, links, list markers), kept where they stand.
+        case placeholder
+        /// A correction said inside a mention ("words like X, sorry, not X, Y"), and an ordinary
+        /// contrast ("three, not four") that stays.
+        case mention
     }
 
     public var category: Category
@@ -36,15 +55,26 @@ public struct DeepExample: Codable, Sendable, Equatable {
     public var target: String
     /// The field takes several lines.
     public var multiline: Bool
+    /// The text is the body of an email: the app has laid out its greeting and sign-off.
+    public var letterBody: Bool
     /// Where the example came from: "generated", or the file it was read from.
     public var source: String
 
-    public init(category: Category, context: [String] = [], raw: String, target: String, multiline: Bool, source: String) {
+    public init(
+        category: Category,
+        context: [String] = [],
+        raw: String,
+        target: String,
+        multiline: Bool,
+        letterBody: Bool = false,
+        source: String
+    ) {
         self.category = category
         self.context = context
         self.raw = raw
         self.target = target
         self.multiline = multiline
+        self.letterBody = letterBody
         self.source = source
     }
 
@@ -63,7 +93,7 @@ public struct DeepExample: Codable, Sendable, Equatable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case category, context, raw, target, multiline, source
+        case category, context, raw, target, multiline, letterBody, source
     }
 
     public init(from decoder: any Decoder) throws {
@@ -73,6 +103,7 @@ public struct DeepExample: Codable, Sendable, Equatable {
         raw = try container.decode(String.self, forKey: .raw)
         target = try container.decode(String.self, forKey: .target)
         multiline = try container.decodeIfPresent(Bool.self, forKey: .multiline) ?? false
+        letterBody = try container.decodeIfPresent(Bool.self, forKey: .letterBody) ?? false
         source = try container.decodeIfPresent(String.self, forKey: .source) ?? ""
     }
 

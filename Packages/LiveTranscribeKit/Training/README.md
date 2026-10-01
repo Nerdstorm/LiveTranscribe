@@ -124,6 +124,12 @@ example comes from anyone's dictation history**, and none from the hand-written 
 | `layout` | 500 | An email, letter or list laid out in a field that takes several lines |
 | `oneLine` | 250 | The same, kept to one paragraph in a field that doesn't |
 | `unchanged` | 250 | Text that is already right stays as it is |
+| `listTwo` | 400 | Two things set off with a colon ("two things I need: A and B") become a list, or stay a sentence in a one-line field |
+| `listMany` | 600 | Three to six items, bulleted, or numbered when their order matters, with an opening sentence, a greeting or a closing sentence around them |
+| `series` | 600 | A series inside a sentence ("we visited Lisbon, Porto and Faro last summer"), two items with no colon, and a colon that introduces no list, all stay as said |
+| `body` | 700 | The body of an email, which the app sends without its greeting and sign-off and with `letterBody` set: a paragraph that stays one, a list laid out, a correction resolved |
+| `placeholder` | 800 | Tokens for emoji, links and list markers stay once each, where they stand, with the text around them cleaned; spoken list markers keep the text one paragraph |
+| `mention` | 200 | A correction said inside a mention ("tools like Docker, sorry, not Docker, Kubernetes") is resolved; an ordinary contrast ("three, not four") stays |
 
 Validation and test get a tenth and an eighth of these. Training and validation also get 1,260 and
 126 of Medium's own examples (`ExampleGenerator`), a third of them in a field that takes several
@@ -131,10 +137,28 @@ lines, so Deep keeps what Medium does. Examples the validator rejects are left o
 are lowercase and unpunctuated like a streaming recognizer's, the rest cased like Parakeet's.
 `generated/deep-*.jsonl` is not committed; `Train generate --deep` recreates it.
 
-`eval/deep.jsonl` holds 114 hand-written cases, never trained on and kept out of the generated
-data: the acceptance case twice, 18 controls, 15 cross-sentence and 14 garbled corrections, 14
-grammar, 10 each of facts, unchanged text, misheard words and layout, 8 corrections within a
-sentence and 3 one-line fields.
+The layout categories use `DeepLayoutFrames` (lists as packs of items with their intros, series
+frames, email bodies, token frames, mention frames), written by hand and split into training and
+test pools. No frame, intro or item pack of the test pool is in training; plain values such as
+names, cities and homophone pairs may repeat across the two, since the split measures the layout.
+They follow the conventions of the eval cases: a bulleted list is
+the intro and a colon, then `- Item` lines with a capital and no full stop; a numbered one has
+`1. Item.` lines; text after a list follows a blank line; a greeting has a line and a blank line
+to itself; a list of two is laid out only after a colon the speaker said, and `or` stays in the
+sentence, since Deep's check does not let a list drop it. Placeholder tokens are written as the
+words the model sees (`S1`), as `CleanupExecutor.trainingPair` makes them.
+
+Two files of hand-written cases are never trained on and kept out of the generated data. Both
+read as `EvalCase`s (`letterBody` marks an email's body; the placeholder tokens in the raw text
+are the ones the app passes):
+
+- `eval/deep.jsonl`, 114 cases: the acceptance case twice, 18 controls, 15 cross-sentence and 14
+  garbled corrections, 14 grammar, 10 each of facts, unchanged text, misheard words and layout, 8
+  corrections within a sentence and 3 one-line fields.
+- `eval/layout.jsonl`, 229 cases, in the categories of the table above: 35 `list-two`, 42
+  `list-many` (some of them lists that must stay sentences), 40 `series`, 40 `email-body`, 50
+  `placeholder` (four with the markers of a spoken list, as the app sends them) and 22 `mention`.
+  A unit test holds every target to Deep's own check.
 
 ### Commands
 
@@ -142,14 +166,16 @@ sentence and 3 one-line fields.
 cd Packages/LiveTranscribeKit
 .build/xcode/Build/Products/Release/Train generate --deep
 .build/xcode/Build/Products/Release/Train validate --deep
-.build/xcode/Build/Products/Release/Train train --deep --iterations 1000
-.build/xcode/Build/Products/Release/Train measure --level deep --data Training/eval/deep.jsonl --deep-adapter-dir Training/runs/deep-adapter
+.build/xcode/Build/Products/Release/Train train --deep --iterations 1500
+.build/xcode/Build/Products/Release/Train measure --level deep --data Training/eval/deep.jsonl --data Training/eval/layout.jsonl --deep-adapter-dir Training/runs/deep-adapter
 ```
 
 - `train --deep` trains on `generated/deep-train.jsonl` and writes to `Training/runs/deep-adapter`;
   the other options are `train`'s, except `--curated-repeats`, which Deep ignores. The bundled
   adapter was trained with the defaults (batch 8, learning rate 2e-5, seed 1) for 1,000
-  iterations.
+  iterations on 6,043 examples; the data above has 9,345, so the same number of passes over it
+  is about 1,500. The prompt it is trained on includes the email-body line (`letterBody`), so
+  that adapter and the app's prompt ship together.
 - `measure --level <level>` cleans every case through `MLXCleaner` and `CleanupExecutor`, as the app
   does at that level, and reports per category how often the shown text matches the target, fell
   back, came out unchanged, changed the meaning (lost a word the case keeps, or has one it rules

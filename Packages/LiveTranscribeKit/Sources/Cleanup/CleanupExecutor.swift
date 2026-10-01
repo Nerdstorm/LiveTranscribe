@@ -207,6 +207,21 @@ public struct CleanupExecutor: Sendable {
         return outputGuard.review(raw: input, outcome: outcome, options: options)
     }
 
+    /// The request the first pass sends for `input`, and `target` as the model writes it: the
+    /// placeholders in both as the words the model sees (``PlaceholderAliases``), as in `run`, so
+    /// a model trained on the pair is trained on what it will be asked.
+    public func trainingPair(
+        input: String,
+        target: String,
+        context: [String],
+        options: CleanupOptions
+    ) -> (request: CleanupRequest, target: String) {
+        let aliases = PlaceholderAliases(tokens: options.placeholders, text: input)
+        var modelOptions = options
+        modelOptions.placeholders = aliases.aliases
+        return (request(for: aliases.aliased(input), context: context, options: modelOptions), aliases.aliased(target))
+    }
+
     /// What the model is asked for `text` under `options`. The adapter is on where the level
     /// resolves self-corrections, as it was trained to, and at Deep as ``deep`` says; only Deep
     /// thinks. Training builds its prompts here too, so they are the app's.

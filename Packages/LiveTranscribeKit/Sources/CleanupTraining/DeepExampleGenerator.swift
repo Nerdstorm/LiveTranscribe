@@ -20,6 +20,7 @@ public struct DeepExampleGenerator: Sendable {
         let train: Counts = [
             .crossSentence: 800, .malformed: 650, .sameSentence: 450, .control: 650, .facts: 300,
             .grammar: 550, .recognition: 450, .layout: 500, .oneLine: 250, .unchanged: 250,
+            .listTwo: 400, .listMany: 600, .series: 600, .body: 700, .placeholder: 800, .mention: 200,
         ]
         switch split {
         case .train: return train
@@ -51,7 +52,7 @@ public struct DeepExampleGenerator: Sendable {
     static let leadShare = 0.35
 
     public let split: DataSplit
-    private var rng: SeededGenerator
+    var rng: SeededGenerator
 
     public init(split: DataSplit, seed: UInt64) {
         self.split = split
@@ -108,6 +109,18 @@ public struct DeepExampleGenerator: Sendable {
             return laidOut(multiline: true)
         case .oneLine:
             return laidOut(multiline: false)
+        case .listTwo:
+            return listTwo()
+        case .listMany:
+            return listMany()
+        case .series:
+            return series()
+        case .body:
+            return body()
+        case .placeholder:
+            return placeholder()
+        case .mention:
+            return mention()
         }
     }
 
@@ -224,7 +237,7 @@ public struct DeepExampleGenerator: Sendable {
     // MARK: - Text that stays, and slips
 
     /// Every word stays; only casing and punctuation change, and a word marked `~` is said twice.
-    private mutating func kept(_ category: DeepExample.Category, from frames: [String]) -> DeepExample {
+    mutating func kept(_ category: DeepExample.Category, from frames: [String]) -> DeepExample {
         let (said, written) = Self.alternatives(in: fill(pick(frames)))
         return dictation(category, said: sentence(said), written: sentence(written))
     }
@@ -313,12 +326,14 @@ public struct DeepExampleGenerator: Sendable {
 
     /// The example for a dictation: sometimes after a sentence that stays, in a field that takes
     /// several lines or not, and as a streaming or a cased recognizer would write it.
-    private mutating func dictation(
+    mutating func dictation(
         _ category: DeepExample.Category,
         said: String,
         written: String,
         lead: Bool = true,
-        multiline: Bool? = nil
+        multiline: Bool? = nil,
+        letterBody: Bool = false,
+        streaming: Bool = true
     ) -> DeepExample {
         var said = said
         var written = written
@@ -327,23 +342,24 @@ public struct DeepExampleGenerator: Sendable {
             said = "\(opening) \(said)"
             written = "\(opening) \(written)"
         }
-        let raw = chance(Self.streamingShare) ? EditDistance.normalize(said) : said
+        let raw = streaming && chance(Self.streamingShare) ? Self.streamingForm(of: said) : said
         return DeepExample(
             category: category,
             raw: raw,
             target: written,
             multiline: multiline ?? chance(Self.multilineShare),
+            letterBody: letterBody,
             source: "generated"
         )
     }
 
-    private mutating func contextLines() -> [String] {
+    mutating func contextLines() -> [String] {
         let frames = split == .test ? DeepFrames.unchangedTest + DeepFrames.factsTest : DeepFrames.unchangedTrain + DeepFrames.factsTrain
         return (0..<Int.random(in: 1...2, using: &rng)).map { _ in sentence(Self.alternatives(in: fill(pick(frames))).written) }
     }
 
     /// Replaces every `{kind}` placeholder except `{X}` with a value from its pool.
-    private mutating func fill(_ text: String) -> String {
+    mutating func fill(_ text: String) -> String {
         var result = text
         func replace(_ placeholder: String, _ values: () -> [String]) {
             while let range = result.range(of: placeholder) {
@@ -387,18 +403,33 @@ public struct DeepExampleGenerator: Sendable {
 
     // MARK: - Helpers
 
-    private mutating func twoValues(_ slot: Slot) -> (String, String) {
+    mutating func twoValues(_ slot: Slot) -> (String, String) {
         let values = slot == .name ? DeepPools.names(split: split) : Pools.values(slot, split: split)
         let old = pick(values)
         return (old, pick(values.filter { $0 != old }))
     }
 
-    private mutating func distinct(_ count: Int, from values: [String]) -> [String] {
+    mutating func distinct(_ count: Int, from values: [String]) -> [String] {
         Array(values.shuffled(using: &rng).prefix(count))
     }
 
-    private func sentence(_ text: String) -> String {
+    func sentence(_ text: String) -> String {
         Self.capitalisedFirst(text.trimmingCharacters(in: .whitespaces))
+    }
+
+    /// `text` as a streaming recognizer writes it: lowercase and unpunctuated, placeholder tokens
+    /// as they are.
+    static func streamingForm(of text: String) -> String {
+        let tokens = PlaceholderToken.tokens(in: text)
+        var marked = text
+        for (index, token) in tokens.enumerated() {
+            marked = marked.replacingOccurrences(of: token, with: "qzplaceholder\(index)qz")
+        }
+        var form = EditDistance.normalize(marked)
+        for (index, token) in tokens.enumerated() {
+            form = form.replacingOccurrences(of: "qzplaceholder\(index)qz", with: token)
+        }
+        return form
     }
 
     static func capitalisedFirst(_ text: String) -> String {
@@ -416,11 +447,11 @@ public struct DeepExampleGenerator: Sendable {
         return first.lowercased() + text.dropFirst()
     }
 
-    private mutating func chance(_ share: Double) -> Bool {
+    mutating func chance(_ share: Double) -> Bool {
         Double.random(in: 0..<1, using: &rng) < share
     }
 
-    private mutating func pick<T>(_ values: [T]) -> T {
+    mutating func pick<T>(_ values: [T]) -> T {
         values[Int.random(in: 0..<values.count, using: &rng)]
     }
 }
