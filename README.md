@@ -62,12 +62,28 @@ Real outputs from the dictation eval, at the default **Medium** cleanup level:
 | see you soon smiley face emoji | See you soon! 🙂 |
 | email me at john dot smith at example dot com | Email me at john.smith@example.com. |
 
-And in anything that takes several lines, such as a document, an email or a chat message:
+And in anything that takes several lines, such as a document, an email or a chat message, **Deep**
+lays out lists you never announced, and leaves a series inside a sentence alone:
 
 | You say | Live Transcribe types |
 |---|---|
-| Things to do today. First, call the bank. Second, book the flights. Third, send the invoice. | Things to do today:<br>1. Call the bank<br>2. Book the flights<br>3. Send the invoice |
-| hi John thanks for the update I will review it tomorrow cheers Sam | Hi John,<br><br>Thanks for the update. I will review it tomorrow.<br><br>Cheers,<br>Sam |
+| Hey Kofi, two things about your invoice: the total looks too high and the tax number is missing. Can you fix it? | Hey Kofi,<br><br>Two things about your invoice:<br>- The total looks too high<br>- The tax number is missing<br><br>Can you fix it? |
+| For the community garden we need: compost, raised beds, a water barrel, gloves, and volunteers for Saturday. | For the community garden we need:<br>- Compost<br>- Raised beds<br>- A water barrel<br>- Gloves<br>- Volunteers for Saturday |
+| Here's how to renew the parking permit: first log in to the council portal, second upload your proof of address, third pay the fee, and finally print the receipt. | Here's how to renew the parking permit:<br>1. Log in to the council portal.<br>2. Upload your proof of address.<br>3. Pay the fee.<br>4. Print the receipt. |
+| three things went wrong last sprint we underestimated the migration work the test environment was down for two days and nobody owned the release notes | Three things went wrong last sprint:<br>- We underestimated the migration work<br>- The test environment was down for two days<br>- Nobody owned the release notes |
+| three changes i would suggest to the pricing page: shorten the headline, show the annual plan first and add a comparison table. happy to talk it through | Three changes I would suggest to the pricing page:<br>- Shorten the headline<br>- Show the annual plan first<br>- Add a comparison table<br><br>Happy to talk it through. |
+| Last Sunday we cleaned the creek bank, planted thirty saplings and ate lunch under the old fig tree. | Last Sunday we cleaned the creek bank, planted thirty saplings and ate lunch under the old fig tree. |
+| Please send the order to the Leeds warehouse. No, sorry, the Bristol warehouse. We close for stocktake on the thirtieth. | Please send the order to the Bristol warehouse. We close for stocktake on the thirtieth. |
+| Languages like Python, sorry, not Python, Rust are a good fit for this kind of service. | Languages like Rust are a good fit for this kind of service. |
+
+These are cases from the set Deep is tested on
+([`Training/eval/layout.jsonl`](Packages/LiveTranscribeKit/Training/eval/layout.jsonl), described in
+[Training](Packages/LiveTranscribeKit/Training/README.md)), which it is never trained on; the left
+column is the text as the speech model writes it, and the right column is Deep's own answer,
+unedited. Deep got 216 of the 229 cases in
+that set right, about 0.36 s at p50 on an M4 Pro. At Medium, the default, a list you announce
+("first… second…", "number one… two…", "bullet point…") and a letter's greeting and sign-off are
+laid out by rules alone.
 
 **12 of 12 self-corrections resolved. 10 of 10 filler clips cleaned. 65 of 65 clips laid out as
 meant. 641 ms at p95.** In the 65-clip dictation eval at Medium, dictating into a multi-line
