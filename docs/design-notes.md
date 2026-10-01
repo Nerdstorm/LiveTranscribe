@@ -96,9 +96,9 @@ in [Architecture](architecture.md), with diagrams.
   rules after cleanup, from placeholders; had Deep's model laid it out too, both would have, and
   the eval's spoken lists came out with a stray line between items. So a dictation with a spoken
   line break or list marker goes to the model as one paragraph. Deep's check also turns down a
-  bulleted list of two things (a sentence's "the invoice and the agreement" pulled apart) and a
-  placeholder left on a line of its own (an emoji moved below its sentence), the two layouts the
-  eval found wrong.
+  bulleted list of two things (a sentence's "the invoice and the agreement" pulled apart, unless the
+  speaker set them off with a colon) and a placeholder left on a line of its own (an emoji moved
+  below its sentence), the two layouts the eval found wrong.
 - **A rejected Deep answer gets Medium's pass**, not the uncleaned text, so choosing Deep never
   shows less than Medium would. Running Medium's pass first, on every dictation with a
   correction cue, took two passes and got fewer right (72 of the 114, against 88 in one pass).
