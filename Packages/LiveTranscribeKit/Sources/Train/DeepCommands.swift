@@ -11,8 +11,11 @@ enum DeepPaths {
         Paths.generated.appending(component: "deep-\(split.rawValue).jsonl")
     }
 
-    /// Hand-written cases that measure Deep and are never trained on.
-    static let eval = Paths.root.appending(path: "eval/deep.jsonl")
+    /// Hand-written cases that measure Deep and are never trained on: `deep.jsonl` (corrections,
+    /// grammar, layout) and `layout.jsonl` (lists, email bodies, placeholders, mentions).
+    static let evalDirectory = Paths.root.appending(path: "eval", directoryHint: .isDirectory)
+    static let eval = evalDirectory.appending(path: "deep.jsonl")
+    static let layoutEval = evalDirectory.appending(path: "layout.jsonl")
     static let defaultAdapterOutput = Paths.root.appending(path: "runs/deep-adapter", directoryHint: .isDirectory)
 }
 
@@ -145,10 +148,12 @@ func trainDeep(_ options: TrainCommandOptions) async throws {
                  report.bestValidationLoss, report.bestIteration, options.output.relativePath, reportURL.relativePath))
 }
 
-/// The raw texts of the hand-written eval cases, normalized, which no generated example may repeat.
+/// The raw texts of the hand-written eval cases (every `.jsonl` file in `eval/`), normalized, which
+/// no generated example may repeat.
 private func heldOutRaws() throws -> Set<String> {
-    guard FileManager.default.fileExists(atPath: DeepPaths.eval.path) else { return [] }
-    return Set(try EvalCase.read(from: DeepPaths.eval).map { EditDistance.normalize($0.raw) })
+    // An unreadable folder is an error: with no cases held out, generation would train on them.
+    let files = try FileManager.default.contentsOfDirectory(at: DeepPaths.evalDirectory, includingPropertiesForKeys: nil)
+    return Set(try files.filter { $0.pathExtension == "jsonl" }.flatMap { try EvalCase.read(from: $0) }.map { EditDistance.normalize($0.raw) })
 }
 
 /// The raw texts of Medium's test cases, normalized, which measure Deep against Medium and so

@@ -19,6 +19,22 @@ public enum PlaceholderToken {
         "\(opening)S\(index)\(closing)"
     }
 
+    /// The tokens in `text`, in order of appearance: each from an opening bracket to the next
+    /// closing one.
+    public static func tokens(in text: String) -> [String] {
+        var tokens: [String] = []
+        var start: String.Index?
+        for index in text.indices {
+            if text[index] == opening {
+                start = index
+            } else if text[index] == closing, let begin = start {
+                tokens.append(String(text[begin...index]))
+                start = nil
+            }
+        }
+        return tokens
+    }
+
     /// Opening brackets in `text`: the number of tokens it holds, whole or damaged.
     public static func openingCount(in text: String) -> Int {
         text.reduce(0) { $1 == opening ? $0 + 1 : $0 }
