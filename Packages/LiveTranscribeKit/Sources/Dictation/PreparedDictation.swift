@@ -14,17 +14,25 @@ import Vocabulary
 /// ``PhraseProtector``); the user's snippets come first, so a snippet wins over a command with
 /// the same words. Afterwards the placeholders come back in two steps: line breaks and list
 /// markers first, so the layout rules see lines, then snippets, emoji and addresses, so no rule
-/// can change them.
+/// can change them. Between the two, after the layout, spoken numbers are written in digits
+/// (``NumberStyle``): after the model, which resolves a correction in words ("fifty thousand, I
+/// mean sixty thousand"), and after the list rules, which read the markers said as words.
 struct PreparedDictation {
     /// The transcript with phrases replaced and vocabulary applied: what cleanup starts from.
     let text: String
     /// Lists and letters are laid out: from Medium up, in fields that take several lines.
     let laysOut: Bool
+    /// Spoken numbers are written in digits: from Medium up, in every field.
+    let writesNumbers: Bool
     private let protected: ProtectedText
     private let layout: Layout
+    private let numbers: NumberStyle
 
     init(transcript: String, configuration: DictationProcessor.Configuration, layout: Layout = Layout()) {
         laysOut = configuration.level.formatsLayout && configuration.multiline
+        writesNumbers = configuration.level.writesNumbers
+        // A vocabulary term keeps its numbers as the user wrote them ("Studio Fifty-Four").
+        numbers = NumberStyle(keeping: configuration.vocabulary.map(\.term))
         var matchers: [any PhraseMatcher] = [SnippetExpander(snippets: configuration.snippets)]
         matchers += SpokenCommands.matchers(multiline: configuration.multiline)
         if laysOut {
@@ -48,7 +56,7 @@ struct PreparedDictation {
     }
 
     /// The text before cleanup, which Undo AI edit puts back: phrases replaced and line breaks
-    /// in place, but list markers as they were said and nothing laid out.
+    /// in place, but list markers and numbers as they were said and nothing laid out.
     var uncleaned: String {
         let asSaid: (Placeholder) -> String = { $0.role == .structure ? $0.spoken : $0.expansion }
         if let restored = protected.restore(in: withoutFullStopsAfterEmoji(text), resolving: asSaid) {
@@ -78,7 +86,8 @@ struct PreparedDictation {
         }
         let tidy = tidied(lines)
         let arranged = laysOut ? layout.arrange(tidy) : tidy
-        return protected.restore(in: arranged, roles: [.content])
+        let numbered = writesNumbers ? numbers.written(arranged) : arranged
+        return protected.restore(in: numbered, roles: [.content])
     }
 
     // MARK: - Private

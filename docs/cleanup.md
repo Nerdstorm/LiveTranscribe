@@ -6,7 +6,7 @@
 |---|---|
 | **None** | Nothing. The transcript is inserted as heard, with spoken commands applied (and, on the Mac, your snippets and vocabulary). |
 | **Light** | Punctuation, casing and misheard words. Fillers and self-corrections are kept as spoken; the model is told not to add or remove words (it may drop a repeated word such as "the the"). |
-| **Medium** (default) | Light, plus: fillers such as "um" are removed, spoken self-corrections are resolved ("Monday, no wait, Tuesday" → "Tuesday"), and spoken lists and letters are laid out wherever line breaks are allowed. |
+| **Medium** (default) | Light, plus: fillers such as "um" are removed, spoken self-corrections are resolved ("Monday, no wait, Tuesday" → "Tuesday"), spoken lists and letters are laid out wherever line breaks are allowed, and spoken numbers are written in digits ("twenty one chairs" → "21 chairs"). |
 | **High** | Medium, plus light rewording for grammar and clarity. On a 1.7B model it behaves close to Medium. A dictation with a word that can cue a correction ("no", "actually", …, whether or not it is one) is cleaned twice: Medium's pass resolves the correction, then High's rewords the result, and if that rewording is rejected, Medium's result is used. |
 | **Deep** | Medium, plus repairs that need the whole dictation: a correction that reaches back into an earlier sentence ("…whether the release is tomorrow. No, sorry, the after tomorrow." → "…whether the release is the day after tomorrow."), a garbled correction phrase read as meant, grammar ("he actually check" → "he actually checked") and misheard words fixed from what the rest says, and emails, letters and lists laid out wherever line breaks are allowed. It doesn't reword as High does: every change must be one of those repairs. Slower, and never the default. |
 
@@ -14,8 +14,8 @@ The levels work the same on the Mac, Linux and Windows: Linux and Windows run a 
 Mac app's prompts, checks and executor, held to the Swift code by test fixtures, with the same two
 adapters ([Architecture](architecture.md)). Choose the level from the menu bar (Mac) or the tray
 (Linux and Windows), or in **Settings › General**. It applies to dictation and, on the Mac, to the
-live transcript. Spoken commands and layout apply to dictation only, as do the Mac's snippets and
-vocabulary (Linux and Windows have none yet).
+live transcript. Spoken commands, layout and numbers in digits apply to dictation only, as do the
+Mac's snippets and vocabulary (Linux and Windows have none yet).
 
 ## What cleanup does
 
@@ -52,6 +52,39 @@ vocabulary (Linux and Windows have none yet).
   the line before the list ends with a colon, text after the list starts a new paragraph, and items
   keep their full stops only if every item is a sentence of four words or more. No other words
   change.
+- **Numbers.** From Medium up, in every field, rules write spoken numbers in digits once the model
+  and the list layout are done. The model sees and writes numbers as words, so it can still resolve
+  a correction between them ("fifty thousand, I mean sixty thousand" → "60,000"); speech-to-text
+  writes them as words too. These always become digits:
+
+  | Said | Written |
+  |---|---|
+  | digits said one by one, three or more ("oh" is zero there) | "zero four four six" → 0446, "room three oh two" → room 302 |
+  | decimals and versions, and any number after "version" | "two point five" → 2.5, "version two point four point one" → version 2.4.1, "version two" → version 2 |
+  | percentages | "twenty five percent" → 25%, "five percent" → 5% |
+  | dollars and cents | "one hundred and twenty five dollars" → $125, "five dollars and fifty cents" → $5.50, "fifty cents" → 50 cents |
+  | times after "at", "by", "from", "until", "till", "around", "before" or "after", or before "am" or "pm" | "at nine fifteen" → at 9:15, "seven thirty pm" → 7:30 pm, "at twelve oh five" → at 12:05 |
+  | years said in halves, 1900 to 2099 | "in twenty twenty six" → in 2026, "nineteen oh five" → 1905 |
+
+  Any other number is a count: one to nine stay words ("two things"), and 10 and up become digits
+  ("twenty one chairs" → "21 chairs"), at the start of a sentence too ("Twenty people came." →
+  "20 people came."). Numbers of five digits or more take commas and four-digit ones don't, so a
+  count reads like a year: 1500, 2026, 50,000, 1,200,000. Whole millions and billions keep the
+  word: "five million dollars" → "$5 million". Number words are read in any case ("Zero Three
+  Three Six") and hyphenated ("twenty-five-year-old" → "25-year-old"). Punctuation or a line break
+  ends a number, except a comma after "thousand", "million" or "billion" before more hundreds
+  ("two thousand, five hundred" → 2500).
+
+  These stay as said: "one" as a word ("the one I want", "one of them", "one day"); list markers
+  that were not laid out, which are below ten ("One, go to shops, two, …"), while laid-out lists
+  start with digits already; number words that make no one number ("nine eleven", "twenty four
+  seven", or "nine fifteen" without "at" or "pm"); a number before an ordinal ("the twenty first
+  century"), "o'clock" or "and a half"; clock phrases ("half past ten", "twenty to eleven");
+  "a hundred" and "a thousand", except before "dollars" or "percent" ("a hundred dollars" → $100);
+  and a range or series with a number below ten ("five to ten", "nine or ten", "eight, nine,
+  ten"), while "ten to fifteen" becomes "10 to 15" and "five to ten percent" "5% to 10%". A
+  vocabulary term keeps its numbers as you wrote it ("Studio Fifty-Four"), and so do a few idioms
+  ("forty winks", "hindsight is twenty twenty"). Undo AI edit puts the words back.
 - **Letters.** A letter needs a greeting at the start ("Dear…", "Hi…", "Hello…", "Hey…", "Good
   morning…", "To whom it may concern") and a sign-off at the end ("Kind regards", "Sincerely",
   "Best wishes", …). An everyday sign-off ("Thanks", "Thank you", "Cheers", "Best", "Love", "Take
@@ -67,8 +100,8 @@ vocabulary (Linux and Windows have none yet).
   only the system's own edit controls (Notepad's, older programs') are known to take several
   lines; browser, Electron and Office fields are typed on one line, with line breaks as spaces.
 - **A check on every answer.** The model's answer is used only if it passes. Otherwise your own
-  words are typed instead, with fillers still removed from Medium up and lists and letters still
-  laid out. Below Deep, an answer fails if it:
+  words are typed instead, with fillers still removed from Medium up, lists and letters still
+  laid out, and numbers still written in digits. Below Deep, an answer fails if it:
   - is empty or chatty;
   - drops a correction cue without a genuine self-correction;
   - deletes a run of spoken words (below High), or leaves out a word that carries meaning at any
@@ -94,9 +127,9 @@ vocabulary (Linux and Windows have none yet).
   releasing the fix", or with a comma after words that count them, "two things, …"), and a
   placeholder alone on a line. When Deep's answer is turned down, Medium's pass runs in the time
   left, so Deep never shows less than Medium would.
-- **With the language model off**, nothing is reworded. Medium, High and Deep still remove fillers
-  and lay out lists and letters in dictation, and snippets, vocabulary and spoken commands still
-  apply. The switch is **Clean up transcripts with the LLM** in **Settings › Advanced**; on the
+- **With the language model off**, nothing is reworded. Medium, High and Deep still remove fillers,
+  lay out lists and letters and write numbers in digits in dictation, and snippets, vocabulary and
+  spoken commands still apply. The switch is **Clean up transcripts with the LLM** in **Settings › Advanced**; on the
   Mac it applies at the next launch, on Linux and Windows at once.
 
 ## Spoken commands

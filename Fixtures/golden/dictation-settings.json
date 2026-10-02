@@ -64,6 +64,12 @@
       "spokenVariants": [
         "cube"
       ]
+    },
+    {
+      "term": "Studio Fifty-Four",
+      "spokenVariants": [
+        "studio fifty for"
+      ]
     }
   ],
   "vocabularyPromptLimit": 50,

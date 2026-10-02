@@ -67,7 +67,8 @@ flowchart TD
     F -->|no| G["Letter frame<br/>a letter's greeting and sign-off<br/>go on lines of their own"]
     G --> H["Cleanup of the body<br/>the only step that uses the language model"]
     H --> I["Line breaks and list markers put back<br/>lists and letters laid out"]
-    I --> J["Snippets, emoji and addresses put back"]
+    I --> NUM["Numbers written in digits<br/>from Medium up"]
+    NUM --> J["Snippets, emoji and addresses put back"]
     J --> K["Inserted at the cursor"]
     N --> K
     K --> L["Dictation history, if on (Mac)"]
@@ -88,9 +89,12 @@ flowchart TD
 5. **Letter frame.** From Medium up, in fields that take several lines, a letter's greeting and
    sign-off go on lines of their own, by rules, and only the body goes to the language model.
 6. **Cleanup.** See the next section.
-7. **Layout, then the rest put back.** Line breaks and list markers come back first, so the
-   layout rules can lay out lists and letters. Then snippets, emoji and addresses come back, where
-   no rule can change them.
+7. **Layout, numbers, then the rest put back.** Line breaks and list markers come back first, so
+   the layout rules can lay out lists and letters. From Medium up, in every field, spoken numbers
+   are then written in digits ("twenty one chairs" → "21 chairs"). This comes after the model, so
+   it resolves a correction between numbers in words ("fifty thousand, I mean sixty thousand"),
+   and after the list rules, so a list marker said as a word still makes a list. Then snippets,
+   emoji and addresses come back, where no rule can change them.
 8. **Insertion.** On the Mac, Accessibility is tried first (the text is read back to check it
    arrived), and pasting, with your clipboard restored afterwards, is the fallback; an app set to
    paste gets paste only. Linux types it through the Wayland input method, or pastes it: for now on
@@ -108,7 +112,7 @@ Where each step lives:
 | Speech to text | `Transcription` | `transcription`, with `language-model` for OpenVINO |
 | Placeholders | `Shared` (`PhraseProtector`), `Snippets`, `SpokenCommands`, `Styles` (list markers) | `shared`, `snippets`, `spoken-commands`, `styles` |
 | Vocabulary | `Vocabulary` | `vocabulary` |
-| Fillers, lists and letters | `Styles` (`FillerRemover`, `LetterFrame`) | `styles` |
+| Fillers, lists, letters and numbers | `Styles` (`FillerRemover`, `LetterFrame`, `NumberStyle`) | `styles` |
 | Cleanup | `Cleanup` | `cleanup`, which runs a model behind a trait; `language-model` is the model, joined to it in `app` |
 | Insertion | `Insertion` | `insertion`, `wayland` (Linux), `windows` (Windows) |
 | Panel, menu, Settings | `DictationUI` | `dictation-ui`, `app` |
@@ -129,7 +133,8 @@ flowchart LR
 ```
 
 1. **Rules** (`Styles`) do what needs no judgement: fillers such as "um" go from Medium up, and
-   lists and letters are laid out by rules around the model, as the previous section shows.
+   lists, letters and numbers are written by rules around the model, as the previous section
+   shows.
 2. **The prompt** (`PromptBuilder`) tells the model the level's rules in plain English, with no
    worked examples. Light to High start from the same two base rules, and each level adds its
    own; Deep has its own, longer set. This is what Medium sends, with one vocabulary term:
@@ -284,7 +289,7 @@ flowchart TD
 | `Hotkey` | The global shortcut monitor (event tap), hold and double-tap gestures, bindings |
 | `Permissions` | Accessibility and microphone permission, System Settings links |
 | `Insertion` | Typing at the cursor: Accessibility, paste with clipboard restore, per-app settings |
-| `Styles` | Rule-based filler removal and layout: lists and letters |
+| `Styles` | Rule-based filler removal, layout (lists and letters) and numbers in digits |
 | `SpokenCommands` | Emoji, punctuation, line breaks and addresses said aloud |
 | `Snippets` | Trigger phrases and the text they insert |
 | `Vocabulary` | Names and jargon, with how they are spoken |
@@ -335,7 +340,7 @@ reproduce them:
 
 ```mermaid
 flowchart LR
-    SW["Mac app's tests<br/>make golden"] -->|write| G["Fixtures/golden<br/>12,160 dictation cases,<br/>speech features"]
+    SW["Mac app's tests<br/>make golden"] -->|write| G["Fixtures/golden<br/>13,380 dictation cases,<br/>speech features"]
     SW -->|write| CF["Fixtures/cleanup<br/>every prompt, check verdict<br/>and executor trace"]
     G --> RT["Rust tests<br/>cargo test"]
     CF --> RT
@@ -379,7 +384,7 @@ flowchart LR
 | To… | Change | Then |
 |---|---|---|
 | add a spoken command | `Sources/SpokenCommands` | `make golden`, and port it to `crates/spoken-commands` |
-| change how lists or letters are laid out | `Sources/Styles` | `make golden`, and port it to `crates/styles` |
+| change how lists or letters are laid out, or numbers written | `Sources/Styles` | `make golden`, and port it to `crates/styles` |
 | change what a level may do | the level's flags and word-ratio bounds (`Shared/CleanupLevel`), the prompt (`PromptBuilder`), the passes and deadline (`CleanupExecutor`, `DeepCleanup`), and the check (`OutputGuard`, `SelfRepair`) | `make golden`, port it to `crates/cleanup` (and `crates/shared`), and measure with `Train measure` |
 | teach the model something new | the generators in `Sources/CleanupTraining` | retrain, measure before and after, and commit the adapter if nothing gets worse |
 | add a speech model | `Sources/Transcription/Resources/speech-models.json` | pin its Mac entry with `scripts/pin-speech-model.sh`, and its Linux and Windows entry with `scripts/pin-linux-windows-speech-model.sh` |

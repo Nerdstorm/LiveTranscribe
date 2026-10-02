@@ -305,6 +305,79 @@ struct DictationProcessorTests {
         #expect(output.text == "Hi John,\n\nThanks for the update\n\nCheers,\nSam")
     }
 
+    // MARK: - Numbers
+
+    /// The numbers reach the model as words, so it can resolve a correction between them, and the
+    /// number rules write its answer in digits.
+    @Test func numbersAreWrittenAfterTheModelResolvesACorrection() async {
+        let transcript = "the budget is fifty thousand, I mean sixty thousand"
+        let cleaner = ScriptedCleaner { _ in "The budget is sixty thousand." }
+        let output = await finish(transcript, configuration(.medium), cleaner: cleaner)
+        let request = await cleaner.requests.first
+        #expect(request?.text == transcript, "no placeholder hides a number from the model")
+        #expect(output.text == "The budget is 60,000.")
+        #expect(output.uncleanedText == transcript, "Undo AI edit puts the words back")
+        #expect(!output.fellBack)
+    }
+
+    @Test func numbersAreWrittenFromMediumUpInEveryField() async {
+        let transcript = "version two point four point one is out"
+        for level in CleanupLevel.allCases {
+            for multiline in [false, true] {
+                let output = await finish(transcript, configuration(level, multiline: multiline), cleaner: ScriptedCleaner { $0 })
+                #expect(output.text == (level.writesNumbers ? "version 2.4.1 is out" : transcript), "\(level), multiline \(multiline)")
+                #expect(output.uncleanedText == transcript)
+            }
+        }
+    }
+
+    @Test func numbersAreWrittenWhenCleanupFallsBack() async {
+        let output = await finish("we need twenty one chairs", configuration(.medium), cleaner: ScriptedCleaner { _ in "" })
+        #expect(output.fellBack)
+        #expect(output.text == "we need 21 chairs")
+    }
+
+    @Test func numbersAreWrittenWithTheCleanupModelOff() async {
+        let output = await finish("um we need twenty one chairs", configuration(.medium), cleaner: nil)
+        #expect(output.text == "we need 21 chairs")
+        #expect(!output.fellBack)
+    }
+
+    /// The number rules run after the list layout, so the markers said as words still make a list.
+    @Test func spokenListMarkersStillMakeAList() async {
+        let cleaner = ScriptedCleaner { _ in "One, go to shops. Two, talk to mechanic." }
+        let transcript = "one, go to shops, two talk to mechanic"
+        let multiline = await finish(transcript, configuration(.medium, multiline: true), cleaner: cleaner)
+        #expect(multiline.text == "1. Go to shops\n2. Talk to mechanic")
+        let singleLine = await finish(transcript, configuration(.medium), cleaner: cleaner)
+        #expect(singleLine.text == "One, go to shops. Two, talk to mechanic.", "markers below ten stay words")
+        let withoutTheModel = await finish(
+            "one, go to shops, two, talk to mechanic, three, buy twelve eggs",
+            configuration(.medium, multiline: true),
+            cleaner: nil
+        )
+        #expect(withoutTheModel.text == "1. Go to shops\n2. Talk to mechanic\n3. Buy 12 eggs")
+    }
+
+    @Test func snippetsAndVocabularyTermsKeepTheirNumbers() async {
+        let office = Snippet(trigger: "my office", expansion: "Suite twenty, Level five")
+        let studio = VocabularyEntry(term: "Studio Fifty-Four", spokenVariants: ["studio fifty for"])
+        let configuration = DictationProcessor.Configuration(
+            level: .medium,
+            snippets: [office],
+            vocabulary: [studio],
+            vocabularyPromptLimit: 50,
+            vocabularySimilarityThreshold: 0.8,
+            multiline: false
+        )
+        let output = await finish(
+            "meet at my office or at studio fifty for at nine thirty with twenty people",
+            configuration,
+            cleaner: nil
+        )
+        #expect(output.text == "meet at Suite twenty, Level five or at Studio Fifty-Four at 9:30 with 20 people")
+    }
+
     // MARK: - Cleanup model turned off
 
     /// Turning the model off in Advanced is a choice, not a failure: Medium still removes

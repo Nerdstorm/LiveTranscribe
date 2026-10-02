@@ -54,6 +54,14 @@
   letter, the rules put the greeting and sign-off on lines of their own and the model gets only
   the body, with a line saying so: Deep lays out the lists in it, but doesn't split it into
   paragraphs.
+- Spoken numbers are written in digits by rules, which read the words around a number but not its
+  meaning ([Cleanup](cleanup.md#what-cleanup-does)). A time needs "at", "by", "from" or the like
+  before it, or "am" or "pm" after it, so "moved to ten fifteen" stays words; three digits said
+  one by one are always a number, so "testing one two three" becomes "testing 123". A range or
+  series with a number below ten stays words ("five to ten"), which also keeps "ten to twelve"
+  whether it was a range or a time. Dates and ordinals ("March twenty first"), 24-hour times,
+  "a hundred" before anything but dollars or percent, and words such as "dozen" stay as said, and
+  other currencies are counts ("five euros", "20 euros").
 
 ## Mac
 

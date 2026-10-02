@@ -2,7 +2,7 @@ use lt_cleanup::deterministic_cleanup;
 use lt_shared::swift_string::{self as s};
 use lt_shared::{CleanupLevel, PhraseMatcher, PhraseProtector, Placeholder, ProtectedText, Role};
 use lt_snippets::SnippetExpander;
-use lt_styles::{Layout, ListMarkerCommand, TextFrame};
+use lt_styles::{Layout, ListMarkerCommand, NumberStyle, TextFrame};
 use lt_vocabulary::VocabularyReplacer;
 
 use crate::Configuration;
@@ -17,14 +17,19 @@ const SENTENCE_ENDERS: [&str; 3] = [".", "!", "?"];
 /// [`PhraseProtector`]); the user's snippets come first, so a snippet wins over a command with the
 /// same words. Afterwards the placeholders come back in two steps: line breaks and list markers
 /// first, so the layout rules see lines, then snippets, emoji and addresses, so no rule can change
-/// them.
+/// them. Between the two, after the layout, spoken numbers are written in digits ([`NumberStyle`]):
+/// after the model, which resolves a correction in words ("fifty thousand, I mean sixty
+/// thousand"), and after the list rules, which read the markers said as words.
 pub(crate) struct PreparedDictation {
     /// The transcript with phrases replaced and vocabulary applied: what cleanup starts from.
     text: String,
     /// Lists and letters are laid out: from Medium up, in fields that take several lines.
     lays_out: bool,
+    /// Spoken numbers are written in digits: from Medium up, in every field.
+    writes_numbers: bool,
     protected: ProtectedText,
     layout: Layout,
+    numbers: NumberStyle,
 }
 
 impl PreparedDictation {
@@ -37,11 +42,19 @@ impl PreparedDictation {
         }
         let protected = PhraseProtector::new(matchers).protect(transcript);
         let text = VocabularyReplacer::new(&configuration.vocabulary).apply(protected.text());
+        // A vocabulary term keeps its numbers as the user wrote them ("Studio Fifty-Four").
+        let terms: Vec<&str> = configuration
+            .vocabulary
+            .iter()
+            .map(|entry| entry.term.as_str())
+            .collect();
         Self {
             text,
             lays_out,
+            writes_numbers: configuration.level.writes_numbers(),
             protected,
             layout: Layout::default(),
+            numbers: NumberStyle::keeping(&terms),
         }
     }
 
@@ -65,7 +78,7 @@ impl PreparedDictation {
     }
 
     /// The text before cleanup, which Undo AI edit puts back: phrases replaced and line breaks in
-    /// place, but list markers as they were said and nothing laid out.
+    /// place, but list markers and numbers as they were said and nothing laid out.
     pub fn uncleaned(&self) -> String {
         let text = self.without_full_stops_after_emoji(&self.text);
         if let Some(restored) = self
@@ -108,7 +121,12 @@ impl PreparedDictation {
         } else {
             tidy
         };
-        self.protected.restore_roles(&arranged, &[Role::Content])
+        let numbered = if self.writes_numbers {
+            self.numbers.written(&arranged)
+        } else {
+            arranged
+        };
+        self.protected.restore_roles(&numbered, &[Role::Content])
     }
 
     /// The emoji placeholders: content placeholders whose expansion is emoji.

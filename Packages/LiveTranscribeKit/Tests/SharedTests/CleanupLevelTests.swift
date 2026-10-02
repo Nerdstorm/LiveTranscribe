@@ -8,12 +8,13 @@ struct CleanupLevelTests {
         #expect(CleanupLevel.allCases.filter { !$0.usesLanguageModel } == [.none])
     }
 
-    @Test func levelsFromMediumUpRemoveFillersResolveCorrectionsAndLayOutText() {
+    @Test func levelsFromMediumUpRemoveFillersResolveCorrectionsLayOutTextAndWriteNumbers() {
         for level in CleanupLevel.allCases {
             let expected = [.medium, .high, .deep].contains(level)
             #expect(level.removesFillers == expected)
             #expect(level.resolvesSelfCorrections == expected)
             #expect(level.formatsLayout == expected)
+            #expect(level.writesNumbers == expected)
         }
         #expect(CleanupLevel.allCases.filter(\.allowsRewording) == [.high])
         #expect(CleanupLevel.allCases.filter(\.repairsAcrossSentences) == [.deep])

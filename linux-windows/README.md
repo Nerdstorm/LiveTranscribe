@@ -49,7 +49,7 @@ same place in both apps:
 | Crate | Swift module | What it holds |
 |---|---|---|
 | `lt-shared` | `Shared` | Text with Swift's semantics, the phrase protector and its placeholders, word normalisation, cleanup levels |
-| `lt-styles` | `Styles` | Filler removal, and the layout of spoken lists and letters |
+| `lt-styles` | `Styles` | Filler removal, the layout of spoken lists and letters, and numbers in digits |
 | `lt-spoken-commands` | `SpokenCommands` | Emoji, dictated punctuation, line breaks, email and web addresses |
 | `lt-snippets` | `Snippets` | Snippets (tested through the golden cases; the app loads none yet) |
 | `lt-vocabulary` | `Vocabulary` | Vocabulary (the same) |
@@ -287,7 +287,7 @@ in Settings › Advanced, as it is at first, the app downloads the model the fir
 models folder, checks each file's SHA-256, and loads it on the CPU on a thread of its own
 (`cleaner.rs`). Settings › Advanced shows how that goes, and then where the model runs and with
 which adapters. Until it's ready, or with it off, nothing is reworded: dictation still removes
-filler words and lays out spoken lists and letters from Medium up. Turning it off lets the model
+filler words, lays out spoken lists and letters and writes numbers in digits from Medium up. Turning it off lets the model
 go, and turning it on loads it again, without a restart. A cleanup that takes longer than the
 **Timeout** there (3 s; for Deep, at least 8 s) is dropped, and the text goes in without it, as on
 the Mac.
