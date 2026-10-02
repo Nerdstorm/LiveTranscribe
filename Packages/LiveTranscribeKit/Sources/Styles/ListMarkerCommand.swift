@@ -7,11 +7,12 @@ import Shared
 ///
 /// Numbered markers count only in a run that starts at one and goes up by one, with the same
 /// word ("number", "item" or "step"), at least two of them, so "we're number one" stays as said.
-/// After "number one", the later numbers may be said bare, as people do: "Number one, the form is
-/// too long. Two, the sign-in failed." A bare number counts only as a marker of a run already
-/// begun, with an item between it and the marker before, starting its clause and followed by a
-/// comma, a colon, a full stop or "is" ("Two people came" and "number one, two, three" stay as
-/// said). Bullets need two markers too. Every marker needs words after it. A marker is talked
+/// After "number one", the later numbers may be said bare or as ordinals, as people do: "Number
+/// one, the form is too long. Two, the sign-in failed. Third, the emails were late." A bare
+/// number counts only as a marker of a run already begun, with an item between it and the marker
+/// before, starting its clause and followed by a comma, a colon, a full stop or "is" ("Two people
+/// came" and "number one, two, three" stay as said). A list that starts with a bare number or an
+/// ordinal is left to ``ListFormatter``, which reads "number two" after it. Bullets need two markers too. Every marker needs words after it. A marker is talked
 /// about, not said, after a determiner ("the number one priority", "a bullet point"), after a form
 /// of "be" ("speed is number one and cost is number two"), and, for bullets, after an ordinal
 /// ("the second bullet point is wrong"). An "is" straight after a number belongs to the marker
@@ -113,12 +114,12 @@ public struct ListMarkerCommand: PhraseMatcher {
         }
     }
 
-    /// Numbers said without "number" before them: "Two, …", "Three: …", "Four. …", "Five is …". Each
-    /// starts a clause, so "we have two, …" is not one, and has words after it.
+    /// Numbers said without "number" before them: "Two, …", "Three: …", "Four. …", "Five is …",
+    /// "Second, …". Each starts a clause, so "we have two, …" is not one, and has words after it.
     private func bareNumbers(in text: TokenizedText) -> [Candidate] {
         text.words.indices.dropFirst().compactMap { position in
             let word = text.words[position]
-            guard let number = Self.number(word.text),
+            guard let number = Self.number(word.text) ?? ListFormatter.ordinals[word.text],
                   text.coversWholeTokens(position..<(position + 1)),
                   Self.startsClause(position, in: text)
             else { return nil }

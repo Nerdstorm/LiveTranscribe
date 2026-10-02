@@ -1,6 +1,7 @@
 use lt_shared::phrase_grammar::{self, is_word_in};
 use lt_shared::swift_string::{self as s, CharacterSet};
 
+use crate::list_marker_command::NUMBERED_KEYWORDS;
 use crate::list_style::ListStyle;
 
 const ORDINALS: [(&str, usize); 15] = [
@@ -58,11 +59,18 @@ const SENTENCE_ENDERS: [&str; 3] = [".", "!", "?"];
 /// Deterministic, so it never changes words: it only moves them onto lines. A list needs at
 /// least two items numbered in order from one, each number starting a clause (at the start of
 /// the text, after punctuation, or after "and" / "then"); "finally" or "lastly" may end it. The
-/// numbers are spoken ordinals ("first", "second", … or "firstly", …) or cardinals ("one",
-/// "two", … or 1, 2, …). A cardinal counts only when "is", a comma, a colon or a full stop follows
-/// it, so "One of them left" and "Two people came" stay as said. A one before the list's second
-/// item starts it again. The last item runs to the end of its sentence, and any text after that
-/// starts a new paragraph. The lead-in and items are punctuated by [`ListStyle`].
+/// numbers are spoken ordinals ("first", "second", … or "firstly", …), cardinals ("one", "two", …
+/// or 1, 2, …) or cardinals after "number", "item" or "step" ("number two"), and a list may switch
+/// between them: "One, … Number two, …", "First, … Two, …". A cardinal said alone counts only
+/// when "is", a comma, a colon or a full stop follows it, so "One of them left" and "Two people
+/// came" stay as said.
+///
+/// A number said again before the list's next one moves the marker to it when it starts a
+/// sentence and the first did not, so numbers inside an item stay in it: "One, when we fix one, and
+/// two, then does it pass? Number two, …". A one said again also starts the list again when both
+/// start sentences, or neither does: "One is enough. One is the launch. Two, …". The last item
+/// runs to the end of its sentence, and any text after that starts a new paragraph. The lead-in
+/// and items are punctuated by [`ListStyle`].
 ///
 /// Words that only introduce an item belong to its number: "First of all, …", "First is …", "One
 /// is …", "Second thing is …", "Third one's …". The "is" stays in the item after a comma ("First,
@@ -92,7 +100,7 @@ impl ListFormatter {
 
         let mut items = Vec::new();
         for (index, &marker) in markers.iter().enumerate() {
-            let start = item_start(marker, &tokens);
+            let start = item_start(number_index(marker, &tokens), &tokens);
             let end = if let Some(&next) = markers.get(index + 1) {
                 let mut end = next;
                 while end > start && is_word_in(&core(tokens[end - 1]), &CONNECTORS) {
@@ -122,7 +130,7 @@ impl ListFormatter {
                 .enumerate()
                 .map(|(offset, item)| format!("{}. {item}", offset + 1)),
         );
-        let last_item_end = sentence_end(&tokens, markers[markers.len() - 1] + 1);
+        let last_item_end = sentence_end(&tokens, number_index(markers[markers.len() - 1], &tokens) + 1);
         if last_item_end < tokens.len() {
             lines.push(String::new());
             lines.push(tokens[last_item_end..].join(" "));
@@ -139,35 +147,62 @@ fn sentence_end(tokens: &[&str], start: usize) -> usize {
         .map_or(tokens.len(), |offset| start + offset + 1)
 }
 
-/// Token indices of the list's numbers, in order from one: the run of ordinals or of cardinals
-/// that starts first.
+/// Token indices of the list's numbers, where each starts: the first run of at least two numbers
+/// in order from one, each starting a clause, with "finally" or "lastly" after the second or
+/// later; `None` when there is none. A number said again moves its marker as the type's rules
+/// say.
 fn markers(tokens: &[&str]) -> Option<Vec<usize>> {
-    [run(tokens, ordinal), run(tokens, cardinal)]
-        .into_iter()
-        .flatten()
-        .min_by_key(|markers| markers[0])
-}
-
-/// The first run of at least two numbers in order from one, each starting a clause, with
-/// "finally" or "lastly" after the second or later; `None` when there is none. A one before the
-/// run's second number starts it again: "One is enough. One is the launch. Two, …".
-fn run(tokens: &[&str], numbering: fn(usize, &[&str]) -> Option<usize>) -> Option<Vec<usize>> {
     let mut markers: Vec<usize> = Vec::new();
     for index in 0..tokens.len() {
         if !starts_clause(index, tokens) {
             continue;
         }
-        let number = numbering(index, tokens);
-        if number == Some(1) && markers.len() < 2 {
-            markers = vec![index];
-        } else if !markers.is_empty() && number == Some(markers.len() + 1) {
+        let number = number(index, tokens);
+        if number == Some(markers.len() + 1) {
             markers.push(index);
+        } else if let Some(&last) = markers.last()
+            && number == Some(markers.len())
+            && takes_over(index, last, markers.len(), tokens)
+        {
+            let count = markers.len();
+            markers[count - 1] = index;
         } else if markers.len() >= 2 && is_word_in(&core(tokens[index]), &CLOSERS) {
             markers.push(index);
             break;
         }
     }
     (markers.len() >= 2).then_some(markers)
+}
+
+/// Whether the marker at `index`, which says `number` again, takes over from the run's last
+/// marker at `last`: when it starts a sentence and `last` does not, or, for a one, when both or
+/// neither do.
+fn takes_over(index: usize, last: usize, number: usize, tokens: &[&str]) -> bool {
+    let opens_sentence = starts_sentence(index, tokens);
+    let last_opens_sentence = starts_sentence(last, tokens);
+    if number == 1 {
+        opens_sentence || !last_opens_sentence
+    } else {
+        opens_sentence && !last_opens_sentence
+    }
+}
+
+/// The number the marker starting at `index` gives its item, or `None`: an ordinal, a cardinal
+/// said alone, or a cardinal after "number", "item" or "step".
+fn number(index: usize, tokens: &[&str]) -> Option<usize> {
+    ordinal(index, tokens)
+        .or_else(|| cardinal(index, tokens))
+        .or_else(|| keyworded(index, tokens))
+}
+
+/// The token index of the number in the marker starting at `index`: the next one after "number",
+/// "item" or "step", or `index` itself.
+fn number_index(index: usize, tokens: &[&str]) -> usize {
+    if keyworded(index, tokens).is_some() {
+        index + 1
+    } else {
+        index
+    }
 }
 
 fn look_up(table: &[(&str, usize)], word: &str) -> Option<usize> {
@@ -177,9 +212,26 @@ fn look_up(table: &[(&str, usize)], word: &str) -> Option<usize> {
         .map(|&(_, number)| number)
 }
 
+/// The number an ordinal gives its item ("second" → 2), or `None`.
+pub(crate) fn ordinal_number(word: &str) -> Option<usize> {
+    look_up(&ORDINALS, word)
+}
+
 /// The number the ordinal at `index` gives its item ("second" → 2), or `None`.
 fn ordinal(index: usize, tokens: &[&str]) -> Option<usize> {
-    look_up(&ORDINALS, &core(tokens[index]))
+    ordinal_number(&core(tokens[index]))
+}
+
+/// The number a cardinal after "number", "item" or "step" at `index` gives its item ("number
+/// two" → 2), or `None`, also when no words follow it.
+fn keyworded(index: usize, tokens: &[&str]) -> Option<usize> {
+    if index + 2 >= tokens.len()
+        || ends_in_punctuation(tokens[index])
+        || !is_word_in(&core(tokens[index]), &NUMBERED_KEYWORDS)
+    {
+        return None;
+    }
+    look_up(&CARDINALS, &core(tokens[index + 1]))
 }
 
 /// The number the cardinal at `index` gives its item, or `None` when it is not followed by "is",
@@ -195,8 +247,8 @@ fn cardinal(index: usize, tokens: &[&str]) -> Option<usize> {
     is_word_in(&core(tokens[index + 1]), &COPULAS).then_some(number)
 }
 
-/// Where the item introduced by the number at `marker` starts: after the words that belong to
-/// the marker (see the type's rules).
+/// Where the item introduced by the number at token `marker` starts: after the words that belong
+/// to the marker (see the type's rules).
 fn item_start(marker: usize, tokens: &[&str]) -> usize {
     let next = marker + 1;
     if next + 1 < tokens.len()
@@ -238,22 +290,25 @@ fn asks_question(index: usize, tokens: &[&str]) -> bool {
 }
 
 fn starts_clause(index: usize, tokens: &[&str]) -> bool {
-    if index == 0 || ends_with_clause_ender(tokens[index - 1]) {
-        return true;
-    }
-    // "…, and second" / "and then third"
-    let mut previous = index - 1;
-    while is_word_in(&core(tokens[previous]), &CONNECTORS) {
-        if previous == 0 || ends_with_clause_ender(tokens[previous - 1]) {
-            return true;
-        }
-        previous -= 1;
-    }
-    false
+    starts_after(index, &phrase_grammar::CLAUSE_ENDERS, tokens)
 }
 
-fn ends_with_clause_ender(token: &str) -> bool {
-    s::last_character(token).is_some_and(|last| s::is_one_of(last, &phrase_grammar::CLAUSE_ENDERS))
+fn starts_sentence(index: usize, tokens: &[&str]) -> bool {
+    starts_after(index, &SENTENCE_ENDERS, tokens)
+}
+
+/// Whether the token at `index` starts the text or follows one that ends with one of `enders`,
+/// perhaps with "and" or "then" between: "…, and second" / "and then third".
+fn starts_after(index: usize, enders: &[&str], tokens: &[&str]) -> bool {
+    for &previous in tokens[..index].iter().rev() {
+        if s::last_character(previous).is_some_and(|last| s::is_one_of(last, enders)) {
+            return true;
+        }
+        if !is_word_in(&core(previous), &CONNECTORS) {
+            return false;
+        }
+    }
+    true
 }
 
 /// The token's word, lowercased, without the punctuation around it, with a typographic
@@ -284,5 +339,94 @@ mod tests {
             Some("We need three things:\n1. Milk\n2. Eggs\n3. Bread")
         );
         assert_eq!(formatter.formatted("One of them left. Two people came."), None);
+    }
+
+    #[test]
+    fn a_list_may_switch_between_ordinals_cardinals_and_number() {
+        let formatter = ListFormatter::default();
+        for (text, list) in [
+            (
+                "First, book the venue. Two, send the invites.",
+                "1. Book the venue\n2. Send the invites",
+            ),
+            (
+                "One is the budget. Second, the timeline.",
+                "1. The budget\n2. The timeline",
+            ),
+            (
+                "One, book the venue. Number two, send the invites.",
+                "1. Book the venue\n2. Send the invites",
+            ),
+            (
+                "Number one, book the venue. Two, send the invites.",
+                "1. Book the venue\n2. Send the invites",
+            ),
+            (
+                "Number one, book the venue. Second, send the invites.",
+                "1. Book the venue\n2. Send the invites",
+            ),
+            (
+                "First, book the venue. Number two is send the invites.",
+                "1. Book the venue\n2. Send the invites",
+            ),
+            (
+                "First, book the venue. Second, send the invites. Three, order the food.",
+                "1. Book the venue\n2. Send the invites\n3. Order the food",
+            ),
+            (
+                "One, book the venue. Two, send the invites. Number three, order the food.",
+                "1. Book the venue\n2. Send the invites\n3. Order the food",
+            ),
+            (
+                "We need two things: one, the venue; and item two, the invites.",
+                "We need two things:\n1. The venue\n2. The invites",
+            ),
+        ] {
+            assert_eq!(formatter.formatted(text).as_deref(), Some(list), "{text}");
+        }
+    }
+
+    #[test]
+    fn numbers_inside_an_item_stay_in_it_when_the_markers_around_them_start_sentences() {
+        let formatter = ListFormatter::default();
+        for (text, list) in [
+            (
+                "I have two questions. One, are we sure that when we fix one and two, then the build will pass? Number two, what does it cost?",
+                "I have two questions:\n1. Are we sure that when we fix one and two, then the build will pass?\n2. What does it cost?",
+            ),
+            (
+                "One, when we fix one, and two, then does it pass? Number two, what does it cost?",
+                "1. When we fix one, and two, then does it pass?\n2. What does it cost?",
+            ),
+            (
+                "One, if we do it, one, and two, then does it pass? Number two, what does it cost?",
+                "1. If we do it, one, and two, then does it pass?\n2. What does it cost?",
+            ),
+            (
+                "First, pick one, two, then ship. Second, test it.",
+                "1. Pick one, two, then ship\n2. Test it",
+            ),
+            (
+                "One is enough, I thought. Then there were two issues. One is the build. Two, the docs.",
+                "One is enough, I thought. Then there were two issues:\n1. The build\n2. The docs",
+            ),
+        ] {
+            assert_eq!(formatter.formatted(text).as_deref(), Some(list), "{text}");
+        }
+    }
+
+    #[test]
+    fn leaves_markers_of_other_styles_that_dont_make_a_list() {
+        let formatter = ListFormatter::default();
+        for text in [
+            "Number one, two, three, go!",
+            "We're number one. Number two is Apple.",
+            "Speed is number one, number two is cost.",
+            "First, the budget. Number three, the timeline.",
+            "One, speed. Two people came.",
+            "Number two, the venue. Three, the invites.",
+        ] {
+            assert_eq!(formatter.formatted(text), None, "{text}");
+        }
     }
 }

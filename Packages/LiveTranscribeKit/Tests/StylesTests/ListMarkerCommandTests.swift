@@ -70,6 +70,8 @@ struct ListMarkerCommandTests {
         ("Number 1, speed. 2, cost. 3, price.", ["1. ", "\n2. ", "\n3. "]),
         ("Number one, speed. Number two, cost. Three, price.", ["1. ", "\n2. ", "\n3. "]),
         ("Number one speed. Two. cost.", ["1. ", "\n2. "]),
+        ("Number one, speed. Second, cost.", ["1. ", "\n2. "]),
+        ("Number one, speed. Two, cost. Third, price.", ["1. ", "\n2. ", "\n3. "]),
     ])
     func bareNumbersContinueARun(text: String, expansions: [String]) {
         #expect(protector.protect(text).placeholders.map(\.expansion) == expansions)
@@ -84,6 +86,9 @@ struct ListMarkerCommandTests {
         "Two, cost. Three, speed.",
         "Number one, speed. Two",
         "One, speed. Two, cost.",
+        "One, speed. Number two, cost.",
+        "First, speed. Second, cost.",
+        "Number one, speed. Second people came.",
         "Choose from number one, two, three or four.",
         "Number one, two, three, go!",
         "Number one, two. Three, four.",

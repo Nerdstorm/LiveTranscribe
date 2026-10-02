@@ -43,15 +43,19 @@ Mac's snippets and vocabulary (Linux and Windows have none yet).
   numbers one, two, … to ten in order, each starting a clause and followed by "is" or "was", a
   comma, a colon or a full stop ("one is the launch, two, the marketing"), by "number", "item" or
   "step" with the numbers one, two, … to twenty in order (after "number one", the later numbers may
-  be said bare: "Number one, the form. Two, the sign-in."; each then starts a clause after an item
-  and is followed by a comma, colon, full stop or "is", so "number one, two, three" stays as said),
-  or by "bullet point". A marker that is talked about stays as said: after a determiner or
-  possessive ("the", "my", "Apple's") or a form of "be" ("cost is number two", "we're number one"),
-  and a bullet marker also after an ordinal or "last", "next", "previous", "final" or "other" ("the
-  second bullet point is wrong"). The markers become "1." or "-", each item starts with a capital,
-  the line before the list ends with a colon, text after the list starts a new paragraph, and items
-  keep their full stops only if every item is a sentence of four words or more. No other words
-  change.
+  be said bare or as ordinals: "Number one, the form. Two, the sign-in. Third, the emails."; each
+  then starts a clause after an item and is followed by a comma, colon, full stop or "is", so
+  "number one, two, three" stays as said), or by "bullet point". The numbers of one list may be said
+  in different ways, each starting a clause, in order: "One, the venue. Number two, the invites."
+  and "First, the venue. Two, the invites. Three, the food." are lists. A number said again at the
+  start of a sentence takes over from the same number inside the sentence before, so numbers inside
+  an item stay there: "One, when we fix one, and two, does it pass? Number two, what does it cost?" is
+  a list of two. A marker that is talked about stays as said: after a determiner or possessive
+  ("the", "my", "Apple's") or a form of "be" ("cost is number two", "we're number one"), and a
+  bullet marker also after an ordinal or "last", "next", "previous", "final" or "other" ("the second
+  bullet point is wrong"). The markers become "1." or "-", each item starts with a capital, the line
+  before the list ends with a colon, text after the list starts a new paragraph, and items keep
+  their full stops only if every item is a sentence of four words or more. No other words change.
 - **Numbers.** From Medium up, in every field, rules write spoken numbers in digits once the model
   and the list layout are done. The model sees and writes numbers as words, so it can still resolve
   a correction between them ("fifty thousand, I mean sixty thousand" → "60,000"); speech-to-text

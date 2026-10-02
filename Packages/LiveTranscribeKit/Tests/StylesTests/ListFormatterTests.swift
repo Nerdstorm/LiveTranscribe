@@ -88,9 +88,63 @@ struct ListFormatterTests {
         "We need one, two or three volunteers.",
         "I only need one.",
         "One is enough.",
-        "One is the budget. Second, the timeline.",
     ])
     func leavesOtherCardinals(text: String) {
+        #expect(formatter.formatted(text) == nil)
+    }
+
+    @Test("A list may switch between ordinals, cardinals and \"number\"", arguments: [
+        ("First, book the venue. Two, send the invites.", "1. Book the venue\n2. Send the invites"),
+        ("One is the budget. Second, the timeline.", "1. The budget\n2. The timeline"),
+        ("One, book the venue. Number two, send the invites.", "1. Book the venue\n2. Send the invites"),
+        ("Number one, book the venue. Two, send the invites.", "1. Book the venue\n2. Send the invites"),
+        ("Number one, book the venue. Second, send the invites.", "1. Book the venue\n2. Send the invites"),
+        ("First, book the venue. Number two is send the invites.", "1. Book the venue\n2. Send the invites"),
+        (
+            "First, book the venue. Second, send the invites. Three, order the food.",
+            "1. Book the venue\n2. Send the invites\n3. Order the food"
+        ),
+        (
+            "One, book the venue. Two, send the invites. Number three, order the food.",
+            "1. Book the venue\n2. Send the invites\n3. Order the food"
+        ),
+        (
+            "We need two things: one, the venue; and item two, the invites.",
+            "We need two things:\n1. The venue\n2. The invites"
+        ),
+    ])
+    func switchesMarkerStyles(text: String, list: String) {
+        #expect(formatter.formatted(text) == list)
+    }
+
+    @Test("Numbers inside an item stay in it when the markers around them start sentences", arguments: [
+        (
+            "I have two questions. One, are we sure that when we fix one and two, then the build will pass? Number two, what does it cost?",
+            "I have two questions:\n1. Are we sure that when we fix one and two, then the build will pass?\n2. What does it cost?"
+        ),
+        (
+            "One, when we fix one, and two, then does it pass? Number two, what does it cost?",
+            "1. When we fix one, and two, then does it pass?\n2. What does it cost?"
+        ),
+        (
+            "One, if we do it, one, and two, then does it pass? Number two, what does it cost?",
+            "1. If we do it, one, and two, then does it pass?\n2. What does it cost?"
+        ),
+        ("First, pick one, two, then ship. Second, test it.", "1. Pick one, two, then ship\n2. Test it"),
+    ])
+    func numbersInsideAnItemStayInIt(text: String, list: String) {
+        #expect(formatter.formatted(text) == list)
+    }
+
+    @Test("Leaves markers of other styles that don't make a list", arguments: [
+        "Number one, two, three, go!",
+        "We're number one. Number two is Apple.",
+        "Speed is number one, number two is cost.",
+        "First, the budget. Number three, the timeline.",
+        "One, speed. Two people came.",
+        "Number two, the venue. Three, the invites.",
+    ])
+    func leavesOtherStyles(text: String) {
         #expect(formatter.formatted(text) == nil)
     }
 

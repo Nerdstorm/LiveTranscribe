@@ -7,10 +7,16 @@ import Shared
 /// Deterministic, so it never changes words: it only moves them onto lines. A list needs at
 /// least two items numbered in order from one, each number starting a clause (at the start of
 /// the text, after punctuation, or after "and" / "then"); "finally" or "lastly" may end it. The
-/// numbers are spoken ordinals ("first", "second", … or "firstly", …) or cardinals ("one",
-/// "two", … or 1, 2, …). A cardinal counts only when "is", a comma, a colon or a full stop
-/// follows it, as in "One is the launch. Two, the marketing.", so "One of them left" and "Two
-/// people came" stay as said. A one before the list's second item starts it again. The last item
+/// numbers are spoken ordinals ("first", "second", … or "firstly", …), cardinals ("one",
+/// "two", … or 1, 2, …) or cardinals after "number", "item" or "step" ("number two"), and a list
+/// may switch between them: "One, … Number two, …", "First, … Two, …". A cardinal said alone
+/// counts only when "is", a comma, a colon or a full stop follows it, as in "One is the launch.
+/// Two, the marketing.", so "One of them left" and "Two people came" stay as said.
+///
+/// A number said again before the list's next one moves the marker to it when it starts a
+/// sentence and the first did not, so numbers inside an item stay in it: "One, when we fix one, and
+/// two, then does it pass? Number two, …". A one said again also starts the list again when both
+/// start sentences, or neither does: "One is enough. One is the launch. Two, …". The last item
 /// runs to the end of its sentence, and any text after that starts a new paragraph. The lead-in
 /// and items are punctuated by ``ListStyle``.
 ///
@@ -18,7 +24,7 @@ import Shared
 /// "One is …", "Second thing is …", "Third one's …". The "is" stays in the item after a comma
 /// ("First, is it ready?") or in a question ("First is it ready?").
 public struct ListFormatter: Sendable {
-    private static let ordinals: [String: Int] = [
+    static let ordinals: [String: Int] = [
         "first": 1, "firstly": 1, "second": 2, "secondly": 2, "third": 3, "thirdly": 3,
         "fourth": 4, "fourthly": 4, "fifth": 5, "fifthly": 5, "sixth": 6, "seventh": 7,
         "eighth": 8, "ninth": 9, "tenth": 10,
@@ -56,7 +62,7 @@ public struct ListFormatter: Sendable {
 
         var items: [String] = []
         for (index, marker) in markers.enumerated() {
-            let start = Self.itemStart(after: marker, in: tokens)
+            let start = Self.itemStart(after: Self.numberIndex(ofMarkerAt: marker, in: tokens), in: tokens)
             var end: Int
             if index + 1 < markers.count {
                 end = markers[index + 1]
@@ -77,32 +83,27 @@ public struct ListFormatter: Sendable {
             lines.append(leadIn)
         }
         lines += styled.enumerated().map { "\($0.offset + 1). \($0.element)" }
-        let lastItemEnd = tokens[(markers.last! + 1)...].firstIndex(where: Self.endsSentence).map { $0 + 1 } ?? tokens.count
+        let lastNumber = Self.numberIndex(ofMarkerAt: markers.last!, in: tokens)
+        let lastItemEnd = tokens[(lastNumber + 1)...].firstIndex(where: Self.endsSentence).map { $0 + 1 } ?? tokens.count
         if lastItemEnd < tokens.count {
             lines += ["", tokens[lastItemEnd...].joined(separator: " ")]
         }
         return lines
     }
 
-    /// Token indices of the list's numbers, in order from one: the run of ordinals or of
-    /// cardinals that starts first.
+    /// Token indices of the list's numbers, where each starts: the first run of at least two
+    /// numbers in order from one, each starting a clause, with "finally" or "lastly" after the
+    /// second or later; `nil` when there is none. A number said again moves its marker as the
+    /// type's rules say.
     private func markers(in tokens: [String]) -> [Int]? {
-        [run(in: tokens, numbering: Self.ordinal), run(in: tokens, numbering: Self.cardinal)]
-            .compactMap { $0 }
-            .min { $0[0] < $1[0] }
-    }
-
-    /// The first run of at least two numbers in order from one, each starting a clause, with
-    /// "finally" or "lastly" after the second or later; `nil` when there is none. A one before
-    /// the run's second number starts it again: "One is enough. One is the launch. Two, …".
-    private func run(in tokens: [String], numbering: (Int, [String]) -> Int?) -> [Int]? {
         var markers: [Int] = []
-        for index in tokens.indices where startsClause(index, in: tokens) {
-            let number = numbering(index, tokens)
-            if number == 1, markers.count < 2 {
-                markers = [index]
-            } else if !markers.isEmpty, number == markers.count + 1 {
+        for index in tokens.indices where Self.startsClause(index, in: tokens) {
+            let number = Self.number(at: index, in: tokens)
+            if number == markers.count + 1 {
                 markers.append(index)
+            } else if let last = markers.last, number == markers.count,
+                      Self.takesOver(index, from: last, saying: markers.count, in: tokens) {
+                markers[markers.count - 1] = index
             } else if markers.count >= 2, Self.closers.contains(Self.core(tokens[index])) {
                 markers.append(index)
                 break
@@ -111,9 +112,39 @@ public struct ListFormatter: Sendable {
         return markers.count >= 2 ? markers : nil
     }
 
+    /// Whether the marker at `index`, which says `number` again, takes over from the run's last
+    /// marker at `last`: when it starts a sentence and `last` does not, or, for a one, when both
+    /// or neither do.
+    private static func takesOver(_ index: Int, from last: Int, saying number: Int, in tokens: [String]) -> Bool {
+        let opensSentence = startsSentence(index, in: tokens)
+        let lastOpensSentence = startsSentence(last, in: tokens)
+        return number == 1 ? opensSentence || !lastOpensSentence : opensSentence && !lastOpensSentence
+    }
+
+    /// The number the marker starting at `index` gives its item, or `nil`: an ordinal, a cardinal
+    /// said alone, or a cardinal after "number", "item" or "step".
+    private static func number(at index: Int, in tokens: [String]) -> Int? {
+        ordinal(at: index, in: tokens) ?? cardinal(at: index, in: tokens) ?? keyworded(at: index, in: tokens)
+    }
+
+    /// The token index of the number in the marker starting at `index`: the next one after
+    /// "number", "item" or "step", or `index` itself.
+    private static func numberIndex(ofMarkerAt index: Int, in tokens: [String]) -> Int {
+        keyworded(at: index, in: tokens) == nil ? index : index + 1
+    }
+
     /// The number the ordinal at `index` gives its item ("second" → 2), or `nil`.
     private static func ordinal(at index: Int, in tokens: [String]) -> Int? {
         ordinals[core(tokens[index])]
+    }
+
+    /// The number a cardinal after "number", "item" or "step" at `index` gives its item ("number
+    /// two" → 2), or `nil`, also when no words follow it.
+    private static func keyworded(at index: Int, in tokens: [String]) -> Int? {
+        guard index + 2 < tokens.count, tokens[index].last?.isPunctuation != true,
+              ListMarkerCommand.numberedKeywords.contains(core(tokens[index]))
+        else { return nil }
+        return cardinals[core(tokens[index + 1])]
     }
 
     /// The number the cardinal at `index` gives its item, or `nil` when it is not followed by
@@ -124,8 +155,8 @@ public struct ListFormatter: Sendable {
         return copulas.contains(core(tokens[index + 1])) ? number : nil
     }
 
-    /// Where the item introduced by the number at `marker` starts: after the words that belong
-    /// to the marker (see the type's rules).
+    /// Where the item introduced by the number at token `marker` starts: after the words that
+    /// belong to the marker (see the type's rules).
     private static func itemStart(after marker: Int, in tokens: [String]) -> Int {
         let next = marker + 1
         if next + 1 < tokens.count, core(tokens[marker]) == "first", core(tokens[next]) == "of", core(tokens[next + 1]) == "all" {
@@ -149,17 +180,24 @@ public struct ListFormatter: Sendable {
         tokens[index...].first(where: endsSentence)?.last == "?"
     }
 
-    private func startsClause(_ index: Int, in tokens: [String]) -> Bool {
-        guard index > 0 else { return true }
-        if let last = tokens[index - 1].last, Self.clauseEnders.contains(last) { return true }
-        // "…, and second" / "and then third"
+    private static func startsClause(_ index: Int, in tokens: [String]) -> Bool {
+        starts(index, after: clauseEnders, in: tokens)
+    }
+
+    private static func startsSentence(_ index: Int, in tokens: [String]) -> Bool {
+        starts(index, after: sentenceEnders, in: tokens)
+    }
+
+    /// Whether the token at `index` starts the text or follows one that ends with one of
+    /// `enders`, perhaps with "and" or "then" between: "…, and second" / "and then third".
+    private static func starts(_ index: Int, after enders: Set<Character>, in tokens: [String]) -> Bool {
         var previous = index - 1
-        while previous >= 0, Self.connectors.contains(Self.core(tokens[previous])) {
-            if previous == 0 { return true }
-            if let last = tokens[previous - 1].last, Self.clauseEnders.contains(last) { return true }
+        while previous >= 0 {
+            if let last = tokens[previous].last, enders.contains(last) { return true }
+            guard connectors.contains(core(tokens[previous])) else { return false }
             previous -= 1
         }
-        return false
+        return true
     }
 
     /// The token's word, lowercased, without the punctuation around it, with a typographic
