@@ -25,18 +25,41 @@ extension SelfRepair {
     /// inside the phrase, a repair may re-use only the words it corrects ("the Monday after" → "the
     /// Monday after next"). The cues may be followed by "not" and corrected words said again, which
     /// go with them ("room four, no, not four, five"; ``restates(_:_:)``).
+    ///
+    /// A correction must also keep its meaning: the word that says what it says instead, its
+    /// phrase's key word (``keyWord(of:correcting:)``), stays, as itself or a word like it
+    /// ("busses" → "buses"), and the corrected words it takes back are never written again
+    /// (``takenBack(by:from:)``, ``stoodInFor(phrase:key:corrected:)``), so "the blue room, sorry,
+    /// the green room" is "the green room", and neither "the blue room" nor "the blue green room".
+    /// Nor does a phrase that says the corrected words again after a new word leave the word before
+    /// them, which the new word takes back (``leavesTakenBack(_:corrected:phrase:)``); it corrects
+    /// that word too ("The billing service goes live. Sorry, I mean the login service." → "The
+    /// login service goes live."). Nor does a fact or a name leave the one of its sort just before
+    /// the words it corrects ("three servers, sorry, four" corrects "three", never only "servers").
     enum Corrections {
-        /// Medium's corrections: for each start, the ends of the corrected words and cues that may
-        /// be taken out from there; and for each phrase that follows, the words it may correct and,
-        /// of those, the ones its repair may re-use (none after "scratch that").
-        static func spans(
-            in words: [SaidWord],
-            repair: SelfRepair,
-            placeholders: Set<String>
-        ) -> (ends: [Int: [Int]], corrected: [Int: Set<String>], spare: [Int: Set<String>]) {
+        /// Medium's corrections in the words said, by said index.
+        struct Spans {
+            /// For each start, the ends of the corrected words and cues that may be taken out from
+            /// there.
             var ends: [Int: [Int]] = [:]
-            var correctedWords: [Int: Set<String>] = [:]
+            /// For each phrase that follows, by where it starts, the words it may correct.
+            var corrected: [Int: Set<String>] = [:]
+            /// Of those, the ones its repair may re-use (none after "scratch that").
             var spare: [Int: Set<String>] = [:]
+            /// For each phrase, by where it starts, the corrected words its key word takes back,
+            /// which no repair may write again.
+            var taken: [Int: Set<String>] = [:]
+            /// Where the key words of the phrases are, which no repair may change.
+            var keys: [Int] = []
+        }
+
+        /// Medium's corrections in `words`.
+        static func spans(in words: [SaidWord], repair: SelfRepair, placeholders: Set<String>) -> Spans {
+            var spans = Spans()
+            // Every word each phrase may correct, by where it starts. Which of them a repair took
+            // back isn't known, so its key word and the words that takes back are found among them
+            // all.
+            var takenBack: [Int: Set<Int>] = [:]
             for (cueStart, runEnds) in cueRuns(in: words, repair: repair) {
                 // Speech-to-text ends a sentence where the speaker paused, so a cue that opens one
                 // may take back the end of the one before ("I left my charger in the garage.
@@ -83,19 +106,31 @@ extension SelfRepair {
                                 || restated.map({ repair.restates(corrected, words[$0]) }) == true
                                 || standsIn(from: end)) {
                             let length = min(Alignment.phraseLength(from: end, in: words), SelfRepair.correctionPhraseWords)
+                            let phrase = words[end..<(end + length)]
+                            guard !repair.leavesTakenBack(words, corrected: start..<cueStart, phrase: phrase) else { continue }
                             if !retractsStatement {
-                                guard repair.phrase(words[end..<(end + length)], takesBackFactsIn: corrected, placeholders: placeholders) else {
+                                guard repair.phrase(phrase, takesBackFactsIn: corrected, placeholders: placeholders) else {
                                     continue
                                 }
-                                spare[end, default: []].formUnion(corrected.map(\.word))
+                                spans.spare[end, default: []].formUnion(corrected.map(\.word))
                             }
-                            ends[start, default: []].append(end)
-                            correctedWords[end, default: []].formUnion(corrected.map(\.word))
+                            takenBack[end, default: []].formUnion(start..<cueStart)
+                            spans.ends[start, default: []].append(end)
+                            spans.corrected[end, default: []].formUnion(corrected.map(\.word))
                         }
                     }
                 }
             }
-            return (ends, correctedWords, spare)
+            for (end, indices) in takenBack {
+                let length = min(Alignment.phraseLength(from: end, in: words), SelfRepair.correctionPhraseWords)
+                let phrase = words[end..<(end + length)]
+                let corrected = indices.sorted().map { words[$0] }[...]
+                if let key = repair.keyWord(of: phrase, correcting: corrected) {
+                    spans.keys.append(end + key)
+                    spans.taken[end] = repair.stoodInFor(phrase: phrase, key: key, corrected: corrected)
+                }
+            }
+            return spans
         }
 
         /// The words said with the corrections whose phrase goes back applied, in every way they
@@ -166,10 +201,12 @@ extension SelfRepair {
                                           !words[corrected].contains(where: { $0.opensPhrase > 0 }),
                                           restated.map({ repair.restates(words[$0], words[corrected]) }) ?? true,
                                           repair.relates(words[start], to: words[phrase], weak: weak)
-                                            || (count == 1 && !weak && repair.replaces(words[start], with: words[phrase])),
+                                            || (count == 1 && !weak && repair.replaces(words[start], with: words[phrase]))
+                                            || repair.takesBackFirst(words[corrected], phrase: words[phrase]),
                                           repair.relates(words[corrected.upperBound - 1], to: words[phrase], weak: weak)
                                             || (count == 1 && !weak && repair.replaces(words[start], with: words[phrase])),
-                                          repair.phrase(words[phrase], takesBackFactsIn: words[corrected], placeholders: placeholders)
+                                          repair.phrase(words[phrase], takesBackFactsIn: words[corrected], placeholders: placeholders),
+                                          !repair.leavesTakenBack(words, corrected: corrected, phrase: words[phrase])
                                     else { continue }
                                     results.append(rewrite(words, correcting: corrected, cues: cueStart..<end, phrase: phrase))
                                 }
@@ -182,8 +219,16 @@ extension SelfRepair {
         }
 
         /// `words` with `phrase` put in place of `corrected`, and `cues` taken out. The phrase ends
-        /// a sentence when it replaced words that did.
-        private static func rewrite(_ words: [SaidWord], correcting corrected: Range<Int>, cues: Range<Int>, phrase: Range<Int>) -> [SaidWord] {
+        /// a sentence when it replaced words that did. A phrase an earlier correction opened ends
+        /// where its words stop following each other, as when this one takes a cue out of it
+        /// ("email no one").
+        private static func rewrite(_ said: [SaidWord], correcting corrected: Range<Int>, cues: Range<Int>, phrase: Range<Int>) -> [SaidWord] {
+            var words = said
+            for segment in [0..<corrected.lowerBound, phrase, corrected.upperBound..<cues.lowerBound, phrase.upperBound..<words.count] {
+                for index in segment where words[index].opensPhrase > 0 {
+                    words[index].opensPhrase = min(words[index].opensPhrase, segment.upperBound - index)
+                }
+            }
             var moved = Array(words[phrase])
             moved[0].opensPhrase = moved.count
             moved[0].spare = words[corrected].map(\.word)
@@ -209,13 +254,21 @@ extension SelfRepair {
             return starts
         }
 
-        /// Where each run of cues can end, by where it starts.
+        /// Where each run of cues can end, by where it starts; a cue misheard as another word
+        /// (``cueSoundAlikes``) may end it. The ends of a run follow the order of the policy's cues,
+        /// which decides which rewrites ``maxRewrites`` keeps.
         private static func cueRuns(in words: [SaidWord], repair: SelfRepair) -> [Int: [Int]] {
             let texts = words.map(\.word)
             var cueEnds: [Int: [Int]] = [:]
             for cue in repair.correctionCues where texts.count >= cue.count {
                 for start in 0...(texts.count - cue.count) where texts[start..<(start + cue.count)].elementsEqual(cue) {
-                    cueEnds[start, default: []].append(start + cue.count)
+                    let end = start + cue.count
+                    cueEnds[start, default: []].append(end)
+                    // A cue speech-to-text misheard, just after one it didn't, goes with it ("the
+                    // monitor, wait, node, the router").
+                    if end < texts.count, cueSoundAlikes.contains(texts[end]) {
+                        cueEnds[start, default: []].append(end + 1)
+                    }
                 }
             }
             func runEnds(from start: Int) -> [Int] {
@@ -226,6 +279,9 @@ extension SelfRepair {
 
         /// Cue words that as often start a new point as correct the last one.
         static let weakCues: Set<String> = ["no", "wait", "actually", "rather"]
+        /// Words speech-to-text writes for a cue ("know" for "no", "weight" for "wait", "made" for
+        /// "make"), which say nothing a correction says instead.
+        static let cueSoundAlikes: Set<String> = ["know", "now", "note", "node", "weight", "weigh", "way", "made", "maid"]
         /// Words that start a new clause, which a correction of the sentence before doesn't.
         static let subjects: Set<String> = [
             "i", "we", "you", "he", "she", "it", "they", "i'm", "i'll", "i've", "i'd", "we're", "we'll", "we've", "we'd",
@@ -340,4 +396,159 @@ extension SelfRepair {
         guard let verb = WordForms.expansions(of: negation).first?.first else { return false }
         return words.contains { $0 == verb || WordForms.areForms($0, verb) }
     }
+
+    // MARK: - Meaning
+
+    /// Whether `word` says something a correction can take back or say instead: it holds more than
+    /// the grammar together, and isn't a filler, a cue, or a cue as speech-to-text misheard it
+    /// ("know" for "no").
+    private func carriesMeaning(_ word: SaidWord) -> Bool {
+        !isFunctionWord(word.word) && !isFiller(word.word) && !isCue(word.word)
+            && !Corrections.cueSoundAlikes.contains(word.word)
+    }
+
+    /// Whether `word` is likely a word that holds the grammar together, misheard ("thee" for "the",
+    /// "theon" for "then"): no fact or name, and close to one.
+    private func isMisheardFunctionWord(_ word: SaidWord) -> Bool {
+        guard !word.mayBeName, factKind(word) == nil else { return false }
+        let length = word.word.count
+        return allFunctionWords.contains { functionWord in
+            let other = functionWord.count
+            // Words further apart in length can't be as alike.
+            return Double(abs(length - other)) <= (1 - Self.minMisheardSimilarity) * Double(max(length, other))
+                && EditDistance.normalizedSimilarity(word.word, functionWord) >= Self.minMisheardSimilarity
+        }
+    }
+
+    /// How far into a correction's `phrase` its key word is: the first word that carries meaning
+    /// and isn't among the `corrected` words or a misheard word that only holds the grammar
+    /// together, which says what the correction says instead ("green" in "the blue room, sorry,
+    /// the green room"). No repair may change it into another word, so an answer can't keep what
+    /// was corrected and lose the correction.
+    func keyWord(of phrase: ArraySlice<SaidWord>, correcting corrected: ArraySlice<SaidWord>) -> Int? {
+        phrase.firstIndex { carriesMeaning($0) && !Self.isSaid($0, in: corrected) && !isMisheardFunctionWord($0) }
+            .map { $0 - phrase.startIndex }
+    }
+
+    /// What sort of thing a word says, finer than ``FactKind``, for what a key word takes back.
+    private enum Sort {
+        case number, day, month
+        /// Another word of time ("tomorrow", "noon", "week").
+        case time
+        case unit, negation
+        /// A name, capitalised where no sentence starts.
+        case name
+        /// Any other word that carries meaning.
+        case word
+    }
+
+    /// What sort of thing `word` says, which a key word takes back one of its own sort of.
+    private func sort(of word: SaidWord, mayIsMonth: Bool = false) -> Sort {
+        switch factKind(word, mayIsMonth: mayIsMonth) {
+        case nil: word.isName ? .name : .word
+        case .negation: .negation
+        case .unit: .unit
+        case .number where WordForms.isNumber(word.word): .number
+        case .number where Self.days.contains(word.word): .day
+        case .number where Self.isMonth(word) || word.word == "may": .month
+        case .number: .time
+        }
+    }
+
+    /// The `corrected` words a correction whose `phrase` goes back takes back, which no repair may
+    /// write again once it has a key word: those that carry meaning and that the phrase doesn't say
+    /// again ("Tuesday" for "Wednesday", "billing" for "the login service").
+    func takenBack(by phrase: ArraySlice<SaidWord>, from corrected: ArraySlice<SaidWord>) -> Set<String> {
+        Set(corrected.filter { carriesMeaning($0) && !Self.isSaid($0, in: phrase) }.map(\.word))
+    }
+
+    /// Of the words a phrase of Medium's corrections may correct (`corrected`, all of them, since
+    /// which a repair took back isn't known), the ones the key word `key` words into the phrase
+    /// stands in for, which no repair may write again: the one where the phrase puts it, found by a
+    /// word the phrase says again after it ("blue" in "the blue room, sorry, the green room") or
+    /// else before it ("Sam" in "send it to Sam, sorry, to Priya"); without one, for a fact, the
+    /// corrected facts ("three" in "three servers, sorry, four"), and for a name, the one name
+    /// corrected. Other corrected words may be written again ("I'm meeting divya at the station,
+    /// actually nikhil" → "I'm meeting Nikhil at the station").
+    func stoodInFor(phrase: ArraySlice<SaidWord>, key: Int, corrected: ArraySlice<SaidWord>) -> Set<String> {
+        let mayIsMonth = corrected.contains(where: Self.isMonth)
+        let keySort = sort(of: phrase[phrase.startIndex + key], mayIsMonth: mayIsMonth)
+        func isTaken(_ word: SaidWord) -> Bool {
+            carriesMeaning(word) && sort(of: word, mayIsMonth: mayIsMonth) == keySort && !Self.isSaid(word, in: phrase)
+        }
+        let after = ((key + 1)..<phrase.count).first {
+            carriesMeaning(phrase[phrase.startIndex + $0]) && Self.isSaid(phrase[phrase.startIndex + $0], in: corrected)
+        }
+        let before = (0..<key).reversed().first { Self.isSaid(phrase[phrase.startIndex + $0], in: corrected) }
+        guard let anchor = after ?? before else {
+            switch keySort {
+            case .name:
+                let names = corrected.filter(isTaken)
+                return names.count == 1 ? [names[0].word] : []
+            case .word:
+                return []
+            default:
+                return Set(corrected.filter { factKind($0, mayIsMonth: mayIsMonth) != nil && !Self.isSaid($0, in: phrase) }.map(\.word))
+            }
+        }
+        // The corrected word as far from the anchor said again as the key word is in the phrase.
+        guard let index = corrected.lastIndex(where: { $0.word == phrase[phrase.startIndex + anchor].word }),
+              corrected.indices.contains(index + key - anchor), isTaken(corrected[index + key - anchor])
+        else { return [] }
+        return [corrected[index + key - anchor].word]
+    }
+
+    /// Whether a reading of a correction would keep the word its key word takes back, just before
+    /// the `corrected` words of `words`: its `phrase` says each of them that carries meaning again,
+    /// after the key word, so it corrects that word too ("the blue room, sorry, the green room"
+    /// corrects "blue room", and is never "the blue green room"); or the key word is a fact or a
+    /// name, none of the corrected words is one of its sort, and the word before them that carries
+    /// meaning is ("three servers, sorry, four" corrects "three", and is never "three, four
+    /// servers"; "Invite Sam to the launch. Sorry, Priya." corrects "Sam", and is never "Invite Sam
+    /// and Priya to the launch.").
+    func leavesTakenBack(_ words: [SaidWord], corrected: Range<Int>, phrase: ArraySlice<SaidWord>) -> Bool {
+        corrected.lowerBound > 0 && !words[corrected.lowerBound - 1].endsSentence
+            && (takesBackFirst(words[(corrected.lowerBound - 1)..<corrected.upperBound], phrase: phrase)
+                || leavesItsSort(words, corrected: corrected, phrase: phrase))
+    }
+
+    /// Whether the key word of `phrase` is a fact or a name, none of the `corrected` words of
+    /// `words` is of its sort, and the last word before them in their sentence that carries
+    /// meaning is.
+    private func leavesItsSort(_ words: [SaidWord], corrected: Range<Int>, phrase: ArraySlice<SaidWord>) -> Bool {
+        let correctedWords = words[corrected]
+        guard let before = words[..<corrected.lowerBound].reversed().prefix(while: { !$0.endsSentence }).first(where: carriesMeaning)
+        else { return false }
+        let mayIsMonth = correctedWords.contains(where: Self.isMonth)
+        let beforeSort = sort(of: before, mayIsMonth: mayIsMonth)
+        // The key word, the costliest to find, last.
+        return beforeSort != .word && !Self.isSaid(before, in: phrase)
+            && !correctedWords.contains { carriesMeaning($0) && sort(of: $0, mayIsMonth: mayIsMonth) == beforeSort }
+            && keyWord(of: phrase, correcting: correctedWords)
+                .map { sort(of: phrase[phrase.startIndex + $0], mayIsMonth: mayIsMonth) == beforeSort } == true
+    }
+
+    /// Whether the key word of `phrase` takes back the first of the `corrected` words, and the
+    /// phrase says each of the others that carries meaning again after it: "the green room" for
+    /// "blue room", "the login service" for "billing service".
+    func takesBackFirst(_ corrected: ArraySlice<SaidWord>, phrase: ArraySlice<SaidWord>) -> Bool {
+        guard let first = corrected.first, carriesMeaning(first), !Self.isSaid(first, in: phrase) else { return false }
+        let rest = corrected.dropFirst()
+        guard !rest.contains(where: { carriesMeaning($0) && !Self.isSaid($0, in: phrase) }),
+              let saidAgain = phrase.firstIndex(where: { carriesMeaning($0) && Self.isSaid($0, in: rest) }),
+              let key = keyWord(of: phrase, correcting: corrected)
+        else { return false }
+        return key < saidAgain - phrase.startIndex && sort(of: first) == sort(of: phrase[phrase.startIndex + key])
+    }
+
+    /// Whether `word` is among `words`, as itself or another form of it.
+    private static func isSaid(_ word: SaidWord, in words: ArraySlice<SaidWord>) -> Bool {
+        words.contains { $0.word == word.word || WordForms.areForms($0.word, word.word) }
+    }
+
+    /// How alike a word and one that only holds the grammar together must be for the word to be
+    /// that one misheard ("thee" for "the", "theon" for "then").
+    private static let minMisheardSimilarity = 0.75
+    /// The days of the week, which a key word that is one takes back one of.
+    private static let days: Set<String> = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 }

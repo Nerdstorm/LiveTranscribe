@@ -47,7 +47,10 @@ pub(crate) const MIN_BULLETED_ITEMS: usize = 3;
 ///   earlier sentence kept. One may not answer a question: "Is it tomorrow? No, the day after."
 ///   keeps its "No". A cue's words are taken out only with the correction they make, and never
 ///   changed ("make that" is not "made that"). Nor may a correction that opens a later sentence
-///   be dropped whole, leaving what it corrects as said;
+///   be dropped whole, leaving what it corrects as said. Whichever way, the correction keeps its
+///   meaning: the word that says what it says instead stays, and what it takes back is not
+///   written again ("the blue room, sorry, the green room" is never "the blue room" or "the blue
+///   green room");
 /// - inside a correction phrase, up to [`MAX_REPAIR_WORDS`] new words or changed words, and the
 ///   words it corrects, which is how a garbled phrase is read as meant ("tomorrow. No, sorry, the
 ///   after tomorrow" → "the day after tomorrow");
@@ -266,9 +269,14 @@ pub(crate) fn said_words(text: &str, function_words: &WordSet, placeholders: &Wo
     for line in s::split_where(text, usize::MAX, true, s::is_newline) {
         let mut starts_sentence = true;
         let line_start = words.len();
-        for part in parts(line) {
+        let parts: Vec<&str> = parts(line).collect();
+        for (index, &part) in parts.iter().enumerate() {
             let trailing = trailing_marks(part);
-            let ends = trailing.iter().any(|mark| s::is_one_of(mark, &SENTENCE_ENDERS));
+            // An abbreviation's own full stop ("at 3 p.m. today") ends a sentence only before a
+            // capital.
+            let abbreviation =
+                is_dotted_abbreviation(part) && parts.get(index + 1).is_some_and(|next| !starts_with_uppercase(next));
+            let ends = !abbreviation && trailing.iter().any(|mark| s::is_one_of(mark, &SENTENCE_ENDERS));
             let asks = trailing.iter().any(|mark| s::canonically_equal(mark, "?"));
             let normalized = normalized_words(part);
             if normalized.is_empty()
@@ -484,6 +492,13 @@ fn trailing_marks(part: &str) -> Vec<&str> {
         .rev()
         .take_while(|&character| !s::is_letter(character) && !s::is_number(character))
         .collect()
+}
+
+/// Whether `part` is only letters each followed by a full stop ("p.m.", "e.g.", "U.S.").
+fn is_dotted_abbreviation(part: &str) -> bool {
+    let characters: Vec<&str> = s::characters(part).collect();
+    let length = characters.len();
+    length >= 4 && length.is_multiple_of(2) && characters.chunks(2).all(|pair| s::is_letter(pair[0]) && pair[1] == ".")
 }
 
 /// Whether the first letter of `part` is a capital.

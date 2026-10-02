@@ -145,6 +145,110 @@ struct SelfRepairTests {
         #expect(review(raw, cleaned) == .accepted(cleaned))
     }
 
+    /// A correction keeps its meaning: the word it says instead stays, as itself or a word like it,
+    /// and what it takes back isn't written again.
+    @Test("A correction is resolved with its meaning kept", arguments: [
+        ("book the blue room sorry the green room for friday", "Book the green room for Friday."),
+        ("send it to the finance team make that the legal team today", "Send it to the legal team today."),
+        ("ask the designer i mean the developer to check it", "Ask the developer to check it."),
+        ("we're migrating the load balancer make that the scheduler next week", "We're migrating the scheduler next week."),
+        ("paint the fence red no wait blue", "Paint the fence blue."),
+        ("we need three servers sorry four", "We need four servers."),
+        ("send it to sam sorry to priya", "Send it to Priya."),
+        ("the demo is next week sorry the after next", "The demo is the week after next."),
+        ("i'm meeting divya at the station actually nikhil", "I'm meeting Nikhil at the station."),
+        ("The billing service goes live next Tuesday. Sorry, I mean the login service.", "The login service goes live next Tuesday."),
+        ("fuel efficiency in cars sorry busses", "Fuel efficiency in buses."),
+    ])
+    func keepsTheMeaningOfACorrection(raw: String, cleaned: String) {
+        #expect(review(raw, cleaned) == .accepted(cleaned))
+    }
+
+    /// However a repair could otherwise line the words up, an answer may not lose what a correction
+    /// says instead or write what it takes back.
+    @Test("A correction whose meaning is lost is rejected", arguments: [
+        ("book the blue room sorry the green room for friday", "Book the blue room for Friday."),
+        ("book the blue room sorry the green room for friday", "Book the room for Friday."),
+        ("book the blue room sorry the green room for friday", "Book the blue green room for Friday."),
+        ("Book the blue room, sorry, the green room for Friday.", "Book the blue room for Friday."),
+        ("send it to the finance team make that the legal team today", "Send it to the finance team today."),
+        ("ask the designer i mean the developer to check it", "Ask the designer to check it."),
+        ("we're migrating the load balancer make that the scheduler next week", "We're migrating the load balancer next week."),
+        ("paint the fence red no wait blue", "Paint the fence red."),
+        ("we need three servers sorry four", "We need four three servers."),
+        ("send it to sam sorry to priya", "Send it to Priya Sam."),
+        ("I left my charger in the garage. Actually, the lobby.", "I left my charger in the garage lobby."),
+        ("The demo is on Tuesday at noon. Sorry, Wednesday.", "The demo is on Tuesday Wednesday at noon."),
+        ("Invite Sam to the launch. Sorry, Priya.", "Invite Sam and Priya to the launch."),
+        ("fuel efficiency in cars sorry busses", "Fuel efficiency in trains."),
+        ("i wanted to say sorry to jo", "I wanted to say it to Jo."),
+    ])
+    func rejectsLosingTheMeaningOfACorrection(raw: String, cleaned: String) {
+        #expect(review(raw, cleaned) == .rejected(.invalidRepair))
+    }
+
+    /// A fact or a name a correction says instead takes back one of its own sort, so no reading of
+    /// it keeps that one beside it: one that takes back only the words after it is no reading at
+    /// all.
+    @Test("A correction never keeps what it takes back beside it", arguments: [
+        ("we need three servers sorry four", "We need three four servers."),
+        ("we need three servers sorry four", "We need three or four servers."),
+        ("we need three of the servers sorry four", "We need three of the four servers."),
+        ("Invite Sam to the launch. Sorry, Priya.", "Invite Sam and Priya to the launch."),
+        ("Invite Sam to the launch. Sorry, Priya.", "Invite Sam, Priya to the launch."),
+        ("Invite Sam to the launch, sorry, Priya.", "Invite Sam and Priya to the launch."),
+        ("I am meeting Divya at the station. Actually, Nikhil.", "I am meeting Divya and Nikhil at the station."),
+        ("I am meeting Divya at the station. Actually, Nikhil.", "I am meeting Divya Nikhil at the station."),
+        ("Call me on Tuesday, no, Wednesday.", "Call me on Tuesday or Wednesday."),
+        ("We have two weeks left. Sorry, three.", "We have two or three weeks left."),
+    ])
+    func rejectsKeepingWhatACorrectionTakesBack(raw: String, cleaned: String) {
+        #expect(review(raw, cleaned) == .rejected(.invalidRepair))
+    }
+
+    @Test("A correction of a fact or a name is resolved however far back it reaches", arguments: [
+        ("we need three servers sorry four", "We need four servers."),
+        ("two people said we need servers sorry four", "Two people said we need four servers."),
+        ("we need three of the servers sorry four", "We need four of the servers."),
+        ("Invite Sam to the launch. Sorry, Priya.", "Invite Priya to the launch."),
+        ("Invite Sam to the launch, sorry, Priya.", "Invite Priya to the launch."),
+        ("I am meeting Divya at the station. Actually, Nikhil.", "I am meeting Nikhil at the station."),
+        ("meet me at the station sorry at six", "Meet me at six."),
+        ("Ask Sam to email Ana, sorry, Priya.", "Ask Sam to email Priya."),
+        ("Ask Sam to email Ana, sorry, Priya.", "Ask Priya to email Ana."),
+        ("We have two weeks left. Sorry, three.", "We have three weeks left."),
+    ])
+    func resolvesACorrectionOfAFactOrAName(raw: String, cleaned: String) {
+        #expect(review(raw, cleaned) == .accepted(cleaned))
+    }
+
+    /// A cue speech-to-text misheard just after one it heard goes with it, and a misheard word that
+    /// only holds the grammar together says nothing a correction says instead.
+    @Test("Misheard cues and small words say nothing a correction says", arguments: [
+        ("Can you bring the monitor, wait node, the router to the meeting?", "Can you bring the router to the meeting?"),
+        ("The city is buying more electric buses, no weight vans.", "The city is buying more electric vans."),
+        ("Dinner is on Saturday. Sorry, no theon Tuesday.", "Dinner is on Tuesday."),
+        ("The product review is on the 12th of October. No sorry thee of November.", "The product review is on the 12th of November."),
+    ])
+    func resolvesACorrectionWithMisheardWords(raw: String, cleaned: String) {
+        #expect(review(raw, cleaned) == .accepted(cleaned))
+    }
+
+    /// "No" in "no one" is a cue too, so one correction can take words out of the phrase another
+    /// moved back, and that phrase then ends where its words do.
+    @Test func aPhraseALaterCorrectionCutsEndsWhereItsWordsDo() {
+        let raw = "I'll call no one now. Scratch that. I'll email no one instead."
+        #expect(review(raw, "I'll email no one instead.") == .accepted("I'll email no one instead."))
+        #expect(review(raw, "I'll email Noah instead.") == .rejected(.invalidRepair))
+    }
+
+    /// An abbreviation's full stop ends a sentence only before a capital, so "at 3 p.m. today" is
+    /// one sentence and its time can be corrected.
+    @Test func anAbbreviationEndsASentenceOnlyBeforeACapital() {
+        let cleaned = "The shop closes at 10 a.m. today."
+        #expect(review("The shop closes at 3 p.m. today. Sorry, I meant at 10 a.m.", cleaned) == .accepted(cleaned))
+    }
+
     @Test("A cue followed by \"not\" and the corrected words said again goes with them", arguments: [
         ("The meeting is in room four, no, not four, five.", "The meeting is in room five."),
         ("Book the flight for Tuesday, sorry, not Tuesday, Thursday morning.", "Book the flight for Thursday morning."),

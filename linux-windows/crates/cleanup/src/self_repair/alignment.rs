@@ -24,6 +24,9 @@ type Step = (usize, usize, usize);
 
 /// Most letters spelled out that may be written as one word.
 const MAX_ACRONYM_LETTERS: usize = 6;
+/// How alike a correction's key word and a word a repair puts in its place must be: a garbled key
+/// word may be read as meant ("busses" → "buses"), never as another word ("busses" → "trains").
+const MIN_KEY_WORD_SIMILARITY: f64 = 0.5;
 
 /// Whether some sequence of a repair's edits turns the words said into the words written.
 ///
@@ -35,7 +38,9 @@ const MAX_ACRONYM_LETTERS: usize = 6;
 /// ([`corrections`]). Once a word of a phrase has been written, the words it corrected may be
 /// written too ("three servers, sorry, four" → "four servers"; "next week, sorry, the after next"
 /// → "the week after next"), until the word after the phrase is read; never before, which would
-/// keep what was taken back and drop only the cue.
+/// keep what was taken back and drop only the cue. The words its key word takes back are never
+/// written again, and the key word itself is changed only into a word like it
+/// ([`SelfRepair::key_word`](super::SelfRepair::key_word)).
 pub(super) struct Alignment<'a> {
     repair: &'a SelfRepair,
     said: &'a [SaidWord],
@@ -51,6 +56,12 @@ pub(super) struct Alignment<'a> {
     /// For each said index, the words corrected by the phrase that covers it, which a repair may
     /// not add there as new words.
     corrected: Vec<WordSet>,
+    /// For each said index, the corrected words the key word of the phrase that covers it takes
+    /// back, which a repair may not write there either.
+    taken: Vec<WordSet>,
+    /// Whether each said word is the key word of a correction phrase, which a repair may not
+    /// change.
+    key: Vec<bool>,
     /// The words of the cues said, whose forms a repair may not add ("make that" → "made that").
     cue_words: Vec<String>,
 }
@@ -78,10 +89,42 @@ impl<'a> Alignment<'a> {
         for (start, words) in corrections.corrected.iter().enumerate() {
             cover(&mut corrected, start, phrase_length(start, said).min(PHRASE), words);
         }
+        let mut taken = vec![WordSet::default(); n + 1];
+        for (start, words) in corrections.taken.iter().enumerate() {
+            cover(&mut taken, start, phrase_length(start, said).min(PHRASE), words);
+        }
+        let mut keys = corrections.keys;
         for (start, word) in said.iter().enumerate().filter(|(_, word)| word.opens_phrase > 0) {
             let words = WordSet::new(&word.spare);
             cover(&mut spare, start, word.opens_phrase, &words);
             cover(&mut corrected, start, word.opens_phrase, &words);
+            let phrase = &said[start..(start + word.opens_phrase).min(said.len())];
+            let spare_words: Vec<SaidWord> = word
+                .spare
+                .iter()
+                .map(|text| SaidWord {
+                    word: text.clone(),
+                    ..SaidWord::default()
+                })
+                .collect();
+            if let Some(key) = repair.key_word(phrase, &spare_words) {
+                keys.push(start + key);
+                cover(
+                    &mut taken,
+                    start,
+                    word.opens_phrase,
+                    &repair.taken_back(phrase, &spare_words),
+                );
+            }
+        }
+        // The key word said again in a row is the key word too: either copy may be the one kept.
+        let mut key = vec![false; n];
+        for index in keys {
+            let mut end = index;
+            while end + 1 < n && same(&said[end + 1].word, &said[index].word) {
+                end += 1;
+            }
+            key[index..=end].fill(true);
         }
         Self {
             repair,
@@ -92,6 +135,8 @@ impl<'a> Alignment<'a> {
             spans: corrections.ends,
             spare,
             corrected,
+            taken,
+            key,
             cue_words: said
                 .iter()
                 .filter(|word| word.is_cue)
@@ -152,12 +197,22 @@ impl<'a> Alignment<'a> {
             let (left, repairs_left, begun) = decode(state);
             let word = &self.written[j].word;
             let new = self.is_repair(&self.written[j]) && !self.corrected[i].contains(word);
-            if begun && self.spare[i].contains(word) && !self.placeholders.contains(word) {
+            if begun
+                && self.spare[i].contains(word)
+                && !self.taken[i].contains(word)
+                && !self.placeholders.contains(word)
+            {
                 steps.push((0, 1, state));
             } else if left > 0 && repairs_left > 0 && new {
                 steps.push((0, 1, encode(left, repairs_left - 1, begun)));
             }
-            if left > 0 && repairs_left > 0 && i < n && self.is_replaceable(&self.said[i]) && new {
+            if left > 0
+                && repairs_left > 0
+                && i < n
+                && self.may_stand_in(word, i)
+                && self.is_replaceable(&self.said[i])
+                && new
+            {
                 let after = self.consuming(1, i, encode(left, repairs_left - 1, begun), true);
                 steps.push((1, 1, after));
             }
@@ -317,6 +372,12 @@ impl<'a> Alignment<'a> {
                 .cue_words
                 .iter()
                 .any(|cue| same(cue, text) || word_forms::are_forms(cue, text))
+    }
+
+    /// Whether a repair may put `word` in place of said word `i`: any word, unless that is a
+    /// correction's key word, which only a word like it may stand in for.
+    fn may_stand_in(&self, word: &str, i: usize) -> bool {
+        !self.key[i] || edit_distance::normalized_similarity(&self.said[i].word, word) >= MIN_KEY_WORD_SIMILARITY
     }
 
     fn is_replaceable(&self, word: &SaidWord) -> bool {
