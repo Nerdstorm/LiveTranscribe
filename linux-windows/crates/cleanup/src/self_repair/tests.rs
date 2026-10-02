@@ -1017,7 +1017,9 @@ fn a_correction_takes_back_its_whole_sentence_only_when_its_phrase_says_it_again
 }
 
 /// Without capitals or punctuation, nothing tells a name from another word, so the ferries read
-/// like a false start ("alice knows sorry tara will lead the design review") and stay accepted.
+/// like a false start ("alice knows sorry tara will lead the design review") and stay accepted. A
+/// weekday, an acronym or a vocabulary term in text written without capitals doesn't make it text
+/// written with them.
 #[test]
 fn only_capitals_and_punctuation_tell_a_correction_from_a_false_start() {
     assert_accepted(&[
@@ -1036,6 +1038,18 @@ fn only_capitals_and_punctuation_tell_a_correction_from_a_false_start() {
         (
             "alice knows sorry tara will lead the design review",
             "Tara will lead the design review.",
+        ),
+        (
+            "alice knows, sorry, tara will lead the design review on Monday.",
+            "Tara will lead the design review on Monday.",
+        ),
+        (
+            "alice knows, sorry, tara will review the PR.",
+            "Tara will review the PR.",
+        ),
+        (
+            "insurance for ferries, no wait, boats went up again on Monday.",
+            "Boats went up again on Monday.",
         ),
     ]);
 }

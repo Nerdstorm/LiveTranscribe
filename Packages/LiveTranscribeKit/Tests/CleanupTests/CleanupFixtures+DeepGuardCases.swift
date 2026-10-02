@@ -580,6 +580,15 @@ extension CleanupFixtures.Guard {
             completed("alice knows sorry tara will lead the design review", "Tara will lead the design review."),
             completed("The garden Cleaner comes on Tuesday, or rather on Friday.", "The cleaner comes on Friday."),
             completed("The garden Cleaner comes on Tuesday, or rather on Friday.", "The garden Cleaner comes on Friday."),
+            // A weekday or an acronym doesn't make text written without capitals text written
+            // with them.
+            completed("alice knows, sorry, tara will lead the design review on Monday.", "Tara will lead the design review on Monday."),
+            completed("alice knows, sorry, tara will review the PR.", "Tara will review the PR."),
+            completed("insurance for ferries, no wait, boats went up again on Monday.", "Boats went up again on Monday."),
+            // A restart that says nothing again, turned down in text written with capitals:
+            // what the rule costs.
+            completed("Buy milk, sorry, get bread.", "Get bread."),
+            completed("Take the bus, sorry, walk to work.", "Walk to work."),
             completed("I'll call no one now. Scratch that. I'll email no one instead.", "I'll email no one instead."),
             completed("I'll call no one now. Scratch that. I'll email no one instead.", "I'll email Noah instead."),
             completed("The shop closes at 3 p.m. today. Sorry, I meant at 10 a.m.", "The shop closes at 10 a.m. today."),

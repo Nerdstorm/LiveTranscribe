@@ -233,6 +233,10 @@ pub(crate) struct SaidWord {
     /// semicolon, or a sentence end it wrote ("ferries," in "Insurance for ferries, no wait, boats
     /// …"). The end of a line alone isn't one.
     pub(crate) pauses_after: bool,
+    /// Written with a lower-case first letter. Where a sentence starts, it shows text that
+    /// speech-to-text wrote without capitals, whatever capitals a vocabulary term or a weekday
+    /// has in it ("insurance" in "insurance for ferries, no wait, boats went up on Monday").
+    pub(crate) is_lower_case: bool,
     /// Where a correction from a later sentence was put in place of what it corrects, how many
     /// words its phrase has, starting here; 0 elsewhere (see [`corrections`]).
     pub(crate) opens_phrase: usize,
@@ -254,6 +258,7 @@ impl PartialEq for SaidWord {
             && self.starts_sentence == other.starts_sentence
             && self.may_be_broken_off == other.may_be_broken_off
             && self.pauses_after == other.pauses_after
+            && self.is_lower_case == other.is_lower_case
             && self.opens_phrase == other.opens_phrase
             && self.spare.len() == other.spare.len()
             && self.spare.iter().zip(&other.spare).all(|(a, b)| same(a, b))
@@ -317,6 +322,7 @@ pub(crate) fn said_words(text: &str, function_words: &WordSet, placeholders: &Wo
                 last.pauses_after |= pauses;
             }
             let upper = starts_with_uppercase(part);
+            let lower = starts_with_lowercase(part);
             let count = normalized.len();
             for (offset, word) in normalized.into_iter().enumerate() {
                 let is_last_of_part = offset == count - 1;
@@ -332,6 +338,7 @@ pub(crate) fn said_words(text: &str, function_words: &WordSet, placeholders: &Wo
                     starts_sentence: starts_sentence && offset == 0,
                     may_be_broken_off: is_last_of_part && last_of_token[index] && may_be_broken_off(part),
                     pauses_after: is_last_of_part && pauses,
+                    is_lower_case: offset == 0 && lower,
                     ..SaidWord::default()
                 });
             }
@@ -537,6 +544,12 @@ fn starts_with_uppercase(part: &str) -> bool {
     s::characters(part)
         .find(|&character| s::is_letter(character))
         .is_some_and(s::is_uppercase)
+}
+
+fn starts_with_lowercase(part: &str) -> bool {
+    s::characters(part)
+        .find(|&character| s::is_letter(character))
+        .is_some_and(s::is_lowercase)
 }
 
 /// Whether `part`, the last part between two spaces, is written as the start of a word broken off

@@ -313,12 +313,16 @@ struct SelfRepairTests {
 
     /// Without capitals or punctuation, nothing tells a name from another word, so the ferries
     /// read like a false start ("alice knows sorry tara will lead the design review") and stay
-    /// accepted.
+    /// accepted. A weekday, an acronym or a vocabulary term in text written without capitals
+    /// doesn't make it text written with them.
     @Test("Only capitals and punctuation tell a correction from a false start", arguments: [
         ("insurance for ferries no wait boats went up again", "Boats went up again."),
         ("insurance for ferries, no wait, boats went up again.", "Boats went up again."),
         ("Insurance for ferries no wait boats went up again", "Boats went up again."),
         ("alice knows sorry tara will lead the design review", "Tara will lead the design review."),
+        ("alice knows, sorry, tara will lead the design review on Monday.", "Tara will lead the design review on Monday."),
+        ("alice knows, sorry, tara will review the PR.", "Tara will review the PR."),
+        ("insurance for ferries, no wait, boats went up again on Monday.", "Boats went up again on Monday."),
     ])
     func onlyCapitalsAndPunctuationTellACorrectionFromAFalseStart(raw: String, cleaned: String) {
         #expect(review(raw, cleaned) == .accepted(cleaned))

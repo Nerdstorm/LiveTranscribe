@@ -109,8 +109,11 @@ pub(super) fn spans(words: &[SaidWord], repair: &SelfRepair, placeholders: &Word
     // Every word each phrase may correct, by where it starts. Which of them a repair took back
     // isn't known, so its key word and the words that takes back are found among them all.
     let mut taken_back: BTreeMap<usize, BTreeSet<usize>> = BTreeMap::new();
-    // Capitals show names only in text speech-to-text wrote with them.
-    let cased = words.iter().any(|word| word.may_be_name);
+    // Capitals show names only in text speech-to-text wrote with them: a capital a name may have,
+    // and no sentence started in lower case. A vocabulary term or a weekday in text written
+    // without capitals ("alice knows, sorry, tara will lead the review on Monday") isn't one.
+    let cased = words.iter().any(|word| word.may_be_name)
+        && !words.iter().any(|word| word.starts_sentence && word.is_lower_case);
     for (cue_start, run_ends) in cue_runs(words, repair) {
         // Speech-to-text ends a sentence where the speaker paused, so a cue that opens one may
         // take back the end of the one before ("I left my charger in the garage. Actually, the

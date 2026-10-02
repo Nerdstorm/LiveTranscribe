@@ -67,8 +67,11 @@ extension SelfRepair {
             // back isn't known, so its key word and the words that takes back are found among them
             // all.
             var takenBack: [Int: Set<Int>] = [:]
-            // Capitals show names only in text speech-to-text wrote with them.
-            let cased = words.contains(where: \.mayBeName)
+            // Capitals show names only in text speech-to-text wrote with them: a capital a name may
+            // have, and no sentence started in lower case. A vocabulary term or a weekday in text
+            // written without capitals ("alice knows, sorry, tara will lead the review on Monday")
+            // isn't one.
+            let cased = words.contains(where: \.mayBeName) && !words.contains { $0.startsSentence && $0.isLowerCase }
             for (cueStart, runEnds) in cueRuns(in: words, repair: repair) {
                 // Speech-to-text ends a sentence where the speaker paused, so a cue that opens one
                 // may take back the end of the one before ("I left my charger in the garage.

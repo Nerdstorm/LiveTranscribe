@@ -127,6 +127,10 @@ struct SelfRepair: Sendable {
         /// semicolon, or a sentence end it wrote ("ferries," in "Insurance for ferries, no wait,
         /// boats …"). The end of a line alone isn't one.
         var pausesAfter = false
+        /// Written with a lower-case first letter. Where a sentence starts, it shows text that
+        /// speech-to-text wrote without capitals, whatever capitals a vocabulary term or a weekday
+        /// has in it ("insurance" in "insurance for ferries, no wait, boats went up on Monday").
+        var isLowerCase = false
         /// Where a correction from a later sentence was put in place of what it corrects, how many
         /// words its phrase has, starting here; 0 elsewhere (see ``Corrections``).
         var opensPhrase = 0
@@ -185,6 +189,7 @@ struct SelfRepair: Sendable {
                 for (offset, word) in normalized.enumerated() {
                     let isLastOfPart = offset == normalized.count - 1
                     let upper = offset == 0 && startsWithUppercase(part)
+                    let lower = offset == 0 && startsWithLowercase(part)
                     let couldBeName = upper && !functionWords.contains(word) && !placeholders.contains(word)
                     words.append(SaidWord(
                         word: word,
@@ -195,7 +200,8 @@ struct SelfRepair: Sendable {
                         mayBeName: couldBeName,
                         startsSentence: startsSentence && offset == 0,
                         mayBeBrokenOff: isLastOfPart && lastOfToken[index] && mayBeBrokenOff(part),
-                        pausesAfter: isLastOfPart && pauses
+                        pausesAfter: isLastOfPart && pauses,
+                        isLowerCase: lower
                     ))
                 }
                 if !normalized.isEmpty { startsSentence = ends }
@@ -218,6 +224,10 @@ struct SelfRepair: Sendable {
     /// Whether the first letter of `part` is a capital.
     private static func startsWithUppercase(_ part: Substring) -> Bool {
         part.first(where: \.isLetter)?.isUppercase ?? false
+    }
+
+    private static func startsWithLowercase(_ part: Substring) -> Bool {
+        part.first(where: \.isLetter)?.isLowercase ?? false
     }
 
     /// Whether `part`, the last part between two spaces, is written as the start of a word broken
