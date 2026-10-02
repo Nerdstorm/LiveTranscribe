@@ -240,6 +240,30 @@ The default candidate recipe is:
   `training_weight`; other pairs have x1. Validation and test pairs have x1. The first
   preparation version included curated pairs once and changed that recipe; it is corrected.
 
+**Families written by their own generators.** Some skills need sentences the Swift generator
+doesn't make. Each family has a generator in `scripts/e_seeds/` that writes
+`Training/generated-e/FAMILY-{train,valid,test}.jsonl` and a gate set of hand-checked cases in
+`Training/eval/FAMILY.jsonl`. Each writes the same files on every run. `--check`
+(slot-corrections, spoken-numbers) also checks that no raw text is shared with the held-out
+files. The families are:
+
+- `slot-corrections`: a correction inside one slot of a sentence, which keeps the words before
+  the slot ("the cost of parking, no wait, petrol has doubled" is "The cost of petrol has
+  doubled.");
+- `spoken-numbers`: numbers kept exactly as said, since the number rules write digits after the
+  model;
+- `marker-lists`: steps counted out loud in mixed styles, kept as said for the list rules to
+  number.
+
+Word fragments ("con consider") and the whole words that start like the next one ("an animal",
+"new newsletter") are transcript seeds (`scripts/transcript-seeds.py`), as the recognizer writes
+them.
+
+`prepare --extra-dir Training/generated-e` adds the families to Deep's seeds, each split from the
+files named for it. A row its split already holds, with the same words in the same kind of field and
+punctuation aside, is left out, and the report counts those per file
+(`extra_rows_already_held`).
+
 There is no default lowercasing or blanket comma removal (`--input-variant`, below, adds a
 bounded share of measured transcripts as other recognizers write them). `make prepare-stress-data` is an
 optional diagnostic set with bulk punctuation/casing variants; it is separate from this
@@ -297,6 +321,15 @@ python3 scripts/prepare-cleanup-data.py merge-asr \
   --input-variant odd-case=0.1 --input-variant lowercase=0.1
 ```
 
+Candidate E prepares its seeds with the families above
+(`prepare --kind deep --extra-dir Packages/LiveTranscribeKit/Training/generated-e`). It then
+merges with stops moved as well as added:
+
+```bash
+  --input-variant unpunctuated=0.2 --input-variant odd-stops=0.1 --input-variant odd-case=0.1 \
+  --input-variant lowercase=0.1 --input-variant moved-stops=0.1
+```
+
 Repeat `--transcripts` for other recognizers. `--include-synthetic` explicitly adds the seed or
 stress bank for an experiment; it is outside the default mix above.
 
@@ -330,6 +363,7 @@ recognizer writes it, with the same answer:
 | `lowercase` | Lower case, punctuation kept |
 | `odd-stops` | One or two full stops where a speaker could pause ("the demo on Friday. Sorry, Thursday"), the next word capitalised |
 | `odd-case` | One to three capitals guessed wrong: a common word as a name, a sentence or a name begun in lower case |
+| `moved-stops` | A comma or full stop a word before or after where it belongs, as when the speaker pauses in the wrong place; never beside a number, a list marker or a correction's cue |
 
 Families are chosen per kind by digest, and the stops and capitals by a seed from the row, so a
 run is reproducible. The words stay the recognizer's, values such as `9:30` and placeholders are

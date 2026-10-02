@@ -188,6 +188,36 @@ class PreparationTests(unittest.TestCase):
                     self.assertEqual(row["provenance"]["line"], 2)
                 self.assertEqual(len(prep.read_rows(root / "first" / f"{split}.jsonl")), 1)
 
+    def test_extra_families_join_their_split_once_each(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+            source, extra = root / "source", root / "extra"
+            for split in prep.SPLITS:
+                prep.write_rows(source / f"deep-{split}.jsonl", [example(f"The {split} zebra sleeps.", f"g-{split}", split)])
+                prep.write_rows(extra / f"numbers-{split}.jsonl", [
+                    example(f"The {split} order is twelve dollars.", f"n-{split}", split),
+                    # The generator's row again, punctuation aside: left out.
+                    example(f"the {split} zebra sleeps", f"n2-{split}", split),
+                    # The same words in a field that takes several lines: another example.
+                    example(f"The {split} zebra sleeps.", f"n3-{split}", split, multiline=True),
+                ])
+                prep.write_rows(extra / f"lists-{split}.jsonl", [example(f"The {split} order is twelve dollars", f"l-{split}", split)])
+            options = argparse.Namespace(kind="deep", input_dir=source, output=root / "out", extra_dir=[extra], composite_share=0)
+            prep.prepare(options)
+            report = json.loads((root / "out/preparation-report.json").read_text())
+            for split in prep.SPLITS:
+                rows = prep.read_rows(root / "out" / f"{split}.jsonl")
+                # Files are read in name order, so "lists" comes before "numbers" and keeps the order.
+                self.assertEqual([row["raw"] for row in rows], [f"The {split} zebra sleeps.", f"The {split} order is twelve dollars",
+                                                                f"The {split} zebra sleeps."])
+                self.assertEqual([row["multiline"] for row in rows], [False, False, True])
+                self.assertEqual([row["provenance"]["file"] for row in rows],
+                                 [f"deep-{split}.jsonl", f"lists-{split}.jsonl", f"numbers-{split}.jsonl"])
+            self.assertEqual(report["extra_rows_already_held"], {f"numbers-{split}.jsonl": 2 for split in prep.SPLITS})
+            self.assertEqual(len([s for s in report["sources"] if "/extra/" in s["path"]]), 6)
+        with self.assertRaisesRegex(ValueError, "Deep's seeds only"):
+            prep.prepare(argparse.Namespace(kind="medium", input_dir=Path("unused"), output=Path("unused"), extra_dir=[Path("x")]))
+
     def test_stress_profiles_are_opt_in(self):
         with tempfile.TemporaryDirectory() as root:
             root = Path(root)

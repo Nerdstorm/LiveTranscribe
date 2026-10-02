@@ -640,14 +640,30 @@ def prepare(options):
         held_out_files.append(options.input_dir / "test.jsonl")
     for path in held_out_files:
         excluded.update(normalize(row["raw"]) for row in read_rows(path))
+    # Families written by their own generators (`--extra-dir`) join the generator's rows, each split
+    # from the files named for it. A row its split already holds, the same words in the same kind of
+    # field with punctuation aside, is left out: its protected-token family may hold only one, and
+    # the example is trained on once.
+    extra_dirs = getattr(options, "extra_dir", None) or []
+    if extra_dirs and options.kind != "deep":
+        raise ValueError("--extra-dir adds families to Deep's seeds only")
+    dropped_extra = {}
     for split in SPLITS:
         paths = [options.input_dir / f"{prefix}{split}.jsonl"]
         if options.kind == "medium" and split in ("train", "test"):
             paths += sorted((TRAINING / f"curated/{split}").glob("*.jsonl"))
+        extra = [path for directory in extra_dirs for path in sorted(directory.glob(f"*-{split}.jsonl"))]
+        paths += extra
+        held = set()
         for path in paths:
             sources.append({"path": str(path.resolve()), "sha256": file_digest(path)})
             for line_number, original in read_rows(path, with_line_numbers=True):
                 check_example(original)
+                key = (original.get("multiline", False), normalize(original["raw"]))
+                if path in extra and key in held:
+                    dropped_extra[path.name] = dropped_extra.get(path.name, 0) + 1
+                    continue
+                held.add(key)
                 family = digest({
                     "raw": normalize(original["raw"]), "target": original["target"],
                     "context": original.get("context", []),
@@ -688,6 +704,7 @@ def prepare(options):
     save_dataset(options.output, data, {"kind": options.kind, "stage": "stress-data" if stress else "speech-seeds",
                                       "profiles": list(profiles), "sources": sources,
                                       "composite_share": share, "composites": composites,
+                                      "extra_rows_already_held": dropped_extra,
                                       "rules_sha256": file_digest(policy_path), "curated_train_weight": 2})
     print(json.dumps({"output": str(options.output), "splits": {k: len(v) for k, v in data.items()}}))
 
@@ -1143,6 +1160,9 @@ def main():
     prepare_parser.add_argument("--rules", type=Path, default=RULES)
     prepare_parser.add_argument("--composite-share", type=float, default=COMPOSITE_SHARE,
                                 help="share of joinable Deep seed dictations joined into longer ones (0 for none)")
+    prepare_parser.add_argument("--extra-dir", type=Path, action="append", metavar="DIR",
+                                help="a folder of FAMILY-{train,valid,test}.jsonl added to Deep's seeds, leaving out "
+                                     "rows a split already holds (repeatable)")
     audio_parser = commands.add_parser("audio", help="speak original dictations, not cleaned targets")
     audio_parser.add_argument("--dataset", type=Path, required=True)
     audio_parser.add_argument("--output", type=Path, required=True)
