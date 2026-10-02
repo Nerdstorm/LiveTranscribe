@@ -14,7 +14,9 @@ extension SelfRepair {
     /// a word of a phrase has been written, the words it corrected may be written too ("three
     /// servers, sorry, four" → "four servers"; "next week, sorry, the after next" → "the week
     /// after next"), until the word after the phrase is read; never before, which would keep what
-    /// was taken back and drop only the cue.
+    /// was taken back and drop only the cue. The words its key word takes back are never written
+    /// again, and the key word itself is changed only into a word like it
+    /// (``SelfRepair/keyWord(of:correcting:)``).
     struct Alignment {
         let repair: SelfRepair
         let said: [SaidWord]
@@ -30,6 +32,12 @@ extension SelfRepair {
         /// For each said index, the words corrected by the phrase that covers it, which a repair
         /// may not add there as new words.
         private let corrected: [Set<String>]
+        /// For each said index, the corrected words the key word of the phrase that covers it
+        /// takes back, which a repair may not write there either.
+        private let taken: [Set<String>]
+        /// Whether each said word is the key word of a correction phrase, which a repair may not
+        /// change.
+        private let key: [Bool]
         /// The words of the cues said, whose forms a repair may not add ("make that" → "made that").
         private let cueWords: Set<String>
 
@@ -57,12 +65,35 @@ extension SelfRepair {
                     corrected[index].formUnion(words)
                 }
             }
+            var taken = Array(repeating: Set<String>(), count: said.count + 1)
+            for (start, words) in corrections.taken {
+                for index in start...min(start + min(Self.phraseLength(from: start, in: said), Self.phrase), said.count) {
+                    taken[index].formUnion(words)
+                }
+            }
+            var keys = corrections.keys
             for (start, word) in said.enumerated() where word.opensPhrase > 0 {
                 cover(from: start, length: word.opensPhrase, with: Set(word.spare))
                 for index in start...min(start + word.opensPhrase, said.count) { corrected[index].formUnion(word.spare) }
+                let phrase = said[start..<min(start + word.opensPhrase, said.count)]
+                let spareWords = word.spare.map { SaidWord(word: $0, endsSentence: false, endsQuestion: false, isName: false) }[...]
+                if let keyIndex = repair.keyWord(of: phrase, correcting: spareWords) {
+                    keys.append(start + keyIndex)
+                    let words = repair.takenBack(by: phrase, from: spareWords)
+                    for index in start...min(start + word.opensPhrase, said.count) { taken[index].formUnion(words) }
+                }
+            }
+            // The key word said again in a row is the key word too: either copy may be the one kept.
+            var key = Array(repeating: false, count: said.count)
+            for index in keys {
+                var end = index
+                while end + 1 < said.count, said[end + 1].word == said[index].word { end += 1 }
+                for position in index...end { key[position] = true }
             }
             self.spare = spare
             self.corrected = corrected
+            self.taken = taken
+            self.key = key
             cueWords = Set(said.filter(\.isCue).map(\.word))
         }
 
@@ -116,12 +147,13 @@ extension SelfRepair {
             if state != 0, j < m {
                 let (left, repairsLeft, begun) = Self.decode(state)
                 let new = isRepair(written[j]) && !corrected[i].contains(written[j].word)
-                if begun, spare[i].contains(written[j].word), !placeholders.contains(written[j].word) {
+                if begun, spare[i].contains(written[j].word), !taken[i].contains(written[j].word),
+                   !placeholders.contains(written[j].word) {
                     steps.append((0, 1, state))
                 } else if left > 0, repairsLeft > 0, new {
                     steps.append((0, 1, Self.encode(left: left, repairs: repairsLeft - 1, begun: begun)))
                 }
-                if left > 0, repairsLeft > 0, i < n, isReplaceable(said[i]), new {
+                if left > 0, repairsLeft > 0, i < n, mayStandIn(written[j].word, at: i), isReplaceable(said[i]), new {
                     let after = consuming(1, from: i, in: Self.encode(left: left, repairs: repairsLeft - 1, begun: begun), writing: true)
                     steps.append((1, 1, after))
                 }
@@ -254,6 +286,17 @@ extension SelfRepair {
                 && !repair.isCue(word.word) && !repair.isFiller(word.word)
                 && !cueWords.contains { $0 == word.word || WordForms.areForms($0, word.word) }
         }
+
+        /// Whether a repair may put `word` in place of said word `i`: any word, unless that is a
+        /// correction's key word, which only a word like it may stand in for.
+        private func mayStandIn(_ word: String, at i: Int) -> Bool {
+            !key[i] || EditDistance.normalizedSimilarity(said[i].word, word) >= Self.minKeyWordSimilarity
+        }
+
+        /// How alike a correction's key word and a word a repair puts in its place must be: a
+        /// garbled key word may be read as meant ("busses" → "buses"), never as another word
+        /// ("busses" → "trains").
+        static let minKeyWordSimilarity = 0.5
 
         private func isReplaceable(_ word: SaidWord) -> Bool {
             !repair.isProtected(word.word, placeholders: placeholders) && !word.isName && !word.isCue
