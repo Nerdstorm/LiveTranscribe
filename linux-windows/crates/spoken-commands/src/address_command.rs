@@ -117,8 +117,30 @@ const EMAIL_CUES: &[&str] = &[
 ];
 /// Plain names that are never email names: "contact us at example.com".
 const PRONOUNS: &[&str] = &[
-    "me", "us", "you", "him", "her", "them", "it", "we", "i", "they", "she", "he", "one", "everyone", "someone",
+    "me",
+    "us",
+    "you",
+    "him",
+    "her",
+    "them",
+    "it",
+    "we",
+    "i",
+    "they",
+    "she",
+    "he",
+    "one",
+    "everyone",
+    "someone",
     "anyone",
+    "everybody",
+    "somebody",
+    "anybody",
+    "nobody",
+    "everything",
+    "something",
+    "anything",
+    "nothing",
 ];
 /// Domains of mail providers, before which a plain name is an email name: "alex at gmail dot com".
 const MAIL_PROVIDERS: &[&str] = &[
@@ -168,10 +190,11 @@ const NAME_SEPARATORS: [(&str, &str); 4] = [("dot", "."), ("underscore", "_"), (
 /// dot, underscore, hyphen or digit ("john.smith"), follows a word such as "email", "to" or "is"
 /// ("email support at example.com"), or comes before a mail provider's domain ("alex at gmail dot
 /// com"). "look at example.com" and "contact us at example.com" keep their "at", and so do a
-/// pronoun, a verb that takes "at" or a word after a determiner before a mail provider ("look at
-/// gmail.com", "she works at outlook.com", "my account at gmail.com"). A domain speech-to-text
-/// already wrote as one word is left as it is unless it gains a name before it or a path after it;
-/// an email address it already wrote ("John.Smith@example.com") is taken whole.
+/// pronoun, a verb that takes "at", a word after a determiner or the provider's own name before a
+/// mail provider ("look at gmail.com", "she works at outlook.com", "my account at gmail.com",
+/// "open Gmail at gmail.com"). A domain speech-to-text already wrote as one word is left as it is
+/// unless it gains a name before it or a path after it; an email address it already wrote
+/// ("John.Smith@example.com") is taken whole.
 ///
 /// The address goes behind a placeholder, lowercased except for its path, so the model cannot
 /// capitalise or split it.
@@ -387,12 +410,13 @@ fn email_name(domain_start: usize, host: &str, tokens: &[AddressToken]) -> Optio
 }
 
 /// Whether `name`, a plain word said before "at" and `host`, is a mailbox there: `host` is a mail
-/// provider's, and `name` is no verb that takes "at" ("look at gmail.com") nor a word after a
-/// determiner ("my account at gmail.com"). `word_before` is the word before `name` in the same
-/// clause, if any.
+/// provider's, and `name` is no verb that takes "at" ("look at gmail.com"), nor a word after a
+/// determiner ("my account at gmail.com"), nor the provider's own name ("open Gmail at
+/// gmail.com"). `word_before` is the word before `name` in the same clause, if any.
 fn names_a_mailbox(name: &str, host: &str, word_before: Option<&str>) -> bool {
     is_word_in(host, MAIL_PROVIDERS)
         && !is_word_in(name, NOT_EMAIL_NAMES)
+        && !s::has_prefix(host, &format!("{name}."))
         && !word_before.is_some_and(|word| is_word_in(word, &phrase_grammar::DETERMINERS))
 }
 
@@ -515,6 +539,15 @@ mod tests {
             ("the app is at icloud.com", "the app is at icloud.com"),
             ("my account at gmail dot com is full", "my account at gmail.com is full"),
             ("find us at hotmail.com", "find us at hotmail.com"),
+            (
+                "somebody at gmail dot com wrote back",
+                "somebody at gmail.com wrote back",
+            ),
+            ("open Gmail at gmail.com", "open Gmail at gmail.com"),
+            (
+                "sign up for iCloud at icloud dot com",
+                "sign up for iCloud at icloud.com",
+            ),
             ("alex at example.com", "alex at example.com"),
         ] {
             assert_eq!(expanded(spoken), expected, "{spoken}");

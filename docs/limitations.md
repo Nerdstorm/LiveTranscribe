@@ -46,14 +46,16 @@
   [Development](development.md#bench-and-eval)), and a rejected answer adds Medium's pass.
 - Spoken lists are laid out only when you say their markers ("first…", "one is…", "number one…", or
   a mix of them in order, "bullet point…"), and lists and letters only where line breaks are
-  allowed. The model sometimes drops or rewrites a list item; the check then inserts your words,
-  still laid out. **Deep** also makes lists you didn't mark, in fields that take several lines:
-  things you need or steps to take become a list of three or more ("We need milk, eggs and bread."),
-  and it may do the same for two you set off with a colon or a pause ("A few things: fixing the
-  feeds and releasing the patch."), which in a chat box may be more than you wanted. For a longer
-  letter, the rules put the greeting and sign-off on lines of their own and the model gets only
-  the body, with a line saying so: Deep lays out the lists in it, but doesn't split it into
-  paragraphs.
+  allowed. A number said alone is a marker only with "is", a comma, a colon or a full stop after it:
+  "one, go to the shops, two talk to the mechanic" stays as said unless the model puts a comma after
+  "two", while "number two talk to the mechanic" is laid out. The model sometimes drops or rewrites
+  a list item; the check then inserts your words, still laid out. **Deep** also makes lists you
+  didn't mark, in fields that take several lines: things you need or steps to take become a list of
+  three or more ("We need milk, eggs and bread."), and it may do the same for two you set off with a
+  colon or a pause ("A few things: fixing the feeds and releasing the patch."), which in a chat box
+  may be more than you wanted. For a longer letter, the rules put the greeting and sign-off on lines
+  of their own and the model gets only the body, with a line saying so: Deep lays out the lists in
+  it, but doesn't split it into paragraphs.
 - Spoken numbers are written in digits by rules, which read the words around a number but not its
   meaning ([Cleanup](cleanup.md#what-cleanup-does)). A time needs "at", "by", "from" or the like
   before it, or "am" or "pm" after it, so "moved to ten fifteen" stays words; three digits said
@@ -64,6 +66,12 @@
   and ordinals ("March twenty first"), 24-hour times, "a hundred" alone before anything but dollars
   or percent, and words such as "dozen" stay as said, and other currencies are counts ("five
   euros", "20 euros").
+- Before a mail provider's domain (gmail.com, outlook.com, …), the word said before "at" becomes the
+  email name unless it is a pronoun, a verb that takes "at", a word after "my", "the" and the like,
+  or the provider's own name ([Cleanup](cleanup.md#spoken-commands)). Other words are taken as
+  names: "the best people at gmail.com" becomes "the best people@gmail.com", and "it's free at
+  outlook.com" becomes "it's free@outlook.com". Only the last word is the name, so "alex smith at
+  gmail dot com" becomes "alex smith@gmail.com".
 
 ## Mac
 

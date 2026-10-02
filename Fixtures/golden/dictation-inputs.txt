@@ -1376,3 +1376,10 @@ One, book the venue. Two, send the invites. Number three, order the food.
 Number one, book the venue. Two, send the invites. Third, order the food.
 We're number one. Number two is Apple.
 One, speed. Two people came.
+One, go to the shops. First thing tomorrow, call the mechanic. Two, buy eggs.
+First, check the logs. One is that they are big. Second, tell the team.
+First, a quick update. One, the build. Two, the docs.
+Number one, check the logs. Second, restart the server. Number two, tell the team.
+First, the release. Number one priority is speed. Second, the docs.
+Open Gmail at gmail.com and sign in.
+somebody at gmail dot com wrote back

@@ -148,6 +148,44 @@ struct ListFormatterTests {
         #expect(formatter.formatted(text) == nil)
     }
 
+    @Test("A number said the other way inside an item stays in it", arguments: [
+        (
+            "One, go to the shops. First thing tomorrow, call the mechanic. Two, buy eggs.",
+            "1. Go to the shops. First thing tomorrow, call the mechanic\n2. Buy eggs"
+        ),
+        (
+            "One, check the logs. First we look at the errors. Two, tell the team.",
+            "1. Check the logs. First we look at the errors\n2. Tell the team"
+        ),
+        (
+            "First, check the logs. One is that they are big. Second, tell the team.",
+            "1. Check the logs. One is that they are big\n2. Tell the team"
+        ),
+        (
+            "First, the release. Number one priority is speed. Second, the docs.",
+            "1. The release. Number one priority is speed\n2. The docs"
+        ),
+        (
+            "One, go to the shops. Second thing, call the mechanic. Two, buy eggs.",
+            "1. Go to the shops. Second thing, call the mechanic\n2. Buy eggs"
+        ),
+        (
+            "First, check the logs. Two is that they are big. Second, tell the team.",
+            "1. Check the logs. Two is that they are big\n2. Tell the team"
+        ),
+    ])
+    func numbersSaidTheOtherWayStayInTheirItem(text: String, list: String) {
+        #expect(formatter.formatted(text) == list)
+    }
+
+    /// A one said the way the list's two is said starts the list after a one said the other way.
+    @Test func aOneSaidTheWayTheTwoIsStartsTheList() {
+        #expect(formatter.formatted("First, a quick update. One, the build. Two, the docs.")
+            == "First, a quick update:\n1. The build\n2. The docs")
+        #expect(formatter.formatted("First, an update, one, the build. Two, the docs.")
+            == "First, an update:\n1. The build\n2. The docs")
+    }
+
     /// A one that isn't followed by two leaves the list to a later one.
     @Test func aOneBeforeTheSecondItemStartsTheListAgain() {
         #expect(formatter.formatted("One is enough, I thought. Then there were two issues. One is the build. Two, the docs.")

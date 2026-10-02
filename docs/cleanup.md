@@ -50,12 +50,16 @@ Mac's snippets and vocabulary (Linux and Windows have none yet).
   and "First, the venue. Two, the invites. Three, the food." are lists. A number said again at the
   start of a sentence takes over from the same number inside the sentence before, so numbers inside
   an item stay there: "One, when we fix one, and two, does it pass? Number two, what does it cost?" is
-  a list of two. A marker that is talked about stays as said: after a determiner or possessive
-  ("the", "my", "Apple's") or a form of "be" ("cost is number two", "we're number one"), and a
-  bullet marker also after an ordinal or "last", "next", "previous", "final" or "other" ("the second
-  bullet point is wrong"). The markers become "1." or "-", each item starts with a capital, the line
-  before the list ends with a colon, text after the list starts a new paragraph, and items keep
-  their full stops only if every item is a sentence of four words or more. No other words change.
+  a list of two. Otherwise a list keeps the way it says its numbers, as ordinals or as numbers, so
+  a number said the other way inside an item stays there: "One, the shops. First thing tomorrow,
+  the car. Two, the eggs." is a list of two from "One", and "Number one, the logs. Second, the
+  server. Number two, the team." a list of two from "Number one". A marker that is talked about
+  stays as said: after a determiner or possessive ("the", "my", "Apple's") or a form of "be" ("cost
+  is number two", "we're number one"), and a bullet marker also after an ordinal or "last", "next",
+  "previous", "final" or "other" ("the second bullet point is wrong"). The markers become "1." or
+  "-", each item starts with a capital, the line before the list ends with a colon, text after the
+  list starts a new paragraph, and items keep their full stops only if every item is a sentence of
+  four words or more. No other words change.
 - **Numbers.** From Medium up, in every field, rules write spoken numbers in digits once the model
   and the list layout are done. The model sees and writes numbers as words, so it can still resolve
   a correction between them ("fifty thousand, I mean sixty thousand" → "60,000"); speech-to-text
@@ -164,9 +168,10 @@ never sees an emoji, an address or a line break, only a placeholder it must copy
   underscore, hyphen, plus sign or digit in its name, a word such as "email", "to" or "at" before
   it, or a mail provider's domain after it (gmail.com, outlook.com, hotmail.com, icloud.com,
   yahoo.com, proton.me and a few others): "alex at gmail dot com" → alex@gmail.com. There, "at"
-  stays when the word before it is a pronoun, a verb that takes "at" ("look", "work", "is", …) or a
-  word after "my", "the" and the like: "look at gmail.com", "my account at gmail.com". One that
-  speech-to-text writes out itself is kept too, in lower case.
+  stays when the word before it is a pronoun ("somebody" too), a verb that takes "at" ("look",
+  "work", "is", …), a word after "my", "the" and the like, or the provider's own name: "look at
+  gmail.com", "my account at gmail.com", "open Gmail at gmail.com". One that speech-to-text writes
+  out itself is kept too, in lower case.
 - "Fireworks" is 🎆 (Unicode's FIREWORKS); 🎇 is "sparkler". A snippet with the same words wins
   over a command, so you can map any phrase to the emoji you prefer. An emoji said on its own
   after a sentence takes no full stop: "See you soon. 🙂".

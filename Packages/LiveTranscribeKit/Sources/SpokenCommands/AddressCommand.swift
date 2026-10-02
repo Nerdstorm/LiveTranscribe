@@ -10,10 +10,11 @@ import Shared
 /// a dot, underscore, hyphen or digit ("john.smith"), follows a word such as "email", "to" or
 /// "is" ("email support at example.com"), or comes before a mail provider's domain ("alex at
 /// gmail dot com"). "look at example.com" and "contact us at example.com" keep their "at", and
-/// so do a pronoun, a verb that takes "at" or a word after a determiner before a mail provider
-/// ("look at gmail.com", "she works at outlook.com", "my account at gmail.com"). A domain
-/// speech-to-text already wrote as one word is left as it is unless it gains a name before it or
-/// a path after it; an email address it already wrote ("John.Smith@example.com") is taken whole.
+/// so do a pronoun, a verb that takes "at", a word after a determiner or the provider's own name
+/// before a mail provider ("look at gmail.com", "she works at outlook.com", "my account at
+/// gmail.com", "open Gmail at gmail.com"). A domain speech-to-text already wrote as one word is
+/// left as it is unless it gains a name before it or a path after it; an email address it
+/// already wrote ("John.Smith@example.com") is taken whole.
 ///
 /// The address goes behind a placeholder, lowercased except for its path, so the model cannot
 /// capitalise or split it.
@@ -38,6 +39,7 @@ public struct AddressCommand: PhraseMatcher {
     /// Plain names that are never email names: "contact us at example.com".
     static let pronouns: Set<String> = [
         "me", "us", "you", "him", "her", "them", "it", "we", "i", "they", "she", "he", "one", "everyone", "someone", "anyone",
+        "everybody", "somebody", "anybody", "nobody", "everything", "something", "anything", "nothing",
     ]
     /// Domains of mail providers, before which a plain name is an email name: "alex at gmail dot
     /// com".
@@ -220,11 +222,11 @@ public struct AddressCommand: PhraseMatcher {
     }
 
     /// Whether `name`, a plain word said before "at" and `host`, is a mailbox there: `host` is a
-    /// mail provider's, and `name` is no verb that takes "at" ("look at gmail.com") nor a word
-    /// after a determiner ("my account at gmail.com"). `wordBefore` is the word before `name` in
-    /// the same clause, if any.
+    /// mail provider's, and `name` is no verb that takes "at" ("look at gmail.com"), nor a word
+    /// after a determiner ("my account at gmail.com"), nor the provider's own name ("open Gmail at
+    /// gmail.com"). `wordBefore` is the word before `name` in the same clause, if any.
     private static func namesAMailbox(_ name: String, at host: String, after wordBefore: String?) -> Bool {
-        guard mailProviders.contains(host), !notEmailNames.contains(name) else { return false }
+        guard mailProviders.contains(host), !notEmailNames.contains(name), !host.hasPrefix(name + ".") else { return false }
         return !(wordBefore.map(PhraseGrammar.determiners.contains) ?? false)
     }
 

@@ -61,6 +61,9 @@ struct AddressCommandTests {
         ("the app is at icloud.com", "the app is at icloud.com"),
         ("my account at gmail dot com is full", "my account at gmail.com is full"),
         ("find us at hotmail.com", "find us at hotmail.com"),
+        ("somebody at gmail dot com wrote back", "somebody at gmail.com wrote back"),
+        ("open Gmail at gmail.com", "open Gmail at gmail.com"),
+        ("sign up for iCloud at icloud dot com", "sign up for iCloud at icloud.com"),
         ("alex at example.com", "alex at example.com"),
     ])
     func keepsAtBeforeAMailProvider(spoken: String, expected: String) {

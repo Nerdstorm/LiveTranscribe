@@ -67,10 +67,15 @@ const SENTENCE_ENDERS: [&str; 3] = [".", "!", "?"];
 ///
 /// A number said again before the list's next one moves the marker to it when it starts a
 /// sentence and the first did not, so numbers inside an item stay in it: "One, when we fix one, and
-/// two, then does it pass? Number two, …". A one said again also starts the list again when both
-/// start sentences, or neither does: "One is enough. One is the launch. Two, …". The last item
-/// runs to the end of its sentence, and any text after that starts a new paragraph. The lead-in
-/// and items are punctuated by [`ListStyle`].
+/// two, then does it pass? Number two, …". When both start sentences, or neither does, the marker
+/// moves only to a number said the same way as the list's one, as an ordinal or as a cardinal:
+/// "One, the shops. Second thing, the car. Two, …" keeps "Second thing" in the first item. A one
+/// said again also starts the list again when both start sentences, or neither does: "One is
+/// enough. One is the launch. Two, …". Only ones said the same way as the list's two count for
+/// that when there are any, so "First, an update. One, the build. Two, …" starts at "One" and
+/// "One, the shops. First thing tomorrow, the car. Two, …" at the first "One". The last item runs
+/// to the end of its sentence, and any text after that starts a new paragraph. The lead-in and
+/// items are punctuated by [`ListStyle`].
 ///
 /// Words that only introduce an item belong to its number: "First of all, …", "First is …", "One
 /// is …", "Second thing is …", "Third one's …". The "is" stays in the item after a comma ("First,
@@ -149,24 +154,30 @@ fn sentence_end(tokens: &[&str], start: usize) -> usize {
 
 /// Token indices of the list's numbers, where each starts: the first run of at least two numbers
 /// in order from one, each starting a clause, with "finally" or "lastly" after the second or
-/// later; `None` when there is none. A number said again moves its marker as the type's rules
-/// say.
+/// later; `None` when there is none. Which one starts the list, and which of a number said again
+/// is its marker, follow the type's rules.
 fn markers(tokens: &[&str]) -> Option<Vec<usize>> {
+    let mut ones: Vec<usize> = Vec::new();
     let mut markers: Vec<usize> = Vec::new();
     for index in 0..tokens.len() {
         if !starts_clause(index, tokens) {
             continue;
         }
         let number = number(index, tokens);
-        if number == Some(markers.len() + 1) {
+        if markers.is_empty() {
+            if number == Some(1) {
+                ones.push(index);
+            } else if number == Some(2)
+                && let Some(one) = list_one(&ones, index, tokens)
+            {
+                markers = vec![one, index];
+            }
+        } else if number == Some(markers.len() + 1) {
             markers.push(index);
-        } else if let Some(&last) = markers.last()
-            && number == Some(markers.len())
-            && takes_over(index, last, markers.len(), tokens)
-        {
+        } else if number == Some(markers.len()) && takes_over(index, markers[markers.len() - 1], markers[0], tokens) {
             let count = markers.len();
             markers[count - 1] = index;
-        } else if markers.len() >= 2 && is_word_in(&core(tokens[index]), &CLOSERS) {
+        } else if is_word_in(&core(tokens[index]), &CLOSERS) {
             markers.push(index);
             break;
         }
@@ -174,17 +185,42 @@ fn markers(tokens: &[&str]) -> Option<Vec<usize>> {
     (markers.len() >= 2).then_some(markers)
 }
 
-/// Whether the marker at `index`, which says `number` again, takes over from the run's last
-/// marker at `last`: when it starts a sentence and `last` does not, or, for a one, when both or
-/// neither do.
-fn takes_over(index: usize, last: usize, number: usize, tokens: &[&str]) -> bool {
+/// The one that starts the list, of the `ones` said before its two at `two`: the last of those
+/// said the same way as the two, or of all when none is, except that a one inside a sentence does
+/// not take over from one that starts a sentence.
+fn list_one(ones: &[usize], two: usize, tokens: &[&str]) -> Option<usize> {
+    let same_way: Vec<usize> = ones
+        .iter()
+        .copied()
+        .filter(|&one| said_as_ordinal(one, tokens) == said_as_ordinal(two, tokens))
+        .collect();
+    let candidates = if same_way.is_empty() { ones } else { &same_way };
+    let (&first, later) = candidates.split_first()?;
+    Some(later.iter().fold(first, |one, &later| {
+        if starts_sentence(later, tokens) || !starts_sentence(one, tokens) {
+            later
+        } else {
+            one
+        }
+    }))
+}
+
+/// Whether the marker at `index`, which says the number of the run's last marker at `last` again,
+/// takes over from it: when only one of them starts a sentence, the one that does; otherwise when
+/// it is said the same way as the list's one at `first` and `last` is not.
+fn takes_over(index: usize, last: usize, first: usize, tokens: &[&str]) -> bool {
     let opens_sentence = starts_sentence(index, tokens);
-    let last_opens_sentence = starts_sentence(last, tokens);
-    if number == 1 {
-        opens_sentence || !last_opens_sentence
-    } else {
-        opens_sentence && !last_opens_sentence
+    if opens_sentence != starts_sentence(last, tokens) {
+        return opens_sentence;
     }
+    let list_way = said_as_ordinal(first, tokens);
+    said_as_ordinal(index, tokens) == list_way && said_as_ordinal(last, tokens) != list_way
+}
+
+/// Whether the marker at `index` is an ordinal ("second") rather than a cardinal ("two", "number
+/// two"): the two ways a list's numbers are said.
+fn said_as_ordinal(index: usize, tokens: &[&str]) -> bool {
+    ordinal(index, tokens).is_some()
 }
 
 /// The number the marker starting at `index` gives its item, or `None`: an ordinal, a cardinal
@@ -409,6 +445,56 @@ mod tests {
             (
                 "One is enough, I thought. Then there were two issues. One is the build. Two, the docs.",
                 "One is enough, I thought. Then there were two issues:\n1. The build\n2. The docs",
+            ),
+        ] {
+            assert_eq!(formatter.formatted(text).as_deref(), Some(list), "{text}");
+        }
+    }
+
+    #[test]
+    fn a_number_said_the_other_way_inside_an_item_stays_in_it() {
+        let formatter = ListFormatter::default();
+        for (text, list) in [
+            (
+                "One, go to the shops. First thing tomorrow, call the mechanic. Two, buy eggs.",
+                "1. Go to the shops. First thing tomorrow, call the mechanic\n2. Buy eggs",
+            ),
+            (
+                "One, check the logs. First we look at the errors. Two, tell the team.",
+                "1. Check the logs. First we look at the errors\n2. Tell the team",
+            ),
+            (
+                "First, check the logs. One is that they are big. Second, tell the team.",
+                "1. Check the logs. One is that they are big\n2. Tell the team",
+            ),
+            (
+                "First, the release. Number one priority is speed. Second, the docs.",
+                "1. The release. Number one priority is speed\n2. The docs",
+            ),
+            (
+                "One, go to the shops. Second thing, call the mechanic. Two, buy eggs.",
+                "1. Go to the shops. Second thing, call the mechanic\n2. Buy eggs",
+            ),
+            (
+                "First, check the logs. Two is that they are big. Second, tell the team.",
+                "1. Check the logs. Two is that they are big\n2. Tell the team",
+            ),
+        ] {
+            assert_eq!(formatter.formatted(text).as_deref(), Some(list), "{text}");
+        }
+    }
+
+    #[test]
+    fn a_one_said_the_way_the_two_is_starts_the_list() {
+        let formatter = ListFormatter::default();
+        for (text, list) in [
+            (
+                "First, a quick update. One, the build. Two, the docs.",
+                "First, a quick update:\n1. The build\n2. The docs",
+            ),
+            (
+                "First, an update, one, the build. Two, the docs.",
+                "First, an update:\n1. The build\n2. The docs",
             ),
         ] {
             assert_eq!(formatter.formatted(text).as_deref(), Some(list), "{text}");

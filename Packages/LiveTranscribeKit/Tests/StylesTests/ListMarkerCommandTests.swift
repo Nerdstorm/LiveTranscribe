@@ -89,6 +89,8 @@ struct ListMarkerCommandTests {
         "One, speed. Number two, cost.",
         "First, speed. Second, cost.",
         "Number one, speed. Second people came.",
+        "First, the release. Number one priority is speed. Second, the docs.",
+        "Number one, we should, first, check the logs, second, restart it.",
         "Choose from number one, two, three or four.",
         "Number one, two, three, go!",
         "Number one, two. Three, four.",
@@ -97,6 +99,16 @@ struct ListMarkerCommandTests {
         let protected = protector.protect(text)
         #expect(protected.placeholders.isEmpty)
         #expect(protected.text == text, "the speaker's words are all still there")
+    }
+
+    @Test("A number said with the run's word takes over from a bare one before it", arguments: [
+        "Number one, check the logs. Second, restart the server. Number two, tell the team.",
+        "Number one, we should, first, check the logs, second, restart it. Number two, tell the team.",
+        "Number one, finish the report, two, check it. Number two, send it.",
+    ])
+    func aKeywordedNumberTakesOverFromABareOne(text: String) {
+        let protected = protector.protect(text)
+        #expect(protected.placeholders.map(\.spoken) == ["Number one,", "Number two,"])
     }
 
     @Test func aBareNumberContinuesTheRunOfTheNearestKeyword() {

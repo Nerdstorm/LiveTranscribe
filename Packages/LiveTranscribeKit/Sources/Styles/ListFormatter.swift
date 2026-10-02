@@ -15,10 +15,15 @@ import Shared
 ///
 /// A number said again before the list's next one moves the marker to it when it starts a
 /// sentence and the first did not, so numbers inside an item stay in it: "One, when we fix one, and
-/// two, then does it pass? Number two, …". A one said again also starts the list again when both
-/// start sentences, or neither does: "One is enough. One is the launch. Two, …". The last item
-/// runs to the end of its sentence, and any text after that starts a new paragraph. The lead-in
-/// and items are punctuated by ``ListStyle``.
+/// two, then does it pass? Number two, …". When both start sentences, or neither does, the marker
+/// moves only to a number said the same way as the list's one, as an ordinal or as a cardinal:
+/// "One, the shops. Second thing, the car. Two, …" keeps "Second thing" in the first item. A one
+/// said again also starts the list again when both start sentences, or neither does: "One is
+/// enough. One is the launch. Two, …". Only ones said the same way as the list's two count for
+/// that when there are any, so "First, an update. One, the build. Two, …" starts at "One" and
+/// "One, the shops. First thing tomorrow, the car. Two, …" at the first "One". The last item runs
+/// to the end of its sentence, and any text after that starts a new paragraph. The lead-in and
+/// items are punctuated by ``ListStyle``.
 ///
 /// Words that only introduce an item belong to its number: "First of all, …", "First is …",
 /// "One is …", "Second thing is …", "Third one's …". The "is" stays in the item after a comma
@@ -93,18 +98,25 @@ public struct ListFormatter: Sendable {
 
     /// Token indices of the list's numbers, where each starts: the first run of at least two
     /// numbers in order from one, each starting a clause, with "finally" or "lastly" after the
-    /// second or later; `nil` when there is none. A number said again moves its marker as the
-    /// type's rules say.
+    /// second or later; `nil` when there is none. Which one starts the list, and which of a
+    /// number said again is its marker, follow the type's rules.
     private func markers(in tokens: [String]) -> [Int]? {
+        var ones: [Int] = []
         var markers: [Int] = []
         for index in tokens.indices where Self.startsClause(index, in: tokens) {
             let number = Self.number(at: index, in: tokens)
-            if number == markers.count + 1 {
+            if markers.isEmpty {
+                if number == 1 {
+                    ones.append(index)
+                } else if number == 2, let one = Self.listOne(among: ones, before: index, in: tokens) {
+                    markers = [one, index]
+                }
+            } else if number == markers.count + 1 {
                 markers.append(index)
-            } else if let last = markers.last, number == markers.count,
-                      Self.takesOver(index, from: last, saying: markers.count, in: tokens) {
+            } else if number == markers.count,
+                      Self.takesOver(index, from: markers[markers.count - 1], inListFrom: markers[0], in: tokens) {
                 markers[markers.count - 1] = index
-            } else if markers.count >= 2, Self.closers.contains(Self.core(tokens[index])) {
+            } else if Self.closers.contains(Self.core(tokens[index])) {
                 markers.append(index)
                 break
             }
@@ -112,13 +124,33 @@ public struct ListFormatter: Sendable {
         return markers.count >= 2 ? markers : nil
     }
 
-    /// Whether the marker at `index`, which says `number` again, takes over from the run's last
-    /// marker at `last`: when it starts a sentence and `last` does not, or, for a one, when both
-    /// or neither do.
-    private static func takesOver(_ index: Int, from last: Int, saying number: Int, in tokens: [String]) -> Bool {
+    /// The one that starts the list, of the `ones` said before its two at `two`: the last of
+    /// those said the same way as the two, or of all when none is, except that a one inside a
+    /// sentence does not take over from one that starts a sentence.
+    private static func listOne(among ones: [Int], before two: Int, in tokens: [String]) -> Int? {
+        let sameWay = ones.filter { saidAsOrdinal($0, in: tokens) == saidAsOrdinal(two, in: tokens) }
+        let candidates = sameWay.isEmpty ? ones : sameWay
+        guard var one = candidates.first else { return nil }
+        for later in candidates.dropFirst() where startsSentence(later, in: tokens) || !startsSentence(one, in: tokens) {
+            one = later
+        }
+        return one
+    }
+
+    /// Whether the marker at `index`, which says the number of the run's last marker at `last`
+    /// again, takes over from it: when only one of them starts a sentence, the one that does;
+    /// otherwise when it is said the same way as the list's one at `first` and `last` is not.
+    private static func takesOver(_ index: Int, from last: Int, inListFrom first: Int, in tokens: [String]) -> Bool {
         let opensSentence = startsSentence(index, in: tokens)
-        let lastOpensSentence = startsSentence(last, in: tokens)
-        return number == 1 ? opensSentence || !lastOpensSentence : opensSentence && !lastOpensSentence
+        guard opensSentence == startsSentence(last, in: tokens) else { return opensSentence }
+        let listWay = saidAsOrdinal(first, in: tokens)
+        return saidAsOrdinal(index, in: tokens) == listWay && saidAsOrdinal(last, in: tokens) != listWay
+    }
+
+    /// Whether the marker at `index` is an ordinal ("second") rather than a cardinal ("two",
+    /// "number two"): the two ways a list's numbers are said.
+    private static func saidAsOrdinal(_ index: Int, in tokens: [String]) -> Bool {
+        ordinal(at: index, in: tokens) != nil
     }
 
     /// The number the marker starting at `index` gives its item, or `nil`: an ordinal, a cardinal
