@@ -62,29 +62,35 @@ Mac's snippets and vocabulary (Linux and Windows have none yet).
   | digits said one by one, three or more ("oh" is zero there) | "zero four four six" → 0446, "room three oh two" → room 302 |
   | decimals and versions, and any number after "version" | "two point five" → 2.5, "version two point four point one" → version 2.4.1, "version two" → version 2 |
   | percentages | "twenty five percent" → 25%, "five percent" → 5% |
-  | dollars and cents | "one hundred and twenty five dollars" → $125, "five dollars and fifty cents" → $5.50, "fifty cents" → 50 cents |
+  | dollars and cents | "one hundred and twenty five dollars" → $125, "five dollars and fifty cents" → $5.50, "two dollars fifty" → $2.50, "fifty cents" → 50 cents |
   | times after "at", "by", "from", "until", "till", "around", "before" or "after", or before "am" or "pm" | "at nine fifteen" → at 9:15, "seven thirty pm" → 7:30 pm, "at twelve oh five" → at 12:05 |
   | years said in halves, 1900 to 2099 | "in twenty twenty six" → in 2026, "nineteen oh five" → 1905 |
+  | decades and centuries said with their first two digits | "the nineteen nineties" → the 1990s, "the eighteen hundreds" → the 1800s |
 
   Any other number is a count: one to nine stay words ("two things"), and 10 and up become digits
   ("twenty one chairs" → "21 chairs"), at the start of a sentence too ("Twenty people came." →
   "20 people came."). Numbers of five digits or more take commas and four-digit ones don't, so a
   count reads like a year: 1500, 2026, 50,000, 1,200,000. Whole millions and billions keep the
-  word: "five million dollars" → "$5 million". Number words are read in any case ("Zero Three
-  Three Six") and hyphenated ("twenty-five-year-old" → "25-year-old"). Punctuation or a line break
-  ends a number, except a comma after "thousand", "million" or "billion" before more hundreds
-  ("two thousand, five hundred" → 2500).
+  word: "five million dollars" → "$5 million". "A hundred" with more number words after it is a
+  count too: "a hundred and fifty people" → "150 people". Number words are read in any case ("Zero
+  Four Four Six") and hyphenated ("twenty-five-year-old" → "25-year-old"), and a number that
+  runs into a word that way is a count, not a year: "twenty twelve-year-olds" → "20
+  12-year-olds". Punctuation or a line break ends a number, except a comma after "thousand",
+  "million" or "billion" before more hundreds ("two thousand, five hundred" → 2500). In a range,
+  the scale word and the unit after the last number carry back to the first: "twenty to thirty
+  thousand" → "20,000 to 30,000", "ten to twenty million dollars" → "$10 million to $20 million".
 
   These stay as said: "one" as a word ("the one I want", "one of them", "one day"); list markers
   that were not laid out, which are below ten ("One, go to shops, two, …"), while laid-out lists
   start with digits already; number words that make no one number ("nine eleven", "twenty four
   seven", or "nine fifteen" without "at" or "pm"); a number before an ordinal ("the twenty first
   century"), "o'clock" or "and a half"; clock phrases ("half past ten", "twenty to eleven");
-  "a hundred" and "a thousand", except before "dollars" or "percent" ("a hundred dollars" → $100);
-  and a range or series with a number below ten ("five to ten", "nine or ten", "eight, nine,
-  ten"), while "ten to fifteen" becomes "10 to 15" and "five to ten percent" "5% to 10%". A
+  "a hundred" and "a thousand" alone, except before "dollars" or "percent" ("a hundred dollars" →
+  $100); and a range or series with a number below ten ("five to ten", "nine or ten", "eight,
+  nine, ten"), while "ten to fifteen" becomes "10 to 15" and "five to ten percent" "5% to 10%". A
   vocabulary term keeps its numbers as you wrote it ("Studio Fifty-Four"), and so do a few idioms
-  ("forty winks", "hindsight is twenty twenty"). Undo AI edit puts the words back.
+  ("forty winks", "a thousand and one", "hindsight is twenty twenty"). Undo AI edit puts the words
+  back.
 - **Letters.** A letter needs a greeting at the start ("Dear…", "Hi…", "Hello…", "Hey…", "Good
   morning…", "To whom it may concern") and a sign-off at the end ("Kind regards", "Sincerely",
   "Best wishes", …). An everyday sign-off ("Thanks", "Thank you", "Cheers", "Best", "Love", "Take
@@ -129,8 +135,8 @@ Mac's snippets and vocabulary (Linux and Windows have none yet).
   left, so Deep never shows less than Medium would.
 - **With the language model off**, nothing is reworded. Medium, High and Deep still remove fillers,
   lay out lists and letters and write numbers in digits in dictation, and snippets, vocabulary and
-  spoken commands still apply. The switch is **Clean up transcripts with the LLM** in **Settings › Advanced**; on the
-  Mac it applies at the next launch, on Linux and Windows at once.
+  spoken commands still apply. The switch is **Clean up transcripts with the LLM** in **Settings ›
+  Advanced**; on the Mac it applies at the next launch, on Linux and Windows at once.
 
 ## Spoken commands
 

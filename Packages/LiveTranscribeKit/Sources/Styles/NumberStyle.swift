@@ -10,20 +10,28 @@ import Foundation
 ///   "version 2.4.1", and any number after "version" ("version 2");
 /// - percentages: "twenty five percent" → "25%";
 /// - dollars and cents: "one hundred and twenty five dollars" → "$125", "five dollars and fifty
-///   cents" → "$5.50", "fifty cents" → "50 cents";
+///   cents" → "$5.50", "two dollars fifty" → "$2.50", "fifty cents" → "50 cents";
 /// - times, after "at", "by", "from", "until", "till", "around", "before" or "after", or before
 ///   "am" or "pm": "at nine fifteen" → "at 9:15", "seven thirty pm" → "7:30 pm";
-/// - years said in halves, 1900 to 2099: "in twenty twenty six" → "in 2026".
+/// - years said in halves, 1900 to 2099: "in twenty twenty six" → "in 2026";
+/// - decades and centuries said with their first two digits: "the nineteen nineties" → "the
+///   1990s", "the eighteen hundreds" → "the 1800s".
 ///
 /// Other numbers are counts: one to nine stay words, 10 and up become digits ("twenty one
 /// chairs" → "21 chairs"). Numbers of five digits or more take commas (50,000) and four-digit
 /// ones don't, so a count reads like a year (1500, 2026); whole millions and billions keep the
-/// word ("5 million"). A number that starts a sentence is written the same way.
+/// word ("5 million"). A number that starts a sentence is written the same way. "A hundred" or "a
+/// thousand" with more number words after it is a count too: "a hundred and fifty" → "150".
 ///
 /// Number words are read in any case ("Zero Four Four Six") and hyphenated ("twenty-one",
 /// "twenty-five-year-old" → "25-year-old"). Punctuation or a line break ends a number, except a
 /// comma after "thousand", "million" or "billion" before more hundreds ("two thousand, five
-/// hundred" → "2500").
+/// hundred" → "2500"). A number that runs into a word such as "twelve-year-olds" is a count,
+/// never a year or a time: "twenty twelve-year-olds" → "20 12-year-olds".
+///
+/// In a range, the scale word and the unit after the last number carry back to the first:
+/// "twenty to thirty thousand" → "20,000 to 30,000", "five to ten percent" → "5% to 10%", "ten
+/// to twenty million dollars" → "$10 million to $20 million".
 ///
 /// These stay as said:
 /// - "one" and every count below ten, so list markers that were not laid out stay words ("One, go
@@ -31,16 +39,16 @@ import Foundation
 /// - number words that make no one number: "nine eleven", "twenty four seven", "nine fifteen"
 ///   with no "at" or "pm";
 /// - a number before an ordinal ("twenty first"), "o'clock" or "and a half", in a clock phrase
-///   ("half past ten", "twenty to eleven"), and "a hundred" or "a thousand" except before
+///   ("half past ten", "twenty to eleven"), and "a hundred" or "a thousand" alone, except before
 ///   "dollars" or "percent";
 /// - a range or series with a count below ten: "five to ten", "nine or ten", "eight, nine, ten"
-///   (but "ten to fifteen" → "10 to 15"); a unit after the last number carries back, "five to
-///   ten percent" → "5% to 10%";
+///   (but "ten to fifteen" → "10 to 15");
 /// - idioms (``idioms``) and the phrases the rule is told to keep, such as vocabulary terms.
 public struct NumberStyle: Sendable {
     /// Idioms whose numbers stay words.
     public static let idioms = [
-        "forty winks", "hindsight is twenty twenty", "twenty twenty hindsight", "twenty twenty vision",
+        "a thousand and one", "forty winks", "hindsight is twenty twenty", "twenty twenty hindsight",
+        "twenty twenty vision",
     ]
 
     /// Words before a time: "at nine fifteen".
@@ -52,6 +60,11 @@ public struct NumberStyle: Sendable {
     private static let rangeLinks: Set<String> = ["to", "or", "and"]
     /// Minutes said before "past" or "to" in a clock phrase: "twenty past ten".
     private static let clockMinutes: Set<Int> = [5, 10, 20, 25]
+    /// The decades said after a century, "the nineteen nineties", and their tens.
+    private static let decades: [String: Int] = [
+        "twenties": 20, "thirties": 30, "forties": 40, "fifties": 50, "sixties": 60, "seventies": 70,
+        "eighties": 80, "nineties": 90,
+    ]
     private static let ordinals: Set<String> = [
         "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth", "eleventh",
         "twelfth", "thirteenth", "fourteenth", "fifteenth", "sixteenth", "seventeenth", "eighteenth", "nineteenth",
@@ -83,6 +96,7 @@ public struct NumberStyle: Sendable {
             readUpTo = readings.last?.words.upperBound ?? readUpTo
         }
         Self.keepClockPhrases(&readings, in: words)
+        Self.carryScalesBack(&readings, in: words)
         Self.carryUnitsBack(&readings, in: words)
         Self.keepRangesWithSmallCounts(&readings, in: words)
 
@@ -229,16 +243,41 @@ public struct NumberStyle: Sendable {
             || saysAndAHalf(after: run, in: words) {
             return Reading(words: run, text: nil, kind: .other)
         }
+        if let decade = decadeOrCentury(run, said: said, in: words) { return decade }
         if let comma = run.dropLast().last(where: { words[$0].trailing == "," }) {
             // Only hundreds may follow a comma: "two thousand, five hundred".
             guard run[(comma + 1)...].contains(where: { NumberWords.isMultiplier(words[$0].text) }) else { return nil }
             return wholeNumber(run, said: said, in: words)
         }
-        if let time = time(run, said: said, in: words, after: previous) { return time }
+        // A number that runs into a word such as "twelve-year-olds" is a count, never a time,
+        // digits said one by one or a year: "twenty twelve-year-olds" is 20 of them.
+        let intoMixedToken = run.dropFirst().contains { words[$0].startsToken && words[$0].inMixedToken }
+        if !intoMixedToken, let time = time(run, said: said, in: words, after: previous) { return time }
         if said.contains(NumberWords.point) { return decimal(run, said: said, in: words) }
-        if let digits = NumberWords.digitString(said) { return Reading(words: run, text: digits, kind: .other) }
-        if let year = NumberWords.year(said) { return Reading(words: run, text: String(year), kind: .other) }
+        if !intoMixedToken, let digits = NumberWords.digitString(said) {
+            return Reading(words: run, text: digits, kind: .other)
+        }
+        if !intoMixedToken, let year = NumberWords.year(said) {
+            return Reading(words: run, text: String(year), kind: .other)
+        }
         return wholeNumber(run, said: said, in: words)
+    }
+
+    /// A decade or a century said with its first two digits, and the plural after it: "nineteen
+    /// nineties" → "1990s", "eighteen hundreds" → "1800s".
+    private static func decadeOrCentury(_ run: Range<Int>, said: [String], in words: [Word]) -> Reading? {
+        guard let plural = text(after: run.upperBound - 1, in: words), let century = NumberWords.cardinal(said),
+              (10...99).contains(century)
+        else { return nil }
+        let tens: Int
+        if plural == "hundreds" {
+            tens = 0
+        } else if let decade = decades[plural] {
+            tens = decade
+        } else {
+            return nil
+        }
+        return Reading(words: run.lowerBound..<run.upperBound + 1, text: "\(century * 100 + tens)s", kind: .other)
     }
 
     /// "Twelve and a half", "two and a quarter".
@@ -249,7 +288,8 @@ public struct NumberStyle: Sendable {
     }
 
     /// A clock time: an hour and minutes after a word such as "at", or before "am" or "pm", where
-    /// an hour alone is enough too. "At nine fifteen year olds" stays a count.
+    /// an hour alone is enough too. "At nine fifteen year olds" stays a count, and "at five fifty
+    /// dollars" is no time.
     private static func time(_ run: Range<Int>, said: [String], in words: [Word], after previous: Reading?) -> Reading? {
         let after = text(after: run.upperBound - 1, in: words)
         let beforeMeridiem = after.map(meridiems.contains) ?? false
@@ -261,7 +301,9 @@ public struct NumberStyle: Sendable {
         if let before = text(before: run.lowerBound, in: words) {
             cued = cued || timeCues.contains(before) || (afterTime && timeLinks.contains(before))
         }
-        guard cued, after != "year", after != "years" else { return nil }
+        guard cued, after != "year", after != "years", unit(after: run.upperBound - 1, in: words) == nil else {
+            return nil
+        }
         if let time = NumberWords.clockTime(said) { return Reading(words: run, text: time, kind: .time) }
         if beforeMeridiem, said.count == 1, let hour = NumberWords.hour(said[0]) {
             return Reading(words: run, text: String(hour), kind: .time)
@@ -281,12 +323,14 @@ public struct NumberStyle: Sendable {
         return Reading(words: run.lowerBound..<end, text: unit.written(pointed.text + cents), kind: .unit(unit))
     }
 
-    /// A whole number: a count, or an amount with a unit. "A hundred" counts only before a unit.
+    /// A whole number: a count, or an amount with a unit. "A hundred" counts only before a unit or
+    /// with more number words after it: "a hundred and fifty".
     private static func wholeNumber(_ run: Range<Int>, said: [String], in words: [Word]) -> Reading? {
         var start = run.lowerBound
         var value = NumberWords.cardinal(said)
         let before = text(before: run.lowerBound, in: words)
-        if value == nil, before == "a", NumberWords.isMultiplier(said[0]), unit(after: run.upperBound - 1, in: words) != nil {
+        if value == nil, before == "a", NumberWords.isMultiplier(said[0]),
+           said.count > 1 || unit(after: run.upperBound - 1, in: words) != nil {
             value = NumberWords.cardinal(["one"] + said)
             start -= 1
         }
@@ -294,7 +338,9 @@ public struct NumberStyle: Sendable {
         let digits = NumberWords.written(value, saidWith: said)
         guard let (unit, end) = unit(after: run.upperBound - 1, in: words) else {
             if before == "version" { return Reading(words: run, text: digits, kind: .other) }
-            return Reading(words: run, text: value >= 10 ? digits : nil, kind: .plain(digits: digits, value: value))
+            return Reading(
+                words: start..<run.upperBound, text: value >= 10 ? digits : nil, kind: .plain(digits: digits, value: value)
+            )
         }
         if unit == .dollars, let (cents, centsEnd) = cents(after: end - 1, in: words) {
             return Reading(words: start..<centsEnd, text: "$\(digits).\(cents < 10 ? "0" : "")\(cents)", kind: .unit(.dollars))
@@ -314,18 +360,24 @@ public struct NumberStyle: Sendable {
         }
     }
 
-    /// The cents in "and fifty cents" after word `index`, "dollars": their number, 1 to 99, and
-    /// the end of the words.
+    /// The cents after word `index`, "dollars": their number and the end of the words. With
+    /// "cents" they are 1 to 99, "and" or not ("and fifty cents"); without it, 10 to 99, straight
+    /// after "dollars" ("two dollars fifty") or after "and" at the end of a clause ("two dollars
+    /// and fifty.").
     private static func cents(after index: Int, in words: [Word]) -> (Int, Int)? {
-        guard text(after: index, in: words) == NumberWords.and else { return nil }
-        var end = index + 2
+        let saysAnd = text(after: index, in: words) == NumberWords.and
+        let start = index + (saysAnd ? 2 : 1)
+        guard start < words.count, words[start - 1].runsOn else { return nil }
+        var end = start
         while end < words.count, NumberWords.isNumberWord(words[end].text), words[end - 1].runsOn {
             end += 1
         }
-        guard end > index + 2, ["cent", "cents"].contains(text(after: end - 1, in: words) ?? ""),
-              let value = NumberWords.cardinal(words[(index + 2)..<end].map(\.text)), value < 100
-        else { return nil }
-        return (value, end + 1)
+        guard end > start, let value = NumberWords.cardinal(words[start..<end].map(\.text)), value < 100 else {
+            return nil
+        }
+        if ["cent", "cents"].contains(text(after: end - 1, in: words) ?? "") { return (value, end + 1) }
+        guard value >= 10, !saysAnd || !words[end - 1].runsOn else { return nil }
+        return (value, end)
     }
 
     // MARK: - Ranges and clock phrases
@@ -360,6 +412,42 @@ public struct NumberStyle: Sendable {
                 }
             }
         }
+    }
+
+    /// A scale word that ends the last number of a range carries back to a smaller first number
+    /// said without one: "twenty to thirty thousand" → "20,000 to 30,000", "five or six hundred"
+    /// → "500 or 600". Without it, "20 to 30,000" would say a different range.
+    private static func carryScalesBack(_ readings: inout [Reading], in words: [Word]) {
+        for index in readings.indices.dropFirst() {
+            guard case .plain(_, let first?) = readings[index - 1].kind, first > 0,
+                  !readings[index - 1].words.contains(where: { NumberWords.isMultiplier(words[$0].text) }),
+                  let link = link(readings[index - 1], readings[index], in: words), rangeLinks.contains(link),
+                  let (scale, leading) = scale(of: readings[index], in: words), first < leading
+            else { continue }
+            let value = first * (NumberWords.scales[scale] ?? 100)
+            let digits = NumberWords.written(value, saidWith: [scale])
+            readings[index - 1].text = digits
+            readings[index - 1].kind = .plain(digits: digits, value: value)
+        }
+    }
+
+    /// The word that multiplies the whole number `reading` says, and the number before it: "thirty
+    /// thousand dollars" → "thousand" and 30; `nil` for a decimal, a number with more than one
+    /// multiplier ("two thousand five hundred"), or anything but a count or an amount.
+    private static func scale(of reading: Reading, in words: [Word]) -> (String, Int)? {
+        switch reading.kind {
+        case .plain(_, _?), .unit: break
+        default: return nil
+        }
+        let said = reading.words.map { words[$0].text }
+        guard !said.contains(NumberWords.point) else { return nil }
+        let numberWords = said.filter(NumberWords.isNumberWord)
+        guard numberWords.count > 1, let scale = numberWords.last, NumberWords.isMultiplier(scale) else { return nil }
+        let before = Array(numberWords.dropLast())
+        guard !before.contains(where: NumberWords.isMultiplier), let leading = NumberWords.cardinal(before) else {
+            return nil
+        }
+        return (scale, leading)
     }
 
     /// A unit after the last number of a range carries back to the first: "five to ten percent"

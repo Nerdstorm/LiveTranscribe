@@ -10,7 +10,8 @@ mod words;
 use words::{Word, text_after, text_before, words};
 
 /// Idioms whose numbers stay words.
-pub const NUMBER_IDIOMS: [&str; 4] = [
+pub const NUMBER_IDIOMS: [&str; 5] = [
+    "a thousand and one",
     "forty winks",
     "hindsight is twenty twenty",
     "twenty twenty hindsight",
@@ -26,6 +27,17 @@ const MERIDIEMS: [&str; 4] = ["am", "pm", "a.m", "p.m"];
 const RANGE_LINKS: [&str; 3] = ["to", "or", "and"];
 /// Minutes said before "past" or "to" in a clock phrase: "twenty past ten".
 const CLOCK_MINUTES: [u64; 4] = [5, 10, 20, 25];
+/// The decades said after a century, "the nineteen nineties", and their tens.
+const DECADES: [(&str, u64); 8] = [
+    ("twenties", 20),
+    ("thirties", 30),
+    ("forties", 40),
+    ("fifties", 50),
+    ("sixties", 60),
+    ("seventies", 70),
+    ("eighties", 80),
+    ("nineties", 90),
+];
 const ORDINALS: [&str; 31] = [
     "first",
     "second",
@@ -70,20 +82,28 @@ const ORDINALS: [&str; 31] = [
 ///   "version 2.4.1", and any number after "version" ("version 2");
 /// - percentages: "twenty five percent" → "25%";
 /// - dollars and cents: "one hundred and twenty five dollars" → "$125", "five dollars and fifty
-///   cents" → "$5.50", "fifty cents" → "50 cents";
+///   cents" → "$5.50", "two dollars fifty" → "$2.50", "fifty cents" → "50 cents";
 /// - times, after "at", "by", "from", "until", "till", "around", "before" or "after", or before
 ///   "am" or "pm": "at nine fifteen" → "at 9:15", "seven thirty pm" → "7:30 pm";
-/// - years said in halves, 1900 to 2099: "in twenty twenty six" → "in 2026".
+/// - years said in halves, 1900 to 2099: "in twenty twenty six" → "in 2026";
+/// - decades and centuries said with their first two digits: "the nineteen nineties" → "the
+///   1990s", "the eighteen hundreds" → "the 1800s".
 ///
 /// Other numbers are counts: one to nine stay words, 10 and up become digits ("twenty one chairs"
 /// → "21 chairs"). Numbers of five digits or more take commas (50,000) and four-digit ones don't,
 /// so a count reads like a year (1500, 2026); whole millions and billions keep the word ("5
-/// million"). A number that starts a sentence is written the same way.
+/// million"). A number that starts a sentence is written the same way. "A hundred" or "a
+/// thousand" with more number words after it is a count too: "a hundred and fifty" → "150".
 ///
 /// Number words are read in any case ("Zero Four Four Six") and hyphenated ("twenty-one",
 /// "twenty-five-year-old" → "25-year-old"). Punctuation or a line break ends a number, except a
 /// comma after "thousand", "million" or "billion" before more hundreds ("two thousand, five
-/// hundred" → "2500").
+/// hundred" → "2500"). A number that runs into a word such as "twelve-year-olds" is a count, never
+/// a year or a time: "twenty twelve-year-olds" → "20 12-year-olds".
+///
+/// In a range, the scale word and the unit after the last number carry back to the first: "twenty
+/// to thirty thousand" → "20,000 to 30,000", "five to ten percent" → "5% to 10%", "ten to twenty
+/// million dollars" → "$10 million to $20 million".
 ///
 /// These stay as said:
 /// - "one" and every count below ten, so list markers that were not laid out stay words ("One, go
@@ -91,11 +111,10 @@ const ORDINALS: [&str; 31] = [
 /// - number words that make no one number: "nine eleven", "twenty four seven", "nine fifteen" with
 ///   no "at" or "pm";
 /// - a number before an ordinal ("twenty first"), "o'clock" or "and a half", in a clock phrase
-///   ("half past ten", "twenty to eleven"), and "a hundred" or "a thousand" except before
+///   ("half past ten", "twenty to eleven"), and "a hundred" or "a thousand" alone, except before
 ///   "dollars" or "percent";
 /// - a range or series with a count below ten: "five to ten", "nine or ten", "eight, nine, ten"
-///   (but "ten to fifteen" → "10 to 15"); a unit after the last number carries back, "five to ten
-///   percent" → "5% to 10%";
+///   (but "ten to fifteen" → "10 to 15");
 /// - idioms ([`NUMBER_IDIOMS`]) and the phrases the rule is told to keep, such as vocabulary
 ///   terms.
 #[derive(Clone, Debug)]
@@ -142,6 +161,7 @@ impl NumberStyle {
             read_up_to = readings.last().map_or(read_up_to, |reading| reading.words.end);
         }
         keep_clock_phrases(&mut readings, &words);
+        carry_scales_back(&mut readings, &words);
         carry_units_back(&mut readings, &words);
         keep_ranges_with_small_counts(&mut readings, &words);
 
@@ -347,6 +367,9 @@ fn reading(run: Range<usize>, words: &[Word], previous: Option<&Reading>) -> Opt
     {
         return Some(Reading::as_said(run));
     }
+    if let Some(decade) = decade_or_century(&run, &said, words) {
+        return Some(decade);
+    }
     if let Some(comma) = (run.start..run.end - 1)
         .rev()
         .find(|&index| s::canonically_equal(words[index].trailing, ","))
@@ -357,19 +380,40 @@ fn reading(run: Range<usize>, words: &[Word], previous: Option<&Reading>) -> Opt
         }
         return whole_number(run, &said, words);
     }
-    if let Some(time) = time(run.clone(), &said, words, previous) {
+    // A number that runs into a word such as "twelve-year-olds" is a count, never a time, digits
+    // said one by one or a year: "twenty twelve-year-olds" is 20 of them.
+    let into_mixed_token =
+        (run.start + 1..run.end).any(|index| words[index].starts_token && words[index].in_mixed_token);
+    if !into_mixed_token && let Some(time) = time(run.clone(), &said, words, previous) {
         return Some(time);
     }
     if said.contains(&POINT) {
         return decimal(run, &said, words);
     }
-    if let Some(digits) = numbers::digit_string(&said) {
+    if !into_mixed_token && let Some(digits) = numbers::digit_string(&said) {
         return Some(Reading::new(run, Some(digits), Kind::Other));
     }
-    if let Some(year) = numbers::year(&said) {
+    if !into_mixed_token && let Some(year) = numbers::year(&said) {
         return Some(Reading::new(run, Some(year.to_string()), Kind::Other));
     }
     whole_number(run, &said, words)
+}
+
+/// A decade or a century said with its first two digits, and the plural after it: "nineteen
+/// nineties" → "1990s", "eighteen hundreds" → "1800s".
+fn decade_or_century(run: &Range<usize>, said: &[&str], words: &[Word]) -> Option<Reading> {
+    let plural = text_after(run.end - 1, words)?;
+    let century = numbers::cardinal(said).filter(|century| (10..=99).contains(century))?;
+    let tens = if plural == "hundreds" {
+        0
+    } else {
+        DECADES.iter().find(|(decade, _)| *decade == plural)?.1
+    };
+    Some(Reading::new(
+        run.start..run.end + 1,
+        Some(format!("{}s", century * 100 + tens)),
+        Kind::Other,
+    ))
 }
 
 /// "Twelve and a half", "two and a quarter".
@@ -381,7 +425,8 @@ fn says_and_a_half(run: &Range<usize>, words: &[Word]) -> bool {
 }
 
 /// A clock time: an hour and minutes after a word such as "at", or before "am" or "pm", where an
-/// hour alone is enough too. "At nine fifteen year olds" stays a count.
+/// hour alone is enough too. "At nine fifteen year olds" stays a count, and "at five fifty dollars"
+/// is no time.
 fn time(run: Range<usize>, said: &[&str], words: &[Word], previous: Option<&Reading>) -> Option<Reading> {
     let after = text_after(run.end - 1, words);
     let before_meridiem = is_in(after, &MERIDIEMS);
@@ -391,7 +436,7 @@ fn time(run: Range<usize>, said: &[&str], words: &[Word], previous: Option<&Read
     if let Some(before) = text_before(run.start, words) {
         cued = cued || TIME_CUES.contains(&before) || (after_time && TIME_LINKS.contains(&before));
     }
-    if !cued || is_in(after, &["year", "years"]) {
+    if !cued || is_in(after, &["year", "years"]) || unit_after(run.end - 1, words).is_some() {
         return None;
     }
     if let Some(time) = numbers::clock_time(said) {
@@ -436,7 +481,8 @@ fn decimal(run: Range<usize>, said: &[&str], words: &[Word]) -> Option<Reading> 
     ))
 }
 
-/// A whole number: a count, or an amount with a unit. "A hundred" counts only before a unit.
+/// A whole number: a count, or an amount with a unit. "A hundred" counts only before a unit or with
+/// more number words after it: "a hundred and fifty".
 fn whole_number(run: Range<usize>, said: &[&str], words: &[Word]) -> Option<Reading> {
     let mut start = run.start;
     let mut value = numbers::cardinal(said);
@@ -444,7 +490,7 @@ fn whole_number(run: Range<usize>, said: &[&str], words: &[Word]) -> Option<Read
     if value.is_none()
         && before == Some("a")
         && numbers::is_multiplier(said[0])
-        && unit_after(run.end - 1, words).is_some()
+        && (said.len() > 1 || unit_after(run.end - 1, words).is_some())
     {
         let with_one: Vec<&str> = std::iter::once("one").chain(said.iter().copied()).collect();
         value = numbers::cardinal(&with_one);
@@ -457,7 +503,7 @@ fn whole_number(run: Range<usize>, said: &[&str], words: &[Word]) -> Option<Read
             return Some(Reading::new(run, Some(digits), Kind::Other));
         }
         return Some(Reading::new(
-            run,
+            start..run.end,
             (value >= 10).then(|| digits.clone()),
             Kind::Plain {
                 digits,
@@ -489,27 +535,34 @@ fn unit_after(index: usize, words: &[Word]) -> Option<(Unit, usize)> {
     }
 }
 
-/// The cents in "and fifty cents" after word `index`, "dollars": their number, 1 to 99, and the
-/// end of the words.
+/// The cents after word `index`, "dollars": their number and the end of the words. With "cents"
+/// they are 1 to 99, "and" or not ("and fifty cents"); without it, 10 to 99, straight after
+/// "dollars" ("two dollars fifty") or after "and" at the end of a clause ("two dollars and
+/// fifty.").
 fn cents_after(index: usize, words: &[Word]) -> Option<(u64, usize)> {
-    if text_after(index, words) != Some(AND) {
+    let says_and = text_after(index, words) == Some(AND);
+    let start = index + if says_and { 2 } else { 1 };
+    if start >= words.len() || !words[start - 1].runs_on() {
         return None;
     }
-    let mut end = index + 2;
+    let mut end = start;
     while end < words.len() && numbers::is_number_word(&words[end].text) && words[end - 1].runs_on() {
         end += 1;
     }
-    if end <= index + 2 || !is_in(text_after(end - 1, words), &["cent", "cents"]) {
+    if end <= start {
         return None;
     }
     let value = numbers::cardinal(
-        &words[index + 2..end]
+        &words[start..end]
             .iter()
             .map(|word| word.text.as_str())
             .collect::<Vec<_>>(),
     )
     .filter(|&value| value < 100)?;
-    Some((value, end + 1))
+    if is_in(text_after(end - 1, words), &["cent", "cents"]) {
+        return Some((value, end + 1));
+    }
+    (value >= 10 && (!says_and || !words[end - 1].runs_on())).then_some((value, end))
 }
 
 // MARK: - Ranges and clock phrases
@@ -552,6 +605,61 @@ fn keep_clock_phrases(readings: &mut [Reading], words: &[Word]) {
             }
         }
     }
+}
+
+/// A scale word that ends the last number of a range carries back to a smaller first number said
+/// without one: "twenty to thirty thousand" → "20,000 to 30,000", "five or six hundred" → "500 or
+/// 600". Without it, "20 to 30,000" would say a different range.
+fn carry_scales_back(readings: &mut [Reading], words: &[Word]) {
+    for index in 1..readings.len() {
+        let Kind::Plain { value: Some(first), .. } = readings[index - 1].kind else {
+            continue;
+        };
+        if first == 0
+            || readings[index - 1]
+                .words
+                .clone()
+                .any(|word| numbers::is_multiplier(&words[word].text))
+            || !is_in(link(&readings[index - 1], &readings[index], words), &RANGE_LINKS)
+        {
+            continue;
+        }
+        let Some((scale, leading)) = scale_of(&readings[index], words) else {
+            continue;
+        };
+        if first >= leading {
+            continue;
+        }
+        let value = first * numbers::scale(scale).unwrap_or(100);
+        let digits = numbers::written(value, &[scale]);
+        readings[index - 1].text = Some(digits.clone());
+        readings[index - 1].kind = Kind::Plain {
+            digits,
+            value: Some(value),
+        };
+    }
+}
+
+/// The word that multiplies the whole number `reading` says, and the number before it: "thirty
+/// thousand dollars" → "thousand" and 30; `None` for a decimal, a number with more than one
+/// multiplier ("two thousand five hundred"), or anything but a count or an amount.
+fn scale_of<'w>(reading: &Reading, words: &'w [Word]) -> Option<(&'w str, u64)> {
+    if !matches!(reading.kind, Kind::Plain { value: Some(_), .. } | Kind::Unit(_)) {
+        return None;
+    }
+    let said: Vec<&str> = words[reading.words.clone()]
+        .iter()
+        .map(|word| word.text.as_str())
+        .collect();
+    if said.contains(&POINT) {
+        return None;
+    }
+    let number_words: Vec<&str> = said.into_iter().filter(|word| numbers::is_number_word(word)).collect();
+    let (&scale, before) = number_words.split_last()?;
+    if before.is_empty() || !numbers::is_multiplier(scale) || before.iter().any(|word| numbers::is_multiplier(word)) {
+        return None;
+    }
+    Some((scale, numbers::cardinal(before)?))
 }
 
 /// A unit after the last number of a range carries back to the first: "five to ten percent" → "5%
@@ -628,6 +736,19 @@ mod tests {
             ("fifty thousand, I mean sixty thousand", "50,000, I mean 60,000"),
             ("nine fifteen-year-olds", "nine 15-year-olds"),
             ("between five and ten percent", "between 5% and 10%"),
+            ("it costs two dollars fifty", "it costs $2.50"),
+            ("It was two dollars and fifty.", "It was $2.50."),
+            ("five dollars and ten minutes", "$5 and 10 minutes"),
+            ("back in the nineteen nineties", "back in the 1990s"),
+            ("in the eighteen hundreds", "in the 1800s"),
+            ("a hundred and fifty people", "150 people"),
+            ("twenty twelve-year-olds", "20 12-year-olds"),
+            (
+                "we expect twenty to thirty thousand visitors",
+                "we expect 20,000 to 30,000 visitors",
+            ),
+            ("ten to twenty million dollars", "$10 million to $20 million"),
+            ("fifty to two thousand people", "50 to 2000 people"),
             (
                 "We need three things:\n1. Twenty eggs\n2. Milk",
                 "We need three things:\n1. 20 eggs\n2. Milk",
@@ -650,6 +771,9 @@ mod tests {
             "the twenty first century",
             "hindsight is twenty twenty",
             "One, go to shops, two, talk to mechanic.",
+            "call me at five fifty dollars",
+            "a thousand and one nights",
+            "a hundred people",
         ] {
             assert_eq!(style.written(text), text);
         }

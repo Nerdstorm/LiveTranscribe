@@ -340,7 +340,7 @@ reproduce them:
 
 ```mermaid
 flowchart LR
-    SW["Mac app's tests<br/>make golden"] -->|write| G["Fixtures/golden<br/>13,380 dictation cases,<br/>speech features"]
+    SW["Mac app's tests<br/>make golden"] -->|write| G["Fixtures/golden<br/>13,570 dictation cases,<br/>speech features"]
     SW -->|write| CF["Fixtures/cleanup<br/>every prompt, check verdict<br/>and executor trace"]
     G --> RT["Rust tests<br/>cargo test"]
     CF --> RT

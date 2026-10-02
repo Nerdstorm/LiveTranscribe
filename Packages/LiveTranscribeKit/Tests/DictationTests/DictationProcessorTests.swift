@@ -359,6 +359,21 @@ struct DictationProcessorTests {
         #expect(withoutTheModel.text == "1. Go to shops\n2. Talk to mechanic\n3. Buy 12 eggs")
     }
 
+    /// "Number one … number two …" lays out as before, past ten too, and a number in an item is
+    /// written in digits; in a single-line field the markers below ten stay as said.
+    @Test func numberedMarkersStillMakeAList() async {
+        let transcript = "number one go to shops number two buy fifteen eggs at nine thirty"
+        let multiline = await finish(transcript, configuration(.medium, multiline: true), cleaner: nil)
+        #expect(multiline.text == "1. Go to shops\n2. Buy 15 eggs at 9:30")
+        let singleLine = await finish(transcript, configuration(.medium), cleaner: nil)
+        #expect(singleLine.text == "number one go to shops number two buy 15 eggs at 9:30")
+
+        let markers = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven"]
+        let long = markers.map { "number \($0) check the form" }.joined(separator: " ")
+        let laidOut = await finish(long, configuration(.medium, multiline: true), cleaner: nil)
+        #expect(laidOut.text == (1...11).map { "\($0). Check the form" }.joined(separator: "\n"))
+    }
+
     @Test func snippetsAndVocabularyTermsKeepTheirNumbers() async {
         let office = Snippet(trigger: "my office", expansion: "Suite twenty, Level five")
         let studio = VocabularyEntry(term: "Studio Fifty-Four", spokenVariants: ["studio fifty for"])

@@ -287,10 +287,10 @@ in Settings › Advanced, as it is at first, the app downloads the model the fir
 models folder, checks each file's SHA-256, and loads it on the CPU on a thread of its own
 (`cleaner.rs`). Settings › Advanced shows how that goes, and then where the model runs and with
 which adapters. Until it's ready, or with it off, nothing is reworded: dictation still removes
-filler words, lays out spoken lists and letters and writes numbers in digits from Medium up. Turning it off lets the model
-go, and turning it on loads it again, without a restart. A cleanup that takes longer than the
-**Timeout** there (3 s; for Deep, at least 8 s) is dropped, and the text goes in without it, as on
-the Mac.
+filler words, lays out spoken lists and letters and writes numbers in digits from Medium up.
+Turning it off lets the model go, and turning it on loads it again, without a restart. A cleanup
+that takes longer than the **Timeout** there (3 s; for Deep, at least 8 s) is dropped, and the
+text goes in without it, as on the Mac.
 
 The model is
 [Nerdstorm/Qwen3-1.7B-MLX-4bit-OpenVINO](https://huggingface.co/Nerdstorm/Qwen3-1.7B-MLX-4bit-OpenVINO)

@@ -63,6 +63,13 @@ struct NumberStyleTests {
         ("one dollar", "$1"),
         ("five or six dollars", "$5 or $6"),
         ("two point five dollars", "$2.50"),
+        ("it costs two dollars fifty", "it costs $2.50"),
+        ("one dollar ninety nine each", "$1.99 each"),
+        ("five dollars fifty cents", "$5.50"),
+        ("It was two dollars and fifty.", "It was $2.50."),
+        ("five dollars and ten minutes", "$5 and 10 minutes"),
+        ("ten to twenty million dollars", "$10 million to $20 million"),
+        ("between nine and ten thousand dollars", "between $9000 and $10,000"),
     ])
     func money(text: String, written: String) {
         #expect(style.written(text) == written)
@@ -89,6 +96,10 @@ struct NumberStyleTests {
         ("since two thousand and eight", "since 2008"),
         ("Twenty twenty-six was a good year.", "2026 was a good year."),
         ("from twenty twenty to twenty twenty six", "from 2020 to 2026"),
+        ("back in the nineteen nineties", "back in the 1990s"),
+        ("in the nineteen-nineties", "in the 1990s"),
+        ("the twenty twenties", "the 2020s"),
+        ("in the eighteen hundreds", "in the 1800s"),
     ])
     func years(text: String, written: String) {
         #expect(style.written(text) == written)
@@ -118,6 +129,13 @@ struct NumberStyleTests {
         ("between two hundred and three hundred", "between 200 and 300"),
         ("In two thousand, five people came.", "In 2000, five people came."),
         ("the point is twenty", "the point is 20"),
+        ("a hundred and fifty people", "150 people"),
+        ("a hundred twenty people", "120 people"),
+        ("twenty twelve-year-olds", "20 12-year-olds"),
+        ("we expect twenty to thirty thousand visitors", "we expect 20,000 to 30,000 visitors"),
+        ("five or six hundred people", "500 or 600 people"),
+        ("two to three million people", "2 million to 3 million people"),
+        ("fifty to two thousand people", "50 to 2000 people"),
     ])
     func counts(text: String, written: String) {
         #expect(style.written(text) == written)
@@ -161,6 +179,8 @@ struct NumberStyleTests {
         "Oh, I see.",
         "oh no",
         "Oh oh oh",
+        "call me at five fifty dollars",
+        "a thousand and one nights",
     ])
     func wordsThatMakeNoNumber(text: String) {
         #expect(style.written(text) == text)

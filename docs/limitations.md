@@ -59,9 +59,11 @@
   before it, or "am" or "pm" after it, so "moved to ten fifteen" stays words; three digits said
   one by one are always a number, so "testing one two three" becomes "testing 123". A range or
   series with a number below ten stays words ("five to ten"), which also keeps "ten to twelve"
-  whether it was a range or a time. Dates and ordinals ("March twenty first"), 24-hour times,
-  "a hundred" before anything but dollars or percent, and words such as "dozen" stay as said, and
-  other currencies are counts ("five euros", "20 euros").
+  whether it was a range or a time. A number word after "point" makes a decimal, so "at one point
+  two people left" becomes "at 1.2 people left" unless the model puts a comma after "point". Dates
+  and ordinals ("March twenty first"), 24-hour times, "a hundred" alone before anything but dollars
+  or percent, and words such as "dozen" stay as said, and other currencies are counts ("five
+  euros", "20 euros").
 
 ## Mac
 
