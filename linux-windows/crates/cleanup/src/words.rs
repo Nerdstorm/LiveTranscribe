@@ -61,6 +61,10 @@ impl WordSet {
         self.0.contains(s::canonical_key(word).as_ref())
     }
 
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &str> {
+        self.0.iter().map(String::as_str)
+    }
+
     /// Adds every word of `other`, as `formUnion(_:)`.
     pub(crate) fn form_union(&mut self, other: &WordSet) {
         self.0.extend(other.0.iter().cloned());

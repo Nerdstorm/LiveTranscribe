@@ -26,7 +26,10 @@ import Shared
 ///   of the earlier sentence kept. One may not answer a question: "Is it tomorrow? No, the day after."
 ///   keeps its "No". A cue's words are taken out only with the correction they make, and never
 ///   changed ("make that" is not "made that"). Nor may a correction that opens a later sentence
-///   be dropped whole, leaving what it corrects as said;
+///   be dropped whole, leaving what it corrects as said. Whichever way, the correction keeps its
+///   meaning: the word that says what it says instead stays, and what it takes back is not
+///   written again ("the blue room, sorry, the green room" is never "the blue room" or "the blue
+///   green room");
 /// - inside a correction phrase, up to ``maxRepairWords`` new words or changed words, and the words
 ///   it corrects, which is how a garbled phrase is read as meant ("tomorrow. No, sorry, the after
 ///   tomorrow" → "the day after tomorrow");
@@ -142,34 +145,36 @@ struct SelfRepair: Sendable {
         for line in text.split(whereSeparator: \.isNewline) {
             var startsSentence = true
             let lineStart = words.count
-            for token in line.split(whereSeparator: \.isWhitespace) {
-                for part in token.split(whereSeparator: hyphens.contains) {
-                    let trailing = part.reversed().prefix { !$0.isLetter && !$0.isNumber }
-                    let ends = trailing.contains(where: sentenceEnders.contains)
-                    let asks = trailing.contains("?")
-                    let normalized = EditDistance.words(in: EditDistance.normalize(String(part)))
-                    if normalized.isEmpty {
-                        if ends, let last = words.indices.last, last >= lineStart {
-                            words[last].endsSentence = true
-                            words[last].endsQuestion = asks
-                        }
+            let parts = line.split(whereSeparator: \.isWhitespace).flatMap { $0.split(whereSeparator: hyphens.contains) }
+            for (index, part) in parts.enumerated() {
+                let trailing = part.reversed().prefix { !$0.isLetter && !$0.isNumber }
+                // An abbreviation's own full stop ("at 3 p.m. today") ends a sentence only before a
+                // capital.
+                let abbreviation = isDottedAbbreviation(part) && index + 1 < parts.count && !startsWithUppercase(parts[index + 1])
+                let ends = !abbreviation && trailing.contains(where: sentenceEnders.contains)
+                let asks = trailing.contains("?")
+                let normalized = EditDistance.words(in: EditDistance.normalize(String(part)))
+                if normalized.isEmpty {
+                    if ends, let last = words.indices.last, last >= lineStart {
+                        words[last].endsSentence = true
+                        words[last].endsQuestion = asks
                     }
-                    for (offset, word) in normalized.enumerated() {
-                        let isLastOfPart = offset == normalized.count - 1
-                        let upper = offset == 0 && (part.first(where: \.isLetter)?.isUppercase ?? false)
-                        let couldBeName = upper && !functionWords.contains(word) && !placeholders.contains(word)
-                        words.append(SaidWord(
-                            word: word,
-                            endsSentence: isLastOfPart && ends,
-                            endsQuestion: isLastOfPart && asks,
-                            isName: couldBeName && !startsSentence,
-                            isCapitalised: upper && !startsSentence,
-                            mayBeName: couldBeName,
-                            startsSentence: startsSentence && offset == 0
-                        ))
-                    }
-                    if !normalized.isEmpty { startsSentence = ends }
                 }
+                for (offset, word) in normalized.enumerated() {
+                    let isLastOfPart = offset == normalized.count - 1
+                    let upper = offset == 0 && startsWithUppercase(part)
+                    let couldBeName = upper && !functionWords.contains(word) && !placeholders.contains(word)
+                    words.append(SaidWord(
+                        word: word,
+                        endsSentence: isLastOfPart && ends,
+                        endsQuestion: isLastOfPart && asks,
+                        isName: couldBeName && !startsSentence,
+                        isCapitalised: upper && !startsSentence,
+                        mayBeName: couldBeName,
+                        startsSentence: startsSentence && offset == 0
+                    ))
+                }
+                if !normalized.isEmpty { startsSentence = ends }
             }
             if let last = words.indices.last, last >= lineStart, !words[last].endsSentence {
                 words[last].endsSentence = true
@@ -177,6 +182,18 @@ struct SelfRepair: Sendable {
             }
         }
         return words
+    }
+
+    /// Whether `part` is only letters each followed by a full stop ("p.m.", "e.g.", "U.S.").
+    private static func isDottedAbbreviation(_ part: Substring) -> Bool {
+        let characters = Array(part)
+        guard characters.count >= 4, characters.count.isMultiple(of: 2) else { return false }
+        return stride(from: 0, to: characters.count, by: 2).allSatisfy { characters[$0].isLetter && characters[$0 + 1] == "." }
+    }
+
+    /// Whether the first letter of `part` is a capital.
+    private static func startsWithUppercase(_ part: Substring) -> Bool {
+        part.first(where: \.isLetter)?.isUppercase ?? false
     }
 
     /// The words of `text`, with the numbers and bullets that start its list items taken off.
@@ -193,7 +210,7 @@ struct SelfRepair: Sendable {
                         words.append(WrittenWord(
                             word: word,
                             original: String(part),
-                            isCapitalised: offset == 0 && (part.first(where: \.isLetter)?.isUppercase ?? false),
+                            isCapitalised: offset == 0 && startsWithUppercase(part),
                             startsSentence: startsSentence,
                             startsListItem: isListItem && firstOfLine
                         ))
@@ -320,6 +337,7 @@ struct SelfRepair: Sendable {
         words.prefix(2).map(\.word) == ["scratch", "that"]
     }
     func isFunctionWord(_ word: String) -> Bool { functionWords.contains(word) }
+    var allFunctionWords: Set<String> { functionWords }
     var respellingSimilarity: Double { minRespellingSimilarity }
     var retractionLimit: Int { maxRetractedWords }
     var correctionCues: [[String]] { cues }
