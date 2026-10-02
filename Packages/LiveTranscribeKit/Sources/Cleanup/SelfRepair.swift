@@ -11,8 +11,11 @@ import Shared
 /// guard against. Instead the output is lined up with what was said, word by word, and every
 /// difference must be one of these edits:
 /// - a word kept, respelled, or put in another form of itself ("check" → "checked", "is" → "are",
-///   "their" → "there"); two words merged or one split ("do not" → "don't", "twenty five" → "25").
-///   A name is kept as said, and no word is respelled into one;
+///   "their" → "there"); two words merged or one split ("do not" → "don't", "twenty five" → "25");
+///   letters spelled out written as one word ("p r" → "PR"). No word is respelled into a name,
+///   and a name is kept as said, but a capital alone doesn't make one: speech-to-text capitalises
+///   a word it misheard ("Madge the PR"), which may be respelled where it is written without a
+///   capital, or with the one a list item starts with ("merge the PR", "1. Merge the PR");
 /// - a filler, a repeated word, or a word that only holds the grammar together dropped or added
 ///   ("I going" → "I am going");
 /// - a self-correction resolved (``Corrections``): as at Medium, up to
@@ -31,8 +34,9 @@ import Shared
 ///
 /// The layout is checked too (``OutputGuard``): a bulleted list has at least ``minBulletedItems``
 /// items, since two things said in a sentence stay in it, unless what was said already set them
-/// off with a colon ("a few things we need: getting feeds working and releasing the fix"), and
-/// no line holds only placeholders, as when an emoji is moved below the sentence it ended.
+/// off with a colon or a full stop ("a few things we need: getting feeds working and releasing the
+/// fix"), and no line holds only placeholders, as when an emoji is moved below the sentence it
+/// ended.
 ///
 /// Names, numbers, negations and words of time are kept as said everywhere else: none may be
 /// added, dropped or changed, and no other new word may appear, so the model can't add a claim
@@ -43,8 +47,8 @@ struct SelfRepair: Sendable {
     /// Most words a repair may add to or change in one correction phrase.
     static let maxRepairWords = 2
     /// Fewest items in a bulleted list the model makes: two things said in a sentence ("the invoice
-    /// and the agreement") stay in it, unless the speaker's text set them off with a colon
-    /// (``isSetOffByColon(_:in:)``). A numbered list may have two, as when they were counted.
+    /// and the agreement") stay in it, unless the speaker's text set them off (``isSetOff(_:in:)``).
+    /// A numbered list may have two, as when they were counted.
     static let minBulletedItems = 3
 
     private let cues: [[String]]
@@ -106,6 +110,8 @@ struct SelfRepair: Sendable {
         var isCapitalised = false
         /// A name, or a capitalised word that starts a sentence and could be one ("Chloe will …").
         var mayBeName = false
+        /// The first word of a sentence or line, whose capital says nothing about it.
+        var startsSentence = false
         /// Where a correction from a later sentence was put in place of what it corrects, how many
         /// words its phrase has, starting here; 0 elsewhere (see ``Corrections``).
         var opensPhrase = 0
@@ -144,11 +150,8 @@ struct SelfRepair: Sendable {
                     let normalized = EditDistance.words(in: EditDistance.normalize(String(part)))
                     if normalized.isEmpty {
                         if ends, let last = words.indices.last, last >= lineStart {
-                            words[last] = SaidWord(
-                                word: words[last].word, endsSentence: true, endsQuestion: asks,
-                                isName: words[last].isName, isCapitalised: words[last].isCapitalised,
-                                mayBeName: words[last].mayBeName
-                            )
+                            words[last].endsSentence = true
+                            words[last].endsQuestion = asks
                         }
                     }
                     for (offset, word) in normalized.enumerated() {
@@ -161,17 +164,16 @@ struct SelfRepair: Sendable {
                             endsQuestion: isLastOfPart && asks,
                             isName: couldBeName && !startsSentence,
                             isCapitalised: upper && !startsSentence,
-                            mayBeName: couldBeName
+                            mayBeName: couldBeName,
+                            startsSentence: startsSentence && offset == 0
                         ))
                     }
                     if !normalized.isEmpty { startsSentence = ends }
                 }
             }
             if let last = words.indices.last, last >= lineStart, !words[last].endsSentence {
-                words[last] = SaidWord(
-                    word: words[last].word, endsSentence: true, endsQuestion: false,
-                    isName: words[last].isName, isCapitalised: words[last].isCapitalised, mayBeName: words[last].mayBeName
-                )
+                words[last].endsSentence = true
+                words[last].endsQuestion = false
             }
         }
         return words
@@ -264,19 +266,30 @@ struct SelfRepair: Sendable {
         return lists
     }
 
-    /// Whether the speaker's text `said` already set the list off with a colon: the list's lead
-    /// line ends with one, and the words that end the lead (up to three) come right before a colon
-    /// in `said`. So the model laid out what was said ("…focus on: getting feeds working and
-    /// releasing the fix") and did not make a list of two things in a sentence. A word fixed
-    /// inside the items doesn't matter, only the words that lead into them.
-    static func isSetOffByColon(_ list: BulletedList, in said: String) -> Bool {
+    /// Whether the speaker's text `said` already set the list off from the words that lead into
+    /// it: the list's lead line ends with a colon, and the words that end the lead (up to three)
+    /// come right before a colon or the end of a sentence in `said`, or before a comma when the lead
+    /// counts the items ("two things, …", "a couple of things, …"). Speech-to-text writes a full
+    /// stop at least as often as a colon where the speaker paused before the items ("A couple of
+    /// things we need to do. Fix the notes, and fix the alerts."), so either sets them off; two
+    /// things said in a sentence ("I've attached the invoice and the agreement") stay in it. A
+    /// word fixed inside the items doesn't matter, only the words that lead into them.
+    static func isSetOff(_ list: BulletedList, in said: String) -> Bool {
         guard let lead = list.lead?.trimmingCharacters(in: .whitespaces), lead.hasSuffix(":") else { return false }
-        let ending = EditDistance.words(in: EditDistance.normalize(lead)).suffix(3)
+        let leadWords = EditDistance.words(in: EditDistance.normalize(lead))
+        let ending = leadWords.suffix(3)
         guard !ending.isEmpty else { return false }
+        let counted = leadWords.contains(where: countWords.contains)
         return said.indices.contains { index in
-            said[index] == ":" && EditDistance.words(in: EditDistance.normalize(String(said[..<index]))).suffix(ending.count) == ending
+            (setOffMarks.contains(said[index]) || (counted && said[index] == ","))
+                && EditDistance.words(in: EditDistance.normalize(String(said[..<index]))).suffix(ending.count) == ending
         }
     }
+
+    /// Marks after which what follows is set off from what came before.
+    private static let setOffMarks: Set<Character> = [":", ".", "!", "?"]
+    /// Words that count two items ahead of them.
+    private static let countWords: Set<String> = ["two", "couple", "pair", "both"]
 
     /// How many lines of `text` hold placeholders and nothing else, list markers and punctuation
     /// aside. `placeholders` are normalized, as the words are.

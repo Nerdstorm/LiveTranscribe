@@ -5,8 +5,11 @@
 //! kinds:
 //! - Medium's: up to [`GuardPolicy::max_retracted_words`](crate::GuardPolicy) words just before a
 //!   run of cues, taken out with the cues ("we need three, sorry, four"), in the cue's sentence;
-//!   or, after a "scratch that" that opens a sentence, at the end of the one before ("I'll call
-//!   the plumber tomorrow. Scratch that, I'll fix the tap myself.");
+//!   or at the end of the one before, when the cues open the next: one phrase that doesn't start
+//!   it ("I left my charger in the garage. Actually, the lobby."), or more after a "scratch that"
+//!   ("I'll call the plumber tomorrow. Scratch that, I'll fix the tap myself.") or after cues
+//!   followed by "not" and exactly those words ("We'll need compasses. Sorry, not compasses.
+//!   Stoves.");
 //! - one whose phrase goes back in place of what it corrects, with the words in between kept: in
 //!   an earlier sentence ("The demo is on Tuesday at noon. Sorry, Wednesday." → "The demo is on
 //!   Wednesday at noon.") or earlier in the same one ("three servers at noon, sorry, four" → "four
@@ -32,6 +35,12 @@ use crate::words::{WordSet, same};
 const MAX_APPLIED: usize = 2;
 /// How many ways of applying them are checked, which bounds the search.
 const MAX_REWRITES: usize = 256;
+/// Words that start a new clause, which a correction of the sentence before doesn't.
+const SUBJECTS: [&str; 30] = [
+    "i", "we", "you", "he", "she", "it", "they", "i'm", "i'll", "i've", "i'd", "we're", "we'll", "we've", "we'd",
+    "you're", "you'll", "you've", "he's", "he'll", "she's", "she'll", "it's", "it'll", "they're", "they'll", "they've",
+    "there's", "that's", "let's",
+];
 /// Cue words that as often start a new point as correct the last one.
 const WEAK_CUES: [&str; 4] = ["no", "wait", "actually", "rather"];
 /// Words that join a number said in parts ("half past two", "ten to five", "two point five").
@@ -55,13 +64,27 @@ pub(super) fn spans(words: &[SaidWord], repair: &SelfRepair, placeholders: &Word
         spare: vec![WordSet::default(); words.len() + 1],
     };
     for (cue_start, run_ends) in cue_runs(words, repair) {
-        // Other corrections of an earlier sentence must be about the same thing, which only a
-        // phrase that goes back is checked for ([`once`]).
+        // Speech-to-text ends a sentence where the speaker paused, so a cue that opens one may
+        // take back the end of the one before ("I left my charger in the garage. Actually, the
+        // lobby."): one phrase, after a word that stays, for a phrase that starts like it and not
+        // with a subject. "Sorry, I haven't had time" after "I finished the report.", "Actually,
+        // it's quite fast" after "It works." and "Actually, we shipped it early" after "We shipped
+        // version two." start a new thought; "Sorry, four" after "three servers for the launch."
+        // and "No, three" after "Bring two chairs." take back only the number ([`once`]). Saying
+        // the corrected words again ("compasses. Sorry, not compasses. Stoves and water.") or
+        // "scratch that" takes back more.
         let retracts_statement = SelfRepair::retracts_statement(&words[cue_start..]);
         let crosses = cue_start > 0 && words[cue_start - 1].ends_sentence;
-        if crosses && !retracts_statement {
-            continue;
-        }
+        let sentence_start = match crosses {
+            true => words[..cue_start - 1]
+                .iter()
+                .rposition(|word| word.ends_sentence)
+                .map_or(0, |end| end + 1),
+            false => 0,
+        };
+        // A lone "No" after a question answers it ("Is it on Tuesday? No, not Tuesday,
+        // Thursday."), as [`once`] reads it.
+        let answers = crosses && words[cue_start - 1].ends_question && same(&words[cue_start].word, "no");
         for start in cue_start.saturating_sub(repair.max_retracted_words)..cue_start {
             let corrected = &words[start..cue_start];
             if corrected[..corrected.len() - 1].iter().any(|word| word.ends_sentence)
@@ -71,12 +94,39 @@ pub(super) fn spans(words: &[SaidWord], repair: &SelfRepair, placeholders: &Word
                 continue;
             }
             let corrected_words = WordSet::new(corrected.iter().map(|word| &word.word));
+            let content = |word: &SaidWord| {
+                !repair.is_function_word(&word.word) && !repair.is_filler(&word.word) && !repair.is_cue(&word.word)
+            };
+            let ends_sentence_before =
+                words[sentence_start..start].iter().any(content) && corrected[1..].iter().all(content);
+            let says_more_than_a_fact = corrected
+                .iter()
+                .any(|word| content(word) && repair.fact_kind(word, false).is_none());
             // A phrase starts after the whole run of cues, and after the corrected words said
             // again.
             for &run_end in &run_ends {
+                if answers && run_end - cue_start == 1 {
+                    continue;
+                }
                 for (end, restated) in phrase_starts(run_end, words, repair) {
+                    let among_corrected = restated
+                        .clone()
+                        .is_none_or(|restated| repair.restates(&words[restated], corrected));
+                    let all_corrected = restated.is_some_and(|restated| repair.restates(corrected, &words[restated]));
+                    let stands_in = ends_sentence_before
+                        && words.get(end).is_some_and(|first| {
+                            content(first) == content(&corrected[0])
+                                && !SUBJECTS.iter().any(|subject| same(&first.word, subject))
+                        })
+                        && !(says_more_than_a_fact
+                            && words[end..]
+                                .iter()
+                                .take(CORRECTION_PHRASE_WORDS)
+                                .find(|word| content(word))
+                                .is_some_and(|word| repair.fact_kind(word, false).is_some()));
                     if (end < words.len() && repair.is_cue(&words[end].word))
-                        || restated.is_some_and(|restated| !repair.restates(&words[restated], corrected))
+                        || !among_corrected
+                        || (crosses && !retracts_statement && !all_corrected && !stands_in)
                     {
                         continue;
                     }
@@ -221,21 +271,23 @@ fn rewrite(words: &[SaidWord], corrected: Range<usize>, cues: Range<usize>, phra
 }
 
 /// Where a correction's phrase can start after a run of cues that ends at `end`: there, or, when
-/// "not" follows the cues, after the corrected words said again, in the same sentence ("Tuesday,
-/// sorry, not Tuesday, Thursday"), with the range of the words said again, which must be among the
-/// corrected words ([`SelfRepair::restates`]).
+/// "not" follows the cues, after the corrected words said again ("Tuesday, sorry, not Tuesday,
+/// Thursday"), with the range of the words said again, which must be among the corrected words
+/// ([`SelfRepair::restates`]). Those words may end their sentence, since speech-to-text ends one
+/// where the speaker paused ("not Sunday. Thursday."), and the phrase then starts the next.
 fn phrase_starts(end: usize, words: &[SaidWord], repair: &SelfRepair) -> Vec<(usize, Option<Range<usize>>)> {
     let mut starts = vec![(end, None)];
     if end >= words.len() || !same(&words[end].word, RESTATING_WORD) {
         return starts;
     }
     let first = end + 1;
-    let restated = words[first..]
-        .iter()
-        .take(repair.max_retracted_words)
-        .take_while(|word| !word.ends_sentence)
-        .count();
-    starts.extend((first + 1..=first + restated).map(|stop| (stop, Some(first..stop))));
+    for (offset, word) in words[first..].iter().take(repair.max_retracted_words).enumerate() {
+        let stop = first + offset + 1;
+        starts.push((stop, Some(first..stop)));
+        if word.ends_sentence {
+            break;
+        }
+    }
     starts
 }
 

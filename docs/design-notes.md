@@ -97,14 +97,27 @@ in [Architecture](architecture.md), with diagrams.
   the eval's spoken lists came out with a stray line between items. So a dictation with a spoken
   line break or list marker goes to the model as one paragraph. Deep's check also turns down a
   bulleted list of two things (a sentence's "the invoice and the agreement" pulled apart, unless the
-  speaker set them off with a colon) and a placeholder left on a line of its own (an emoji moved
-  below its sentence), the two layouts the eval found wrong.
+  speaker set them off, with a colon or the full stop speech-to-text writes for a pause) and a
+  placeholder left on a line of its own (an emoji moved below its sentence), the two layouts the
+  eval found wrong.
+- **Deep's check reads punctuation and capitals as speech-to-text guesses.** Speech-to-text writes
+  a full stop where the speaker paused, and capitalises letters spelled out and words it mishears
+  ("First, Madge, P R thirty one" for "first, merge PR 31"). So a full stop sets two things off as
+  a colon does, and a correction may reach across one: one that replaces the phrase the sentence
+  before ends with, as it would after a comma ("…in the garage. Actually, the lobby."), or one
+  that says the corrected words again ("compasses. Sorry, not compasses. Stoves."). Letters may be
+  joined, and a capitalised word may be respelled where the capital says nothing: written without
+  one, or at the start of a list item.
+  A capital still guards a name everywhere else, since the capital is all the check has to tell a
+  name from a misheard word.
 - **A rejected Deep answer gets Medium's pass**, not the uncleaned text, so choosing Deep never
   shows less than Medium would. Running Medium's pass first, on every dictation with a
   correction cue, took two passes and got fewer right (72 of the 114, against 88 in one pass).
 - **Deep's limits.** A correction may take back up to six words, as at Medium, and its phrase may
   bring up to two new ones; one from a later sentence must share a word or a kind of fact with what
-  it corrects; Deep waits at least 8 s, since a rejected answer runs Medium's pass too; and an
+  it corrects, unless it replaces the phrase that sentence ends with by one that starts like it
+  (not a whole sentence, a new clause, or a bare number for "two chairs"); Deep waits at least
+  8 s, since a rejected answer runs Medium's pass too; and an
   answer that drops a later sentence's correction whole is rejected, after Deep's adapter did that
   on a real dictation.
 

@@ -73,10 +73,23 @@ struct SelfRepairTests {
         ("The demo is on Tuesday at noon. Sorry, Wednesday.", "The demo is on Wednesday at noon.", "The demo is on Wednesday."),
         ("We need three servers for the launch. Sorry, four.", "We need four servers for the launch.", "We need four."),
         ("Chloe is presenting at the all hands. Sorry, no, Karen.", "Karen is presenting at the all hands.", "Karen is presenting."),
+        ("Bring two chairs. No, three.", "Bring three chairs.", "Bring three."),
     ])
     func keepsTheRestOfTheCorrectedSentence(raw: String, kept: String, dropped: String) {
         #expect(review(raw, kept) == .accepted(kept))
         #expect(review(raw, dropped) == .rejected(.invalidRepair))
+    }
+
+    @Test("A cue after a full stop corrects the end of the sentence before, as after a comma", arguments: [
+        ("I left my charger in the garage. Actually, the lobby.", "I left my charger in the lobby."),
+        ("The alert came from the billing service. Sorry, the database.", "The alert came from the database."),
+        ("The team is replacing the laptop. No, the printer next week.", "The team is replacing the printer next week."),
+        ("I'm making pasta. Actually, tacos for dinner.", "I'm making tacos for dinner."),
+        ("Paint the door red. Actually, blue.", "Paint the door blue."),
+    ])
+    func resolvesACorrectionOfTheEndOfTheSentenceBefore(raw: String, cleaned: String) {
+        #expect(review(raw, cleaned) == .accepted(cleaned))
+        #expect(review(raw.replacingOccurrences(of: ". ", with: ", "), cleaned) == .accepted(cleaned), "as after a comma")
     }
 
     /// Dropping a correction made in a later sentence leaves what it took back as said, however the
@@ -145,6 +158,22 @@ struct SelfRepairTests {
         #expect(review(raw, cleaned) == .accepted(cleaned))
     }
 
+    @Test("A correction speech-to-text broke into sentences is resolved", arguments: [
+        ("My shift starts on Sunday. No, sorry, not Sunday. Thursday.", "My shift starts on Thursday."),
+        (
+            "For the overnight trek, we'll need compasses. Sorry, not compasses. Stoves and plenty of water.",
+            "For the overnight trek we'll need stoves and plenty of water."
+        ),
+    ])
+    func resolvesACorrectionBrokenIntoSentences(raw: String, cleaned: String) {
+        #expect(review(raw, cleaned) == .accepted(cleaned))
+        #expect(
+            review(raw, raw.replacingOccurrences(of: "No, sorry, not Sunday. ", with: "").replacingOccurrences(of: "Sorry, not compasses. ", with: ""))
+                == .rejected(.invalidRepair),
+            "the cue and the words said again go only with the correction"
+        )
+    }
+
     @Test("A \"not\" goes with a correction only when it says corrected words again", arguments: [
         // Drops the contrast the speaker made.
         ("We need three chairs, sorry, not four.", "We need four chairs."),
@@ -192,6 +221,10 @@ struct SelfRepairTests {
         ("uma hasn't replied to my message", "Una hasn't replied to my message."),
         ("delia i mean uma left the keys at reception", "Dela, I mean Uma, left the keys at reception."),
         ("remind xavier about the dentist no sorry uma", "Remind Xavier about the dentist. No, sorry, um..."),
+        // A name that started the sentence as said, where either capital may be a name's.
+        ("Uma will bring the cake.", "Una will bring the cake."),
+        // Another name where no sentence starts.
+        ("Can you ask Madge to review it?", "Can you ask Marge to review it?"),
     ])
     func keepsNamesAsSaid(raw: String, cleaned: String) {
         #expect(review(raw, cleaned) == .rejected(.invalidRepair))
@@ -199,6 +232,36 @@ struct SelfRepairTests {
 
     @Test func aNameMayTakeItsPossessive() {
         #expect(review("that is kirk car", "That is Kirk's car.") == .accepted("That is Kirk's car."))
+    }
+
+    @Test("A word speech-to-text took for a name is fixed where its capital says nothing", arguments: [
+        ("Can you Madge the PR before lunch?", "Can you merge the PR before lunch?"),
+        ("Can you review the P R before lunch?", "Can you review the PR before lunch?"),
+        ("The A P I is down again.", "The API is down again."),
+        (
+            "Plan for the release tomorrow. First, Madge, P R thirty one, Sam get the notes once the build has finished. Two follow up for the sign off. Three, the export screen needs a fix. Four, Ellis review should come last.",
+            "Plan for the release tomorrow. First, merge PR 31, Sam get the notes once the build has finished. Two, follow up for the sign-off. Three, the export screen needs a fix. Four, Ellis review should come last."
+        ),
+    ])
+    func fixesAWordTakenForAName(raw: String, cleaned: String) {
+        #expect(review(raw, cleaned) == .accepted(cleaned))
+    }
+
+    @Test func fixesAWordTakenForANameThatStartsAListItem() {
+        let raw = "Two things for today. First, Madge the PR. Second, John updates the website."
+        let cleaned = "Two things for today:\n1. Merge the PR.\n2. John updates the website."
+        #expect(review(raw, cleaned, multiline: true) == .accepted(cleaned))
+        let renamed = "Two things for today:\n1. Merge the PR.\n2. Pete updates the website."
+        #expect(review(raw, renamed, multiline: true) == .rejected(.invalidRepair), "a name isn't swapped for another")
+    }
+
+    @Test("Letters spelled out keep their order and number", arguments: [
+        "Can you review the RP before lunch?",
+        "Can you review the PRs before lunch?",
+        "Can you review the P before lunch?",
+    ])
+    func keepsTheLettersSpelledOut(cleaned: String) {
+        #expect(review("Can you review the P R before lunch?", cleaned) == .rejected(.invalidRepair))
     }
 
     @Test("A cue that starts a new thought stays", arguments: [
@@ -209,6 +272,7 @@ struct SelfRepairTests {
         ("I finished the report. Sorry, I was late.", "I was late."),
         ("It works. Actually, it's quite fast.", "It's quite fast."),
         ("We shipped version two. Actually, we shipped it a week early.", "We shipped it a week early."),
+        ("I finished the report. Sorry, I was late.", "I finished. I was late."),
         ("Is Sam coming tonight? No, he's working late.", "Is Sam coming? He's working late."),
     ])
     func keepsACueThatStartsANewThought(raw: String, cleaned: String) {
@@ -300,6 +364,22 @@ struct SelfRepairTests {
         #expect(
             review("two things: call the bank and email sarah", "Two things:\n- Call the bank", multiline: true) == .rejected(.shortList),
             "one item is never a list"
+        )
+    }
+
+    @Test func allowsTwoThingsSetOffWithAFullStopOrCountedBeforeAComma() {
+        let cleaned = "Two things:\n- Call the bank\n- Email Sarah"
+        #expect(review("Two things. Call the bank and email Sarah.", cleaned, multiline: true) == .accepted(cleaned))
+        #expect(review("Two things, call the bank and email Sarah.", cleaned, multiline: true) == .accepted(cleaned))
+        let attached = "I've attached:\n- The invoice\n- The signed agreement"
+        #expect(
+            review("I've attached, the invoice and the signed agreement.", attached, multiline: true) == .rejected(.shortList),
+            "a comma sets them off only after words that count them"
+        )
+        #expect(
+            review("Reminder. I've attached the invoice and the signed agreement.", "Reminder. I've attached:\n- The invoice\n- The signed agreement", multiline: true)
+                == .rejected(.shortList),
+            "a full stop elsewhere doesn't set them off"
         )
     }
 
