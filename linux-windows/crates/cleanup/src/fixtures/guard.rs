@@ -17,6 +17,7 @@ use crate::output_guard::keeps_placeholders;
 use crate::self_correction::SelfCorrection;
 use crate::spoken_names::SpokenNames;
 use crate::word_alignment::WordAlignment;
+use crate::word_fragments::WordFragments;
 use crate::words::{WordSet, normalized_words};
 use crate::{CleanupOptions, FallbackReason, GenerationOutcome, GuardPolicy, GuardVerdict, OutputGuard};
 use repair::{RepairJson, repair_differences};
@@ -360,6 +361,7 @@ fn parts(raw: &str, output: &str, placeholders: &[String], policy: &GuardPolicy)
     let spoken_names = SpokenNames::new(policy);
     let alignment = WordAlignment::new(raw_words.clone(), cleaned_words.clone());
     let ignored = WordSet::normalized(placeholders);
+    let fragments = WordFragments::new(policy).indices_in_text(raw, &ignored);
     let raw_word_count = edit_distance::words(raw).len();
     Parts {
         raw_cues: self_correction.cue_count(&raw_words),
@@ -372,11 +374,11 @@ fn parts(raw: &str, output: &str, placeholders: &[String], policy: &GuardPolicy)
             .iter()
             .map(|gap| (gap.deleted.clone(), gap.inserted.clone()))
             .collect(),
-        dropped_run: dropped_words.dropped_run(&alignment),
+        dropped_run: dropped_words.dropped_run(&alignment, &fragments),
         loses_negation: dropped_words.loses_negation(&raw_words, &cleaned_words),
         names: spoken_names.name_indices(raw, &raw_words, &ignored),
         moves_or_drops_name: spoken_names.moves_or_drops_name(raw, &alignment, &ignored),
-        dropped_content: ContentWords::new(policy).dropped_count(&alignment, &ignored),
+        dropped_content: ContentWords::new(policy).dropped_count(&alignment, &ignored, &fragments),
         similarity: Exact(edit_distance::normalized_similarity(raw, cleaned)),
         word_ratio: (raw_word_count > 0)
             .then(|| Exact(edit_distance::words(cleaned).len() as f64 / raw_word_count as f64)),

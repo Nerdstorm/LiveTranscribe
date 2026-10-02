@@ -302,6 +302,7 @@ extension CleanupFixtures {
             let spokenNames = SpokenNames(policy: policy)
             let alignment = WordAlignment(raw: rawWords, cleaned: cleanedWords)
             let ignored = Set(placeholders.map(EditDistance.normalize))
+            let fragments = WordFragments(policy: policy).indices(in: raw, placeholders: ignored)
             let rawWordCount = EditDistance.words(in: raw).count
             return Parts(
                 rawWords: rawWords,
@@ -312,11 +313,11 @@ extension CleanupFixtures {
                 keepsPlaceholders: OutputGuard.keepsPlaceholders(placeholders, raw: raw, cleaned: cleaned),
                 matches: alignment.matches,
                 gaps: alignment.gaps.map { Gap(deleted: $0.deleted, inserted: $0.inserted) },
-                droppedRun: droppedWords.droppedRun(in: alignment),
+                droppedRun: droppedWords.droppedRun(in: alignment, fragments: fragments),
                 losesNegation: droppedWords.losesNegation(raw: rawWords, cleaned: cleanedWords),
                 names: spokenNames.nameIndices(in: raw, words: rawWords, ignoring: ignored),
                 movesOrDropsName: spokenNames.movesOrDropsName(in: raw, alignment: alignment, ignoring: ignored),
-                droppedContent: ContentWords(policy: policy).droppedCount(in: alignment, ignoring: ignored),
+                droppedContent: ContentWords(policy: policy).droppedCount(in: alignment, ignoring: ignored, fragments: fragments),
                 similarity: number(EditDistance.normalizedSimilarity(raw, cleaned)),
                 wordRatio: rawWordCount > 0 ? number(Double(EditDistance.words(in: cleaned).count) / Double(rawWordCount)) : nil
             )

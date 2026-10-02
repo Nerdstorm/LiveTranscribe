@@ -9,6 +9,7 @@ use crate::self_correction::SelfCorrection;
 use crate::self_repair::{self, SelfRepair};
 use crate::spoken_names::SpokenNames;
 use crate::word_alignment::WordAlignment;
+use crate::word_fragments::WordFragments;
 use crate::words::{WordSet, normalized_words, starts_with};
 use crate::{CleanupOptions, GuardPolicy};
 
@@ -135,7 +136,8 @@ pub enum GuardVerdict {
 /// Output that keeps every cue may not remove a negation and, unless the level allows rewording
 /// (High), may not delete a run of spoken words outright. At every level, it must keep each name
 /// where the speaker said it and may not delete a word that carries meaning with nothing in its
-/// place: rewording replaces words, it does not leave them out.
+/// place: rewording replaces words, it does not leave them out. The start of a word broken off
+/// and said again in full may go (`WordFragments`).
 ///
 /// Deep's output is checked instead as a repair of what was said, which may resolve corrections
 /// across sentences and lay the text out, and may change nothing else (`SelfRepair`).
@@ -146,6 +148,7 @@ pub struct OutputGuard {
     dropped_words: DroppedWords,
     spoken_names: SpokenNames,
     content_words: ContentWords,
+    word_fragments: WordFragments,
     self_repair: SelfRepair,
 }
 
@@ -162,6 +165,7 @@ impl OutputGuard {
             dropped_words: DroppedWords::new(&policy),
             spoken_names: SpokenNames::new(&policy),
             content_words: ContentWords::new(&policy),
+            word_fragments: WordFragments::new(&policy),
             self_repair: SelfRepair::new(&policy),
             policy,
         }
@@ -268,15 +272,16 @@ impl OutputGuard {
             };
         }
         let alignment = WordAlignment::new(raw_words, cleaned_words);
+        let placeholder_words = WordSet::normalized(&options.placeholders);
+        let fragments = self.word_fragments.indices_in_text(raw, &placeholder_words);
         if !options.level.allows_rewording()
-            && let Some(count) = self.dropped_words.dropped_run(&alignment)
+            && let Some(count) = self.dropped_words.dropped_run(&alignment, &fragments)
         {
             return reject(FallbackReason::DroppedWords { count });
         }
         if self.dropped_words.loses_negation(&alignment.raw, &alignment.cleaned) {
             return reject(FallbackReason::LostNegation);
         }
-        let placeholder_words = WordSet::normalized(&options.placeholders);
         if self.policy.requires_names_in_place
             && self
                 .spoken_names
@@ -284,7 +289,9 @@ impl OutputGuard {
         {
             return reject(FallbackReason::MovedOrDroppedName);
         }
-        let dropped_content = self.content_words.dropped_count(&alignment, &placeholder_words);
+        let dropped_content = self
+            .content_words
+            .dropped_count(&alignment, &placeholder_words, &fragments);
         if dropped_content > self.policy.max_dropped_content {
             return reject(FallbackReason::DroppedContent { count: dropped_content });
         }

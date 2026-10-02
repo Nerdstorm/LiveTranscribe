@@ -12,7 +12,7 @@ extension CleanupFixtures.Guard {
     /// the search's limits.
     static var deepCases: [Case] {
         selfRepairTestCases + layoutCases + numberRepairCases + acronymCases + contractionCases + repairNameCases
-            + cueCases + crossSentenceCases + repairEdgeCases + correctionMeaningCases
+            + cueCases + crossSentenceCases + repairEdgeCases + correctionMeaningCases + wordFragmentCases
     }
 
     /// SelfRepairTests, every input.
@@ -174,6 +174,10 @@ extension CleanupFixtures.Guard {
                 "Reminder. I've attached the invoice and the signed agreement.",
                 "Reminder. I've attached:\n- The invoice\n- The signed agreement"
             ),
+            // The start of a word broken off and said again in full may go, and only that.
+            ("We should con- consider the budget first.", "We should consider the budget first."),
+            ("Bring ten tennis balls.", "Bring tennis balls."),
+            ("Can he help us move?", "Can help us move?"),
         ]
         return kirkCleaned.map { completed(kirk, $0) } + pairs.map { completed($0.0, $0.1) }
     }
@@ -563,6 +567,26 @@ extension CleanupFixtures.Guard {
             completed("I'll call no one now. Scratch that. I'll email no one instead.", "I'll email no one instead."),
             completed("I'll call no one now. Scratch that. I'll email no one instead.", "I'll email Noah instead."),
             completed("The shop closes at 3 p.m. today. Sorry, I meant at 10 a.m.", "The shop closes at 10 a.m. today."),
+        ]
+    }
+
+    /// The start of a word broken off and said again in full, which every level may drop
+    /// (``WordFragments``), and the words that start the next one by chance, which stay.
+    private static var wordFragmentCases: [Case] {
+        [
+            completed("We should con, consider the budget first.", "We should consider the budget first."),
+            completed("the uh rep report is late", "The report is late."),
+            completed("She wants few ex expenses paid back.", "She wants a few expenses paid back."),
+            completed("Con consider the budget first.", "Consider the budget first."),
+            completed("wait for forty minutes", "Wait forty minutes."),
+            completed("move it to tomorrow", "Move it tomorrow."),
+            completed("check the plan plans", "Check the plans."),
+            completed("Ask Ed Edwards about it.", "Ask Edwards about it."),
+            completed("We met the new rep. Report it to them.", "We met the new. Report it to them."),
+            // A word that carries meaning and starts the next one passes for a fragment.
+            completed("the car carpet needs cleaning", "The carpet needs cleaning."),
+            // A counted list keeps its numbers: a number word is never a fragment.
+            completed("one go to the shops two talk to the mechanic", "1. Go to the shops.\n2. Talk to the mechanic."),
         ]
     }
 }

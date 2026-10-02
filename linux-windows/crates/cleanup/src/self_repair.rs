@@ -10,6 +10,7 @@ use lt_shared::swift_string::{self as s};
 
 use crate::GuardPolicy;
 use crate::word_forms;
+use crate::word_fragments::WordFragments;
 use crate::words::{WordSet, normalized_words, same, starts_with};
 use alignment::Alignment;
 
@@ -38,7 +39,8 @@ pub(crate) const MIN_BULLETED_ITEMS: usize = 3;
 ///   a word it misheard ("Madge the PR"), which may be respelled where it is written without a
 ///   capital, or with the one a list item starts with ("merge the PR", "1. Merge the PR");
 /// - a filler, a repeated word, or a word that only holds the grammar together dropped or added
-///   ("I going" → "I am going");
+///   ("I going" → "I am going"); the start of a word broken off and said again in full dropped
+///   ("con consider" → "consider", `WordFragments`);
 /// - a self-correction resolved ([`corrections`]): as at Medium, up to
 ///   [`GuardPolicy::max_retracted_words`] words and the cue after them taken out, with "not" and
 ///   the words taken back when the speaker says them again ("four, no, not four, five"); from a
@@ -74,6 +76,8 @@ pub(crate) struct SelfRepair {
     function_words: WordSet,
     max_retracted_words: usize,
     min_respelling_similarity: f64,
+    /// The starts of words broken off and said again in full, which a repair may drop.
+    fragments: WordFragments,
 }
 
 impl SelfRepair {
@@ -101,6 +105,7 @@ impl SelfRepair {
             function_words: WordSet::normalized(&policy.function_words),
             max_retracted_words: policy.max_retracted_words,
             min_respelling_similarity: policy.min_respelling_similarity,
+            fragments: WordFragments::new(policy),
         }
     }
 

@@ -20,6 +20,9 @@ import Shared
 /// - its gap in the alignment puts back at least as many words as it deletes content words: a
 ///   rewording ("I got the tickets" → "I have the tickets").
 ///
+/// The start of a word broken off and said again in full ("rep" in "the rep report") is not
+/// content: the word it starts carries it (``WordFragments``).
+///
 /// What is left was deleted with nothing in its place.
 struct ContentWords: Sendable {
     /// Closed-class words: articles, pronouns, auxiliary verbs, prepositions, conjunctions and
@@ -86,8 +89,9 @@ struct ContentWords: Sendable {
 
     /// How many content words in `alignment`'s raw text were deleted with nothing in their place.
     /// Words in `ignored` (the normalized placeholder tokens, which are checked on their own) are
-    /// neither content nor a replacement for it.
-    func droppedCount(in alignment: WordAlignment, ignoring ignored: Set<String>) -> Int {
+    /// neither content nor a replacement for it, and `fragments`, the raw indices of the starts of
+    /// words broken off (``WordFragments``), are not content.
+    func droppedCount(in alignment: WordAlignment, ignoring ignored: Set<String>, fragments: Set<Int>) -> Int {
         let raw = alignment.raw, cleaned = alignment.cleaned
         let spoken = Set(raw)
         // Output words the alignment left unmatched and nothing has claimed yet.
@@ -95,7 +99,7 @@ struct ContentWords: Sendable {
         var missing: [[Int]] = []
 
         for gap in alignment.gaps {
-            let content = gap.deleted.filter { isContent(at: $0, in: raw, ignoring: ignored) }
+            let content = gap.deleted.filter { !fragments.contains($0) && isContent(at: $0, in: raw, ignoring: ignored) }
             var unaccounted: [Int] = []
             for index in content {
                 let standsIn = { standIn in self.standsIn(for: raw[index], word: cleaned[standIn], spoken: spoken) }

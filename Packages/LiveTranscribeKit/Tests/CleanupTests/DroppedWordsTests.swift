@@ -52,8 +52,29 @@ struct DroppedWordsTests {
     }
 
     @Test func aReplacementIsNotADeletion() {
-        #expect(droppedWords.droppedRun(in: WordAlignment(raw: words("we need twenty five chairs"), cleaned: words("We need 25 chairs."))) == nil)
-        #expect(droppedWords.droppedRun(in: WordAlignment(raw: words("email the nerd storm team"), cleaned: words("Email the Nerdstorm team."))) == nil)
+        #expect(droppedWords.droppedRun(in: WordAlignment(raw: words("we need twenty five chairs"), cleaned: words("We need 25 chairs.")), fragments: []) == nil)
+        #expect(droppedWords.droppedRun(in: WordAlignment(raw: words("email the nerd storm team"), cleaned: words("Email the Nerdstorm team.")), fragments: []) == nil)
+    }
+
+    @Test("The start of a word broken off and said again in full may go", arguments: [
+        ("She wants few ex expenses paid back.", "She wants few expenses paid back."),
+        ("We should con consider the budget first.", "We should consider the budget first."),
+        ("can you send the rep report by friday", "Can you send the report by Friday?"),
+    ])
+    func acceptsADroppedWordFragment(raw: String, cleaned: String) {
+        #expect(outputGuard.review(raw: raw, outcome: .completed(cleaned), options: medium) == .accepted(cleaned))
+    }
+
+    @Test("A word that only starts the next by chance stays", arguments: [
+        ("there is not nothing left", "There is nothing left.", FallbackReason.lostNegation),
+        ("bring ten tennis balls", "Bring tennis balls.", .droppedContent(count: 1)),
+        // "for" is no fragment of "forty", so the run is two words long.
+        ("we could stay for forty minutes", "We could forty minutes.", .droppedWords(count: 2)),
+        ("We met the new rep. Reports are due on Monday.", "We met the new. Reports are due on Monday.", .droppedContent(count: 1)),
+        ("can you send the rap report by friday", "Can you send the report by Friday?", .droppedContent(count: 1)),
+    ])
+    func keepsAWordThatIsNoFragment(raw: String, cleaned: String, reason: FallbackReason) {
+        #expect(outputGuard.review(raw: raw, outcome: .completed(cleaned), options: medium) == .rejected(reason))
     }
 
     @Test func fallbackReasonsDoNotRepeatWhatWasSaid() {

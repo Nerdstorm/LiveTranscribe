@@ -17,7 +17,8 @@ import Shared
 ///   a word it misheard ("Madge the PR"), which may be respelled where it is written without a
 ///   capital, or with the one a list item starts with ("merge the PR", "1. Merge the PR");
 /// - a filler, a repeated word, or a word that only holds the grammar together dropped or added
-///   ("I going" → "I am going");
+///   ("I going" → "I am going"); the start of a word broken off and said again in full dropped
+///   ("con consider" → "consider", ``WordFragments``);
 /// - a self-correction resolved (``Corrections``): as at Medium, up to
 ///   ``OutputGuard/Policy/maxRetractedWords`` words and the cue after them taken out, with "not"
 ///   and the words taken back when the speaker says them again ("four, no, not four, five");
@@ -61,6 +62,8 @@ struct SelfRepair: Sendable {
     private let functionWords: Set<String>
     private let maxRetractedWords: Int
     private let minRespellingSimilarity: Double
+    /// The starts of words broken off and said again in full, which a repair may drop.
+    let fragments: WordFragments
 
     init(policy: OutputGuard.Policy) {
         // "Or rather" is one cue at Deep: its "or" goes with it.
@@ -73,6 +76,7 @@ struct SelfRepair: Sendable {
         functionWords = Set(policy.functionWords.map(EditDistance.normalize))
         maxRetractedWords = policy.maxRetractedWords
         minRespellingSimilarity = policy.minRespellingSimilarity
+        fragments = WordFragments(policy: policy)
     }
 
     /// Whether `cleaned` can be made from `raw` by a repair's edits. `placeholders` are the
