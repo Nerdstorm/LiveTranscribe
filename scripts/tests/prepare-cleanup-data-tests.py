@@ -685,6 +685,28 @@ class ReconciliationTests(unittest.TestCase):
             _, trail = self.reconcile(f"It is {source}.", f"It is {heard}.")
             self.assertFalse(trail["unresolved"], (source, heard, trail))
 
+    def test_a_number_said_in_parts_and_written_as_one_figure_keeps_the_figure(self):
+        for source, heard in (("version seven point six", "version 7.6"),
+                              ("version two point three point one", "version 2.3.1"),
+                              ("order zero four four six", "order 0446"),
+                              ("in twenty twenty six", "in 2026"),
+                              ("in nineteen oh five", "in 1905"),
+                              ("up twenty five percent", "up 25%")):
+            target, trail = self.reconcile(f"It went {source} today.", f"It went {heard} today.")
+            self.assertEqual(target, f"It went {heard} today.", (source, trail))
+            self.assertFalse(trail["unresolved"], (source, heard, trail))
+        # The figure stands for those words only: a different figure still needs review.
+        for source, heard in (("version seven point six", "version 7.5"), ("order zero four four six", "order 0464"),
+                              ("in twenty twenty six", "in 2016")):
+            _, trail = self.reconcile(f"It went {source} today.", f"It went {heard} today.")
+            self.assertEqual(trail["status"], "review", (source, heard))
+        # A correction's figures reconcile on both sides of the cue.
+        target, trail = self.reconcile("The door code is zero one five one, I mean, zero two three two.",
+                                       "The door code is 0151, I mean, 0232.",
+                                       target="The door code is zero two three two.", category="same-sentence")
+        self.assertEqual(target, "The door code is 0232.")
+        self.assertFalse(trail["unresolved"], trail)
+
     def test_number_change_is_never_reconciled_as_formatting(self):
         _, trail = self.reconcile("We need twenty laptops.", "We need 21 laptops.")
         self.assertEqual(trail["status"], "review")
