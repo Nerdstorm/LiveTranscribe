@@ -10,6 +10,7 @@ struct WordFragmentsTests {
         ("We should con consider the budget first.", 2),
         ("can you send the rep report by friday", 4),
         ("We should con- consider the budget first.", 2),
+        ("We should con — consider the budget first.", 2),
         ("Con consider the budget first.", 0),
     ])
     func findsAFragment(text: String, index: Int) {
@@ -33,8 +34,17 @@ struct WordFragmentsTests {
         // Not the start of the next word, or only one letter short of it.
         "can you send the rap report by friday",
         "check the plan plans",
-        // A name.
+        // A single letter.
+        "we can go with plan b because it is cheaper",
+        // A name, or a word before one.
         "Ask Ed Edwards about it.",
+        "Ed Edwards will lead.",
+        // Not written as a word broken off: part of a word, set off by a comma or colon, or in
+        // capitals.
+        "please re-read the contract",
+        "bring a pen, pencil and paper",
+        "call the rep: report it",
+        "PR process is too slow.",
     ])
     func findsNone(text: String) {
         #expect(fragments.indices(in: text, placeholders: []).isEmpty)

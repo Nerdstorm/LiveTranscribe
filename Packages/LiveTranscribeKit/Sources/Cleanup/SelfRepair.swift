@@ -119,6 +119,10 @@ struct SelfRepair: Sendable {
         var mayBeName = false
         /// The first word of a sentence or line, whose capital says nothing about it.
         var startsSentence = false
+        /// Written as speech-to-text writes the start of a word broken off: on its own, with
+        /// nothing after it but a hyphen or dash, and not in capitals ("con" in "con consider" or
+        /// "con- consider"; not "re" in "re-read", "pen" in "pen, pencil" or "PR").
+        var mayBeBrokenOff = false
         /// Where a correction from a later sentence was put in place of what it corrects, how many
         /// words its phrase has, starting here; 0 elsewhere (see ``Corrections``).
         var opensPhrase = 0
@@ -149,7 +153,13 @@ struct SelfRepair: Sendable {
         for line in text.split(whereSeparator: \.isNewline) {
             var startsSentence = true
             let lineStart = words.count
-            let parts = line.split(whereSeparator: \.isWhitespace).flatMap { $0.split(whereSeparator: hyphens.contains) }
+            let tokens = line.split(whereSeparator: \.isWhitespace)
+            let parts = tokens.flatMap { $0.split(whereSeparator: hyphens.contains) }
+            // Only the last part between two spaces may be a word broken off: "con-", not "re-read".
+            let lastOfToken = tokens.flatMap { token in
+                let pieces = token.split(whereSeparator: hyphens.contains)
+                return pieces.indices.map { $0 == pieces.count - 1 }
+            }
             for (index, part) in parts.enumerated() {
                 let trailing = part.reversed().prefix { !$0.isLetter && !$0.isNumber }
                 // An abbreviation's own full stop ("at 3 p.m. today") ends a sentence only before a
@@ -175,7 +185,8 @@ struct SelfRepair: Sendable {
                         isName: couldBeName && !startsSentence,
                         isCapitalised: upper && !startsSentence,
                         mayBeName: couldBeName,
-                        startsSentence: startsSentence && offset == 0
+                        startsSentence: startsSentence && offset == 0,
+                        mayBeBrokenOff: isLastOfPart && lastOfToken[index] && mayBeBrokenOff(part)
                     ))
                 }
                 if !normalized.isEmpty { startsSentence = ends }
@@ -198,6 +209,14 @@ struct SelfRepair: Sendable {
     /// Whether the first letter of `part` is a capital.
     private static func startsWithUppercase(_ part: Substring) -> Bool {
         part.first(where: \.isLetter)?.isUppercase ?? false
+    }
+
+    /// Whether `part`, the last part between two spaces, is written as the start of a word broken
+    /// off may be: ending in a letter, so with nothing after it but the hyphen or dash split off
+    /// ("con-", not "pen," or "rep:"), and not in capitals, as an abbreviation is ("PR").
+    private static func mayBeBrokenOff(_ part: Substring) -> Bool {
+        let letters = part.filter(\.isLetter)
+        return part.last?.isLetter == true && !(letters.count > 1 && letters.allSatisfy(\.isUppercase))
     }
 
     /// The words of `text`, with the numbers and bullets that start its list items taken off.

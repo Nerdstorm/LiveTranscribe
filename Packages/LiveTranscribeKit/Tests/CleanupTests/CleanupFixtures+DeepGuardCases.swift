@@ -574,7 +574,7 @@ extension CleanupFixtures.Guard {
     /// (``WordFragments``), and the words that start the next one by chance, which stay.
     private static var wordFragmentCases: [Case] {
         [
-            completed("We should con, consider the budget first.", "We should consider the budget first."),
+            completed("We should con \u{2014} consider the budget first.", "We should consider the budget first."),
             completed("the uh rep report is late", "The report is late."),
             completed("She wants few ex expenses paid back.", "She wants a few expenses paid back."),
             completed("Con consider the budget first.", "Consider the budget first."),
@@ -583,6 +583,16 @@ extension CleanupFixtures.Guard {
             completed("check the plan plans", "Check the plans."),
             completed("Ask Ed Edwards about it.", "Ask Edwards about it."),
             completed("We met the new rep. Report it to them.", "We met the new. Report it to them."),
+            // Not written as a word broken off: part of a word, set off by a comma or colon, or in
+            // capitals. Nor a single letter, or a name's first part where it starts a sentence.
+            completed("We should con, consider the budget first.", "We should consider the budget first."),
+            completed("please re-read the contract before signing", "Please read the contract before signing."),
+            completed("Bring a pen, pencil and paper.", "Bring a pencil and paper."),
+            completed("Three things: pen, pencil, paper.", "Three things:\n- Pencil\n- Paper"),
+            completed("call the rep: report it", "Call the report it."),
+            completed("PR process is too slow.", "Process is too slow."),
+            completed("vitamin d deficiency is common in winter", "Vitamin deficiency is common in winter."),
+            completed("Ed Edwards will lead.", "Edwards will lead."),
             // A word that carries meaning and starts the next one passes for a fragment.
             completed("the car carpet needs cleaning", "The carpet needs cleaning."),
             // A counted list keeps its numbers: a number word is never a fragment.

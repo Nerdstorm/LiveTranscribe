@@ -1020,5 +1020,17 @@ fn a_word_that_only_starts_the_next_by_chance_stays() {
             "can you send the rap report by friday",
             "Can you send the report by Friday?",
         ),
+        // Not written as a word broken off: part of a word, or set off by a comma.
+        (
+            "please re-read the contract before signing",
+            "Please read the contract before signing.",
+        ),
+        ("Bring a pen, pencil and paper.", "Bring a pencil and paper."),
+        // A single letter, and a name's first part where it starts a sentence.
+        (
+            "vitamin d deficiency is common in winter",
+            "Vitamin deficiency is common in winter.",
+        ),
+        ("Ed Edwards will lead.", "Edwards will lead."),
     ]);
 }

@@ -7,6 +7,10 @@ use crate::self_repair::{SaidWord, said_words};
 use crate::word_forms;
 use crate::words::WordSet;
 
+/// Fewest letters a fragment has: a single letter names something as often as it starts a word
+/// ("plan b because", "vitamin d deficiency").
+pub(crate) const MIN_LETTERS: usize = 2;
+
 /// Fewest letters the whole word has beyond its fragment, so that a word and its plural or another
 /// short form of it ("plan plans", "test tests") are never taken for one.
 pub(crate) const MIN_ADDED_LETTERS: usize = 2;
@@ -18,15 +22,21 @@ pub(crate) const MIN_ADDED_LETTERS: usize = 2;
 ///
 /// A said word is a fragment when the next word said in its sentence starts with it and has at
 /// least [`MIN_ADDED_LETTERS`] letters more ("rep" → "report"), whatever the capitals, and it is
-/// all letters, so "ex-" counts once its hyphen is gone. It is never a word that starts a longer
-/// one by chance and says something of its own: a function word ("for forty", "to tomorrow", "so
-/// soon", "the theory", "an another"), a negation ("not nothing"), a number, a unit or a word of
-/// time; nor a name or a correction cue, nor the last word of a sentence ("Call the rep. Report
-/// it.").
+/// all letters, at least [`MIN_LETTERS`] of them. It must be written as a word broken off is
+/// (`SaidWord::may_be_broken_off`): on its own, with nothing after it but a hyphen or dash ("con-
+/// consider"), so never part of a word ("re" in "re-read") or a word set off by a comma or colon
+/// ("pen" in "pen, pencil and paper"), and not in capitals ("PR process").
+///
+/// It is never a word that starts a longer one by chance and says something of its own: a function
+/// word ("for forty", "to tomorrow", "so soon", "the theory", "an another"), a negation ("not
+/// nothing"), a number, a unit or a word of time; nor a name or a correction cue, nor a word
+/// before a name ("Ed Edwards", however it starts its sentence), nor the last word of a sentence
+/// ("Call the rep. Report it.").
 ///
 /// What it can't tell apart is a word that carries meaning and happens to start the next one:
-/// "car" in "the car carpet" is a fragment of "carpet", so an answer that drops it is accepted.
-/// Such pairs are rare in speech, and the model has no reason to drop the word.
+/// "car" in "the car carpet" is a fragment of "carpet", so an answer that drops it is accepted; so
+/// is one that drops "add" from "add additional notes" or "new" from "the new newsletter". Such
+/// pairs are rare in speech, and the model has no reason to drop the word.
 #[derive(Clone, Debug)]
 pub(crate) struct WordFragments {
     function_words: WordSet,
@@ -53,8 +63,13 @@ impl WordFragments {
         said.windows(2)
             .enumerate()
             .filter(|(_, pair)| {
-                let word = &pair[0];
-                !word.ends_sentence && !word.is_name && !word.is_cue && self.is_fragment(&word.word, &pair[1].word)
+                let (word, next) = (&pair[0], &pair[1]);
+                word.may_be_broken_off
+                    && !word.ends_sentence
+                    && !word.is_name
+                    && !word.is_cue
+                    && !next.is_name
+                    && self.is_fragment(&word.word, &next.word)
             })
             .map(|(index, _)| index)
             .collect()
@@ -63,7 +78,7 @@ impl WordFragments {
     /// Whether `word` is the start of `next`, broken off. Both are normalised words.
     pub(crate) fn is_fragment(&self, word: &str, next: &str) -> bool {
         let length = s::character_count(word);
-        if length == 0
+        if length < MIN_LETTERS
             || !s::characters(word).all(s::is_letter)
             || s::character_count(next) < length + MIN_ADDED_LETTERS
             || !s::has_prefix(next, word)
@@ -93,6 +108,7 @@ mod tests {
             ("We should con consider the budget first.", 2),
             ("can you send the rep report by friday", 4),
             ("We should con- consider the budget first.", 2),
+            ("We should con — consider the budget first.", 2),
             ("Con consider the budget first.", 0),
         ] {
             assert_eq!(fragments(text), HashSet::from([index]), "{text}");
@@ -118,8 +134,17 @@ mod tests {
             // Not the start of the next word, or only one letter short of it.
             "can you send the rap report by friday",
             "check the plan plans",
-            // A name.
+            // A single letter.
+            "we can go with plan b because it is cheaper",
+            // A name, or a word before one.
             "Ask Ed Edwards about it.",
+            "Ed Edwards will lead.",
+            // Not written as a word broken off: part of a word, set off by a comma or colon, or in
+            // capitals.
+            "please re-read the contract",
+            "bring a pen, pencil and paper",
+            "call the rep: report it",
+            "PR process is too slow.",
         ] {
             assert!(fragments(text).is_empty(), "{text}");
         }
