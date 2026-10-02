@@ -12,7 +12,7 @@ extension CleanupFixtures.Guard {
     /// the search's limits.
     static var deepCases: [Case] {
         selfRepairTestCases + layoutCases + numberRepairCases + acronymCases + contractionCases + repairNameCases
-            + cueCases + crossSentenceCases + repairEdgeCases
+            + cueCases + crossSentenceCases + repairEdgeCases + correctionMeaningCases
     }
 
     /// SelfRepairTests, every input.
@@ -488,6 +488,81 @@ extension CleanupFixtures.Guard {
             completed("I'm not free on Tuesday. Sorry, Wednesday.", "I'm free on Wednesday.", policy: Policy(negations: [])),
             completed("The busses are late.", "The buses are late.", policy: Policy(minRespellingSimilarity: 0.95)),
             completed("So um the bus is late.", "So the bus is late.", policy: Policy(fillers: ["So"])),
+        ]
+    }
+
+    /// SelfRepairTests' corrections read for their meaning: what each takes back, the key word
+    /// its phrase says instead, the corrected words said again, and a sentence started again.
+    private static var correctionMeaningCases: [Case] {
+        [
+            completed("book the blue room sorry the green room for friday", "Book the green room for Friday."),
+            completed("send it to the finance team make that the legal team today", "Send it to the legal team today."),
+            completed("ask the designer i mean the developer to check it", "Ask the developer to check it."),
+            completed("we're migrating the load balancer make that the scheduler next week", "We're migrating the scheduler next week."),
+            completed("paint the fence red no wait blue", "Paint the fence blue."),
+            completed("we need three servers sorry four", "We need four servers."),
+            completed("send it to sam sorry to priya", "Send it to Priya."),
+            completed("the demo is next week sorry the after next", "The demo is the week after next."),
+            completed("i'm meeting divya at the station actually nikhil", "I'm meeting Nikhil at the station."),
+            completed("The billing service goes live next Tuesday. Sorry, I mean the login service.", "The login service goes live next Tuesday."),
+            completed("fuel efficiency in cars sorry busses", "Fuel efficiency in buses."),
+            completed("book the blue room sorry the green room for friday", "Book the blue room for Friday."),
+            completed("book the blue room sorry the green room for friday", "Book the room for Friday."),
+            completed("book the blue room sorry the green room for friday", "Book the blue green room for Friday."),
+            completed("Book the blue room, sorry, the green room for Friday.", "Book the blue room for Friday."),
+            completed("send it to the finance team make that the legal team today", "Send it to the finance team today."),
+            completed("ask the designer i mean the developer to check it", "Ask the designer to check it."),
+            completed("we're migrating the load balancer make that the scheduler next week", "We're migrating the load balancer next week."),
+            completed("paint the fence red no wait blue", "Paint the fence red."),
+            completed("we need three servers sorry four", "We need four three servers."),
+            completed("send it to sam sorry to priya", "Send it to Priya Sam."),
+            completed("I left my charger in the garage. Actually, the lobby.", "I left my charger in the garage lobby."),
+            completed("The demo is on Tuesday at noon. Sorry, Wednesday.", "The demo is on Tuesday Wednesday at noon."),
+            completed("Invite Sam to the launch. Sorry, Priya.", "Invite Sam and Priya to the launch."),
+            completed("fuel efficiency in cars sorry busses", "Fuel efficiency in trains."),
+            completed("i wanted to say sorry to jo", "I wanted to say it to Jo."),
+            completed("we need three servers sorry four", "We need three four servers."),
+            completed("we need three servers sorry four", "We need three or four servers."),
+            completed("we need three of the servers sorry four", "We need three of the four servers."),
+            completed("Invite Sam to the launch. Sorry, Priya.", "Invite Sam, Priya to the launch."),
+            completed("Invite Sam to the launch, sorry, Priya.", "Invite Sam and Priya to the launch."),
+            completed("I am meeting Divya at the station. Actually, Nikhil.", "I am meeting Divya and Nikhil at the station."),
+            completed("I am meeting Divya at the station. Actually, Nikhil.", "I am meeting Divya Nikhil at the station."),
+            completed("Call me on Tuesday, no, Wednesday.", "Call me on Tuesday or Wednesday."),
+            completed("We have two weeks left. Sorry, three.", "We have two or three weeks left."),
+            completed("two people said we need servers sorry four", "Two people said we need four servers."),
+            completed("we need three of the servers sorry four", "We need four of the servers."),
+            completed("Invite Sam to the launch. Sorry, Priya.", "Invite Priya to the launch."),
+            completed("Invite Sam to the launch, sorry, Priya.", "Invite Priya to the launch."),
+            completed("I am meeting Divya at the station. Actually, Nikhil.", "I am meeting Nikhil at the station."),
+            completed("meet me at the station sorry at six", "Meet me at six."),
+            completed("Ask Sam to email Ana, sorry, Priya.", "Ask Sam to email Priya."),
+            completed("Ask Sam to email Ana, sorry, Priya.", "Ask Priya to email Ana."),
+            completed("We have two weeks left. Sorry, three.", "We have three weeks left."),
+            completed("Can you bring the monitor, wait node, the router to the meeting?", "Can you bring the router to the meeting?"),
+            completed("The city is buying more electric buses, no weight vans.", "The city is buying more electric vans."),
+            completed("Dinner is on Saturday. Sorry, no theon Tuesday.", "Dinner is on Tuesday."),
+            completed("The product review is on the 12th of October. No sorry thee of November.", "The product review is on the 12th of November."),
+            completed("Ship it to Prague, scratch that, hold it until September.", "Hold it until September."),
+            completed("ship it to prague scratch that hold it until june", "Hold it until June."),
+            completed("Ship it to Lisbon, scratch that, hold it until November.", "Hold it until November."),
+            completed("Ship it to Prague, scratch that, Vienna.", "Ship it to Vienna."),
+            completed("Book the early flight. Scratch that. Book the afternoon one.", "Book the afternoon one."),
+            completed("Put the box on the table, sorry, under the table.", "Put the box under the table."),
+            completed("We need to restart the off service. Actually, the database.", "We need to restart the database."),
+            completed("The leak is under the sink, rather, behind the dishwasher.", "The leak is behind the dishwasher."),
+            completed("Ship it to Prague, scratch that, hold it until September.", "Ship it to hold it until September."),
+            completed("ship it to prague scratch that hold it until june", "Ship it to hold it until June."),
+            completed("Ship it to Lisbon, scratch that, hold it until November.", "Ship it to Hold it until November."),
+            completed("the physio team sorry not physio nursing will join the call at noon", "The nursing team will join the call at noon."),
+            completed("Kofi's brother, no wait, not brother, cousin, is hosting the barbecue.", "Kofi's cousin is hosting the barbecue."),
+            completed("nikhil's team sorry not nikhil's siobhan's owns the billing service", "Siobhan's team owns the billing service."),
+            completed("the physio team sorry not physio nursing will join the call at noon", "The nursing will join the call at noon."),
+            completed("Kofi's brother, no wait, not brother, cousin, is hosting the barbecue.", "Cousin is hosting the barbecue."),
+            completed("nikhil's team sorry not nikhil's siobhan's owns the billing service", "Siobhan's owns the billing service."),
+            completed("I'll call no one now. Scratch that. I'll email no one instead.", "I'll email no one instead."),
+            completed("I'll call no one now. Scratch that. I'll email no one instead.", "I'll email Noah instead."),
+            completed("The shop closes at 3 p.m. today. Sorry, I meant at 10 a.m.", "The shop closes at 10 a.m. today."),
         ]
     }
 }

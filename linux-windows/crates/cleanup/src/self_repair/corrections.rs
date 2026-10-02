@@ -32,7 +32,10 @@
 //! back ([`SelfRepair::leaves_taken_back`]); it corrects that word too ("The billing service goes
 //! live. Sorry, I mean the login service." → "The login service goes live."). Nor does a fact or
 //! a name leave the one of its sort just before the words it corrects ("three servers, sorry,
-//! four" corrects "three", never only "servers").
+//! four" corrects "three", never only "servers"). Medium's take back no more than the corrected
+//! words said again ("the physio team, sorry, not physio, nursing" is never "the nursing"), and no
+//! less than a sentence that a phrase opening the way it did starts again ("Ship it to Prague,
+//! scratch that, hold it until September" is never "Ship it to hold it until September").
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ops::Range;
@@ -125,6 +128,17 @@ pub(super) fn spans(words: &[SaidWord], repair: &SelfRepair, placeholders: &Word
         // A lone "No" after a question answers it ("Is it on Tuesday? No, not Tuesday,
         // Thursday."), as [`once`] reads it.
         let answers = crosses && words[cue_start - 1].ends_question && same(&words[cue_start].word, "no");
+        // The first word that carries meaning in the sentence the corrected words end, if the cues
+        // can take back from there.
+        let opening = {
+            let first = words[..cue_start.saturating_sub(1)]
+                .iter()
+                .rposition(|word| word.ends_sentence)
+                .map_or(0, |end| end + 1);
+            (first..cue_start)
+                .find(|&index| repair.carries_meaning(&words[index]))
+                .filter(|&index| index + repair.max_retracted_words >= cue_start)
+        };
         for start in cue_start.saturating_sub(repair.max_retracted_words)..cue_start {
             let corrected = &words[start..cue_start];
             if corrected[..corrected.len() - 1].iter().any(|word| word.ends_sentence)
@@ -149,10 +163,15 @@ pub(super) fn spans(words: &[SaidWord], repair: &SelfRepair, placeholders: &Word
                     continue;
                 }
                 for (end, restated) in phrase_starts(run_end, words, repair) {
+                    // Corrected words said again are what the correction takes back, all of it:
+                    // "the physio team, sorry, not physio, nursing" corrects "physio", and is
+                    // never "the nursing".
+                    let all_corrected = restated
+                        .clone()
+                        .is_some_and(|restated| repair.restates(corrected, &words[restated]));
                     let among_corrected = restated
                         .clone()
-                        .is_none_or(|restated| repair.restates(&words[restated], corrected));
-                    let all_corrected = restated.is_some_and(|restated| repair.restates(corrected, &words[restated]));
+                        .is_none_or(|restated| repair.restates(&words[restated], corrected) && all_corrected);
                     let stands_in = ends_sentence_before
                         && words.get(end).is_some_and(|first| {
                             content(first) == content(&corrected[0])
@@ -165,9 +184,15 @@ pub(super) fn spans(words: &[SaidWord], repair: &SelfRepair, placeholders: &Word
                                 .find(|word| content(word))
                                 .is_some_and(|word| repair.fact_kind(word, false).is_some()));
                     let phrase = &words[end..end + phrase_length(end, words).min(CORRECTION_PHRASE_WORDS)];
+                    // A phrase that opens the way its sentence did starts it again, and takes back
+                    // from there: "Ship it to Prague, scratch that, hold it until September" is
+                    // never "Ship it to hold it until September".
+                    let after_restart = opening
+                        .is_some_and(|opening| start > opening && repair.restarts(&words[opening..cue_start], phrase));
                     if (end < words.len() && repair.is_cue(&words[end].word))
                         || !among_corrected
                         || (crosses && !retracts_statement && !all_corrected && !stands_in)
+                        || after_restart
                         || repair.leaves_taken_back(words, start..cue_start, phrase)
                     {
                         continue;
@@ -522,6 +547,29 @@ impl SelfRepair {
         phrase
             .iter()
             .any(|other| same(&other.word, text) || word_forms::are_forms(&other.word, text))
+    }
+
+    /// Whether a correction's `phrase` starts again the sentence whose words from its first that
+    /// carries meaning up to the cues are `said`: the phrase's first word is that word ("Book the
+    /// early flight. Scratch that. Book the afternoon one."); or carries meaning in its place, and
+    /// its second is the word said next ("ship it" → "hold it"); or says nothing new before a
+    /// second that is that word ("ship it" → "just ship it"). A word is said again as itself, or
+    /// as another form of a word that carries meaning.
+    fn restarts(&self, said: &[SaidWord], phrase: &[SaidWord]) -> bool {
+        let mut opening = phrase.iter().filter(|word| !self.is_filler(&word.word));
+        let (Some(lead), next) = (opening.next(), opening.next()) else {
+            return false;
+        };
+        let says_again = |said: &SaidWord, word: &SaidWord| {
+            same(&said.word, &word.word)
+                || (self.carries_meaning(said) && word_forms::are_forms(&said.word, &word.word))
+        };
+        let leads_in = !self.carries_meaning(lead) || word_forms::is_droppable(&lead.word);
+        says_again(&said[0], lead)
+            || next.is_some_and(|next| {
+                (self.carries_meaning(lead) && said.get(1).is_some_and(|second| says_again(second, next)))
+                    || (leads_in && says_again(&said[0], next))
+            })
     }
 
     /// Whether `word` says something a correction can take back or say instead: it holds more than
