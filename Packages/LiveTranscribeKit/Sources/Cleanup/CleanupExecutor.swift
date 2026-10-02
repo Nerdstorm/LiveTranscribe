@@ -21,7 +21,8 @@ import Styles
 /// Deep runs as ``DeepCleanup`` says: its own prompt, with or without the adapter, thinking or
 /// not, after Medium's pass or on its own, under a longer deadline. When its repair is turned
 /// down, Medium's result is used, from the pass before it or one run in the time left: a success
-/// at Medium's standard, not a fallback.
+/// at Medium's standard, not a fallback. A result from the pass run in the time left must pass
+/// Deep's check as well.
 public struct CleanupExecutor: Sendable {
     public let contextLimit: Int
     public let timeoutSeconds: Double
@@ -96,7 +97,10 @@ public struct CleanupExecutor: Sendable {
     /// correction cue in the text, Medium's pass resolves what it can first; if Deep's pass is then
     /// rejected or out of time, Medium's result is kept, a success at Medium's standard. Otherwise,
     /// when Deep's answer is turned down, Medium's pass runs in the time left
-    /// (``DeepCleanup/fallsBackToMedium``).
+    /// (``DeepCleanup/fallsBackToMedium``), and its answer is shown only if Deep's check accepts it
+    /// too: Medium's guard lets through some meaning changes that Deep's turns down, such as a
+    /// correction that takes back more than it corrects. Otherwise Deep's reason is reported and
+    /// what was said is shown.
     private func repairing(
         _ input: String,
         context: [String],
@@ -131,7 +135,13 @@ public struct CleanupExecutor: Sendable {
         let left = seconds - Double(started.duration(to: .now).wholeMilliseconds) / 1_000
         guard left > 0, !Task.isCancelled else { return repaired }
         let fallback = await pass(input, context: context, options: resolving, seconds: left, generate: generate)
-        guard case .accepted = fallback else { return repaired }
+        guard case .accepted(let answer) = fallback else { return repaired }
+        if case .rejected(let check) = outputGuard.review(raw: input, outcome: .completed(answer), options: options) {
+            Log.cleanup.notice(
+                "Deep repair rejected (\(reason.description, privacy: .public)), and Medium's cleanup fails Deep's check: \(check.description, privacy: .public)"
+            )
+            return repaired
+        }
         Log.cleanup.notice("Deep repair rejected, showing Medium's cleanup: \(reason.description, privacy: .public)")
         return fallback
     }

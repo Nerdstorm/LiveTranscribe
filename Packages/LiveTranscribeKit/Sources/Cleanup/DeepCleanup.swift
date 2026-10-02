@@ -25,7 +25,8 @@ public struct DeepCleanup: Sendable, Equatable {
     /// Tokens the model may spend reasoning, on top of the answer's budget.
     public var thinkingTokens: Int
     /// When Deep's repair is turned down and Medium's pass hasn't run, whether Medium's pass runs
-    /// in the time left, so Deep never shows less than Medium would have.
+    /// in the time left, so Deep shows what Medium would have. Its answer must pass Deep's check
+    /// too; one that fails it falls back with Deep's reason.
     public var fallsBackToMedium: Bool
     /// Deep's shortest deadline for the whole cleanup; the Advanced timeout applies when it is longer.
     public var minimumTimeoutSeconds: Double
@@ -49,7 +50,7 @@ public struct DeepCleanup: Sendable, Equatable {
     /// What the app runs: one pass with Deep's adapter, without thinking, which was right on
     /// 108 of 114 hand-written cases, against 88 with the self-correction adapter and 52 with
     /// none; with thinking and no adapter, 58, taking 20 times as long (docs/design-notes.md). A
-    /// repair `SelfRepair` turns down gets Medium's cleanup instead.
+    /// repair `SelfRepair` turns down gets Medium's cleanup instead, if `SelfRepair` accepts that.
     public static let shipped = DeepCleanup(
         passes: .one,
         adapter: .deep,
