@@ -40,7 +40,13 @@ PROTECTED = re.compile(
 PLACEHOLDER = re.compile(r"⟦[^⟧]+⟧|\b[STU]\d+\b")
 RULES = TRAINING / "speech-to-text-rules.json"
 # How measured inputs are also given in train and valid, as other recognizers write them.
-INPUT_VARIANTS = ("unpunctuated", "lowercase", "odd-stops", "odd-case")
+INPUT_VARIANTS = ("unpunctuated", "lowercase", "odd-stops", "odd-case", "moved-stops")
+# The English voices of macOS that sound like a person, for ``audio --voices natural``: every
+# installed one but the novelty voices ("Bells", "Bad News", "Zarvox", "Whisper"…), the old
+# formant voices ("Fred", "Kathy", "Ralph", "Junior", "Albert"), whose words the recognizer
+# mishears, and the screen reader's ("Eddy", "Flo", "Reed", "Sandy", "Shelley"…), which sound
+# synthetic. US, UK, Australian, Irish, South African and Indian English.
+NATURAL_VOICES = ("Samantha", "Daniel", "Karen", "Moira", "Tessa", "Rishi", "Aman", "Tara")
 # Share of the seed dictations that can be joined which are, in train and valid.
 COMPOSITE_SHARE = 0.6
 # Words a joined dictation may have; Deep's training checks allow 90 after fillers are removed.
@@ -65,6 +71,76 @@ NEVER_LAST = {
     "through", "over", "under", "between", "both", "either", "more", "most", "such", "other",
     "another", "what", "where", "who", "whose", "how", "why", "whether",
 }
+# Words that number, count or mark a list item. A stop beside one may be what makes it a spoken
+# list marker ("One, go to the shops. Two, call the mechanic"), or sit in a count or a time
+# ("twenty one chairs", "quarter past nine"), so a moved stop keeps away from them.
+NUMBERING_WORDS = {
+    "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+    "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
+    "nineteen", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
+    "hundred", "thousand", "million", "billion", "dozen", "half", "quarter", "first", "second", "third",
+    "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth", "firstly", "secondly",
+    "thirdly", "fourthly", "fifthly", "finally", "lastly", "number", "item", "step", "bullet", "point",
+}
+# Words that join a number to the rest of it ("two hundred and fifty", "half past two", "ten to
+# nine", "nine o'clock"), where no one pauses as if a sentence ended.
+NUMBER_JOINERS = {"and", "past", "to", "o'clock", "percent"}
+# Words a sentence that is an item of a spoken list starts with, besides the numbering words:
+# "First, book the hall. Then send the invites. Finally, …".
+LIST_STEP_WORDS = NUMBERING_WORDS | {"then", "next"}
+# Words a sentence ends on as well as on any other ("We could paint it."), so a full stop moved
+# back onto one leaves a sentence that reads right, and the word it carries may read as a name.
+ENDS_WELL = {"it", "them", "him", "her", "us", "me", "this", "that", "these", "those"}
+# A letter's greeting and sign-off ("Hi Sam, …", "… Kind regards, Ana"), which the app finds by
+# their words and commas, so a moved stop keeps away from them too.
+GREETING_WORDS = {"dear", "hi", "hello", "hey"}
+SIGN_OFF_WORDS = {
+    "regards", "wishes", "best", "cheers", "sincerely", "thanks", "thank", "love", "yours",
+    "faithfully", "truly", "care", "soon",
+}
+# Words a comma isn't written after, even where the speaker paused: an article, possessive or
+# preposition before its noun, a pronoun before its verb, and the first word of a cue ("or
+# rather", "not Monday").
+NO_COMMA_AFTER = {
+    "a", "an", "the", "my", "your", "our", "their", "his", "her", "its", "to", "of", "in", "on",
+    "at", "by", "for", "with", "from", "into", "about", "like", "than", "as", "i", "i'll", "i'm",
+    "i've", "i'd", "you", "we", "they", "he", "she", "or", "not", "make", "scratch", "very",
+    "every", "each", "whose", "let's", "next", "last", "same", "other",
+}
+# Words a sentence may start with that are never a name, so one can lose its capital when a full
+# stop before it moves.
+SENTENCE_STARTERS = {
+    "a", "an", "the", "and", "but", "so", "or", "because", "then", "if", "when", "which", "we",
+    "you", "they", "he", "she", "it", "it's", "this", "that", "these", "those", "there", "there's",
+    "here", "here's", "my", "our", "your", "their", "his", "her", "its", "can", "could", "would", "should",
+    "do", "does", "did", "is", "are", "was", "were", "have", "has", "had", "let's", "we'll",
+    "we're", "we've", "they're", "you're", "you'll", "he's", "she's", "that's", "what's", "please",
+    "also", "maybe", "now", "just", "not", "no", "yes", "okay", "what", "where", "how", "why", "who",
+    "after", "before", "once", "to", "for", "in", "on", "at", "with", "from", "by", "as", "all",
+    "some", "every", "each", "both", "actually", "sorry", "thanks", "still", "even", "only",
+    "otherwise", "anyway", "well", "oh", "sure", "don't", "didn't", "doesn't", "can't", "won't",
+    "isn't", "wasn't", "aren't",
+}
+# Words that read as well at the end of one sentence as at the start of the next ("It rained
+# today. We stayed in"), or as an object of the one before ("We finished it"). A full stop moved
+# past one leaves two sentences that read right, so it would teach the adapter to move words
+# between sentences that were right as written.
+EITHER_SIDE = {
+    "today", "tomorrow", "yesterday", "tonight", "now", "then", "later", "again", "soon", "here",
+    "there", "too", "also", "instead", "anyway", "though", "however", "please", "thanks", "okay",
+    "yes", "still", "already", "first", "finally", "so", "well", "actually", "sorry", "once",
+    "maybe", "sure", "it", "that", "this", "them", "him", "her", "us", "me", "you", "earlier",
+    "even", "next", "last", "yet",
+}
+# Words that take back what was just said ("Sunday afternoon. No, sorry, Saturday"). Where the
+# sentence ends decides what they take back, so a full stop near one stays.
+CUE_WORDS = {"no", "wait", "sorry", "mean", "actually", "rather", "scratch", "make", "not", "oops",
+             "correction", "instead"}
+# A word a comma or full stop can be moved off, and one it can be moved onto.
+STOPPED_WORD = re.compile(r"^[\w'’-]*[^\W_][.,]$")
+BARE_WORD = re.compile(r"^[\w'’-]*[^\W_]$")
+# Words a full stop ends that don't end a sentence.
+ABBREVIATIONS = {"mr", "mrs", "ms", "dr", "st", "jr", "sr", "vs", "etc", "prof", "approx"}
 
 
 def policy_for(options):
@@ -169,9 +245,15 @@ def _odd_stops(text, rng):
     choices, weights = [], []
     for index in range(len(words) - 1):
         (word, free), (following, next_free) = words[index], words[index + 1]
+        core, next_core = word.group().rstrip(",").lower(), following.group().rstrip(",.").lower()
         if (not free or not next_free or "\n" in text[word.end():following.start()]
                 or not re.search(r"[\w,]$", word.group()) or not following.group()[:1].isalpha()
-                or word.group().rstrip(",").lower() in NEVER_LAST or before[index] < 1 or after[index] < 2):
+                or core in NEVER_LAST or before[index] < 1 or after[index] < 2
+                # Nor inside a spoken list marker, number or time: "Number. One, …", "twenty. One
+                # chairs", "quarter. Past nine", "quarter past. Nine".
+                or core in ("number", "item", "step", "bullet")
+                or (core in NUMBERING_WORDS and next_core in NUMBERING_WORDS | NUMBER_JOINERS)
+                or (core in NUMBER_JOINERS and next_core in NUMBERING_WORDS)):
             continue
         choices.append(index)
         weights.append(4 if word.group().endswith(",") else 3 if following.group().lower() in CLAUSE_WORDS else 1)
@@ -209,12 +291,127 @@ def _odd_case(text, rng):
                         for index in rng.sample(choices, count)])
 
 
+def _fixed_words(words, cores):
+    """The words a moved stop keeps away from: the stops of a list or series, and a letter's
+    greeting and sign-off. Those are every word of a sentence that is an item of a spoken list,
+    one that starts "First", "Two", "Number three", "Then", "Finally" and the like, so the stop
+    that ends an item stays where it is ("First, request the details. Then check …"); every word
+    of a sentence with a series, whose commas have an "and", "or" or "then" soon after one
+    ("apples, pears and plums") or after the second ("the form, the badge, and the keys"), so its
+    last item ends where it did; the words after a colon in its sentence; the words from "Hi",
+    "Dear" and the like that start a sentence up to the stop after the name ("Hi, Sam,"), in a
+    text that opens with the greeting or one that has it after other sentences; and from a
+    sign-off word in the last four words on."""
+    fixed, sentence = set(), []
+    sign_off = next((index for index in range(max(0, len(words) - 4), len(words)) if cores[index] in SIGN_OFF_WORDS), None)
+    if sign_off is not None:
+        fixed.update(range(sign_off, len(words)))
+    for index, (match, _) in enumerate(words):
+        if not sentence and cores[index] in GREETING_WORDS:
+            greeting = next((later for later in range(index + 1, len(words))
+                             if words[later][0].group()[-1:] in ",.!" and cores[later] not in ABBREVIATIONS), index)
+            fixed.update(range(index, greeting + 1))
+        sentence.append(index)
+        if index + 1 < len(words) and not ENDS_SENTENCE.search(match.group()):
+            continue
+        colon = next((position for position, word in enumerate(sentence)
+                      if words[word][0].group().endswith((":", ";"))), None)
+        if colon is not None:
+            fixed.update(sentence[colon + 1:])
+        commas = [position for position, word in enumerate(sentence) if words[word][0].group().endswith(",")]
+        joins = [position for position, word in enumerate(sentence) if cores[word] in ("and", "or", "then")]
+        series = any(any(position + 2 <= join <= position + 4 for join in joins)
+                     or (len(commas) >= 2 and any(join > commas[1] for join in joins)) for position in commas)
+        if series or cores[sentence[0]] in LIST_STEP_WORDS:
+            fixed.update(sentence)
+        sentence = []
+    return fixed
+
+
+def _moved_stops(text, rng):
+    """A comma or full stop moved a word before or after where it belongs, as a recognizer writes
+    one when the speaker pauses in the wrong place, with capitals that follow the full stop.
+
+    Only a stop between plain words moves: never one beside a number, a time or a list marker,
+    which may be what makes the list ("One, go to the shops. Two, call the mechanic"), one in a
+    sentence that is an item of a list or holds a series, which would make other items, one of a
+    letter's greeting or sign-off, or the stop the text ends with. A comma never lands where none is written
+    (``NO_COMMA_AFTER``), and a full stop never after a word no one pauses after. A full stop never
+    leaves a sentence of one word, moves beside a correction's cue, whose sentence decides what it
+    takes back, or leaves two sentences that read right (``EITHER_SIDE``); the word that stops
+    starting a sentence is one that is never a name."""
+    words = _free_words(text)
+    before, after = _sentence_positions(words)
+    cores = [match.group().strip("\"'“”‘’()[]").rstrip(".,:;!?…").lower().replace("’", "'") for match, _ in words]
+    fixed = _fixed_words(words, cores)
+
+    def plain(indices):
+        return (all(0 <= index < len(words) and words[index][1] and index not in fixed
+                    and cores[index] not in NUMBERING_WORDS and cores[index] not in GREETING_WORDS
+                    and not any(char.isdigit() for char in cores[index]) for index in indices)
+                and "\n" not in text[words[indices[0]][0].start():words[indices[-1]][0].end()])
+
+    choices, weights = [], []
+    for index in range(len(words) - 1):
+        word = words[index][0].group()
+        if not STOPPED_WORD.match(word) or cores[index] in ABBREVIATIONS:
+            continue
+        stop = word[-1]
+        for step in (-1, 1):
+            window = (index - 1, index, index + 1) if step < 0 else (index, index + 1, index + 2)
+            if not plain(window) or not BARE_WORD.match(words[index + step][0].group()):
+                continue
+            if cores[index + step] in (NO_COMMA_AFTER if stop == "," else NEVER_LAST):
+                continue
+            if stop == ".":
+                starts = words[index + 1][0].group() if step < 0 else words[index + 2][0].group()
+                # The word after the stop now ends a sentence, or sits inside one: never a name.
+                if (not words[index + 1][0].group()[:1].isupper() or cores[index + 1] not in SENTENCE_STARTERS
+                        or not starts[:1].isalpha() or (before[index] < 2 if step < 0 else after[index + 1] < 2)
+                        or any(word in CUE_WORDS for word in cores[index - before[index]:index + 4])):
+                    continue
+                # The text must read wrong: the sentence the stop now starts can't start with the
+                # word it carries over, and the word it now ends with can't end the one before.
+                # Nor can the stop end one that reads whole and start one with a word that reads
+                # as a name: "We could paint it. Gray can you bring the monitor?"
+                carried = cores[index] if step < 0 else cores[index + 1]
+                if carried in EITHER_SIDE or carried.endswith("ly") or (step < 0 and (
+                        cores[index] in SENTENCE_STARTERS or not words[index][0].group()[:1].islower()
+                        or cores[index - 1] in ENDS_WELL)):
+                    continue
+            choices.append((index, step))
+            weights.append(2 if stop == "," else 1)
+    if not choices:
+        return text
+    moves = [rng.choices(choices, weights=weights)[0]]
+    # A second move is a comma's, well away from the first, so no sentence is left one word long.
+    commas = [(choice, weight) for choice, weight in zip(choices, weights)
+              if words[choice[0]][0].group().endswith(",") and abs(choice[0] - moves[0][0]) >= 4]
+    if len(choices) >= 4 and commas and rng.random() < 0.35:
+        moves.append(rng.choices([choice for choice, _ in commas], weights=[weight for _, weight in commas])[0])
+    changed = {}
+    for index, step in moves:
+        word = words[index][0].group()
+        stop, onto = word[-1], index + step
+        changed[index] = word[:-1]
+        changed[onto] = words[onto][0].group() + stop
+        if stop == ".":
+            following = index + 1
+            changed[following] = _swap_case(changed.get(following, words[following][0].group()))
+            starts = index if step < 0 else index + 2
+            if changed.get(starts, words[starts][0].group())[:1].islower():
+                changed[starts] = _swap_case(changed.get(starts, words[starts][0].group()))
+    return _edit(text, [(words[index][0].start(), words[index][0].end(), word) for index, word in changed.items()])
+
+
 def transform(text, profile, seed=None):
     """``text`` as one kind of input writes it, its words and protected values unchanged.
 
-    ``odd-stops`` and ``odd-case`` choose where by ``seed``, so a dataset is reproducible."""
-    if profile in ("odd-stops", "odd-case"):
-        result = (_odd_stops if profile == "odd-stops" else _odd_case)(text, random.Random(seed))
+    ``odd-stops``, ``odd-case`` and ``moved-stops`` choose where by ``seed``, so a dataset is
+    reproducible."""
+    if profile in ("odd-stops", "odd-case", "moved-stops"):
+        augment = {"odd-stops": _odd_stops, "odd-case": _odd_case, "moved-stops": _moved_stops}[profile]
+        result = augment(text, random.Random(seed))
         if normalize(result) != normalize(text):
             raise ValueError("augmentation changed words")
         return result
@@ -258,6 +455,16 @@ def composable(row):
             and "\n" not in row["raw"] and "\n" not in row["target"] and row["category"] != "recognition"
             and not PLACEHOLDER.search(row["raw"]) and not PLACEHOLDER.search(row["target"])
             and ENDS_SENTENCE.search(row["target"].strip()) is not None)
+
+
+# Categories whose answer is a list or a series, whose stops part its items.
+LIST_CATEGORIES = ("list-two", "list-many", "series")
+LIST_LINE = re.compile(r"(?m)^(?:\d+[.)]|[-•*]) ")
+
+
+def lists_items(row):
+    """Whether ``row`` answers with a list or series, laid out or in a line."""
+    return row["category"] in LIST_CATEGORIES or LIST_LINE.search(row["target"]) is not None
 
 
 def said_in_composite(raw):
@@ -516,9 +723,33 @@ def select_audio(data, limit):
     return selected, skipped
 
 
+def installed_voices():
+    """The names of the English voices macOS has installed, as ``say -v`` takes them."""
+    listing = subprocess.run(["say", "-v", "?"], check=True, capture_output=True, text=True).stdout
+    found = (re.match(r"^(.+?)\s+([a-z]{2,3}_[A-Za-z0-9]+)\s+#", line) for line in listing.splitlines())
+    # "Eddy (English (UK))" is "Eddy" to say; both of its accents answer to that name.
+    return {match.group(1).split(" (")[0].strip() for match in found if match and match.group(2).startswith("en_")}
+
+
+def voice_for(row, spoken, options, output):
+    """The voice that speaks a clip. A clip the first voice (``--voice``) already spoke in
+    ``output`` keeps it, so its audio, and the transcripts made of it, stay as they were; any other
+    clip draws one of ``--voices`` by its family and words, so a run is reproducible."""
+    voices = getattr(options, "voices", None) or []
+    first = digest({"family": row["family_id"], "spoken": spoken, "voice": options.voice, "rate": options.rate})[:24]
+    if not voices or (output / f"{first}.wav").exists():
+        return options.voice
+    return voices[int(digest(["voice", row["family_id"], spoken])[:8], 16) % len(voices)]
+
+
 def audio(options):
     if not shutil.which("say") or not shutil.which("afconvert"):
         raise ValueError("audio generation needs macOS say and afconvert")
+    voices = getattr(options, "voices", None) or []
+    missing = sorted(set(voices) - installed_voices())
+    if missing:
+        raise ValueError(f"voices not installed: {', '.join(missing)} (add them in System Settings > "
+                         "Accessibility > Spoken Content; this script downloads none)")
     data = read_dataset(options.dataset)
     limit = sum(len(rows) for rows in data.values()) if getattr(options, "all", False) else options.limit
     selected, skipped = select_audio(data, limit)
@@ -528,8 +759,9 @@ def audio(options):
     def synthesize(row, scratch):
         nonlocal done
         spoken = " ".join(row["raw"].split())
+        voice = voice_for(row, spoken, options, options.output)
         clip_id = digest({"family": row["family_id"], "spoken": spoken,
-                          "voice": options.voice, "rate": options.rate})[:24]
+                          "voice": voice, "rate": options.rate})[:24]
         wav_file = options.output / f"{clip_id}.wav"
         # A clip is written under another name and renamed when complete, so one that exists
         # from an interrupted run is whole and is kept.
@@ -538,7 +770,7 @@ def audio(options):
             aiff_file = Path(scratch) / f"{clip_id}.aiff"
             partial = options.output / f".{clip_id}.wav.partial"
             text_file.write_text(spoken)
-            subprocess.run(["say", "-v", options.voice, "-r", str(options.rate),
+            subprocess.run(["say", "-v", voice, "-r", str(options.rate),
                             "-f", str(text_file), "-o", str(aiff_file)], check=True, capture_output=True)
             subprocess.run(["afconvert", "-f", "WAVE", "-d", "LEI16@16000", "-c", "1",
                             str(aiff_file), str(partial)], check=True, capture_output=True)
@@ -551,7 +783,7 @@ def audio(options):
         target = row["target"].replace("\n", "\\n").replace("\t", " ")
         return ({"id": clip_id, "example": row, "spoken": spoken,
                  "audio_sha256": file_digest(wav_file),
-                 "tts": {"voice": options.voice, "rate": options.rate, "sample_rate": 16000}},
+                 "tts": {"voice": voice, "rate": options.rate, "sample_rate": 16000}},
                 "\t".join((clip_id, row["category"], spoken, target)))
 
     with tempfile.TemporaryDirectory(prefix="lt-cleanup-tts-") as scratch:
@@ -562,6 +794,7 @@ def audio(options):
     write_rows(options.output / "audio-manifest.jsonl", manifest)
     (options.output / "clips.tsv").write_text("\n".join(table) + "\n")
     print(json.dumps({"clips": len(manifest), "placeholder_families_not_spoken": skipped,
+                      "voices": dict(sorted(Counter(clip["tts"]["voice"] for clip in manifest).items())),
                       "output": str(options.output)}))
 
 
@@ -721,15 +954,18 @@ def merge_asr(options):
 
     # Cleanup must not depend on the punctuation or capitals a recognizer guesses. Some write none,
     # some only lower case, some a full stop at every pause, and some capitalise a word they take
-    # for a name, so a share of measured families in train and valid also comes in each such form,
-    # with the same answer. The words are still the recognizer's; the held-out test stays as it
-    # was measured.
+    # for a name, and some put a comma or full stop a word away where the speaker paused, so a share
+    # of measured families in train and valid also comes in each such form, with the same answer.
+    # The words are still the recognizer's; the held-out test stays as it was measured.
     variants = dict(getattr(options, "input_variant", None) or []) if source_report.get("kind") == "deep" else {}
     measured_families = sorted({row["family_id"] for split in ("train", "valid") for row in data[split]
                                 if row["profile"] == "measured-asr" and not row["review_required"]})
+    # A stop moved in a list makes other items of it, so lists keep their stops where they are.
+    listed = {row["family_id"] for split in ("train", "valid") for row in data[split] if lists_items(row)}
     variant_rows = Counter()
     for kind, rate in sorted(variants.items()):
-        ranked = sorted(measured_families, key=lambda family: digest([kind, family]))
+        eligible = [family for family in measured_families if kind != "moved-stops" or family not in listed]
+        ranked = sorted(eligible, key=lambda family: digest([kind, family]))
         chosen = set(ranked[:math.floor(len(ranked) * rate)])
         for split in ("train", "valid"):
             inputs = {row["raw"] for row in data[split]}
@@ -750,12 +986,16 @@ def merge_asr(options):
     # Optional punctuation follows the input each answer is given: a comma English leaves to the
     # writer stays where the input has one and goes where it has none, so the adapter learns no
     # house style, the generator's included. Required punctuation is the target's.
+    # A moved stop is still the stop the recognizer heard, a word away, so its answer is its
+    # parent's: the commas follow the input as the recognizer first wrote it.
+    inputs_by_id = {row["id"]: row["raw"] for split in SPLITS for row in data[split]}
     carried = Counter()
     for split in SPLITS:
         for row in data[split]:
             if row.get("review_required"):
                 continue
-            target = carry_optional_commas(row["target"], row["raw"])
+            given = inputs_by_id[row["provenance"]["parent_id"]] if row["profile"] == "moved-stops" else row["raw"]
+            target = carry_optional_commas(row["target"], given)
             if target != row["target"]:
                 row.update(target=target, target_before_optional_commas=row["target"])
                 carried[split] += 1
@@ -868,6 +1108,18 @@ def score(options):
     print(json.dumps(result["overall"]))
 
 
+def voice_names(value):
+    """Comma-separated macOS voices for ``--voices``, where ``natural`` stands for NATURAL_VOICES."""
+    names = []
+    for part in value.split(","):
+        for voice in NATURAL_VOICES if part.strip() == "natural" else (part.strip(),):
+            if voice and voice not in names:
+                names.append(voice)
+    if not names:
+        raise argparse.ArgumentTypeError("expected voice names separated by commas, or natural")
+    return names
+
+
 def input_variant(value):
     """``KIND=RATE`` for ``--input-variant``."""
     kind, _, rate = value.partition("=")
@@ -897,7 +1149,10 @@ def main():
     audio_size = audio_parser.add_mutually_exclusive_group()
     audio_size.add_argument("--limit", type=int, default=60)
     audio_size.add_argument("--all", action="store_true", help="synthesize every non-placeholder source family")
-    audio_parser.add_argument("--voice", default="Samantha")
+    audio_parser.add_argument("--voice", default="Samantha", help="the voice of every clip, or with --voices, of the clips it already spoke")
+    audio_parser.add_argument("--voices", type=voice_names, metavar="NAMES",
+                              help="voices new clips draw from by their family and words, comma-separated; "
+                                   f"natural is {', '.join(NATURAL_VOICES)}")
     audio_parser.add_argument("--rate", type=int, default=180)
     audio_parser.add_argument("--jobs", type=int, default=1, help="clips synthesized at once")
     merge_parser = commands.add_parser("merge-asr", help="import measured transcripts with audio/model provenance")

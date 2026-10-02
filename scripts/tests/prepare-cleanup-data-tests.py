@@ -77,6 +77,73 @@ class PreparationTests(unittest.TestCase):
             for sentence in sentences[1:]:
                 self.assertTrue(sentence[0][0].isupper(), result)
 
+    def test_an_odd_stop_never_falls_inside_a_spoken_list_marker_or_number(self):
+        for text in ("Here's what to do: number one, restart the router. Number two, wait a minute.",
+                     "We need twenty one chairs for the hall tonight.",
+                     "We raised two hundred and fifty pounds, and dinner is at quarter past nine tonight."):
+            for seed in range(40):
+                result = prep.transform(text, "odd-stops", seed=str(seed))
+                self.assertNotRegex(result.lower(), r"\b(number|twenty|hundred|quarter|past)\. ", result)
+
+    def test_moved_stops_keep_words_values_and_the_count_of_stops_and_repeat_by_seed(self):
+        text = ("When the rain stops, we can paint the fence. Sam fixed the leaking pipe at 9:30 with the U.S. kit ⟦S1⟧. "
+                "The kitchen looks great, but the hallway still needs work. Let me know what you think.")
+        results = {prep.transform(text, "moved-stops", seed=str(seed)) for seed in range(30)}
+        self.assertGreater(len(results), 2)
+        self.assertEqual(prep.transform(text, "moved-stops", seed="a"), prep.transform(text, "moved-stops", seed="a"))
+        for result in results:
+            self.assertNotEqual(result, text)
+            self.assertEqual(prep.normalize(result), prep.normalize(text))
+            self.assertEqual((result.count(","), result.count(".")), (text.count(","), text.count(".")), result)
+            for token in ("9:30", "U.S.", "⟦S1⟧"):
+                self.assertIn(token, result)
+            self.assertTrue(result.endswith("what you think."), result)
+            for sentence in re.split(r"(?<=[a-z⟧]\.) ", result):
+                self.assertTrue(sentence[0].isupper() and len(sentence.split()) > 1, result)
+
+    def test_a_moved_full_stop_takes_its_capital_with_it(self):
+        for seed in range(10):
+            self.assertEqual(prep.transform("Sam fixed the leaking pipe. We can use the kitchen again.", "moved-stops", seed=str(seed)),
+                             "Sam fixed the leaking. Pipe we can use the kitchen again.")
+            # A comma is never written after "we": the only place left is a word earlier.
+            self.assertEqual(prep.transform("When the rain stops, we can paint the fence.", "moved-stops", seed=str(seed)),
+                             "When the rain, stops we can paint the fence.")
+
+    def test_moved_stops_leave_spoken_lists_counts_letters_and_corrections_alone(self):
+        for text in (
+            "One, go to shops, two talk to mechanic, three pay the bill.",
+            "Number one, book the hall. Number two, send the invites.",
+            "First, book the hall. Second, send the invites.",
+            "I need twenty one chairs, and two tables for the party tonight.",
+            "We need apples, pears and plums for the cake.",
+            "Hi Sam, the parcel came today and it looks fine. Kind regards, Ana.",
+            "Dear Dr. Silva, can we move our catch up to Tuesday? Something came up. Regards, Pia.",
+            # Where the sentence ends decides what "No, sorry" takes back.
+            "Let's catch up on Sunday afternoon. No, sorry, Saturday.",
+            # The stop that ends an item, and the last item of a series, stay where they are.
+            "First, request the registration details. Then check their insurance certificate. Finally, run a credit check. "
+            "The parcel arrived late.",
+            "She knitted the scarf in olive, turquoise, and forest green. For her brother she knitted a hat.",
+            # A greeting after other sentences: "Hey, Ada here, are the notes" would be Ada speaking.
+            "I mean December. Hey, Ada, here are the notes from the meeting today.",
+            "The bus leaves at noon. Actually, quarter past nine.",
+        ):
+            for seed in range(20):
+                self.assertEqual(prep.transform(text, "moved-stops", seed=str(seed)), text)
+
+    def test_a_full_stop_is_not_moved_where_both_sentences_would_read_right(self):
+        # "The traffic was terrible. Today the bus came late" reads right, so it would teach the
+        # adapter to move a word that was right as written.
+        text = "The traffic was terrible today. The bus came late and we missed the start."
+        for seed in range(20):
+            self.assertIn("today. The bus", prep.transform(text, "moved-stops", seed=str(seed)))
+            # "but they haven't. Yet the bus…" reads right too, and in "We could paint it. Gray
+            # can you bring…" the word carried over reads as a name.
+            self.assertIn("yet. The bus", prep.transform("Eli said they would help, but they haven't yet. The bus leaves at noon.",
+                                                          "moved-stops", seed=str(seed)))
+            self.assertIn("gray. Can", prep.transform("I guess we could paint it gray. Can you bring the monitor to the meeting?",
+                                                      "moved-stops", seed=str(seed)))
+
     def test_case_change_preserves_protected_token_casing(self):
         self.assertEqual(prep.transform("Hello S1 ⟦T2⟧ API?", "lowercase"), "hello S1 ⟦T2⟧ api?")
 
@@ -169,6 +236,67 @@ class PreparationTests(unittest.TestCase):
                 for split in prep.SPLITS}
         selected, _ = prep.select_audio(data, 3)
         self.assertEqual({row["split"] for row in selected}, set(prep.SPLITS))
+
+    def test_voices_are_named_or_natural(self):
+        self.assertEqual(prep.voice_names("natural"), list(prep.NATURAL_VOICES))
+        self.assertEqual(prep.voice_names("Daniel, natural,Eddy"), ["Daniel"] + [voice for voice in prep.NATURAL_VOICES if voice != "Daniel"] + ["Eddy"])
+        with self.assertRaises(argparse.ArgumentTypeError):
+            prep.voice_names(" , ")
+
+    def test_installed_voices_are_the_english_ones_by_the_name_say_takes(self):
+        listing = ("Daniel              en_GB    # Hello! My name is Daniel.\n"
+                   "Eddy (English (UK)) en_GB    # Hello! My name is Eddy.\n"
+                   "Samantha (English (US)) en_US    # Hello! My name is Samantha.\n"
+                   "Amélie              fr_CA    # Bonjour, je m’appelle Amélie.\n")
+        with patch.object(prep.subprocess, "run", return_value=argparse.Namespace(stdout=listing)):
+            self.assertEqual(prep.installed_voices(), {"Daniel", "Eddy", "Samantha"})
+
+    def test_a_clip_already_spoken_keeps_its_voice_and_new_clips_draw_from_the_pool(self):
+        rows = [example(f"The {animal} crossed the road at noon.", animal)
+                for animal in "zebra horse camel llama otter badger heron moose bison lemur tapir koala".split()]
+        listing = "".join(f"{voice}  en_US  # Hello!\n" for voice in prep.NATURAL_VOICES)
+        spoken = []
+
+        def run(command, **_):
+            if command[:3] == ["say", "-v", "?"]:
+                return argparse.Namespace(stdout=listing)
+            if command[0] == "say":
+                spoken.append(command[2])
+                Path(command[-1]).write_bytes(command[2].encode())
+            else:
+                Path(command[-1]).write_bytes(Path(command[-2]).read_bytes())
+            return argparse.Namespace(stdout="")
+
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+            prep.save_dataset(root / "dataset", {"train": rows, "valid": [], "test": []}, {"kind": "deep"})
+            options = argparse.Namespace(dataset=root / "dataset", output=root / "audio", limit=len(rows),
+                                         voice="Samantha", rate=180, jobs=1, voices=None)
+            with patch.object(prep.subprocess, "run", side_effect=run):
+                prep.audio(options)
+                before = {clip["example"]["id"]: clip for clip in prep.read_rows(root / "audio/audio-manifest.jsonl")}
+                self.assertEqual({clip["tts"]["voice"] for clip in before.values()}, {"Samantha"})
+                # Half the clips are already there; the rest are new.
+                for clip in list(before.values())[::2]:
+                    (root / f"audio/{clip['id']}.wav").unlink()
+                spoken.clear()
+                options.voices = prep.voice_names("natural")
+                prep.audio(options)
+                after = {clip["example"]["id"]: clip for clip in prep.read_rows(root / "audio/audio-manifest.jsonl")}
+                # A clip that was there keeps its voice, its id and its audio.
+                self.assertTrue(all(after[identity] == before[identity] for identity in list(before)[1::2]))
+                new = [after[identity] for identity in list(before)[::2]]
+                self.assertGreater(len({clip["tts"]["voice"] for clip in new}), 1)
+                self.assertEqual(sorted(spoken), sorted(clip["tts"]["voice"] for clip in new))
+                self.assertTrue(set(spoken) <= set(prep.NATURAL_VOICES))
+                # The same clips draw the same voices again, and nothing is spoken twice.
+                spoken.clear()
+                prep.audio(options)
+                self.assertEqual(prep.read_rows(root / "audio/audio-manifest.jsonl"), list(after.values()))
+                self.assertEqual(spoken, [])
+                options.voices = ["Zarvox"]
+                with self.assertRaisesRegex(ValueError, "not installed: Zarvox"):
+                    prep.audio(options)
 
 
 class CompositeTests(unittest.TestCase):
@@ -352,8 +480,39 @@ class MeasuredASRTests(unittest.TestCase):
         self.assertEqual(report["input_variants"], {"unpunctuated": 0.5, "odd-stops": 0.5})
         self.assertEqual(report["input_variant_rows"], {"odd-stops": 3, "unpunctuated": 3})
 
+    def test_moved_stops_skip_lists_and_keep_the_answer_of_the_input_first_written(self):
+        names = {"train": ("Sam", "Ana", "Lee", "Kim"), "valid": ("Ola", "Ivy"), "test": ("Max", "Eve")}
+        self.data = {split: [example(f"After lunch, {name} took the parcel to the depot.", f"{split}-{name}", split)
+                             for name in split_names] for split, split_names in names.items()}
+        for name in ("Bo", "Jo"):
+            self.data["train"].append(example(f"After lunch, {name} bought apples and pears.", f"train-{name}", category="list-two"))
+        prep.save_dataset(self.root / "dataset", self.data, {"kind": "deep"})
+        clips = [dict(self.clip, id=row["id"], example=row, spoken=row["raw"]) for rows in self.data.values() for row in rows]
+        prep.write_rows(self.root / "audio.jsonl", clips)
+        prep.write_rows(self.root / "asr.jsonl", [dict(self.transcript, id=clip["id"], raw=clip["spoken"]) for clip in clips])
+        prep.merge_asr(argparse.Namespace(dataset=self.root / "dataset", audio_manifest=self.root / "audio.jsonl",
+                                         transcripts=[self.root / "asr.jsonl"], output=self.root / "merged",
+                                         include_synthetic=False, input_variant=[prep.input_variant("moved-stops=0.5")]))
+        rows = {split: prep.read_rows(self.root / f"merged/{split}.jsonl") for split in prep.SPLITS}
+        variants = [row for split in prep.SPLITS for row in rows[split] if row["profile"] == "moved-stops"]
+        # Half of the six families that aren't lists; the held-out test stays as measured.
+        self.assertEqual(len(variants), 3)
+        self.assertFalse(any(row["profile"] != "measured-asr" for row in rows["test"]))
+        for variant in variants:
+            parent = next(row for row in rows[variant["split"]] if row["id"] == variant["provenance"]["parent_id"])
+            self.assertNotEqual(parent["category"], "list-two")
+            self.assertIn(variant["raw"].split(" took")[0], ("After, lunch " + parent["raw"].split()[2],
+                                                            "After lunch " + parent["raw"].split()[2] + ","))
+            # Its own input has no comma after "After lunch", but the answer is still its parent's.
+            self.assertEqual(variant["target"], parent["target"])
+            self.assertTrue(variant["target"].startswith("After lunch, "))
+            self.assertEqual(variant["provenance"]["kind"], "derived-moved-stops")
+        report = json.loads((self.root / "merged/preparation-report.json").read_text())
+        self.assertEqual(report["input_variant_rows"], {"moved-stops": 3})
+
     def test_input_variants_are_named_with_a_rate(self):
         self.assertEqual(prep.input_variant("odd-stops=0.2"), ("odd-stops", 0.2))
+        self.assertEqual(prep.input_variant("moved-stops=0.1"), ("moved-stops", 0.1))
         for value in ("odd-stops", "shouting=0.1", "odd-case=0.6", "lowercase=x"):
             with self.assertRaises(argparse.ArgumentTypeError):
                 prep.input_variant(value)
