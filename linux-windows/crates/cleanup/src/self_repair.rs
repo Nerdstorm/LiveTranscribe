@@ -18,8 +18,8 @@ const CORRECTION_PHRASE_WORDS: usize = 6;
 /// Most words a repair may add to or change in one correction phrase.
 const MAX_REPAIR_WORDS: usize = 2;
 /// Fewest items in a bulleted list the model makes: two things said in a sentence ("the invoice and
-/// the agreement") stay in it, unless the speaker's text set them off with a colon
-/// ([`is_set_off_by_colon`]). A numbered list may have two, as when they were counted.
+/// the agreement") stay in it, unless the speaker's text set them off ([`is_set_off`]). A numbered
+/// list may have two, as when they were counted.
 pub(crate) const MIN_BULLETED_ITEMS: usize = 3;
 
 /// Checks Deep's output: that it can be made from the text the model was given by the edits a
@@ -32,8 +32,11 @@ pub(crate) const MIN_BULLETED_ITEMS: usize = 3;
 /// guard against. Instead the output is lined up with what was said, word by word, and every
 /// difference must be one of these edits:
 /// - a word kept, respelled, or put in another form of itself ("check" → "checked", "is" → "are",
-///   "their" → "there"); two words merged or one split ("do not" → "don't", "twenty five" → "25").
-///   A name is kept as said, and no word is respelled into one;
+///   "their" → "there"); two words merged or one split ("do not" → "don't", "twenty five" → "25");
+///   letters spelled out written as one word ("p r" → "PR"). No word is respelled into a name,
+///   and a name is kept as said, but a capital alone doesn't make one: speech-to-text capitalises
+///   a word it misheard ("Madge the PR"), which may be respelled where it is written without a
+///   capital, or with the one a list item starts with ("merge the PR", "1. Merge the PR");
 /// - a filler, a repeated word, or a word that only holds the grammar together dropped or added
 ///   ("I going" → "I am going");
 /// - a self-correction resolved ([`corrections`]): as at Medium, up to
@@ -52,8 +55,9 @@ pub(crate) const MIN_BULLETED_ITEMS: usize = 3;
 ///
 /// The layout is checked too (`OutputGuard`): a bulleted list has at least [`MIN_BULLETED_ITEMS`]
 /// items, since two things said in a sentence stay in it, unless what was said already set them
-/// off with a colon ("a few things we need: getting feeds working and releasing the fix"), and no
-/// line holds only placeholders, as when an emoji is moved below the sentence it ended.
+/// off with a colon or a full stop ("a few things we need: getting feeds working and releasing the
+/// fix"), and no line holds only placeholders, as when an emoji is moved below the sentence it
+/// ended.
 ///
 /// Names, numbers, negations and words of time are kept as said everywhere else: none may be
 /// added, dropped or changed, and no other new word may appear, so the model can't add a claim
@@ -211,6 +215,8 @@ pub(crate) struct SaidWord {
     pub(crate) is_capitalised: bool,
     /// A name, or a capitalised word that starts a sentence and could be one ("Chloe will …").
     pub(crate) may_be_name: bool,
+    /// The first word of a sentence or line, whose capital says nothing about it.
+    pub(crate) starts_sentence: bool,
     /// Where a correction from a later sentence was put in place of what it corrects, how many
     /// words its phrase has, starting here; 0 elsewhere (see [`corrections`]).
     pub(crate) opens_phrase: usize,
@@ -229,6 +235,7 @@ impl PartialEq for SaidWord {
             && self.is_name == other.is_name
             && self.is_capitalised == other.is_capitalised
             && self.may_be_name == other.may_be_name
+            && self.starts_sentence == other.starts_sentence
             && self.opens_phrase == other.opens_phrase
             && self.spare.len() == other.spare.len()
             && self.spare.iter().zip(&other.spare).all(|(a, b)| same(a, b))
@@ -285,6 +292,7 @@ pub(crate) fn said_words(text: &str, function_words: &WordSet, placeholders: &Wo
                     is_name: could_be_name && !starts_sentence,
                     is_capitalised: upper && !starts_sentence,
                     may_be_name: could_be_name,
+                    starts_sentence: starts_sentence && offset == 0,
                     ..SaidWord::default()
                 });
             }
@@ -407,12 +415,20 @@ pub(crate) fn bulleted_lists(text: &str) -> Vec<BulletedList> {
     lists
 }
 
-/// Whether the speaker's text `said` already set the list off with a colon: the list's lead line
-/// ends with one, and the words that end the lead (up to three) come right before a colon in `said`.
-/// So the model laid out what was said ("…focus on: getting feeds working and releasing the fix")
-/// and did not make a list of two things in a sentence. A word fixed inside the items doesn't
-/// matter, only the words that lead into them.
-pub(crate) fn is_set_off_by_colon(list: &BulletedList, said: &str) -> bool {
+/// Marks after which what follows is set off from what came before.
+const SET_OFF_MARKS: [&str; 4] = [":", ".", "!", "?"];
+/// Words that count two items ahead of them.
+const COUNT_WORDS: [&str; 4] = ["two", "couple", "pair", "both"];
+
+/// Whether the speaker's text `said` already set the list off from the words that lead into it:
+/// the list's lead line ends with a colon, and the words that end the lead (up to three) come right
+/// before a colon or the end of a sentence in `said`, or before a comma when the lead counts the
+/// items ("two things, …", "a couple of things, …"). Speech-to-text writes a full stop at least as
+/// often as a colon where the speaker paused before the items ("A couple of things we need to do.
+/// Fix the notes, and fix the alerts."), so either sets them off; two things said in a sentence
+/// ("I've attached the invoice and the agreement") stay in it. A word fixed inside the items
+/// doesn't matter, only the words that lead into them.
+pub(crate) fn is_set_off(list: &BulletedList, said: &str) -> bool {
     let Some(lead) = list
         .lead
         .as_deref()
@@ -426,8 +442,13 @@ pub(crate) fn is_set_off_by_colon(list: &BulletedList, said: &str) -> bool {
     if ending.is_empty() {
         return false;
     }
+    let counted = words
+        .iter()
+        .any(|word| COUNT_WORDS.iter().any(|count| same(word, count)));
     s::character_indices(said)
-        .filter(|&(_, character)| s::canonically_equal(character, ":"))
+        .filter(|&(_, character)| {
+            s::is_one_of(character, &SET_OFF_MARKS) || (counted && s::canonically_equal(character, ","))
+        })
         .any(|(index, _)| {
             let before = normalized_words(&said[..index]);
             before.len() >= ending.len() && starts_with(&before[before.len() - ending.len()..], ending)

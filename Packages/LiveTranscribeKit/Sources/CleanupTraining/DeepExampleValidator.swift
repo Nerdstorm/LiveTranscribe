@@ -75,15 +75,14 @@ public struct DeepExampleValidator: Sendable {
             }
         case .listTwo, .listMany:
             // Laid out where lines are allowed, and kept as said (casing and punctuation aside)
-            // where they are not; a list of two needs the colon the speaker said.
+            // where they are not. Two bulleted things are a list only where the speaker set them
+            // off, with a colon or the full stop speech-to-text often writes in its place, which
+            // the guard checks.
             if example.multiline != laidOut {
                 problems.append(example.multiline ? "must lay the list out" : "must stay on one line in a one-line field")
             }
             if !laidOut, targetWords != inputWords {
                 problems.append("a list that stays keeps every word")
-            }
-            if example.category == .listTwo, laidOut, !input.contains(":") {
-                problems.append("two things are a list only after a colon the speaker said")
             }
         case .series:
             if laidOut || targetWords != inputWords {

@@ -141,9 +141,42 @@ fn keeps_the_rest_of_the_corrected_sentence() {
             "Karen is presenting at the all hands.",
             "Karen is presenting.",
         ),
+        ("Bring two chairs. No, three.", "Bring three chairs.", "Bring three."),
     ] {
         assert_eq!(review(raw, kept), accepted(kept), "{raw:?}");
         assert_eq!(review(raw, dropped), INVALID, "{raw:?}");
+    }
+}
+
+/// The Mac app's `resolvesACorrectionOfTheEndOfTheSentenceBefore`.
+#[test]
+fn a_cue_after_a_full_stop_corrects_the_end_of_the_sentence_before() {
+    for (raw, cleaned) in [
+        (
+            "I left my charger in the garage. Actually, the lobby.",
+            "I left my charger in the lobby.",
+        ),
+        (
+            "The alert came from the billing service. Sorry, the database.",
+            "The alert came from the database.",
+        ),
+        (
+            "The team is replacing the laptop. No, the printer next week.",
+            "The team is replacing the printer next week.",
+        ),
+        (
+            "I'm making pasta. Actually, tacos for dinner.",
+            "I'm making tacos for dinner.",
+        ),
+        ("Paint the door red. Actually, blue.", "Paint the door blue."),
+    ] {
+        assert_eq!(review(raw, cleaned), accepted(cleaned), "{raw:?}");
+        let commas = raw.replace(". ", ", ");
+        assert_eq!(
+            review(&commas, cleaned),
+            accepted(cleaned),
+            "{commas:?}, as after a comma"
+        );
     }
 }
 
@@ -294,6 +327,30 @@ fn a_cue_followed_by_not_and_the_corrected_words_said_again_goes_with_them() {
 }
 
 #[test]
+fn resolves_a_correction_broken_into_sentences() {
+    let cases = [
+        (
+            "My shift starts on Sunday. No, sorry, not Sunday. Thursday.",
+            "My shift starts on Thursday.",
+            "My shift starts on Sunday. Thursday.",
+        ),
+        (
+            "For the overnight trek, we'll need compasses. Sorry, not compasses. Stoves and plenty of water.",
+            "For the overnight trek we'll need stoves and plenty of water.",
+            "For the overnight trek, we'll need compasses. Stoves and plenty of water.",
+        ),
+    ];
+    for (raw, cleaned, cue_dropped) in cases {
+        assert_eq!(review(raw, cleaned), accepted(cleaned), "{raw:?}");
+        assert_eq!(
+            review(raw, cue_dropped),
+            INVALID,
+            "the cue and the words said again go only with the correction"
+        );
+    }
+}
+
+#[test]
 fn a_not_goes_with_a_correction_only_when_it_says_corrected_words_again() {
     assert_rejected(&[
         // Drops the contrast the speaker made.
@@ -390,12 +447,60 @@ fn keeps_names_as_said() {
             "remind xavier about the dentist no sorry uma",
             "Remind Xavier about the dentist. No, sorry, um...",
         ),
+        // A name that started the sentence as said, where either capital may be a name's.
+        ("Uma will bring the cake.", "Una will bring the cake."),
+        // Another name where no sentence starts.
+        ("Can you ask Madge to review it?", "Can you ask Marge to review it?"),
     ]);
 }
 
 #[test]
 fn a_name_may_take_its_possessive() {
     assert_accepted(&[("that is kirk car", "That is Kirk's car.")]);
+}
+
+#[test]
+fn fixes_a_word_taken_for_a_name() {
+    assert_accepted(&[
+        (
+            "Can you Madge the PR before lunch?",
+            "Can you merge the PR before lunch?",
+        ),
+        (
+            "Can you review the P R before lunch?",
+            "Can you review the PR before lunch?",
+        ),
+        ("The A P I is down again.", "The API is down again."),
+        (
+            "Action summary to get done tomorrow. First, Madge, P R twenty two, Max get the update once the website has deployed. Two follow up for the go ahead. Three, emoji parsing needs a revisit. Four, Russell cleanup should work best.",
+            "Action summary to get done tomorrow. First, merge PR 22, Max get the update once the website has deployed. Two, follow up for the go-ahead. Three, emoji parsing needs a revisit. Four, Russell cleanup should work best.",
+        ),
+    ]);
+}
+
+#[test]
+fn fixes_a_word_taken_for_a_name_that_starts_a_list_item() {
+    let raw = "Two things for today. First, Madge the PR. Second, John updates the website.";
+    let cleaned = "Two things for today:\n1. Merge the PR.\n2. John updates the website.";
+    assert_eq!(review_in(raw, cleaned, true), accepted(cleaned));
+    let renamed = "Two things for today:\n1. Merge the PR.\n2. Pete updates the website.";
+    assert_eq!(
+        review_in(raw, renamed, true),
+        INVALID,
+        "a name isn't swapped for another"
+    );
+}
+
+#[test]
+fn keeps_the_letters_spelled_out() {
+    let raw = "Can you review the P R before lunch?";
+    for cleaned in [
+        "Can you review the RP before lunch?",
+        "Can you review the PRs before lunch?",
+        "Can you review the P before lunch?",
+    ] {
+        assert_eq!(review(raw, cleaned), INVALID, "{cleaned:?}");
+    }
 }
 
 #[test]
@@ -419,6 +524,7 @@ fn keeps_a_cue_that_starts_a_new_thought() {
         ),
         ("I finished the report. Sorry, I was late.", "I was late."),
         ("It works. Actually, it's quite fast.", "It's quite fast."),
+        ("I finished the report. Sorry, I was late.", "I finished. I was late."),
         (
             "We shipped version two. Actually, we shipped it a week early.",
             "We shipped it a week early.",
@@ -549,6 +655,35 @@ fn rejects_a_bulleted_list_of_two_things_said_in_a_sentence() {
         ),
         accepted(numbered),
         "a numbered list may have two items, as when they were counted"
+    );
+}
+
+#[test]
+fn allows_two_things_set_off_with_a_full_stop_or_counted_before_a_comma() {
+    let cleaned = "Two things:\n- Call the bank\n- Email Sarah";
+    for raw in [
+        "Two things. Call the bank and email Sarah.",
+        "Two things, call the bank and email Sarah.",
+    ] {
+        assert_eq!(review_in(raw, cleaned, true), accepted(cleaned), "{raw:?}");
+    }
+    assert_eq!(
+        review_in(
+            "I've attached, the invoice and the signed agreement.",
+            "I've attached:\n- The invoice\n- The signed agreement",
+            true
+        ),
+        GuardVerdict::Rejected(FallbackReason::ShortList),
+        "a comma sets them off only after words that count them"
+    );
+    assert_eq!(
+        review_in(
+            "Reminder. I've attached the invoice and the signed agreement.",
+            "Reminder. I've attached:\n- The invoice\n- The signed agreement",
+            true
+        ),
+        GuardVerdict::Rejected(FallbackReason::ShortList),
+        "a full stop elsewhere doesn't set them off"
     );
 }
 

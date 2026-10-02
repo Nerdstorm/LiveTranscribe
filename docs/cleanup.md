@@ -26,15 +26,18 @@ vocabulary (Linux and Windows have none yet).
   synthetic data, resolves them at Medium and High; Deep has an adapter of its own. On the Mac,
   **Resolve spoken self-corrections** in **Settings › Advanced** (on by default) switches both
   adapters off, and then corrections are kept as spoken.
-- **Deep** cares about what a cue follows: "No" that answers a question, "sorry" that apologises
-  and "actually" that starts a new point stay ("Is the release tomorrow? No, it's the day after."
-  is unchanged). Names, numbers, dates, times and negations are kept as said outside the words a
-  correction takes back, and nothing is added that wasn't said. In a field that takes several
-  lines, it lays out what you didn't: a short email's greeting, body and sign-off, and things you
-  need or steps to take as a list, even when you didn't announce one ("We need milk, eggs and
-  bread." becomes three bullets). It doesn't yet split a longer letter's body into paragraphs
-  ([Known limitations](limitations.md)). What you lay out yourself, by saying "new line", "bullet
-  point" or "number one", the layout rules lay out as at Medium.
+- **Deep** cares about what a cue follows: "No" that answers a question, "sorry" that apologises and
+  "actually" that starts a new point stay ("Is the release tomorrow? No, it's the day after." is
+  unchanged). A cue after a full stop corrects the end of the sentence before as it would after a
+  comma, since speech-to-text writes a full stop where the speaker paused ("I left my charger in the
+  garage. Actually, the lobby." → "I left my charger in the lobby."), but not a whole sentence ("I
+  finished the report. Sorry, I was late." stays). Names, numbers, dates, times and negations are
+  kept as said outside the words a correction takes back, and nothing is added that wasn't said. In
+  a field that takes several lines, it lays out what you didn't: a short email's greeting, body and
+  sign-off, and things you need or steps to take as a list, even when you didn't announce one ("We
+  need milk, eggs and bread." becomes three bullets). It doesn't yet split a longer letter's body
+  into paragraphs ([Known limitations](limitations.md)). What you lay out yourself, by saying "new
+  line", "bullet point" or "number one", the layout rules lay out as at Medium.
 - **Lists.** A list needs at least two items, marked by spoken ordinals in order from "first"
   ("first", "second", … to "tenth", or "firstly", …; "finally" or "lastly" may end it), by the
   numbers one, two, … to ten in order, each starting a clause and followed by "is" or "was", a
@@ -81,11 +84,16 @@ vocabulary (Linux and Windows have none yet).
   own (`SelfRepair`) in place of those on words, names, length and similarity: every difference from
   what was said must be one of the repairs Deep may make, numbers, negations, words of time and
   placeholders may never be added, dropped or changed outside what a correction takes back, and no
-  other new word may appear. It also turns down a line break in a field that takes one line, a
-  bulleted list of fewer than three items (two are a list only when you set them off with a colon,
-  "a few things we need: getting the feeds working and releasing the fix"), and a placeholder alone
-  on a line. When Deep's answer is turned down, Medium's pass runs in the time left, so Deep never
-  shows less than Medium would.
+  other new word may appear. A name is kept as said, but a capital alone doesn't make one:
+  speech-to-text capitalises letters you spell out and words it mishears, so Deep may join the
+  letters ("P R" → "PR") and respell a misheard word where it writes it without a capital or at the
+  start of a list item ("can you Madge it" → "can you merge it", "First, Madge the PR" → "1. Merge
+  the PR"). It also turns down a line break in a field that takes one line, a bulleted list of
+  fewer than three items (two are a list only when you set them off: with a colon or a pause that
+  speech-to-text writes as a full stop, "a few things we need. Getting the feeds working and
+  releasing the fix", or with a comma after words that count them, "two things, …"), and a
+  placeholder alone on a line. When Deep's answer is turned down, Medium's pass runs in the time
+  left, so Deep never shows less than Medium would.
 - **With the language model off**, nothing is reworded. Medium, High and Deep still remove fillers
   and lay out lists and letters in dictation, and snippets, vocabulary and spoken commands still
   apply. The switch is **Clean up transcripts with the LLM** in **Settings › Advanced**; on the

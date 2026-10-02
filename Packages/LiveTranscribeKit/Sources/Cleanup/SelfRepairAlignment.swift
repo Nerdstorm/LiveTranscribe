@@ -133,8 +133,27 @@ extension SelfRepair {
                 steps.append((1, 2, consuming(1, from: i, in: state, writing: true)))
             }
             steps += numberSteps(from: i, j, state: state)
+            if let step = acronymStep(from: i, j, state: state) { steps.append(step) }
             return steps
         }
+
+        /// Letters spelled out and written as one word, in order ("p r" → "PR", "A P I" → "API"):
+        /// two to ``maxAcronymLetters`` said words of one letter each. Speech-to-text gives them
+        /// capitals, as it does names, so a spelled letter is kept as a letter either way.
+        private func acronymStep(from i: Int, _ j: Int, state: Int) -> (Int, Int, Int)? {
+            guard j < written.count else { return nil }
+            let letters = written[j].word
+            let count = letters.count
+            guard (2...Self.maxAcronymLetters).contains(count), i + count <= said.count,
+                  letters.allSatisfy(\.isLetter) else { return nil }
+            let run = said[i..<(i + count)]
+            guard run.allSatisfy({ $0.word.count == 1 && !$0.isCue }), !run.dropLast().contains(where: \.endsSentence),
+                  run.map(\.word).joined() == letters else { return nil }
+            return (count, 1, consuming(count, from: i, in: state, writing: true))
+        }
+
+        /// Most letters spelled out that may be written as one word.
+        static let maxAcronymLetters = 6
 
         /// A number said in words and written in digits, or the other way round ("twenty five" →
         /// "25", "2:30" → "two thirty"), with the same value.
@@ -169,9 +188,15 @@ extension SelfRepair {
         /// Whether `writtenWord` keeps `saidWord`: the same word or another form of it, a word
         /// speech-to-text confuses with it ("weather", "whether"), or a respelling; a protected word
         /// only as itself, as another way of writing its number, or, for a negated verb, in another
-        /// form that keeps its negation ("don't" → "doesn't"); a cue only as itself; a name only as
-        /// itself or its possessive. A respelling is never written with a capital, which could make
-        /// it a name the speaker didn't say ("uma" is not "Una", "jura" not "Jira"), nor as a filler.
+        /// form that keeps its negation ("don't" → "doesn't"); a cue only as itself. A respelling is
+        /// never a filler, nor a name the speaker didn't say: a word written with a capital where no
+        /// sentence starts is a name, which keeps only itself or takes its possessive ("uma" is not
+        /// "Una", "jura" not "Jira", "Kirk" not "Kurt"), and one that starts a sentence may be, so
+        /// only another form is written there ("uma hasn't" is not "Una hasn't"). Where a list item
+        /// starts, the capital is the layout's, so a word said within a sentence is respelled there
+        /// as anywhere else. A capital a word had as said shows only that speech-to-text took it for
+        /// a name, which a misheard word often isn't: "can you Madge it" may be "can you merge it",
+        /// and "First, Madge the PR" "1. Merge the PR".
         func keeps(_ saidWord: SaidWord, as writtenWord: WrittenWord) -> Bool {
             let said = saidWord.word, word = writtenWord.word
             if said == word { return true }
@@ -181,11 +206,13 @@ extension SelfRepair {
                 return Self.isNegatedVerb(said) && Self.isNegatedVerb(word) && WordForms.areForms(said, word)
             }
             let pronoun = word == "i" || word.hasPrefix("i'")
-            if saidWord.isName || (writtenWord.isCapitalised && !writtenWord.startsSentence && !pronoun) {
+            let laidOut = writtenWord.startsListItem && !saidWord.startsSentence
+            let mayBeName = writtenWord.isCapitalised && !pronoun && !laidOut
+            if mayBeName, !writtenWord.startsSentence {
                 return !spoken.contains(word) && Self.possessives(of: said).contains(word)
             }
             if WordForms.areForms(said, word) { return true }
-            return (!writtenWord.isCapitalised || pronoun) && !repair.isCue(word) && !spoken.contains(word)
+            return !mayBeName && !repair.isCue(word) && !spoken.contains(word)
                 && EditDistance.normalizedSimilarity(said, word) >= repair.respellingSimilarity
         }
 
@@ -232,8 +259,10 @@ extension SelfRepair {
             !repair.isProtected(word.word, placeholders: placeholders) && !word.isName && !word.isCue
         }
 
+        /// Two words said as one written: a contraction, the two run together, or a respelling of
+        /// both; never across the end of a sentence ("plan A. I think" is not "plan AI think").
         private func merges(_ first: SaidWord, _ second: SaidWord, into written: WrittenWord) -> Bool {
-            guard !first.isCue, !second.isCue, !first.isName, !second.isName else { return false }
+            guard !first.isCue, !second.isCue, !first.isName, !second.isName, !first.endsSentence else { return false }
             let (a, b, word) = (first.word, second.word, written.word)
             if WordForms.expansions(of: word).contains([a, b]) || a + b == word { return true }
             let protected = [a, b, word].contains { repair.isProtected($0, placeholders: placeholders) }

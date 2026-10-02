@@ -7,9 +7,12 @@ extension SelfRepair {
     /// A correction replaces the words it corrects with its phrase, and the cue goes. Deep reads
     /// two kinds:
     /// - Medium's: up to ``OutputGuard/Policy/maxRetractedWords`` words just before a run of cues,
-    ///   taken out with the cues ("we need three, sorry, four"), in the cue's sentence; or, after a
-    ///   "scratch that" that opens a sentence, at the end of the one before ("I'll call the plumber
-    ///   tomorrow. Scratch that, I'll fix the tap myself.");
+    ///   taken out with the cues ("we need three, sorry, four"), in the cue's sentence; or at the
+    ///   end of the one before, when the cues open the next: one phrase that doesn't start it ("I
+    ///   left my charger in the garage. Actually, the lobby."), or more after a "scratch that"
+    ///   ("I'll call the plumber tomorrow. Scratch that, I'll fix the tap myself.") or after cues
+    ///   followed by "not" and exactly those words ("We'll need compasses. Sorry, not compasses.
+    ///   Stoves.");
     /// - one whose phrase goes back in place of what it corrects, with the words in between kept:
     ///   in an earlier sentence ("The demo is on Tuesday at noon. Sorry, Wednesday." → "The demo
     ///   is on Wednesday at noon.") or earlier in the same one ("three servers at noon, sorry,
@@ -35,23 +38,50 @@ extension SelfRepair {
             var correctedWords: [Int: Set<String>] = [:]
             var spare: [Int: Set<String>] = [:]
             for (cueStart, runEnds) in cueRuns(in: words, repair: repair) {
-                // Other corrections of an earlier sentence must be about the same thing, which
-                // only a phrase that goes back is checked for (``once(_:repair:placeholders:)``).
+                // Speech-to-text ends a sentence where the speaker paused, so a cue that opens one
+                // may take back the end of the one before ("I left my charger in the garage.
+                // Actually, the lobby."): one phrase, after a word that stays, for a phrase that
+                // starts like it and not with a subject. "Sorry, I haven't had time" after "I
+                // finished the report.", "Actually, it's quite fast" after "It works." and
+                // "Actually, we shipped it early" after "We shipped version two." start a new
+                // thought; "Sorry, four" after "three servers for the launch." and "No, three"
+                // after "Bring two chairs." take back only the number
+                // (``once(_:repair:placeholders:)``). Saying the corrected words again ("compasses.
+                // Sorry, not compasses. Stoves and water.") or "scratch that" takes back more.
                 let retractsStatement = repair.retractsStatement(words[cueStart...])
                 let crosses = cueStart > 0 && words[cueStart - 1].endsSentence
-                guard !crosses || retractsStatement else { continue }
+                let sentenceStart = crosses ? (words[..<(cueStart - 1)].lastIndex(where: \.endsSentence) ?? -1) + 1 : 0
+                // A lone "No" after a question answers it ("Is it on Tuesday? No, not Tuesday,
+                // Thursday."), as ``once(_:repair:placeholders:)`` reads it.
+                let answers = crosses && words[cueStart - 1].endsQuestion && words[cueStart].word == "no"
                 for start in max(0, cueStart - repair.retractionLimit)..<cueStart {
                     let corrected = words[start..<cueStart]
                     guard !corrected.dropLast().contains(where: \.endsSentence),
                           corrected.contains(where: { !repair.isCue($0.word) }),
                           !corrected.contains(where: { placeholders.contains($0.word) })
                     else { continue }
+                    let isContent = { (word: SaidWord) in
+                        !repair.isFunctionWord(word.word) && !repair.isFiller(word.word) && !repair.isCue(word.word)
+                    }
+                    let endsSentenceBefore = words[sentenceStart..<start].contains(where: isContent)
+                        && corrected.dropFirst().allSatisfy(isContent)
+                    let saysMoreThanAFact = corrected.contains { isContent($0) && repair.factKind($0) == nil }
+                    func standsIn(from end: Int) -> Bool {
+                        guard endsSentenceBefore, end < words.count, isContent(words[end]) == isContent(words[start]),
+                              !subjects.contains(words[end].word)
+                        else { return false }
+                        let first = words[end...].prefix(SelfRepair.correctionPhraseWords).first(where: isContent)
+                        return !(saysMoreThanAFact && first.map { repair.factKind($0) != nil } == true)
+                    }
                     // A phrase starts after the whole run of cues, and after the corrected words
                     // said again.
-                    for runEnd in runEnds {
+                    for runEnd in runEnds where !(answers && runEnd - cueStart == 1) {
                         for (end, restated) in phraseStarts(after: runEnd, in: words, repair: repair)
                         where (end == words.count || !repair.isCue(words[end].word))
-                            && restated.map({ repair.restates(words[$0], corrected) }) ?? true {
+                            && restated.map({ repair.restates(words[$0], corrected) }) ?? true
+                            && (!crosses || retractsStatement
+                                || restated.map({ repair.restates(corrected, words[$0]) }) == true
+                                || standsIn(from: end)) {
                             let length = min(Alignment.phraseLength(from: end, in: words), SelfRepair.correctionPhraseWords)
                             if !retractsStatement {
                                 guard repair.phrase(words[end..<(end + length)], takesBackFactsIn: corrected, placeholders: placeholders) else {
@@ -164,15 +194,17 @@ extension SelfRepair {
         }
 
         /// Where a correction's phrase can start after a run of cues that ends at `end`: there, or,
-        /// when "not" follows the cues, after the corrected words said again, in the same sentence
-        /// ("Tuesday, sorry, not Tuesday, Thursday"), with the range of the words said again, which
-        /// must be among the corrected words (``SelfRepair/restates(_:_:)``).
+        /// when "not" follows the cues, after the corrected words said again ("Tuesday, sorry, not
+        /// Tuesday, Thursday"), with the range of the words said again, which must be among the
+        /// corrected words (``SelfRepair/restates(_:_:)``). Those words may end their sentence,
+        /// since speech-to-text ends one where the speaker paused ("not Sunday. Thursday."), and
+        /// the phrase then starts the next.
         private static func phraseStarts(after end: Int, in words: [SaidWord], repair: SelfRepair) -> [(start: Int, restated: Range<Int>?)] {
             var starts: [(start: Int, restated: Range<Int>?)] = [(end, nil)]
             guard end < words.count, words[end].word == SelfCorrection.restatingWord else { return starts }
             for last in (end + 1)..<min(end + 1 + repair.retractionLimit, words.count) {
-                guard !words[last].endsSentence else { break }
                 starts.append((last + 1, (end + 1)..<(last + 1)))
+                if words[last].endsSentence { break }
             }
             return starts
         }
@@ -194,6 +226,12 @@ extension SelfRepair {
 
         /// Cue words that as often start a new point as correct the last one.
         static let weakCues: Set<String> = ["no", "wait", "actually", "rather"]
+        /// Words that start a new clause, which a correction of the sentence before doesn't.
+        static let subjects: Set<String> = [
+            "i", "we", "you", "he", "she", "it", "they", "i'm", "i'll", "i've", "i'd", "we're", "we'll", "we've", "we'd",
+            "you're", "you'll", "you've", "he's", "he'll", "she's", "she'll", "it's", "it'll", "they're", "they'll",
+            "they've", "there's", "that's", "let's",
+        ]
     }
 
     // MARK: - Facts
