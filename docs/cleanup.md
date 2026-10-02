@@ -157,8 +157,12 @@ never sees an emoji, an address or a line break, only a placeholder it must copy
 - A comma or semicolon needs a word on each side. Quotes and brackets work only in pairs, so a lone
   "end quote" or the idiom "quote unquote" stays as said.
 - An address needs a known ending (.com, .org, .io, .co.uk, …). An email address needs a dot,
-  underscore, hyphen, plus sign or digit in its name, or a word such as "email", "to" or "at" before
-  it. One that speech-to-text writes out itself is kept too, in lower case.
+  underscore, hyphen, plus sign or digit in its name, a word such as "email", "to" or "at" before
+  it, or a mail provider's domain after it (gmail.com, outlook.com, hotmail.com, icloud.com,
+  yahoo.com, proton.me and a few others): "alex at gmail dot com" → alex@gmail.com. There, "at"
+  stays when the word before it is a pronoun, a verb that takes "at" ("look", "work", "is", …) or a
+  word after "my", "the" and the like: "look at gmail.com", "my account at gmail.com". One that
+  speech-to-text writes out itself is kept too, in lower case.
 - "Fireworks" is 🎆 (Unicode's FIREWORKS); 🎇 is "sparkler". A snippet with the same words wins
   over a command, so you can map any phrase to the emoji you prefer. An emoji said on its own
   after a sentence takes no full stop: "See you soon. 🙂".

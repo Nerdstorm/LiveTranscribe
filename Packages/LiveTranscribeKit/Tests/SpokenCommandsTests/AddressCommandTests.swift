@@ -42,6 +42,31 @@ struct AddressCommandTests {
         }
     }
 
+    @Test("A plain name before a mail provider is an email name", arguments: [
+        ("alex at gmail dot com", "alex@gmail.com"),
+        ("Sam at Outlook.com.", "sam@outlook.com."),
+        ("Hi, alex at icloud dot com is best.", "Hi, alex@icloud.com is best."),
+        ("write to me or sam at proton dot me", "write to me or sam@proton.me"),
+        ("alex at yahoo.com or sam at hey dot com", "alex@yahoo.com or sam@hey.com"),
+    ])
+    func writesAMailboxAtAMailProvider(spoken: String, expected: String) {
+        #expect(protector.protect(spoken).expanded == expected)
+    }
+
+    @Test("Keeps \"at\" before a mail provider after a pronoun, a verb that takes it or a determiner", arguments: [
+        ("look at gmail.com", "look at gmail.com"),
+        ("look at gmail dot com", "look at gmail.com"),
+        ("she works at outlook dot com", "she works at outlook.com"),
+        ("I signed up at gmail.com", "I signed up at gmail.com"),
+        ("the app is at icloud.com", "the app is at icloud.com"),
+        ("my account at gmail dot com is full", "my account at gmail.com is full"),
+        ("find us at hotmail.com", "find us at hotmail.com"),
+        ("alex at example.com", "alex at example.com"),
+    ])
+    func keepsAtBeforeAMailProvider(spoken: String, expected: String) {
+        #expect(protector.protect(spoken).expanded == expected)
+    }
+
     @Test("Hides an email address speech-to-text wrote, lowercased", arguments: [
         ("Email me at John.Smith@example.com.", "Email me at ⟦S1⟧.", "john.smith@example.com"),
         ("(ops@Example.co.uk)", "(⟦S1⟧)", "ops@example.co.uk"),
