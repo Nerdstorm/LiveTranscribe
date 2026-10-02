@@ -121,6 +121,14 @@ extension CleanupFixtures.Guard {
             ),
             completed("we need twenty five chairs", "We need 25 chairs."),
             completed("email the nerd storm team", "Email the Nerdstorm team."),
+            completed("She wants few ex expenses paid back.", "She wants few expenses paid back."),
+            completed("We should con consider the budget first.", "We should consider the budget first."),
+            completed("can you send the rep report by friday", "Can you send the report by Friday?"),
+            completed("there is not nothing left", "There is nothing left."),
+            completed("bring ten tennis balls", "Bring tennis balls."),
+            completed("we could stay for forty minutes", "We could forty minutes."),
+            completed("We met the new rep. Reports are due on Monday.", "We met the new. Reports are due on Monday."),
+            completed("can you send the rap report by friday", "Can you send the report by Friday?"),
 
             // ContentWordsTests
             completed("we need milk, eggs, and bread.", "We need eggs and bread."),

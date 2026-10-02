@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use lt_shared::swift_string::{self as s};
 
 use crate::GuardPolicy;
@@ -10,8 +12,8 @@ use crate::words::{WordSet, same};
 /// both change what the speaker said.
 ///
 /// Words are aligned exactly, so a respelling or a number written as digits ("twenty five" →
-/// "25") counts as a replacement, not a deletion. Fillers and a word repeated straight after
-/// itself may always go.
+/// "25") counts as a replacement, not a deletion. Fillers, a word repeated straight after itself
+/// and the start of a word broken off and said again in full (`WordFragments`) may always go.
 #[derive(Clone, Debug)]
 pub(crate) struct DroppedWords {
     fillers: WordSet,
@@ -29,7 +31,8 @@ impl DroppedWords {
     }
 
     /// The longest run of spoken words deleted without replacement, beyond the allowed run.
-    pub(crate) fn dropped_run(&self, alignment: &WordAlignment) -> Option<usize> {
+    /// `fragments` are the raw indices of the starts of words broken off (`WordFragments`).
+    pub(crate) fn dropped_run(&self, alignment: &WordAlignment, fragments: &HashSet<usize>) -> Option<usize> {
         let longest = alignment
             .gaps
             .iter()
@@ -37,7 +40,7 @@ impl DroppedWords {
             .map(|gap| {
                 gap.deleted
                     .iter()
-                    .filter(|&&index| !self.is_droppable(index, &alignment.raw))
+                    .filter(|&&index| !fragments.contains(&index) && !self.is_droppable(index, &alignment.raw))
                     .count()
             })
             .max()
@@ -172,13 +175,81 @@ mod tests {
     fn a_replacement_is_not_a_deletion() {
         let dropped_words = DroppedWords::new(&GuardPolicy::default());
         assert_eq!(
-            dropped_words.dropped_run(&alignment("we need twenty five chairs", "We need 25 chairs.")),
+            dropped_words.dropped_run(
+                &alignment("we need twenty five chairs", "We need 25 chairs."),
+                &HashSet::new()
+            ),
             None
         );
         assert_eq!(
-            dropped_words.dropped_run(&alignment("email the nerd storm team", "Email the Nerdstorm team.")),
+            dropped_words.dropped_run(
+                &alignment("email the nerd storm team", "Email the Nerdstorm team."),
+                &HashSet::new()
+            ),
             None
         );
+    }
+
+    #[test]
+    fn the_start_of_a_word_broken_off_and_said_again_in_full_may_go() {
+        for (raw, cleaned) in [
+            (
+                "She wants few ex expenses paid back.",
+                "She wants few expenses paid back.",
+            ),
+            (
+                "We should con consider the budget first.",
+                "We should consider the budget first.",
+            ),
+            (
+                "can you send the rep report by friday",
+                "Can you send the report by Friday?",
+            ),
+        ] {
+            assert_eq!(
+                review(raw, cleaned, CleanupLevel::Medium),
+                GuardVerdict::Accepted(cleaned.to_owned()),
+                "{raw}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_word_that_only_starts_the_next_by_chance_stays() {
+        for (raw, cleaned, reason) in [
+            (
+                "there is not nothing left",
+                "There is nothing left.",
+                FallbackReason::LostNegation,
+            ),
+            (
+                "bring ten tennis balls",
+                "Bring tennis balls.",
+                FallbackReason::DroppedContent { count: 1 },
+            ),
+            // "for" is no fragment of "forty", so the run is two words long.
+            (
+                "we could stay for forty minutes",
+                "We could forty minutes.",
+                FallbackReason::DroppedWords { count: 2 },
+            ),
+            (
+                "We met the new rep. Reports are due on Monday.",
+                "We met the new. Reports are due on Monday.",
+                FallbackReason::DroppedContent { count: 1 },
+            ),
+            (
+                "can you send the rap report by friday",
+                "Can you send the report by Friday?",
+                FallbackReason::DroppedContent { count: 1 },
+            ),
+        ] {
+            assert_eq!(
+                review(raw, cleaned, CleanupLevel::Medium),
+                GuardVerdict::Rejected(reason),
+                "{raw}"
+            );
+        }
     }
 
     #[test]

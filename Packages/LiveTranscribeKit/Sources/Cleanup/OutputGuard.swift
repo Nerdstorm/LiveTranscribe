@@ -109,7 +109,8 @@ public enum GuardVerdict: Sendable, Equatable {
 /// (High), may not delete a run of spoken words outright (``DroppedWords``). At every level, it
 /// must keep each name where the speaker said it (``SpokenNames``) and may not delete a word that
 /// carries meaning with nothing in its place (``ContentWords``): rewording replaces words, it does
-/// not leave them out.
+/// not leave them out. The start of a word broken off and said again in full may go
+/// (``WordFragments``).
 public struct OutputGuard: Sendable {
     public struct Policy: Sendable, Equatable {
         /// Allowed ratio of the output's word count to the input's, per level. A level missing
@@ -207,6 +208,7 @@ public struct OutputGuard: Sendable {
     private let droppedWords: DroppedWords
     private let spokenNames: SpokenNames
     private let contentWords: ContentWords
+    private let wordFragments: WordFragments
     private let selfRepair: SelfRepair
 
     public init(policy: Policy = .default) {
@@ -215,6 +217,7 @@ public struct OutputGuard: Sendable {
         self.droppedWords = DroppedWords(policy: policy)
         self.spokenNames = SpokenNames(policy: policy)
         self.contentWords = ContentWords(policy: policy)
+        self.wordFragments = WordFragments(policy: policy)
         self.selfRepair = SelfRepair(policy: policy)
     }
 
@@ -293,17 +296,18 @@ public struct OutputGuard: Sendable {
                 : .rejected(.invalidSelfCorrection)
         }
         let alignment = WordAlignment(raw: rawWords, cleaned: cleanedWords)
-        if !options.level.allowsRewording, let count = droppedWords.droppedRun(in: alignment) {
+        let placeholderWords = Set(options.placeholders.map(EditDistance.normalize))
+        let fragments = wordFragments.indices(in: raw, placeholders: placeholderWords)
+        if !options.level.allowsRewording, let count = droppedWords.droppedRun(in: alignment, fragments: fragments) {
             return .rejected(.droppedWords(count: count))
         }
         if droppedWords.losesNegation(raw: rawWords, cleaned: cleanedWords) {
             return .rejected(.lostNegation)
         }
-        let placeholderWords = Set(options.placeholders.map(EditDistance.normalize))
         if policy.requiresNamesInPlace, spokenNames.movesOrDropsName(in: raw, alignment: alignment, ignoring: placeholderWords) {
             return .rejected(.movedOrDroppedName)
         }
-        let droppedContent = contentWords.droppedCount(in: alignment, ignoring: placeholderWords)
+        let droppedContent = contentWords.droppedCount(in: alignment, ignoring: placeholderWords, fragments: fragments)
         if droppedContent > policy.maxDroppedContent {
             return .rejected(.droppedContent(count: droppedContent))
         }
