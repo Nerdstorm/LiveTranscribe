@@ -294,6 +294,44 @@ struct SelfRepairTests {
         #expect(review(raw, cleaned) == .rejected(.invalidRepair))
     }
 
+    /// In text written with capitals and punctuation, a correction takes back its whole sentence
+    /// so far only when its phrase shows it says all of it again.
+    @Test("A correction takes back its whole sentence only when its phrase says it again", arguments: [
+        ("Insurance for ferries, no wait, boats went up again.", "Boats went up again.", false),
+        ("Insurance for ferries, wait, no, planes went up again.", "Planes went up again.", false),
+        ("I emailed Adrian, actually, I'll call them as well.", "I'll call them as well.", false),
+        ("Insurance for ferries, no wait, boats went up again.", "Insurance for boats went up again.", true),
+        // A name for a name, the same word, a fact of the same kind, a word said again.
+        ("Alice knows, sorry, Tara will lead the design review.", "Tara will lead the design review.", true),
+        ("My laptop battery, no wait, my phone is dead.", "My phone is dead.", true),
+        ("On Monday at noon, sorry, Tuesday at two works better.", "Tuesday at two works better.", true),
+        ("The red car, sorry, a blue car is parked outside.", "A blue car is parked outside.", true),
+    ])
+    func takesBackAWholeSentenceOnlyWhenItsPhraseSaysItAgain(raw: String, cleaned: String, accepted: Bool) {
+        #expect(review(raw, cleaned) == (accepted ? .accepted(cleaned) : .rejected(.invalidRepair)))
+    }
+
+    /// Without capitals or punctuation, nothing tells a name from another word, so the ferries
+    /// read like a false start ("alice knows sorry tara will lead the design review") and stay
+    /// accepted.
+    @Test("Only capitals and punctuation tell a correction from a false start", arguments: [
+        ("insurance for ferries no wait boats went up again", "Boats went up again."),
+        ("insurance for ferries, no wait, boats went up again.", "Boats went up again."),
+        ("Insurance for ferries no wait boats went up again", "Boats went up again."),
+        ("alice knows sorry tara will lead the design review", "Tara will lead the design review."),
+    ])
+    func onlyCapitalsAndPunctuationTellACorrectionFromAFalseStart(raw: String, cleaned: String) {
+        #expect(review(raw, cleaned) == .accepted(cleaned))
+    }
+
+    /// A reading turned down for taking back too much still names the words its phrase may
+    /// correct, so a repair can't add them to the phrase as new words and drop the one between.
+    @Test func aReadingTurnedDownLetsNoOtherThrough() {
+        let raw = "The garden Cleaner comes on Tuesday, or rather on Friday."
+        #expect(review(raw, "The cleaner comes on Friday.") == .rejected(.invalidRepair))
+        #expect(review(raw, "The garden Cleaner comes on Friday.") == .accepted("The garden Cleaner comes on Friday."))
+    }
+
     @Test("A cue followed by \"not\" and the corrected words said again goes with them", arguments: [
         ("The meeting is in room four, no, not four, five.", "The meeting is in room five."),
         ("Book the flight for Tuesday, sorry, not Tuesday, Thursday morning.", "Book the flight for Thursday morning."),

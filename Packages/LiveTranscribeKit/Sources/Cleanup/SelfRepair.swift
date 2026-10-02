@@ -123,6 +123,10 @@ struct SelfRepair: Sendable {
         /// nothing after it but a hyphen or dash, and not in capitals ("con" in "con consider" or
         /// "con- consider"; not "re" in "re-read", "pen" in "pen, pencil" or "PR").
         var mayBeBrokenOff = false
+        /// Followed by a mark speech-to-text writes where the speaker paused: a comma, colon or
+        /// semicolon, or a sentence end it wrote ("ferries," in "Insurance for ferries, no wait,
+        /// boats …"). The end of a line alone isn't one.
+        var pausesAfter = false
         /// Where a correction from a later sentence was put in place of what it corrects, how many
         /// words its phrase has, starting here; 0 elsewhere (see ``Corrections``).
         var opensPhrase = 0
@@ -143,6 +147,8 @@ struct SelfRepair: Sendable {
     }
 
     private static let sentenceEnders: Set<Character> = [".", "!", "?", "…"]
+    /// Marks that, like a sentence end, show where the speaker paused.
+    private static let pauseMarks: Set<Character> = [",", ";", ":"]
     private static let hyphens: Set<Character> = ["-", "\u{2014}", "\u{2013}"]
 
     /// The words of `text` as ``EditDistance/words(in:)`` finds them after normalizing, each with
@@ -167,12 +173,14 @@ struct SelfRepair: Sendable {
                 let abbreviation = isDottedAbbreviation(part) && index + 1 < parts.count && !startsWithUppercase(parts[index + 1])
                 let ends = !abbreviation && trailing.contains(where: sentenceEnders.contains)
                 let asks = trailing.contains("?")
+                let pauses = ends || trailing.contains(where: pauseMarks.contains)
                 let normalized = EditDistance.words(in: EditDistance.normalize(String(part)))
-                if normalized.isEmpty {
-                    if ends, let last = words.indices.last, last >= lineStart {
+                if normalized.isEmpty, let last = words.indices.last, last >= lineStart {
+                    if ends {
                         words[last].endsSentence = true
                         words[last].endsQuestion = asks
                     }
+                    words[last].pausesAfter = words[last].pausesAfter || pauses
                 }
                 for (offset, word) in normalized.enumerated() {
                     let isLastOfPart = offset == normalized.count - 1
@@ -186,7 +194,8 @@ struct SelfRepair: Sendable {
                         isCapitalised: upper && !startsSentence,
                         mayBeName: couldBeName,
                         startsSentence: startsSentence && offset == 0,
-                        mayBeBrokenOff: isLastOfPart && lastOfToken[index] && mayBeBrokenOff(part)
+                        mayBeBrokenOff: isLastOfPart && lastOfToken[index] && mayBeBrokenOff(part),
+                        pausesAfter: isLastOfPart && pauses
                     ))
                 }
                 if !normalized.isEmpty { startsSentence = ends }

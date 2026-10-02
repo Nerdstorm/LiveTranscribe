@@ -981,6 +981,74 @@ fn a_correction_takes_back_no_more_than_the_corrected_words_said_again() {
     ]);
 }
 
+/// In text written with capitals and punctuation, a correction takes back its whole sentence so
+/// far only when its phrase shows it says all of it again.
+#[test]
+fn a_correction_takes_back_its_whole_sentence_only_when_its_phrase_says_it_again() {
+    let ferries = "Insurance for ferries, no wait, boats went up again.";
+    assert_rejected(&[
+        (ferries, "Boats went up again."),
+        (
+            "Insurance for ferries, wait, no, planes went up again.",
+            "Planes went up again.",
+        ),
+        (
+            "I emailed Adrian, actually, I'll call them as well.",
+            "I'll call them as well.",
+        ),
+    ]);
+    assert_accepted(&[
+        (ferries, "Insurance for boats went up again."),
+        // A name for a name, the same word, a fact of the same kind, a word said again.
+        (
+            "Alice knows, sorry, Tara will lead the design review.",
+            "Tara will lead the design review.",
+        ),
+        ("My laptop battery, no wait, my phone is dead.", "My phone is dead."),
+        (
+            "On Monday at noon, sorry, Tuesday at two works better.",
+            "Tuesday at two works better.",
+        ),
+        (
+            "The red car, sorry, a blue car is parked outside.",
+            "A blue car is parked outside.",
+        ),
+    ]);
+}
+
+/// Without capitals or punctuation, nothing tells a name from another word, so the ferries read
+/// like a false start ("alice knows sorry tara will lead the design review") and stay accepted.
+#[test]
+fn only_capitals_and_punctuation_tell_a_correction_from_a_false_start() {
+    assert_accepted(&[
+        (
+            "insurance for ferries no wait boats went up again",
+            "Boats went up again.",
+        ),
+        (
+            "insurance for ferries, no wait, boats went up again.",
+            "Boats went up again.",
+        ),
+        (
+            "Insurance for ferries no wait boats went up again",
+            "Boats went up again.",
+        ),
+        (
+            "alice knows sorry tara will lead the design review",
+            "Tara will lead the design review.",
+        ),
+    ]);
+}
+
+/// A reading turned down for taking back too much still names the words its phrase may correct,
+/// so a repair can't add them to the phrase as new words and drop the one between.
+#[test]
+fn a_reading_turned_down_lets_no_other_through() {
+    let raw = "The garden Cleaner comes on Tuesday, or rather on Friday.";
+    assert_rejected(&[(raw, "The cleaner comes on Friday.")]);
+    assert_accepted(&[(raw, "The garden Cleaner comes on Friday.")]);
+}
+
 #[test]
 fn the_start_of_a_word_broken_off_and_said_again_in_full_may_go() {
     assert_accepted(&[

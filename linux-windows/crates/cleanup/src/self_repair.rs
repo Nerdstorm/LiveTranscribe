@@ -229,6 +229,10 @@ pub(crate) struct SaidWord {
     /// after it but a hyphen or dash, and not in capitals ("con" in "con consider" or "con-
     /// consider"; not "re" in "re-read", "pen" in "pen, pencil" or "PR").
     pub(crate) may_be_broken_off: bool,
+    /// Followed by a mark speech-to-text writes where the speaker paused: a comma, colon or
+    /// semicolon, or a sentence end it wrote ("ferries," in "Insurance for ferries, no wait, boats
+    /// …"). The end of a line alone isn't one.
+    pub(crate) pauses_after: bool,
     /// Where a correction from a later sentence was put in place of what it corrects, how many
     /// words its phrase has, starting here; 0 elsewhere (see [`corrections`]).
     pub(crate) opens_phrase: usize,
@@ -249,6 +253,7 @@ impl PartialEq for SaidWord {
             && self.may_be_name == other.may_be_name
             && self.starts_sentence == other.starts_sentence
             && self.may_be_broken_off == other.may_be_broken_off
+            && self.pauses_after == other.pauses_after
             && self.opens_phrase == other.opens_phrase
             && self.spare.len() == other.spare.len()
             && self.spare.iter().zip(&other.spare).all(|(a, b)| same(a, b))
@@ -268,6 +273,8 @@ pub(crate) struct WrittenWord {
 }
 
 const SENTENCE_ENDERS: [&str; 4] = [".", "!", "?", "…"];
+/// Marks that, like a sentence end, show where the speaker paused.
+const PAUSE_MARKS: [&str; 3] = [",", ";", ":"];
 const HYPHENS: [&str; 3] = ["-", "\u{2014}", "\u{2013}"];
 const BULLETS: [&str; 9] = ["-", "*", "•", "‣", "◦", "▪", "–", "—", "·"];
 
@@ -297,14 +304,17 @@ pub(crate) fn said_words(text: &str, function_words: &WordSet, placeholders: &Wo
                 is_dotted_abbreviation(part) && parts.get(index + 1).is_some_and(|next| !starts_with_uppercase(next));
             let ends = !abbreviation && trailing.iter().any(|mark| s::is_one_of(mark, &SENTENCE_ENDERS));
             let asks = trailing.iter().any(|mark| s::canonically_equal(mark, "?"));
+            let pauses = ends || trailing.iter().any(|mark| s::is_one_of(mark, &PAUSE_MARKS));
             let normalized = normalized_words(part);
             if normalized.is_empty()
-                && ends
                 && words.len() > line_start
                 && let Some(last) = words.last_mut()
             {
-                last.ends_sentence = true;
-                last.ends_question = asks;
+                if ends {
+                    last.ends_sentence = true;
+                    last.ends_question = asks;
+                }
+                last.pauses_after |= pauses;
             }
             let upper = starts_with_uppercase(part);
             let count = normalized.len();
@@ -321,6 +331,7 @@ pub(crate) fn said_words(text: &str, function_words: &WordSet, placeholders: &Wo
                     may_be_name: could_be_name,
                     starts_sentence: starts_sentence && offset == 0,
                     may_be_broken_off: is_last_of_part && last_of_token[index] && may_be_broken_off(part),
+                    pauses_after: is_last_of_part && pauses,
                     ..SaidWord::default()
                 });
             }

@@ -35,7 +35,10 @@
 //! four" corrects "three", never only "servers"). Medium's take back no more than the corrected
 //! words said again ("the physio team, sorry, not physio, nursing" is never "the nursing"), and no
 //! less than a sentence that a phrase opening the way it did starts again ("Ship it to Prague,
-//! scratch that, hold it until September" is never "Ship it to hold it until September").
+//! scratch that, hold it until September" is never "Ship it to hold it until September"). In text
+//! written with capitals and punctuation, one takes back its whole sentence so far only when its
+//! phrase shows it says all of it again ("Insurance for ferries, no wait, boats went up again." is
+//! never "Boats went up again."; [`SelfRepair::takes_back_too_much`]).
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ops::Range;
@@ -106,6 +109,8 @@ pub(super) fn spans(words: &[SaidWord], repair: &SelfRepair, placeholders: &Word
     // Every word each phrase may correct, by where it starts. Which of them a repair took back
     // isn't known, so its key word and the words that takes back are found among them all.
     let mut taken_back: BTreeMap<usize, BTreeSet<usize>> = BTreeMap::new();
+    // Capitals show names only in text speech-to-text wrote with them.
+    let cased = words.iter().any(|word| word.may_be_name);
     for (cue_start, run_ends) in cue_runs(words, repair) {
         // Speech-to-text ends a sentence where the speaker paused, so a cue that opens one may
         // take back the end of the one before ("I left my charger in the garage. Actually, the
@@ -128,17 +133,17 @@ pub(super) fn spans(words: &[SaidWord], repair: &SelfRepair, placeholders: &Word
         // A lone "No" after a question answers it ("Is it on Tuesday? No, not Tuesday,
         // Thursday."), as [`once`] reads it.
         let answers = crosses && words[cue_start - 1].ends_question && same(&words[cue_start].word, "no");
-        // The first word that carries meaning in the sentence the corrected words end, if the cues
-        // can take back from there.
-        let opening = {
-            let first = words[..cue_start.saturating_sub(1)]
-                .iter()
-                .rposition(|word| word.ends_sentence)
-                .map_or(0, |end| end + 1);
-            (first..cue_start)
-                .find(|&index| repair.carries_meaning(&words[index]))
-                .filter(|&index| index + repair.max_retracted_words >= cue_start)
-        };
+        // The sentence the corrected words end, and its first word that carries meaning, if the
+        // cues can take back from there.
+        let first = words[..cue_start.saturating_sub(1)]
+            .iter()
+            .rposition(|word| word.ends_sentence)
+            .map_or(0, |end| end + 1);
+        let opening = (first..cue_start)
+            .find(|&index| repair.carries_meaning(&words[index]))
+            .filter(|&index| index + repair.max_retracted_words >= cue_start);
+        // Cues speech-to-text set off with punctuation, in text it wrote with capitals.
+        let set_off = cased && cue_start > 0 && words[cue_start - 1].pauses_after;
         for start in cue_start.saturating_sub(repair.max_retracted_words)..cue_start {
             let corrected = &words[start..cue_start];
             if corrected[..corrected.len() - 1].iter().any(|word| word.ends_sentence)
@@ -203,9 +208,20 @@ pub(super) fn spans(words: &[SaidWord], repair: &SelfRepair, placeholders: &Word
                         }
                         spans.spare[end].form_union(&corrected_words);
                     }
+                    // A reading that takes back too much is turned down, but its words count among
+                    // those the phrase may correct all the same: leaving them out would let a
+                    // repair add them to the phrase as new words, and turning a reading down must
+                    // never let another through.
                     taken_back.entry(end).or_default().extend(start..cue_start);
-                    spans.ends[start].push(end);
                     spans.corrected[end].form_union(&corrected_words);
+                    if set_off
+                        && !retracts_statement
+                        && !all_corrected
+                        && repair.takes_back_too_much(&words[first..start], corrected, phrase)
+                    {
+                        continue;
+                    }
+                    spans.ends[start].push(end);
                 }
             }
         }
@@ -570,6 +586,52 @@ impl SelfRepair {
                 (self.carries_meaning(lead) && said.get(1).is_some_and(|second| says_again(second, next)))
                     || (leads_in && says_again(&said[0], next))
             })
+    }
+
+    /// Whether a reading of a correction takes back its whole sentence so far with nothing to show
+    /// that its `phrase` says all of it again: the `corrected` words hold two or more that carry
+    /// meaning, none does in the words `before` them in their sentence, and the phrase neither
+    /// opens like them ([`SelfRepair::opens_alike`]) nor says one of them again. "Insurance for
+    /// ferries, no wait, boats went up again." corrects "ferries", and is never "Boats went up
+    /// again."; "My laptop battery, no wait, my phone is dead." is "My phone is dead.".
+    ///
+    /// Only for cues that text written with capitals and punctuation sets off: there a word
+    /// without a capital is no name, so "Alice knows, sorry, Tara will lead the design review."
+    /// opens a name for a name, a false start. In lower case "alice knows sorry tara will lead the
+    /// design review" reads like the ferries, and nothing tells them apart.
+    fn takes_back_too_much(&self, before: &[SaidWord], corrected: &[SaidWord], phrase: &[SaidWord]) -> bool {
+        !before.iter().any(|word| self.carries_meaning(word))
+            && corrected.iter().filter(|word| self.carries_meaning(word)).count() > 1
+            && !corrected
+                .iter()
+                .any(|word| self.carries_meaning(word) && said_in(word, phrase))
+            && !self.opens_alike(corrected, phrase)
+    }
+
+    /// Whether `phrase` opens like the `corrected` words, a word for a word: its first, or its
+    /// second after its first, or after a first of theirs, that only leads in ("on Monday" →
+    /// "Tuesday"; "the red car" → "a red bike"). Words are alike when they are the same word, forms
+    /// of a word that carries meaning, both capitalised as a name may be, or facts of one kind.
+    fn opens_alike(&self, corrected: &[SaidWord], phrase: &[SaidWord]) -> bool {
+        let mut opening = phrase.iter().filter(|word| !self.is_filler(&word.word));
+        let (Some(lead), next) = (opening.next(), opening.next()) else {
+            return false;
+        };
+        let alike = |said: &SaidWord, word: &SaidWord| {
+            same(&said.word, &word.word)
+                || (self.carries_meaning(said) && word_forms::are_forms(&said.word, &word.word))
+                || (said.may_be_name && word.may_be_name)
+                || self.fact_kind(said, false).is_some_and(|kind| {
+                    kind != FactKind::Negation && self.fact_kind(word, is_month(said)) == Some(kind)
+                })
+        };
+        let leads_in = |word: &SaidWord| !self.carries_meaning(word) || word_forms::is_droppable(&word.word);
+        let (first, second) = (&corrected[0], corrected.get(1));
+        alike(first, lead)
+            || next.is_some_and(|next| {
+                second.is_some_and(|second| alike(second, next)) || (leads_in(lead) && alike(first, next))
+            })
+            || (leads_in(first) && second.is_some_and(|second| alike(second, lead)))
     }
 
     /// Whether `word` says something a correction can take back or say instead: it holds more than

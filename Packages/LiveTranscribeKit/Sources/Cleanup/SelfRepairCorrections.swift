@@ -39,7 +39,10 @@ extension SelfRepair {
     /// Medium's take back no more than the corrected words said again ("the physio team, sorry,
     /// not physio, nursing" is never "the nursing"), and no less than a sentence that a phrase
     /// opening the way it did starts again ("Ship it to Prague, scratch that, hold it until
-    /// September" is never "Ship it to hold it until September").
+    /// September" is never "Ship it to hold it until September"). In text written with capitals and
+    /// punctuation, one takes back its whole sentence so far only when its phrase shows it says all
+    /// of it again ("Insurance for ferries, no wait, boats went up again." is never "Boats went up
+    /// again."; ``takesBackTooMuch(before:corrected:phrase:)``).
     enum Corrections {
         /// Medium's corrections in the words said, by said index.
         struct Spans {
@@ -64,6 +67,8 @@ extension SelfRepair {
             // back isn't known, so its key word and the words that takes back are found among them
             // all.
             var takenBack: [Int: Set<Int>] = [:]
+            // Capitals show names only in text speech-to-text wrote with them.
+            let cased = words.contains(where: \.mayBeName)
             for (cueStart, runEnds) in cueRuns(in: words, repair: repair) {
                 // Speech-to-text ends a sentence where the speaker paused, so a cue that opens one
                 // may take back the end of the one before ("I left my charger in the garage.
@@ -81,11 +86,13 @@ extension SelfRepair {
                 // A lone "No" after a question answers it ("Is it on Tuesday? No, not Tuesday,
                 // Thursday."), as ``once(_:repair:placeholders:)`` reads it.
                 let answers = crosses && words[cueStart - 1].endsQuestion && words[cueStart].word == "no"
-                // The first word that carries meaning in the sentence the corrected words end, if
+                // The sentence the corrected words end, and its first word that carries meaning, if
                 // the cues can take back from there.
                 let first = (words[..<max(cueStart - 1, 0)].lastIndex(where: \.endsSentence) ?? -1) + 1
                 let opening = words[first..<cueStart].firstIndex(where: repair.carriesMeaning)
                     .flatMap { $0 + repair.retractionLimit >= cueStart ? $0 : nil }
+                // Cues speech-to-text set off with punctuation, in text it wrote with capitals.
+                let setOff = cased && cueStart > 0 && words[cueStart - 1].pausesAfter
                 for start in max(0, cueStart - repair.retractionLimit)..<cueStart {
                     let corrected = words[start..<cueStart]
                     guard !corrected.dropLast().contains(where: \.endsSentence),
@@ -128,9 +135,17 @@ extension SelfRepair {
                                 }
                                 spans.spare[end, default: []].formUnion(corrected.map(\.word))
                             }
+                            // A reading that takes back too much is turned down, but its words count
+                            // among those the phrase may correct all the same: leaving them out
+                            // would let a repair add them to the phrase as new words, and turning a
+                            // reading down must never let another through.
                             takenBack[end, default: []].formUnion(start..<cueStart)
-                            spans.ends[start, default: []].append(end)
                             spans.corrected[end, default: []].formUnion(corrected.map(\.word))
+                            if setOff, !retractsStatement, restated.map({ repair.restates(corrected, words[$0]) }) != true,
+                               repair.takesBackTooMuch(before: words[first..<start], corrected: corrected, phrase: phrase) {
+                                continue
+                            }
+                            spans.ends[start, default: []].append(end)
                         }
                     }
                 }
@@ -431,6 +446,47 @@ extension SelfRepair {
         let leadsIn = !carriesMeaning(lead) || WordForms.droppable.contains(lead.word)
         return (carriesMeaning(lead) && said.dropFirst().first.map { saysAgain($0, next) } == true)
             || (leadsIn && saysAgain(first, next))
+    }
+
+    /// Whether a reading of a correction takes back its whole sentence so far with nothing to show
+    /// that its `phrase` says all of it again: the `corrected` words hold two or more that carry
+    /// meaning, none does in the words `before` them in their sentence, and the phrase neither
+    /// opens like them (``opensAlike(_:phrase:)``) nor says one of them again. "Insurance for
+    /// ferries, no wait, boats went up again." corrects "ferries", and is never "Boats went up
+    /// again."; "My laptop battery, no wait, my phone is dead." is "My phone is dead.".
+    ///
+    /// Only for cues that text written with capitals and punctuation sets off: there a word
+    /// without a capital is no name, so "Alice knows, sorry, Tara will lead the design review."
+    /// opens a name for a name, a false start. In lower case "alice knows sorry tara will lead the
+    /// design review" reads like the ferries, and nothing tells them apart.
+    func takesBackTooMuch(before: ArraySlice<SaidWord>, corrected: ArraySlice<SaidWord>, phrase: ArraySlice<SaidWord>) -> Bool {
+        !before.contains(where: carriesMeaning)
+            && corrected.filter(carriesMeaning).count > 1
+            && !corrected.contains { carriesMeaning($0) && Self.isSaid($0, in: phrase) }
+            && !opensAlike(corrected, phrase: phrase)
+    }
+
+    /// Whether `phrase` opens like the `corrected` words, a word for a word: its first, or its
+    /// second after its first, or after a first of theirs, that only leads in ("on Monday" →
+    /// "Tuesday"; "the red car" → "a red bike"). Words are alike when they are the same word, forms
+    /// of a word that carries meaning, both capitalised as a name may be, or facts of one kind.
+    private func opensAlike(_ corrected: ArraySlice<SaidWord>, phrase: ArraySlice<SaidWord>) -> Bool {
+        let opening = phrase.filter { !isFiller($0.word) }
+        guard let lead = opening.first, let first = corrected.first else { return false }
+        func alike(_ said: SaidWord, _ word: SaidWord) -> Bool {
+            said.word == word.word
+                || (carriesMeaning(said) && WordForms.areForms(said.word, word.word))
+                || (said.mayBeName && word.mayBeName)
+                || factKind(said).map { $0 != .negation && factKind(word, mayIsMonth: Self.isMonth(said)) == $0 } == true
+        }
+        func leadsIn(_ word: SaidWord) -> Bool { !carriesMeaning(word) || WordForms.droppable.contains(word.word) }
+        let second = corrected.dropFirst().first
+        if alike(first, lead) { return true }
+        if opening.count > 1 {
+            let next = opening[1]
+            if second.map({ alike($0, next) }) == true || (leadsIn(lead) && alike(first, next)) { return true }
+        }
+        return leadsIn(first) && second.map { alike($0, lead) } == true
     }
 
     /// Whether `word` says something a correction can take back or say instead: it holds more than
