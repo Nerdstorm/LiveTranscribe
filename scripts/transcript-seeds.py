@@ -520,12 +520,12 @@ def fragment_seeds():
     for text in WHOLE_WORDS:
         assert whole_word_pairs(text) and not NUMBER_WORDS.search(text), text
         group = f"whole-word:{text}"
-        rows.append(row(text, text, "control", group))
+        rows.append(row(text, text, "unchanged", group))
         if int(digest("unpunctuated", text)[:8], 16) % 10 < 4:
-            rows.append(row(unpunctuated(text), text, "control", group))
+            rows.append(row(unpunctuated(text), text, "unchanged", group))
         if int(digest("neighbour", text)[:8], 16) % 6 == 0:
             before, after = neighbour(text, 0, WORDS_ONLY)
-            rows.append(row(f"{before} {after}", f"{before} {after}", "control", group))
+            rows.append(row(f"{before} {after}", f"{before} {after}", "unchanged", group))
     return rows
 
 

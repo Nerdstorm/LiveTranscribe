@@ -3,7 +3,7 @@
 
 Two kinds of example, each written the way speech-to-text hands them to Deep:
 
-- layout: steps counted out loud and kept as said ("One, go to the shops. Two, talk to the
+- series: steps counted out loud and kept as said ("One, go to the shops. Two, talk to the
   mechanic."), with plain or mixed markers ("One, … Number two, …", "First, … Two, …"). Deep
   leaves the words where they are and fixes only capitals and punctuation, so each marker starts
   its sentence with a comma after it; the layout rules number the list after the model. This is
@@ -471,7 +471,7 @@ def generate():
                 continue
             seen.add(raw)
             forms[form] += 1
-            rows[layout_splits[index]].append(row("layout", raw, target, True))
+            rows[layout_splits[index]].append(row("series", raw, target, True))
             made += 1
 
     placeholder_splits = split_of(len(STARTS), PLACEHOLDER_TEST_TEMPLATES, PLACEHOLDER_VALID_TEMPLATES, rng)

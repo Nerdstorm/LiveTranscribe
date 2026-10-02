@@ -1641,427 +1641,427 @@
       {
         "raw": "We saw an animal in the road.",
         "target": "We saw an animal in the road.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "Sign the form in ink.",
         "target": "Sign the form in ink.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "Sign the form in ink. Thanks again for dinner last night.",
         "target": "Sign the form in ink. Thanks again for dinner last night.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "Measure it in inches, not centimetres.",
         "target": "Measure it in inches, not centimetres.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "Thanks for forwarding the email.",
         "target": "Thanks for forwarding the email.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "thanks for forwarding the email",
         "target": "Thanks for forwarding the email.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "Did you read the new newsletter yet?",
         "target": "Did you read the new newsletter yet?",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "did you read the new newsletter yet",
         "target": "Did you read the new newsletter yet?",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "She bought an antique clock.",
         "target": "She bought an antique clock.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "she bought an antique clock",
         "target": "She bought an antique clock.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "A lot of offers end today.",
         "target": "A lot of offers end today.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "His history teacher is really strict.",
         "target": "His history teacher is really strict.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "Sorry for forgetting your birthday.",
         "target": "Sorry for forgetting your birthday.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "Sorry for forgetting your birthday. We're running a bit late.",
         "target": "Sorry for forgetting your birthday. We're running a bit late.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "The newsletter is issued every month.",
         "target": "The newsletter is issued every month.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "I need an answer by the end of the week.",
         "target": "I need an answer by the end of the week.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "i need an answer by the end of the week",
         "target": "I need an answer by the end of the week.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "The blanket is so soft.",
         "target": "The blanket is so soft.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "He headed home after the match.",
         "target": "He headed home after the match.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "he headed home after the match",
         "target": "He headed home after the match.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "Bring a pen, pencil and paper to the exam.",
         "target": "Bring a pen, pencil and paper to the exam.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "It would be better to wait.",
         "target": "It would be better to wait.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "Turn the thermostat down at night.",
         "target": "Turn the thermostat down at night.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "The bar barely had room to stand.",
         "target": "The bar barely had room to stand.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "the bar barely had room to stand",
         "target": "The bar barely had room to stand.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "The car carpet needs a good clean.",
         "target": "The car carpet needs a good clean.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "the car carpet needs a good clean",
         "target": "The car carpet needs a good clean.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "The film ended so soon.",
         "target": "The film ended so soon.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "Do dogs like carrots?",
         "target": "Do dogs like carrots?",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "do dogs like carrots",
         "target": "Do dogs like carrots?",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "She was the key keynote speaker at the conference.",
         "target": "She was the key keynote speaker at the conference.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "We're all allergic to cats.",
         "target": "We're all allergic to cats.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "The boiler needs an annual check.",
         "target": "The boiler needs an annual check.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "We won wonderful prizes at the fair.",
         "target": "We won wonderful prizes at the fair.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "we won wonderful prizes at the fair",
         "target": "We won wonderful prizes at the fair.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "He heard the news on the radio.",
         "target": "He heard the news on the radio.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "He heard the news on the radio. We're running a bit late.",
         "target": "He heard the news on the radio. We're running a bit late.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "We went to the theatre on Saturday.",
         "target": "We went to the theatre on Saturday.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "we went to the theatre on saturday",
         "target": "We went to the theatre on Saturday.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "The man managed to fix it himself.",
         "target": "The man managed to fix it himself.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "The new news app is easier to read.",
         "target": "The new news app is easier to read.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "The new news app is easier to read. The weather has been awful all week.",
         "target": "The new news app is easier to read. The weather has been awful all week.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "We visited an ancient castle on a hill.",
         "target": "We visited an ancient castle on a hill.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "There are no notes from the meeting.",
         "target": "There are no notes from the meeting.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "The theory sounds fine to me.",
         "target": "The theory sounds fine to me.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "We drove to town for the market.",
         "target": "We drove to town for the market.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "we drove to town for the market",
         "target": "We drove to town for the market.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "The cat catches mice in the barn.",
         "target": "The cat catches mice in the barn.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "You can call or order online.",
         "target": "You can call or order online.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "We use user feedback to plan updates.",
         "target": "We use user feedback to plan updates.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "We wear coats even in May.",
         "target": "We wear coats even in May.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "we wear coats even in may",
         "target": "We wear coats even in May.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "I'll call you when I get there. We wear coats even in May.",
         "target": "I'll call you when I get there. We wear coats even in May.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "Let us use the meeting room.",
         "target": "Let us use the meeting room.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "let us use the meeting room",
         "target": "Let us use the meeting room.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "Let me meet them before we decide.",
         "target": "Let me meet them before we decide.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "I'll ask him to come in instead.",
         "target": "I'll ask him to come in instead.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "We heard an announcement about the delay.",
         "target": "We heard an announcement about the delay.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "He helped me move the sofa.",
         "target": "He helped me move the sofa.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "Her herb garden is lovely.",
         "target": "Her herb garden is lovely.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "Let me know what you think. Her herb garden is lovely.",
         "target": "Let me know what you think. Her herb garden is lovely.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "Try not to touch the wet paint.",
         "target": "Try not to touch the wet paint.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "He hears better with his left ear.",
         "target": "He hears better with his left ear.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "She is isolated at home with flu.",
         "target": "She is isolated at home with flu.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "Add it to today's list.",
         "target": "Add it to today's list.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "add it to today's list",
         "target": "Add it to today's list.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "I want to toast the happy couple.",
         "target": "I want to toast the happy couple.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "i want to toast the happy couple",
         "target": "I want to toast the happy couple.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "He held the door for us.",
         "target": "He held the door for us.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "He has an ankle injury from football.",
         "target": "He has an ankle injury from football.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "he has an ankle injury from football",
         "target": "He has an ankle injury from football.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
@@ -3143,121 +3143,121 @@
       {
         "raw": "It itches where the plaster was.",
         "target": "It itches where the plaster was.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "it itches where the plaster was",
         "target": "It itches where the plaster was.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "Please add additional notes to the report.",
         "target": "Please add additional notes to the report.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "please add additional notes to the report",
         "target": "Please add additional notes to the report.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "The traffic was terrible this morning. Please add additional notes to the report.",
         "target": "The traffic was terrible this morning. Please add additional notes to the report.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "I can cancel the order if it's late.",
         "target": "I can cancel the order if it's late.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "Park the car carefully, the space is tight.",
         "target": "Park the car carefully, the space is tight.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "park the car carefully the space is tight",
         "target": "Park the car carefully, the space is tight.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "Can you add addresses to the guest list?",
         "target": "Can you add addresses to the guest list?",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "Can you add addresses to the guest list? We're running a bit late.",
         "target": "Can you add addresses to the guest list? We're running a bit late.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "We were late because of the roadworks.",
         "target": "We were late because of the roadworks.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "we were late because of the roadworks",
         "target": "We were late because of the roadworks.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "The sales rep reported a fault with the order.",
         "target": "The sales rep reported a fault with the order.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "I feel so sore after the gym.",
         "target": "I feel so sore after the gym.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "i feel so sore after the gym",
         "target": "I feel so sore after the gym.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "Hope the kids are well. I feel so sore after the gym.",
         "target": "Hope the kids are well. I feel so sore after the gym.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "Plant the seeds in individual pots.",
         "target": "Plant the seeds in individual pots.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "The main maintenance window is on Sunday night.",
         "target": "The main maintenance window is on Sunday night.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "It's been a long week. The main maintenance window is on Sunday night.",
         "target": "It's been a long week. The main maintenance window is on Sunday night.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "I'll be beside you the whole time.",
         "target": "I'll be beside you the whole time.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
@@ -3697,133 +3697,133 @@
       {
         "raw": "Remind me to top up the meter.",
         "target": "Remind me to top up the meter.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "Let's move the call to tomorrow.",
         "target": "Let's move the call to tomorrow.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "let's move the call to tomorrow",
         "target": "Let's move the call to tomorrow.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "We stayed in a hot hotel room with no fan.",
         "target": "We stayed in a hot hotel room with no fan.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "Would you like tea or orange juice?",
         "target": "Would you like tea or orange juice?",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "would you like tea or orange juice",
         "target": "Would you like tea or orange juice?",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "It will be beautiful in the spring.",
         "target": "It will be beautiful in the spring.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "We were warned about the ice.",
         "target": "We were warned about the ice.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "She wants to tour the old mill.",
         "target": "She wants to tour the old mill.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "Let's go golfing on Sunday.",
         "target": "Let's go golfing on Sunday.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "let's go golfing on sunday",
         "target": "Let's go golfing on Sunday.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "I'll do double shifts next week.",
         "target": "I'll do double shifts next week.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": true
       },
       {
         "raw": "Turn the theme music up a bit.",
         "target": "Turn the theme music up a bit.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "Please re-read the contract before you sign.",
         "target": "Please re-read the contract before you sign.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "Bring her here when she's ready.",
         "target": "Bring her here when she's ready.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "bring her here when she's ready",
         "target": "Bring her here when she's ready.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "She's out of office until Monday.",
         "target": "She's out of office until Monday.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "she's out of office until monday",
         "target": "She's out of office until Monday.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "I'm so sorry about the mix-up.",
         "target": "I'm so sorry about the mix-up.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "i'm so sorry about the mix-up",
         "target": "I'm so sorry about the mix-up.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "I'm so sorry about the mix-up. It's been a long week.",
         "target": "I'm so sorry about the mix-up. It's been a long week.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
         "raw": "That might be because of the rain.",
         "target": "That might be because of the rain.",
-        "category": "control",
+        "category": "unchanged",
         "multiline": false
       },
       {
