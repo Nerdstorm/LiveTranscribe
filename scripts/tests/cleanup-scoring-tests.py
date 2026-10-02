@@ -30,6 +30,8 @@ class MeaningTests(unittest.TestCase):
                        "To jump-start it:\n1. Park close by.\n2. Switch off both engines.",
                        "Dr. Ng is in at 9 p.m. Then we leave. Thanks, Sam.",
                        "Kofi said yes ⟦S1⟧ and Ines agreed. ⟦S2⟧",
+                       "⟦S1⟧ takes you to the sign-up form.",
+                       "⟦S1⟧ or ⟦S2⟧",
                        "Open a PR for the U.S. team's follow-up, and I'll review it."):
             self.assertTrue(all(scoring.compare(target, target).values()), target)
 
@@ -49,6 +51,7 @@ class MeaningTests(unittest.TestCase):
                 ("Bring:\n- some coins.\n- my glasses.", "Bring:\n- Some coins\n- My glasses"),
                 ("Thanks for coming. ⟦S1⟧ It meant a lot. ⟦S2⟧", "Thanks for coming. ⟦S1⟧ It meant a lot ⟦S2⟧"),
                 ("We won! ⟦S1⟧ Thanks to Uma.", "We won ⟦S1⟧ thanks to Uma."),
+                ("⟦S1⟧ Takes you to the sign-up form.", "⟦S1⟧ takes you to the sign-up form."),
                 ("The train leaves at nine forty five.", "The train leaves at nine forty-five."),
                 ("Dr Ng is in at 9 a.m. tomorrow.", "Dr. Ng is in at 9 a.m. tomorrow."),
                 ("No. Nobody called.", "No, nobody called.")):
