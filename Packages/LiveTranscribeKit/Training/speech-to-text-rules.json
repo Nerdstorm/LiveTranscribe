@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 4,
   "names": [
     "Alice",
     "Ben",
@@ -142,6 +142,554 @@
     [
       "travelling",
       "traveling"
+    ],
+    [
+      "neighbour",
+      "neighbor"
+    ],
+    [
+      "neighbours",
+      "neighbors"
+    ],
+    [
+      "neighbouring",
+      "neighboring"
+    ],
+    [
+      "neighbourhood",
+      "neighborhood"
+    ],
+    [
+      "colours",
+      "colors"
+    ],
+    [
+      "favourite",
+      "favorite"
+    ],
+    [
+      "favourites",
+      "favorites"
+    ],
+    [
+      "behaviour",
+      "behavior"
+    ],
+    [
+      "labour",
+      "labor"
+    ],
+    [
+      "honour",
+      "honor"
+    ],
+    [
+      "humour",
+      "humor"
+    ],
+    [
+      "flavour",
+      "flavor"
+    ],
+    [
+      "rumour",
+      "rumor"
+    ],
+    [
+      "harbour",
+      "harbor"
+    ],
+    [
+      "harbours",
+      "harbors"
+    ],
+    [
+      "organised",
+      "organized"
+    ],
+    [
+      "organising",
+      "organizing"
+    ],
+    [
+      "organises",
+      "organizes"
+    ],
+    [
+      "organisation",
+      "organization"
+    ],
+    [
+      "organisations",
+      "organizations"
+    ],
+    [
+      "organiser",
+      "organizer"
+    ],
+    [
+      "organisers",
+      "organizers"
+    ],
+    [
+      "realised",
+      "realized"
+    ],
+    [
+      "realising",
+      "realizing"
+    ],
+    [
+      "summarise",
+      "summarize"
+    ],
+    [
+      "summarised",
+      "summarized"
+    ],
+    [
+      "summarising",
+      "summarizing"
+    ],
+    [
+      "summarises",
+      "summarizes"
+    ],
+    [
+      "finalise",
+      "finalize"
+    ],
+    [
+      "finalised",
+      "finalized"
+    ],
+    [
+      "finalising",
+      "finalizing"
+    ],
+    [
+      "prioritise",
+      "prioritize"
+    ],
+    [
+      "prioritised",
+      "prioritized"
+    ],
+    [
+      "apologise",
+      "apologize"
+    ],
+    [
+      "apologised",
+      "apologized"
+    ],
+    [
+      "recognise",
+      "recognize"
+    ],
+    [
+      "recognised",
+      "recognized"
+    ],
+    [
+      "analyse",
+      "analyze"
+    ],
+    [
+      "analysed",
+      "analyzed"
+    ],
+    [
+      "optimise",
+      "optimize"
+    ],
+    [
+      "optimised",
+      "optimized"
+    ],
+    [
+      "customise",
+      "customize"
+    ],
+    [
+      "authorise",
+      "authorize"
+    ],
+    [
+      "authorised",
+      "authorized"
+    ],
+    [
+      "emphasise",
+      "emphasize"
+    ],
+    [
+      "standardise",
+      "standardize"
+    ],
+    [
+      "synchronise",
+      "synchronize"
+    ],
+    [
+      "centres",
+      "centers"
+    ],
+    [
+      "theatre",
+      "theater"
+    ],
+    [
+      "metre",
+      "meter"
+    ],
+    [
+      "metres",
+      "meters"
+    ],
+    [
+      "litre",
+      "liter"
+    ],
+    [
+      "litres",
+      "liters"
+    ],
+    [
+      "kilometre",
+      "kilometer"
+    ],
+    [
+      "kilometres",
+      "kilometers"
+    ],
+    [
+      "cancelled",
+      "canceled"
+    ],
+    [
+      "cancelling",
+      "canceling"
+    ],
+    [
+      "travelled",
+      "traveled"
+    ],
+    [
+      "traveller",
+      "traveler"
+    ],
+    [
+      "travellers",
+      "travelers"
+    ],
+    [
+      "labelled",
+      "labeled"
+    ],
+    [
+      "labelling",
+      "labeling"
+    ],
+    [
+      "modelling",
+      "modeling"
+    ],
+    [
+      "fuelled",
+      "fueled"
+    ],
+    [
+      "counselling",
+      "counseling"
+    ],
+    [
+      "enrolment",
+      "enrollment"
+    ],
+    [
+      "licences",
+      "licenses"
+    ],
+    [
+      "defence",
+      "defense"
+    ],
+    [
+      "offence",
+      "offense"
+    ],
+    [
+      "practise",
+      "practice"
+    ],
+    [
+      "catalogue",
+      "catalog"
+    ],
+    [
+      "programme",
+      "program"
+    ],
+    [
+      "programmes",
+      "programs"
+    ],
+    [
+      "tyre",
+      "tire"
+    ],
+    [
+      "tyres",
+      "tires"
+    ],
+    [
+      "yoghurt",
+      "yogurt"
+    ],
+    [
+      "chilli",
+      "chili"
+    ],
+    [
+      "annexe",
+      "annex"
+    ],
+    [
+      "cosy",
+      "cozy"
+    ],
+    [
+      "ageing",
+      "aging"
+    ],
+    [
+      "judgement",
+      "judgment"
+    ],
+    [
+      "aluminium",
+      "aluminum"
+    ],
+    [
+      "jewellery",
+      "jewelry"
+    ],
+    [
+      "sceptical",
+      "skeptical"
+    ],
+    [
+      "enquire",
+      "inquire"
+    ],
+    [
+      "enquiry",
+      "inquiry"
+    ],
+    [
+      "enquiries",
+      "inquiries"
+    ],
+    [
+      "mum",
+      "mom"
+    ],
+    [
+      "mum's",
+      "mom's"
+    ],
+    [
+      "mums",
+      "moms"
+    ],
+    [
+      "kebab",
+      "kabob"
+    ],
+    [
+      "kebabs",
+      "kabobs"
+    ],
+    [
+      "mr",
+      "mister"
+    ],
+    [
+      "ms",
+      "miss"
+    ],
+    [
+      "dr",
+      "doctor"
+    ]
+  ],
+  "spacing_variants": [
+    [
+      "frontend",
+      "front end"
+    ],
+    [
+      "backend",
+      "back end"
+    ],
+    [
+      "wifi",
+      "wi fi"
+    ],
+    [
+      "lunchbox",
+      "lunch box"
+    ],
+    [
+      "offsite",
+      "off site"
+    ],
+    [
+      "goodbye",
+      "good bye"
+    ],
+    [
+      "semifinal",
+      "semi final"
+    ],
+    [
+      "semifinals",
+      "semi finals"
+    ],
+    [
+      "waterhole",
+      "water hole"
+    ],
+    [
+      "birdwatching",
+      "bird watching"
+    ],
+    [
+      "timesheet",
+      "time sheet"
+    ],
+    [
+      "timesheets",
+      "time sheets"
+    ],
+    [
+      "anytime",
+      "any time"
+    ],
+    [
+      "roadmap",
+      "road map"
+    ],
+    [
+      "roadmaps",
+      "road maps"
+    ],
+    [
+      "mockup",
+      "mock up"
+    ],
+    [
+      "mockups",
+      "mock ups"
+    ],
+    [
+      "bricklayer",
+      "brick layer"
+    ],
+    [
+      "slideshow",
+      "slide show"
+    ],
+    [
+      "slideshows",
+      "slide shows"
+    ],
+    [
+      "broadband",
+      "broad band"
+    ],
+    [
+      "sweetcorn",
+      "sweet corn"
+    ],
+    [
+      "headteacher",
+      "head teacher"
+    ],
+    [
+      "foxgloves",
+      "fox gloves"
+    ],
+    [
+      "storytelling",
+      "story telling"
+    ],
+    [
+      "noticeboard",
+      "notice board"
+    ],
+    [
+      "meetup",
+      "meet up"
+    ],
+    [
+      "into",
+      "in to"
+    ],
+    [
+      "email",
+      "e mail"
+    ],
+    [
+      "website",
+      "web site"
+    ],
+    [
+      "database",
+      "data base"
+    ],
+    [
+      "username",
+      "user name"
+    ],
+    [
+      "workflow",
+      "work flow"
+    ],
+    [
+      "teammate",
+      "team mate"
+    ],
+    [
+      "teammates",
+      "team mates"
+    ]
+  ],
+  "name_variants": [
+    [
+      "hana",
+      "hannah"
+    ],
+    [
+      "lukas",
+      "lucas"
+    ],
+    [
+      "oskar",
+      "oscar"
+    ],
+    [
+      "tomas",
+      "thomas"
+    ],
+    [
+      "sofia",
+      "sophia"
+    ],
+    [
+      "farid",
+      "fareed"
     ]
   ],
   "sound_alikes": [
@@ -223,70 +771,1278 @@
   "context_seeds": {
     "train": [
       {
-        "raw": "The max need a restart before the demo.",
-        "target": "The Macs need a restart before the demo."
+        "raw": "can you send me the p d f before lunch",
+        "target": "Can you send me the PDF before lunch?"
       },
       {
-        "raw": "Please madge the branch after the checks pass.",
-        "target": "Please merge the branch after the checks pass."
+        "raw": "is the u s b stick in your bag",
+        "target": "Is the USB stick in your bag?"
       },
       {
-        "raw": "Can you review the p r and update the a p i notes?",
-        "target": "Can you review the PR and update the API notes?"
+        "raw": "the b b c said it will rain all weekend",
+        "target": "The BBC said it will rain all weekend."
       },
       {
-        "raw": "Max sent the notes before lunch.",
-        "target": "Max sent the notes before lunch.",
+        "raw": "Bill paid the gas bill on Friday.",
+        "target": "Bill paid the gas bill on Friday.",
         "category": "facts"
       },
       {
-        "raw": "Madge will chair the planning meeting.",
-        "target": "Madge will chair the planning meeting.",
+        "raw": "Carrie will carry the cake to the car.",
+        "target": "Carrie will carry the cake to the car.",
         "category": "facts"
       }
     ],
     "valid": [
       {
-        "raw": "Both max have enough memory for the workshop.",
-        "target": "Both Macs have enough memory for the workshop."
+        "raw": "is there an a t m near the hotel",
+        "target": "Is there an ATM near the hotel?"
       },
       {
-        "raw": "We can madge the patch this afternoon.",
-        "target": "We can merge the patch this afternoon."
+        "raw": "i need to update my c v this weekend",
+        "target": "I need to update my CV this weekend."
       },
       {
-        "raw": "I asked Max to review the draft.",
-        "target": "I asked Max to review the draft.",
+        "raw": "I asked Miles how many miles it is.",
+        "target": "I asked Miles how many miles it is.",
         "category": "facts"
       },
       {
-        "raw": "Madge arrives on Thursday.",
-        "target": "Madge arrives on Thursday.",
+        "raw": "Grace thanked us with real grace.",
+        "target": "Grace thanked us with real grace.",
         "category": "facts"
       }
     ],
     "test": [
       {
-        "raw": "The lab's max are ready for the training session.",
-        "target": "The lab's Macs are ready for the training session."
+        "raw": "my g p wants to see me on tuesday",
+        "target": "My GP wants to see me on Tuesday."
       },
       {
-        "raw": "Could you madge the fix before the next release?",
-        "target": "Could you merge the fix before the next release?"
+        "raw": "the t v remote is under the sofa",
+        "target": "The TV remote is under the sofa."
       },
       {
-        "raw": "The p r changes the a p i used by the mobile client.",
-        "target": "The PR changes the API used by the mobile client."
+        "raw": "please send it to me as a p d f",
+        "target": "Please send it to me as a PDF."
       },
       {
-        "raw": "Max booked the room for the workshop.",
-        "target": "Max booked the room for the workshop.",
+        "raw": "Frank was very frank about the plan.",
+        "target": "Frank was very frank about the plan.",
         "category": "facts"
       },
       {
-        "raw": "Please send the agenda to Madge.",
-        "target": "Please send the agenda to Madge.",
+        "raw": "Rose said prices rose again this month.",
+        "target": "Rose said prices rose again this month.",
         "category": "facts"
+      }
+    ]
+  },
+  "transcript_seeds": {
+    "train": [
+      {
+        "raw": "I saved the menu as a P D F for you.",
+        "target": "I saved the menu as a PDF for you.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "I saved the menu as a PDF for you.",
+        "target": "I saved the menu as a PDF for you.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "I heard it on the B B C news this morning.",
+        "target": "I heard it on the BBC news this morning.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "The G P S sent us the wrong way round the lake.",
+        "target": "The GPS sent us the wrong way round the lake.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "They bought a new S U V for the school run.",
+        "target": "They bought a new SUV for the school run.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "The C E O is visiting the office on Monday.",
+        "target": "The CEO is visiting the office on Monday.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Is there anything good on T V tonight?",
+        "target": "Is there anything good on TV tonight?",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "We watched an old D V D last night.",
+        "target": "We watched an old DVD last night.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "I forgot my P I N at the checkout.",
+        "target": "I forgot my PIN at the checkout.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Remember to bring your I D to the bank.",
+        "target": "Remember to bring your ID to the bank.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "Remember to bring your ID to the bank.",
+        "target": "Remember to bring your ID to the bank.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "The M R I scan is booked for Saturday morning.",
+        "target": "The MRI scan is booked for Saturday morning.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "I've booked an appointment with my G P for Tuesday.",
+        "target": "I've booked an appointment with my GP for Tuesday.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Send your C V to the hiring manager.",
+        "target": "Send your CV to the hiring manager.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "We're flying back to the U K on Friday.",
+        "target": "We're flying back to the UK on Friday.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "You don't need a visa to travel in the E U.",
+        "target": "You don't need a visa to travel in the EU.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "You don't need a visa to travel in the EU.",
+        "target": "You don't need a visa to travel in the EU.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "I updated my C V last night.",
+        "target": "I updated my CV last night.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "There's a good documentary on the B B C tonight.",
+        "target": "There's a good documentary on the BBC tonight.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "There's a good documentary on the BBC tonight.",
+        "target": "There's a good documentary on the BBC tonight.",
+        "category": "unchanged",
+        "multiline": true
+      },
+      {
+        "raw": "I emailed H R about my holiday dates.",
+        "target": "I emailed HR about my holiday dates.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "We're having a B B Q on Saturday if it's sunny.",
+        "target": "We're having a BBQ on Saturday if it's sunny.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "We're having a BBQ on Saturday if it's sunny.",
+        "target": "We're having a BBQ on Saturday if it's sunny.",
+        "category": "unchanged",
+        "multiline": true
+      },
+      {
+        "raw": "Plug the U S B stick into the side of the laptop.",
+        "target": "Plug the USB stick into the side of the laptop.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Plug the USB stick into the side of the laptop.",
+        "target": "Plug the USB stick into the side of the laptop.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "Is there an A T M near the station?",
+        "target": "Is there an ATM near the station?",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Prices in the U K have gone up again.",
+        "target": "Prices in the UK have gone up again.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "The G P said to rest for a week.",
+        "target": "The GP said to rest for a week.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "Take vitamin C every morning.",
+        "target": "Take vitamin C every morning.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "Our seats are in row E, near the front.",
+        "target": "Our seats are in row E, near the front.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "Is it plan A or plan B?",
+        "target": "Is it plan A or plan B?",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "She's in group A this year.",
+        "target": "She's in group A this year.",
+        "category": "unchanged",
+        "multiline": true
+      },
+      {
+        "raw": "The flat is in block D, on the left.",
+        "target": "The flat is in block D, on the left.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "Things to do this weekend. First, pay the gas Bill. Second, call the G P. Third, Harry to the shop before it shuts.",
+        "target": "Things to do this weekend:\n1. Pay the gas bill.\n2. Call the GP.\n3. Hurry to the shop before it shuts.",
+        "category": "list-many",
+        "multiline": true
+      },
+      {
+        "raw": "My list for Monday. First, call H R about my I D. Second, book the M R I. Third, Chase the plumber for the invoice.",
+        "target": "My list for Monday:\n1. Call HR about my ID.\n2. Book the MRI.\n3. Chase the plumber for the invoice.",
+        "category": "list-many",
+        "multiline": true
+      },
+      {
+        "raw": "Jobs for Saturday. First, pay the water Bill. Second, drop my C V at the library. Third, Harry back for lunch.",
+        "target": "Jobs for Saturday:\n1. Pay the water bill.\n2. Drop my CV at the library.\n3. Hurry back for lunch.",
+        "category": "list-many",
+        "multiline": true
+      },
+      {
+        "raw": "Before the B B Q, Carrie the chairs outside, find the U S B speaker and text everyone the E T A.",
+        "target": "Before the BBQ:\n- Carry the chairs outside\n- Find the USB speaker\n- Text everyone the ETA",
+        "category": "list-many",
+        "multiline": true
+      },
+      {
+        "raw": "Before the trip, Carrie the bags to the car, save the tickets as a P D F and charge the G P S.",
+        "target": "Before the trip:\n- Carry the bags to the car\n- Save the tickets as a PDF\n- Charge the GPS",
+        "category": "list-many",
+        "multiline": true
+      },
+      {
+        "raw": "The councils plan to Madge next year.",
+        "target": "The councils plan to merge next year.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "The councils plan to Madge next year. It's been a long week.",
+        "target": "The councils plan to merge next year. It's been a long week.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "I'm in a bit of a Harry this morning, so I'll call you later.",
+        "target": "I'm in a bit of a hurry this morning, so I'll call you later.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "I'll be home by seven. I'm in a bit of a Harry this morning, so I'll call you later.",
+        "target": "I'll be home by seven. I'm in a bit of a hurry this morning, so I'll call you later.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "There's a small Nick in the table from the move.",
+        "target": "There's a small nick in the table from the move.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "We're running a bit late. There's a small Nick in the table from the move.",
+        "target": "We're running a bit late. There's a small nick in the table from the move.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "Plug the headphones into the Jack on the left.",
+        "target": "Plug the headphones into the jack on the left.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "We're running a bit late. Plug the headphones into the Jack on the left.",
+        "target": "We're running a bit late. Plug the headphones into the jack on the left.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Someone tried to Nick my bike from outside the station.",
+        "target": "Someone tried to nick my bike from outside the station.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "It's been a long week. Someone tried to Nick my bike from outside the station.",
+        "target": "It's been a long week. Someone tried to nick my bike from outside the station.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "You should Pat the fish dry before you cook it.",
+        "target": "You should pat the fish dry before you cook it.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "You should Pat the fish dry before you cook it. Let me know what you think.",
+        "target": "You should pat the fish dry before you cook it. Let me know what you think.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Thanks for your Frank feedback on the draft.",
+        "target": "Thanks for your frank feedback on the draft.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Thanks for your Frank feedback on the draft. The traffic was terrible this morning.",
+        "target": "Thanks for your frank feedback on the draft. The traffic was terrible this morning.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The dancers moved with such Grace on stage.",
+        "target": "The dancers moved with such grace on stage.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The dancers moved with such Grace on stage. We're running a bit late.",
+        "target": "The dancers moved with such grace on stage. We're running a bit late.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "We'll Madge the two guest lists into one.",
+        "target": "We'll merge the two guest lists into one.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "The weather has been awful all week. We'll Madge the two guest lists into one.",
+        "target": "The weather has been awful all week. We'll merge the two guest lists into one.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Our Summer holiday is booked for the second week of August.",
+        "target": "Our summer holiday is booked for the second week of August.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "See you on Saturday. Our Summer holiday is booked for the second week of August.",
+        "target": "See you on Saturday. Our summer holiday is booked for the second week of August.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "The birds start singing just before Dawn.",
+        "target": "The birds start singing just before dawn.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "See you on Saturday. The birds start singing just before Dawn.",
+        "target": "See you on Saturday. The birds start singing just before dawn.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "Can you Mark the date in the calendar?",
+        "target": "Can you mark the date in the calendar?",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "See you on Saturday. Can you Mark the date in the calendar?",
+        "target": "See you on Saturday. Can you mark the date in the calendar?",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Tell the kids to Harry up, the ferry is here.",
+        "target": "Tell the kids to hurry up, the ferry is here.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Tell the kids to Harry up, the ferry is here. Hope the kids are well.",
+        "target": "Tell the kids to hurry up, the ferry is here. Hope the kids are well.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Tell the kids to Harry up, the bus is here.",
+        "target": "Tell the kids to hurry up, the bus is here.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Prices Rose again this month.",
+        "target": "Prices rose again this month.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Let me know what you think. Prices Rose again this month.",
+        "target": "Let me know what you think. Prices rose again this month.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "She handled the bad news with real Grace.",
+        "target": "She handled the bad news with real grace.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "She handled the bad news with real Grace. We're running a bit late.",
+        "target": "She handled the bad news with real grace. We're running a bit late.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "What's the Harry? The shop is open until ten.",
+        "target": "What's the hurry? The shop is open until ten.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "We're running a bit late. What's the Harry? The shop is open until ten.",
+        "target": "We're running a bit late. What's the hurry? The shop is open until ten.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "What's the Harry? The shop is open until eight.",
+        "target": "What's the hurry? The shop is open until eight.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "We need to Harry or we'll miss the bus.",
+        "target": "We need to hurry or we'll miss the bus.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "We need to Harry or we'll miss the bus. I'll call you when I get there.",
+        "target": "We need to hurry or we'll miss the bus. I'll call you when I get there.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "We need to Harry or we'll miss the train.",
+        "target": "We need to hurry or we'll miss the train.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "We Drew straws to see who would drive.",
+        "target": "We drew straws to see who would drive.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "See you on Saturday. We Drew straws to see who would drive.",
+        "target": "See you on Saturday. We drew straws to see who would drive.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "I've set up a direct debit for the electricity Bill.",
+        "target": "I've set up a direct debit for the electricity bill.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "See you on Saturday. I've set up a direct debit for the electricity Bill.",
+        "target": "See you on Saturday. I've set up a direct debit for the electricity bill.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "We have a week's Grace before the rent is due.",
+        "target": "We have a week's grace before the rent is due.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "We have a week's Grace before the rent is due. See you on Saturday.",
+        "target": "We have a week's grace before the rent is due. See you on Saturday.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "Please Neil on the mat while you clean the floor.",
+        "target": "Please kneel on the mat while you clean the floor.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Please Neil on the mat while you clean the floor. Let me know what you think.",
+        "target": "Please kneel on the mat while you clean the floor. Let me know what you think.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "To be Frank, I didn't enjoy the film.",
+        "target": "To be frank, I didn't enjoy the film.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "I'll call you when I get there. To be Frank, I didn't enjoy the film.",
+        "target": "I'll call you when I get there. To be frank, I didn't enjoy the film.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "To be Frank, I didn't enjoy the meal.",
+        "target": "To be frank, I didn't enjoy the meal.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The Jerry is still out on the new menu.",
+        "target": "The jury is still out on the new menu.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "The Jerry is still out on the new menu. The traffic was terrible this morning.",
+        "target": "The jury is still out on the new menu. The traffic was terrible this morning.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The Jerry is still out on the new logo.",
+        "target": "The jury is still out on the new logo.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The hotel is three Miles from the beach.",
+        "target": "The hotel is three miles from the beach.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "The hotel is three Miles from the beach. I'll call you when I get there.",
+        "target": "The hotel is three miles from the beach. I'll call you when I get there.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "Give the dog a Pat on the head.",
+        "target": "Give the dog a pat on the head.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "I'll call you when I get there. Give the dog a Pat on the head.",
+        "target": "I'll call you when I get there. Give the dog a pat on the head.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "She was called up for Jerry service next month.",
+        "target": "She was called up for jury service next month.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "We're running a bit late. She was called up for Jerry service next month.",
+        "target": "We're running a bit late. She was called up for jury service next month.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The Jerry took three days to reach a verdict.",
+        "target": "The jury took three days to reach a verdict.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "It's been a long week. The Jerry took three days to reach a verdict.",
+        "target": "It's been a long week. The jury took three days to reach a verdict.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "It takes a lot of Will power to stay off sugar.",
+        "target": "It takes a lot of will power to stay off sugar.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "It's been a long week. It takes a lot of Will power to stay off sugar.",
+        "target": "It's been a long week. It takes a lot of will power to stay off sugar.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The two lanes Madge just after the roundabout.",
+        "target": "The two lanes merge just after the roundabout.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "The two lanes Madge just after the roundabout. The traffic was terrible this morning.",
+        "target": "The two lanes merge just after the roundabout. The traffic was terrible this morning.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "She left the house to her nephew in her Will.",
+        "target": "She left the house to her nephew in her will.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "I'll be home by seven. She left the house to her nephew in her Will.",
+        "target": "I'll be home by seven. She left the house to her nephew in her will.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Remember to Carrie an umbrella, it's going to rain.",
+        "target": "Remember to carry an umbrella, it's going to rain.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Let me know what you think. Remember to Carrie an umbrella, it's going to rain.",
+        "target": "Let me know what you think. Remember to carry an umbrella, it's going to rain.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "We got there just in the Nick of time.",
+        "target": "We got there just in the nick of time.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "I'll call you when I get there. We got there just in the Nick of time.",
+        "target": "I'll call you when I get there. We got there just in the nick of time.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "My daughter Drew a picture of the dog.",
+        "target": "My daughter drew a picture of the dog.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "I'll be home by seven. My daughter Drew a picture of the dog.",
+        "target": "I'll be home by seven. My daughter drew a picture of the dog.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "I'll Carrie the boxes up to the attic after lunch.",
+        "target": "I'll carry the boxes up to the attic after lunch.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "I'll Carrie the boxes up to the attic after lunch. It's been a long week.",
+        "target": "I'll carry the boxes up to the attic after lunch. It's been a long week.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "I'll Carrie the boxes up to the spare room after lunch.",
+        "target": "I'll carry the boxes up to the spare room after lunch.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The corner shop doesn't Carrie that brand any more.",
+        "target": "The corner shop doesn't carry that brand any more.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "The corner shop doesn't Carrie that brand any more. I'll call you when I get there.",
+        "target": "The corner shop doesn't carry that brand any more. I'll call you when I get there.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "He made a new Will before the operation.",
+        "target": "He made a new will before the operation.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "I'll be home by seven. He made a new Will before the operation.",
+        "target": "I'll be home by seven. He made a new will before the operation.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The Bill came to forty pounds, including the tip.",
+        "target": "The bill came to forty pounds, including the tip.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The Bill came to forty pounds, including the tip. Hope the kids are well.",
+        "target": "The bill came to forty pounds, including the tip. Hope the kids are well.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Miles walked three miles to the station.",
+        "target": "Miles walked three miles to the station.",
+        "category": "unchanged",
+        "multiline": true
+      },
+      {
+        "raw": "Madge is coming to the party with her sister.",
+        "target": "Madge is coming to the party with her sister.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "Our neighbour Dawn feeds the cat when we're away.",
+        "target": "Our neighbour Dawn feeds the cat when we're away.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "My brother Jack fixed the fence.",
+        "target": "My brother Jack fixed the fence.",
+        "category": "unchanged",
+        "multiline": true
+      },
+      {
+        "raw": "Thanks, Grace, that was really kind.",
+        "target": "Thanks, Grace, that was really kind.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "Summer starts her new job on Monday.",
+        "target": "Summer starts her new job on Monday.",
+        "category": "unchanged",
+        "multiline": true
+      },
+      {
+        "raw": "Harry is picking us up at six.",
+        "target": "Harry is picking us up at six.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "We met Chase at the school gate.",
+        "target": "We met Chase at the school gate.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "Can you carry this bag for Carrie?",
+        "target": "Can you carry this bag for Carrie?",
+        "category": "unchanged",
+        "multiline": true
+      },
+      {
+        "raw": "Will you ask Will to call me back?",
+        "target": "Will you ask Will to call me back?",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "Ask Carrie if she wants to come to the cinema.",
+        "target": "Ask Carrie if she wants to come to the cinema.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "Rose and Mark are getting married in June.",
+        "target": "Rose and Mark are getting married in June.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "Frank and Jerry are bringing the drinks.",
+        "target": "Frank and Jerry are bringing the drinks.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "Nick is driving, so Jack can relax.",
+        "target": "Nick is driving, so Jack can relax.",
+        "category": "unchanged",
+        "multiline": true
+      },
+      {
+        "raw": "I'll see Frank on Thursday.",
+        "target": "I'll see Frank on Thursday.",
+        "category": "unchanged",
+        "multiline": false
+      }
+    ],
+    "valid": [
+      {
+        "raw": "The T V in the kitchen has stopped working.",
+        "target": "The TV in the kitchen has stopped working.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The shelves were a D I Y job, so they're a bit wonky.",
+        "target": "The shelves were a DIY job, so they're a bit wonky.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Please R S V P by the end of the week.",
+        "target": "Please RSVP by the end of the week.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "They asked for photo I D at the door.",
+        "target": "They asked for photo ID at the door.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The answer is in the F A Q on their website.",
+        "target": "The answer is in the FAQ on their website.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "Option B looks better to me.",
+        "target": "Option B looks better to me.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "For the party. First, send the R S V P cards. Second, book the B B Q. Third, Mark the date in the calendar.",
+        "target": "For the party:\n1. Send the RSVP cards.\n2. Book the BBQ.\n3. Mark the date in the calendar.",
+        "category": "list-many",
+        "multiline": true
+      },
+      {
+        "raw": "There's a dirty Mark on the kitchen wall.",
+        "target": "There's a dirty mark on the kitchen wall.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The traffic was terrible this morning. There's a dirty Mark on the kitchen wall.",
+        "target": "The traffic was terrible this morning. There's a dirty mark on the kitchen wall.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Can you help me Carrie the shopping inside?",
+        "target": "Can you help me carry the shopping inside?",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Can you help me Carrie the shopping inside? Let me know what you think.",
+        "target": "Can you help me carry the shopping inside? Let me know what you think.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "We're going to Scotland this Summer.",
+        "target": "We're going to Scotland this summer.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "We're going to Scotland this Summer. I'll be home by seven.",
+        "target": "We're going to Scotland this summer. I'll be home by seven.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "It finally Dawned on me that the shop was closed.",
+        "target": "It finally dawned on me that the shop was closed.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "See you on Saturday. It finally Dawned on me that the shop was closed.",
+        "target": "See you on Saturday. It finally dawned on me that the shop was closed.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "We walked about ten Miles on Saturday.",
+        "target": "We walked about ten miles on Saturday.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "Let me know what you think. We walked about ten Miles on Saturday.",
+        "target": "Let me know what you think. We walked about ten miles on Saturday.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "We walked about ten Miles on Friday.",
+        "target": "We walked about ten miles on Friday.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Can you pay the water Bill before Tuesday?",
+        "target": "Can you pay the water bill before Tuesday?",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "Can you pay the water Bill before Tuesday? See you on Saturday.",
+        "target": "Can you pay the water bill before Tuesday? See you on Saturday.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Can you pay the gas Bill before Friday?",
+        "target": "Can you pay the gas bill before Friday?",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "We left at Dawn to beat the traffic.",
+        "target": "We left at dawn to beat the traffic.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "We left at Dawn to beat the traffic. We're running a bit late.",
+        "target": "We left at dawn to beat the traffic. We're running a bit late.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The river Rose after all the rain last week.",
+        "target": "The river rose after all the rain last week.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The river Rose after all the rain last week. The traffic was terrible this morning.",
+        "target": "The river rose after all the rain last week. The traffic was terrible this morning.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Bill said the gas bill went up again.",
+        "target": "Bill said the gas bill went up again.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "Pat gave the dog a pat on the head.",
+        "target": "Pat gave the dog a pat on the head.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "Drew drew a map of the route for us.",
+        "target": "Drew drew a map of the route for us.",
+        "category": "unchanged",
+        "multiline": false
+      }
+    ],
+    "test": [
+      {
+        "raw": "Can you call me back A S A P?",
+        "target": "Can you call me back ASAP?",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "The N H S app has all my records.",
+        "target": "The NHS app has all my records.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Can you send the tickets as a P D F?",
+        "target": "Can you send the tickets as a PDF?",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "She's worked for the N H S for twenty years.",
+        "target": "She's worked for the NHS for twenty years.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The A T M kept my card again.",
+        "target": "The ATM kept my card again.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The ATM kept my card again.",
+        "target": "The ATM kept my card again.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "What's your E T A for the party?",
+        "target": "What's your ETA for the party?",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "What's your ETA for the party?",
+        "target": "What's your ETA for the party?",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "We got V I P tickets for the concert.",
+        "target": "We got VIP tickets for the concert.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "We got VIP tickets for the concert.",
+        "target": "We got VIP tickets for the concert.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "I got a B in the maths test.",
+        "target": "I got a B in the maths test.",
+        "category": "unchanged",
+        "multiline": true
+      },
+      {
+        "raw": "To get the flat ready, Carrie the boxes upstairs, Mark the ones for the attic and fix the T V.",
+        "target": "To get the flat ready:\n- Carry the boxes upstairs\n- Mark the ones for the attic\n- Fix the TV",
+        "category": "list-many",
+        "multiline": true
+      },
+      {
+        "raw": "The garden looks lovely in the Summer.",
+        "target": "The garden looks lovely in the summer.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The garden looks lovely in the Summer. I'll call you when I get there.",
+        "target": "The garden looks lovely in the summer. I'll call you when I get there.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Please Mark the boxes that need to go upstairs.",
+        "target": "Please mark the boxes that need to go upstairs.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "We're running a bit late. Please Mark the boxes that need to go upstairs.",
+        "target": "We're running a bit late. Please mark the boxes that need to go upstairs.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "She Rose early to catch the first flight.",
+        "target": "She rose early to catch the first flight.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "She Rose early to catch the first flight. The traffic was terrible this morning.",
+        "target": "She rose early to catch the first flight. The traffic was terrible this morning.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The dog loves to Chase the ball in the park.",
+        "target": "The dog loves to chase the ball in the park.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The dog loves to Chase the ball in the park. Hope the kids are well.",
+        "target": "The dog loves to chase the ball in the park. Hope the kids are well.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "My car has done a lot of Miles this year.",
+        "target": "My car has done a lot of miles this year.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "Let me know what you think. My car has done a lot of Miles this year.",
+        "target": "Let me know what you think. My car has done a lot of miles this year.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "I had to Chase them twice for the invoice.",
+        "target": "I had to chase them twice for the invoice.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "I'll call you when I get there. I had to Chase them twice for the invoice.",
+        "target": "I'll call you when I get there. I had to chase them twice for the invoice.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "You'll have to Neil down to reach the plug.",
+        "target": "You'll have to kneel down to reach the plug.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "I'll be home by seven. You'll have to Neil down to reach the plug.",
+        "target": "I'll be home by seven. You'll have to kneel down to reach the plug.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The match Drew a huge crowd on Tuesday.",
+        "target": "The match drew a huge crowd on Tuesday.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "The match Drew a huge crowd on Tuesday. Thanks again for dinner last night.",
+        "target": "The match drew a huge crowd on Tuesday. Thanks again for dinner last night.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The match Drew a huge crowd on Friday.",
+        "target": "The match drew a huge crowd on Friday.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "We had a very Frank conversation about the budget.",
+        "target": "We had a very frank conversation about the budget.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "The weather has been awful all week. We had a very Frank conversation about the budget.",
+        "target": "The weather has been awful all week. We had a very frank conversation about the budget.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "Let's cut to the Chase and talk about the price.",
+        "target": "Let's cut to the chase and talk about the price.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "Hope the kids are well. Let's cut to the Chase and talk about the price.",
+        "target": "Hope the kids are well. Let's cut to the chase and talk about the price.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "We need a Jack to change the tyre.",
+        "target": "We need a jack to change the tyre.",
+        "category": "recognition",
+        "multiline": true
+      },
+      {
+        "raw": "We need a Jack to change the tyre. The weather has been awful all week.",
+        "target": "We need a jack to change the tyre. The weather has been awful all week.",
+        "category": "recognition",
+        "multiline": false
+      },
+      {
+        "raw": "I told Harry there's no hurry.",
+        "target": "I told Harry there's no hurry.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "Dawn is on holiday until Friday.",
+        "target": "Dawn is on holiday until Friday.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "Neil asked us all to kneel for the photo.",
+        "target": "Neil asked us all to kneel for the photo.",
+        "category": "unchanged",
+        "multiline": false
+      },
+      {
+        "raw": "Grace sent a lovely card to say thanks.",
+        "target": "Grace sent a lovely card to say thanks.",
+        "category": "unchanged",
+        "multiline": true
       }
     ]
   }

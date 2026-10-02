@@ -59,7 +59,9 @@ public struct DeepExampleValidator: Sendable {
                 problems.append("may only change casing and punctuation, or drop a doubled word")
             }
         case .grammar, .recognition:
-            if targetWords == inputWords {
+            // A common word speech-to-text wrote as a name ("in the Summer") is fixed by its capital.
+            let recapitalised = example.category == .recognition && Self.recapitalises(from: input, to: example.target)
+            if targetWords == inputWords && !recapitalised {
                 problems.append("must fix a word")
             }
             if cuesSaid > 0 {
@@ -103,11 +105,47 @@ public struct DeepExampleValidator: Sendable {
             if cuesWritten > cuesSaid {
                 problems.append("a correction takes its cue out; it doesn't add one")
             }
+        case .composite:
+            // Each dictation joined is checked as part of the whole, by the guard above.
+            if laidOut {
+                problems.append("dictations joined stay paragraphs, not a layout")
+            }
         }
         return problems
     }
 
     private func words(_ text: String) -> [String] {
         EditDistance.words(in: EditDistance.normalize(text))
+    }
+
+    /// Whether `target` writes a word of `input` with another capital where neither starts a
+    /// sentence or a line, the words being otherwise the same.
+    static func recapitalises(from input: String, to target: String) -> Bool {
+        let said = casedWords(in: input)
+        let written = casedWords(in: target)
+        guard said.count == written.count else { return false }
+        return zip(said, written).contains { said, written in
+            !said.startsSentence && !written.startsSentence
+                && said.word != written.word && said.word.lowercased() == written.word.lowercased()
+        }
+    }
+
+    /// The words of `text` with their case, split as ``EditDistance/normalize(_:)`` splits them,
+    /// each with whether it starts a sentence or a line.
+    private static func casedWords(in text: String) -> [(word: String, startsSentence: Bool)] {
+        let edges = CharacterSet.punctuationCharacters.union(.symbols).subtracting(CharacterSet(charactersIn: "'\u{2019}"))
+        var words: [(word: String, startsSentence: Bool)] = []
+        for line in text.split(whereSeparator: \.isNewline) {
+            var startsSentence = true
+            for chunk in line.split(whereSeparator: { $0.isWhitespace || "-\u{2014}\u{2013}".contains($0) }) {
+                let word = chunk.trimmingCharacters(in: edges).trimmingCharacters(in: CharacterSet(charactersIn: "'\u{2019}"))
+                if !word.isEmpty {
+                    words.append((word, startsSentence))
+                }
+                startsSentence = chunk.contains(where: { ".?!".contains($0) })
+                    && chunk.trimmingCharacters(in: CharacterSet(charactersIn: "\"')]\u{201D}\u{2019}")).last.map { ".?!".contains($0) } == true
+            }
+        }
+        return words
     }
 }

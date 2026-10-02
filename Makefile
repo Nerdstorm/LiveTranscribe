@@ -68,6 +68,7 @@ test: ## Unit tests, which need no models
 	scripts/tests/fetch-release-tests.sh
 	scripts/tests/check-swift-runtime-tests.sh
 	python3 scripts/tests/prepare-cleanup-data-tests.py
+	python3 scripts/tests/cleanup-scoring-tests.py
 
 test-integration: audio ## End-to-end tests with the real models, which they download (about 2 GB)
 	cd $(PACKAGE) && TEST_RUNNER_LT_RUN_MODEL_TESTS=1 $(PACKAGE_TESTS) -only-testing:IntegrationTests
