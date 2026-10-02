@@ -249,6 +249,51 @@ struct SelfRepairTests {
         #expect(review("The shop closes at 3 p.m. today. Sorry, I meant at 10 a.m.", cleaned) == .accepted(cleaned))
     }
 
+    /// A phrase that opens the way its sentence did starts it again ("Ship it" → "hold it"), so
+    /// it takes back from where the sentence opened, and never leaves its start in front.
+    @Test("A phrase that opens the way its sentence did starts it again", arguments: [
+        ("Ship it to Prague, scratch that, hold it until September.", "Hold it until September."),
+        ("ship it to prague scratch that hold it until june", "Hold it until June."),
+        ("Ship it to Lisbon, scratch that, hold it until November.", "Hold it until November."),
+        ("Ship it to Prague, scratch that, Vienna.", "Ship it to Vienna."),
+        ("Book the early flight. Scratch that. Book the afternoon one.", "Book the afternoon one."),
+        ("Put the box on the table, sorry, under the table.", "Put the box under the table."),
+        ("We need to restart the off service. Actually, the database.", "We need to restart the database."),
+        ("The leak is under the sink, rather, behind the dishwasher.", "The leak is behind the dishwasher."),
+    ])
+    func startsASentenceAgain(raw: String, cleaned: String) {
+        #expect(review(raw, cleaned) == .accepted(cleaned))
+    }
+
+    @Test("A sentence started again never keeps its start in front", arguments: [
+        ("Ship it to Prague, scratch that, hold it until September.", "Ship it to hold it until September."),
+        ("ship it to prague scratch that hold it until june", "Ship it to hold it until June."),
+        ("Ship it to Lisbon, scratch that, hold it until November.", "Ship it to Hold it until November."),
+    ])
+    func rejectsKeepingTheStartOfASentenceStartedAgain(raw: String, cleaned: String) {
+        #expect(review(raw, cleaned) == .rejected(.invalidRepair))
+    }
+
+    /// The corrected words said again after "not" are what a correction takes back, and the
+    /// words beside them stay.
+    @Test("A correction takes back the corrected words said again", arguments: [
+        ("the physio team sorry not physio nursing will join the call at noon", "The nursing team will join the call at noon."),
+        ("Kofi's brother, no wait, not brother, cousin, is hosting the barbecue.", "Kofi's cousin is hosting the barbecue."),
+        ("nikhil's team sorry not nikhil's siobhan's owns the billing service", "Siobhan's team owns the billing service."),
+    ])
+    func takesBackTheWordsSaidAgain(raw: String, cleaned: String) {
+        #expect(review(raw, cleaned) == .accepted(cleaned))
+    }
+
+    @Test("A correction takes back no more than the corrected words said again", arguments: [
+        ("the physio team sorry not physio nursing will join the call at noon", "The nursing will join the call at noon."),
+        ("Kofi's brother, no wait, not brother, cousin, is hosting the barbecue.", "Cousin is hosting the barbecue."),
+        ("nikhil's team sorry not nikhil's siobhan's owns the billing service", "Siobhan's owns the billing service."),
+    ])
+    func rejectsTakingBackMoreThanTheWordsSaidAgain(raw: String, cleaned: String) {
+        #expect(review(raw, cleaned) == .rejected(.invalidRepair))
+    }
+
     @Test("A cue followed by \"not\" and the corrected words said again goes with them", arguments: [
         ("The meeting is in room four, no, not four, five.", "The meeting is in room five."),
         ("Book the flight for Tuesday, sorry, not Tuesday, Thursday morning.", "Book the flight for Thursday morning."),

@@ -36,6 +36,10 @@ extension SelfRepair {
     /// that word too ("The billing service goes live. Sorry, I mean the login service." → "The
     /// login service goes live."). Nor does a fact or a name leave the one of its sort just before
     /// the words it corrects ("three servers, sorry, four" corrects "three", never only "servers").
+    /// Medium's take back no more than the corrected words said again ("the physio team, sorry,
+    /// not physio, nursing" is never "the nursing"), and no less than a sentence that a phrase
+    /// opening the way it did starts again ("Ship it to Prague, scratch that, hold it until
+    /// September" is never "Ship it to hold it until September").
     enum Corrections {
         /// Medium's corrections in the words said, by said index.
         struct Spans {
@@ -77,6 +81,11 @@ extension SelfRepair {
                 // A lone "No" after a question answers it ("Is it on Tuesday? No, not Tuesday,
                 // Thursday."), as ``once(_:repair:placeholders:)`` reads it.
                 let answers = crosses && words[cueStart - 1].endsQuestion && words[cueStart].word == "no"
+                // The first word that carries meaning in the sentence the corrected words end, if
+                // the cues can take back from there.
+                let first = (words[..<max(cueStart - 1, 0)].lastIndex(where: \.endsSentence) ?? -1) + 1
+                let opening = words[first..<cueStart].firstIndex(where: repair.carriesMeaning)
+                    .flatMap { $0 + repair.retractionLimit >= cueStart ? $0 : nil }
                 for start in max(0, cueStart - repair.retractionLimit)..<cueStart {
                     let corrected = words[start..<cueStart]
                     guard !corrected.dropLast().contains(where: \.endsSentence),
@@ -97,16 +106,21 @@ extension SelfRepair {
                         return !(saysMoreThanAFact && first.map { repair.factKind($0) != nil } == true)
                     }
                     // A phrase starts after the whole run of cues, and after the corrected words
-                    // said again.
+                    // said again, which are all it takes back: "the physio team, sorry, not
+                    // physio, nursing" corrects "physio", and is never "the nursing".
                     for runEnd in runEnds where !(answers && runEnd - cueStart == 1) {
                         for (end, restated) in phraseStarts(after: runEnd, in: words, repair: repair)
                         where (end == words.count || !repair.isCue(words[end].word))
-                            && restated.map({ repair.restates(words[$0], corrected) }) ?? true
-                            && (!crosses || retractsStatement
-                                || restated.map({ repair.restates(corrected, words[$0]) }) == true
-                                || standsIn(from: end)) {
+                            && restated.map({ repair.restates(words[$0], corrected) && repair.restates(corrected, words[$0]) }) ?? true
+                            && (!crosses || retractsStatement || restated != nil || standsIn(from: end)) {
                             let length = min(Alignment.phraseLength(from: end, in: words), SelfRepair.correctionPhraseWords)
                             let phrase = words[end..<(end + length)]
+                            // A phrase that opens the way its sentence did starts it again, and
+                            // takes back from there: "Ship it to Prague, scratch that, hold it
+                            // until September" is never "Ship it to hold it until September".
+                            if let opening, start > opening, repair.restarts(words[opening..<cueStart], phrase: phrase) {
+                                continue
+                            }
                             guard !repair.leavesTakenBack(words, corrected: start..<cueStart, phrase: phrase) else { continue }
                             if !retractsStatement {
                                 guard repair.phrase(phrase, takesBackFactsIn: corrected, placeholders: placeholders) else {
@@ -398,6 +412,26 @@ extension SelfRepair {
     }
 
     // MARK: - Meaning
+
+    /// Whether a correction's `phrase` starts again the sentence whose words from its first that
+    /// carries meaning up to the cues are `said`: the phrase's first word is that word ("Book the
+    /// early flight. Scratch that. Book the afternoon one."); or carries meaning in its place, and
+    /// its second is the word said next ("ship it" → "hold it"); or says nothing new before a
+    /// second that is that word ("ship it" → "just ship it"). A word is said again as itself, or
+    /// as another form of a word that carries meaning.
+    func restarts(_ said: ArraySlice<SaidWord>, phrase: ArraySlice<SaidWord>) -> Bool {
+        let opening = phrase.filter { !isFiller($0.word) }
+        guard let lead = opening.first, let first = said.first else { return false }
+        func saysAgain(_ said: SaidWord, _ word: SaidWord) -> Bool {
+            said.word == word.word || (carriesMeaning(said) && WordForms.areForms(said.word, word.word))
+        }
+        if saysAgain(first, lead) { return true }
+        guard opening.count > 1 else { return false }
+        let next = opening[1]
+        let leadsIn = !carriesMeaning(lead) || WordForms.droppable.contains(lead.word)
+        return (carriesMeaning(lead) && said.dropFirst().first.map { saysAgain($0, next) } == true)
+            || (leadsIn && saysAgain(first, next))
+    }
 
     /// Whether `word` says something a correction can take back or say instead: it holds more than
     /// the grammar together, and isn't a filler, a cue, or a cue as speech-to-text misheard it

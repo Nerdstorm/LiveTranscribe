@@ -929,3 +929,54 @@ fn an_abbreviation_ends_a_sentence_only_before_a_capital() {
         "The shop closes at 10 a.m. today.",
     )]);
 }
+
+#[test]
+fn a_phrase_that_opens_the_way_its_sentence_did_starts_it_again() {
+    let prague = "Ship it to Prague, scratch that, hold it until September.";
+    let june = "ship it to prague scratch that hold it until june";
+    let lisbon = "Ship it to Lisbon, scratch that, hold it until November.";
+    assert_rejected(&[
+        (prague, "Ship it to hold it until September."),
+        (june, "Ship it to hold it until June."),
+        (lisbon, "Ship it to Hold it until November."),
+    ]);
+    assert_accepted(&[
+        (prague, "Hold it until September."),
+        (june, "Hold it until June."),
+        (lisbon, "Hold it until November."),
+        ("Ship it to Prague, scratch that, Vienna.", "Ship it to Vienna."),
+        (
+            "Book the early flight. Scratch that. Book the afternoon one.",
+            "Book the afternoon one.",
+        ),
+        (
+            "Put the box on the table, sorry, under the table.",
+            "Put the box under the table.",
+        ),
+        (
+            "We need to restart the off service. Actually, the database.",
+            "We need to restart the database.",
+        ),
+        (
+            "The leak is under the sink, rather, behind the dishwasher.",
+            "The leak is behind the dishwasher.",
+        ),
+    ]);
+}
+
+#[test]
+fn a_correction_takes_back_no_more_than_the_corrected_words_said_again() {
+    let physio = "the physio team sorry not physio nursing will join the call at noon";
+    let kofi = "Kofi's brother, no wait, not brother, cousin, is hosting the barbecue.";
+    let nikhil = "nikhil's team sorry not nikhil's siobhan's owns the billing service";
+    assert_rejected(&[
+        (physio, "The nursing will join the call at noon."),
+        (kofi, "Cousin is hosting the barbecue."),
+        (nikhil, "Siobhan's owns the billing service."),
+    ]);
+    assert_accepted(&[
+        (physio, "The nursing team will join the call at noon."),
+        (kofi, "Kofi's cousin is hosting the barbecue."),
+        (nikhil, "Siobhan's team owns the billing service."),
+    ]);
+}
