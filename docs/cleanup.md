@@ -93,7 +93,7 @@ vocabulary (Linux and Windows have none yet).
   speech-to-text writes as a full stop, "a few things we need. Getting the feeds working and
   releasing the fix", or with a comma after words that count them, "two things, …"), and a
   placeholder alone on a line. When Deep's answer is turned down, Medium's pass runs in the time
-  left, so Deep never shows less than Medium would.
+  left, and its answer is shown if Deep's check accepts it too; otherwise you get what you said.
 - **With the language model off**, nothing is reworded. Medium, High and Deep still remove fillers
   and lay out lists and letters in dictation, and snippets, vocabulary and spoken commands still
   apply. The switch is **Clean up transcripts with the LLM** in **Settings › Advanced**; on the

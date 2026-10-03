@@ -79,6 +79,12 @@ extension CleanupFixtures.Executor {
             Case(name: "unfinished thinking gets Medium's cleanup", deep: deepCleanup(thinking: true, minimumTimeoutSeconds: 8), options: deep, raw: lease, script: [.reply("<think>\nApril, then"), .reply("The lease ends in May.")]),
             Case(name: "leaked thinking tags get Medium's cleanup", options: deep, raw: lease, script: [.reply("<think>April</think> The lease ends in May."), .reply("The lease ends in May.")]),
             Case(name: "a preamble gets Medium's cleanup", options: deep, raw: lease, script: [.reply("Here is the text: The lease ends in May."), .reply("The lease ends in May.")]),
+            Case(
+                name: "Medium's cleanup that fails Deep's check shows what was said",
+                options: deep,
+                raw: "Kofi's brother, no wait, not brother, cousin, is hosting the barbecue.",
+                script: [.reply("Here is the text: Kofi's cousin is hosting the barbecue."), .reply("Cousin is hosting the barbecue.")]
+            ),
 
             // Medium's pass first, whatever each pass does.
             Case(

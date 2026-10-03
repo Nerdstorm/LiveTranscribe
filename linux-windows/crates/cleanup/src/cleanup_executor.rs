@@ -58,7 +58,8 @@ impl CleanedText {
 /// Deep runs as [`DeepCleanup`] says: its own prompt, with or without the adapter, thinking or
 /// not, after Medium's pass or on its own, under a longer deadline. When its repair is turned
 /// down, Medium's result is used, from the pass before it or one run in the time left: a success
-/// at Medium's standard, not a fallback.
+/// at Medium's standard, not a fallback. A result from the pass run in the time left must pass
+/// Deep's check as well.
 #[derive(Clone)]
 pub struct CleanupExecutor {
     context_limit: usize,
@@ -194,7 +195,10 @@ impl CleanupExecutor {
     /// correction cue in the text, Medium's pass resolves what it can first; if Deep's pass is then
     /// rejected or out of time, Medium's result is kept, a success at Medium's standard. Otherwise,
     /// when Deep's answer is turned down, Medium's pass runs in the time left
-    /// ([`DeepCleanup::falls_back_to_medium`]).
+    /// ([`DeepCleanup::falls_back_to_medium`]), and its answer is shown only if Deep's check
+    /// accepts it too: Medium's guard lets through some meaning changes that Deep's turns down,
+    /// such as a correction that takes back more than it corrects. Otherwise Deep's reason is
+    /// reported and what was said is shown.
     fn repairing<M: CleanupModel>(
         &self,
         input: &str,
@@ -246,7 +250,14 @@ impl CleanupExecutor {
             return repaired;
         }
         let fallback = self.pass(input, context, &resolving, left, model, cancel);
-        if !matches!(fallback, GuardVerdict::Accepted(_)) {
+        let GuardVerdict::Accepted(answer) = &fallback else {
+            return repaired;
+        };
+        let checked = self
+            .output_guard
+            .review(input, &GenerationOutcome::Completed(answer.clone()), options);
+        if let GuardVerdict::Rejected(check) = checked {
+            tracing::info!("Deep repair rejected ({reason}), and Medium's cleanup fails Deep's check: {check}");
             return repaired;
         }
         tracing::info!("Deep repair rejected, showing Medium's cleanup: {reason}");
