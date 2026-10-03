@@ -88,10 +88,102 @@ struct ListFormatterTests {
         "We need one, two or three volunteers.",
         "I only need one.",
         "One is enough.",
-        "One is the budget. Second, the timeline.",
     ])
     func leavesOtherCardinals(text: String) {
         #expect(formatter.formatted(text) == nil)
+    }
+
+    @Test("A list may switch between ordinals, cardinals and \"number\"", arguments: [
+        ("First, book the venue. Two, send the invites.", "1. Book the venue\n2. Send the invites"),
+        ("One is the budget. Second, the timeline.", "1. The budget\n2. The timeline"),
+        ("One, book the venue. Number two, send the invites.", "1. Book the venue\n2. Send the invites"),
+        ("Number one, book the venue. Two, send the invites.", "1. Book the venue\n2. Send the invites"),
+        ("Number one, book the venue. Second, send the invites.", "1. Book the venue\n2. Send the invites"),
+        ("First, book the venue. Number two is send the invites.", "1. Book the venue\n2. Send the invites"),
+        (
+            "First, book the venue. Second, send the invites. Three, order the food.",
+            "1. Book the venue\n2. Send the invites\n3. Order the food"
+        ),
+        (
+            "One, book the venue. Two, send the invites. Number three, order the food.",
+            "1. Book the venue\n2. Send the invites\n3. Order the food"
+        ),
+        (
+            "We need two things: one, the venue; and item two, the invites.",
+            "We need two things:\n1. The venue\n2. The invites"
+        ),
+    ])
+    func switchesMarkerStyles(text: String, list: String) {
+        #expect(formatter.formatted(text) == list)
+    }
+
+    @Test("Numbers inside an item stay in it when the markers around them start sentences", arguments: [
+        (
+            "I have two questions. One, are we sure that when we fix one and two, then the build will pass? Number two, what does it cost?",
+            "I have two questions:\n1. Are we sure that when we fix one and two, then the build will pass?\n2. What does it cost?"
+        ),
+        (
+            "One, when we fix one, and two, then does it pass? Number two, what does it cost?",
+            "1. When we fix one, and two, then does it pass?\n2. What does it cost?"
+        ),
+        (
+            "One, if we do it, one, and two, then does it pass? Number two, what does it cost?",
+            "1. If we do it, one, and two, then does it pass?\n2. What does it cost?"
+        ),
+        ("First, pick one, two, then ship. Second, test it.", "1. Pick one, two, then ship\n2. Test it"),
+    ])
+    func numbersInsideAnItemStayInIt(text: String, list: String) {
+        #expect(formatter.formatted(text) == list)
+    }
+
+    @Test("Leaves markers of other styles that don't make a list", arguments: [
+        "Number one, two, three, go!",
+        "We're number one. Number two is Apple.",
+        "Speed is number one, number two is cost.",
+        "First, the budget. Number three, the timeline.",
+        "One, speed. Two people came.",
+        "Number two, the venue. Three, the invites.",
+    ])
+    func leavesOtherStyles(text: String) {
+        #expect(formatter.formatted(text) == nil)
+    }
+
+    @Test("A number said the other way inside an item stays in it", arguments: [
+        (
+            "One, go to the shops. First thing tomorrow, call the mechanic. Two, buy eggs.",
+            "1. Go to the shops. First thing tomorrow, call the mechanic\n2. Buy eggs"
+        ),
+        (
+            "One, check the logs. First we look at the errors. Two, tell the team.",
+            "1. Check the logs. First we look at the errors\n2. Tell the team"
+        ),
+        (
+            "First, check the logs. One is that they are big. Second, tell the team.",
+            "1. Check the logs. One is that they are big\n2. Tell the team"
+        ),
+        (
+            "First, the release. Number one priority is speed. Second, the docs.",
+            "1. The release. Number one priority is speed\n2. The docs"
+        ),
+        (
+            "One, go to the shops. Second thing, call the mechanic. Two, buy eggs.",
+            "1. Go to the shops. Second thing, call the mechanic\n2. Buy eggs"
+        ),
+        (
+            "First, check the logs. Two is that they are big. Second, tell the team.",
+            "1. Check the logs. Two is that they are big\n2. Tell the team"
+        ),
+    ])
+    func numbersSaidTheOtherWayStayInTheirItem(text: String, list: String) {
+        #expect(formatter.formatted(text) == list)
+    }
+
+    /// A one said the way the list's two is said starts the list after a one said the other way.
+    @Test func aOneSaidTheWayTheTwoIsStartsTheList() {
+        #expect(formatter.formatted("First, a quick update. One, the build. Two, the docs.")
+            == "First, a quick update:\n1. The build\n2. The docs")
+        #expect(formatter.formatted("First, an update, one, the build. Two, the docs.")
+            == "First, an update:\n1. The build\n2. The docs")
     }
 
     /// A one that isn't followed by two leaves the list to a later one.

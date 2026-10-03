@@ -11,8 +11,8 @@ public enum CleanupLevel: String, CaseIterable, Codable, Sendable, Identifiable 
     /// self-corrections.
     case light
     /// Light, plus fillers removed, spoken self-corrections resolved ("Tuesday, no wait,
-    /// Wednesday" → "Wednesday") and spoken lists and letters laid out where the text field
-    /// allows lines.
+    /// Wednesday" → "Wednesday"), spoken lists and letters laid out where the text field
+    /// allows lines, and spoken numbers written in digits.
     case medium
     /// Medium, plus light rewording for grammar and clarity.
     case high
@@ -60,6 +60,10 @@ public enum CleanupLevel: String, CaseIterable, Codable, Sendable, Identifiable 
     /// Spoken lists ("first…, second…", "number one…") become numbered or bulleted lines, and a
     /// letter's greeting and sign-off go on lines of their own, in multi-line fields.
     public var formatsLayout: Bool { self >= .medium }
+
+    /// Spoken numbers are written in digits after cleanup ("twenty one chairs" → "21 chairs"), in
+    /// every field: from Medium up, the levels that lay out lists.
+    public var writesNumbers: Bool { self >= .medium }
 
     /// The model may reword for grammar and clarity, not only correct: High only. Deep fixes
     /// grammar without rewording.

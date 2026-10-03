@@ -96,8 +96,8 @@ impl Pending {
         &self.options
     }
 
-    /// The text with the level's rules that need no model, filler removal and layout from Medium
-    /// up, and nothing reworded: cleanup's model is turned off. That was chosen, so it is not
+    /// The text with the level's rules that need no model, filler removal, layout and numbers from
+    /// Medium up, and nothing reworded: cleanup's model is turned off. That was chosen, so it is not
     /// reported as a fallback.
     pub fn without_the_model(self) -> Output {
         // Placeholders are single words that are never fillers, so they come through intact.
@@ -188,8 +188,8 @@ pub fn prepare(transcript: &str, configuration: &Configuration) -> Prepared {
 
 /// Everything after speech-to-text, with cleanup's language model turned off: snippets, spoken
 /// commands and vocabulary at every level, then the level's rules that need no model, filler
-/// removal and layout from Medium up. Nothing is reworded, and that was chosen, so it is not
-/// reported as a fallback.
+/// removal, layout and numbers from Medium up. Nothing is reworded, and that was chosen, so it is
+/// not reported as a fallback.
 pub fn finish(transcript: &str, configuration: &Configuration) -> Output {
     match prepare(transcript, configuration) {
         Prepared::Done(output) => output,

@@ -78,9 +78,9 @@ needs attention does a short message appear in a bubble beside it.
   app took focus.
 - **Undo AI Edit** (⌃⌥Z, within 30 seconds, in the field you dictated into) swaps the cleaned
   text for what you said before cleanup. Snippets, vocabulary and spoken commands stay applied;
-  lists and letters go back to how you said them. It changes nothing if another app or field has
-  focus (click back into the field and try again within the 30 seconds) or if the text was edited
-  since. It works between dictations, and at **None** there is nothing to undo.
+  lists, letters and numbers go back to how you said them. It changes nothing if another app or
+  field has focus (click back into the field and try again within the 30 seconds) or if the text
+  was edited since. It works between dictations, and at **None** there is nothing to undo.
 - **Copy Last Dictation** puts the last dictated text on the clipboard. The app remembers it only
   until it quits.
 - Recordings shorter than 300 ms are ignored ("Didn't catch that").
@@ -199,7 +199,7 @@ Both systems run the same app, and dictate as the Mac does: hold a key, speak, l
 cleaned text is typed where you are working. It has a tray icon and a Settings window, and nothing
 else: no live transcript, dictation history, Undo AI Edit, snippets, vocabulary or per-app
 settings yet ([Known limitations](limitations.md)). Spoken commands, fillers, lists and letters,
-and all five cleanup levels work as on the Mac ([Cleanup](cleanup.md)).
+numbers in digits, and all five cleanup levels work as on the Mac ([Cleanup](cleanup.md)).
 
 ### Installing and first start
 

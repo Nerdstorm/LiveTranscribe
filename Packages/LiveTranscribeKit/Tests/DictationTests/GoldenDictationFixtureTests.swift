@@ -7,7 +7,7 @@ import Testing
 import Vocabulary
 
 /// The shared golden cases for dictation's text path without the language model: snippets,
-/// spoken commands, vocabulary, filler removal, list and letter layout.
+/// spoken commands, vocabulary, filler removal, list and letter layout, and numbers.
 ///
 /// Fixtures/golden/dictation-text.jsonl records what this implementation makes of every
 /// transcript in dictation-inputs.txt, at each cleanup level, in single-line and multi-line

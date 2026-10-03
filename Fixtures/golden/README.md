@@ -3,8 +3,8 @@
 Both apps must turn speech into the same text: the Mac app (Swift, in
 `Packages/LiveTranscribeKit`) and the Linux and Windows app (Rust, in `linux-windows/`). These
 files pin down dictation's text path without the language model (snippets, spoken commands,
-vocabulary, filler removal, and list and letter layout), and what speech to text feeds the speech
-model.
+vocabulary, filler removal, list and letter layout, and numbers written in digits), and what speech
+to text feeds the speech model.
 
 | File | What it holds |
 |---|---|
