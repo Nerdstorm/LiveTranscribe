@@ -3,6 +3,17 @@
     <channel>
         <title>LiveTranscribe</title>
         <item>
+            <title>1.2.0</title>
+            <pubDate>Sat, 03 Oct 2026 00:54:32 +0000</pubDate>
+            <link>https://github.com/Nerdstorm/LiveTranscribe/releases/tag/v1.2.0</link>
+            <sparkle:fullReleaseNotesLink>https://github.com/Nerdstorm/LiveTranscribe/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>328</sparkle:version>
+            <sparkle:shortVersionString>1.2.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/Nerdstorm/LiveTranscribe/releases/download/v1.2.0/LiveTranscribe.dmg" length="30054491" type="application/octet-stream" sparkle:edSignature="Odx4e9b5y/ifZ0YxLLlFQ1Jq79PQCxJjqqHUtIpRSa3pg1fg0KvLMb0YpTTEuDkKqYE3WcZ7SBS13mttD9YXBA=="/>
+        </item>
+        <item>
             <title>1.1.0</title>
             <pubDate>Thu, 01 Oct 2026 09:18:59 +0000</pubDate>
             <link>https://github.com/Nerdstorm/LiveTranscribe/releases/tag/v1.1.0</link>
@@ -23,17 +34,6 @@
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
             <enclosure url="https://github.com/Nerdstorm/LiveTranscribe/releases/download/v1.0.0/LiveTranscribe.dmg" length="30007300" type="application/octet-stream" sparkle:edSignature="k2QKJMsYkM35Ecb+ayGlP19UAqRLt5QZRvm9K2zVr7vHt7pjADHb4IfiPt//QLhNQRRRMwkReTLej5RYkkXZDg=="/>
-        </item>
-        <item>
-            <title>0.3.0</title>
-            <pubDate>Sat, 26 Sep 2026 23:18:53 +1000</pubDate>
-            <link>https://github.com/Nerdstorm/LiveTranscribe/releases/tag/v0.3.0</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/Nerdstorm/LiveTranscribe/releases</sparkle:fullReleaseNotesLink>
-            <sparkle:version>147</sparkle:version>
-            <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/Nerdstorm/LiveTranscribe/releases/download/v0.3.0/LiveTranscribe.dmg" length="20665935" type="application/octet-stream" sparkle:edSignature="R6HyXRyBpbGGxsknfDngXeyUhaug6fDObkdPj5pyB5t0bedkDfHpqs3jCF62zuVdUksYl26pKGXkTRFGjUFpAw=="/>
         </item>
     </channel>
 </rss>
