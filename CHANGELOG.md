@@ -4,6 +4,23 @@ What changed in each release of Live Transcribe, newest first. Before a release,
 `make changelog VERSION=x.y.z` summarises what was merged since the last one
 ([Releasing](docs/releasing.md)).
 
+## 1.2.0 - 2026-10-03
+
+- Write spoken numbers in digits at Medium, High and Deep, on every system: "version two point four point one" → "version 2.4.1", "zero four four six" → "0446", "twenty five percent" → "25%", "at nine fifteen" → "at 9:15", "twenty one chairs" → "21 chairs". One to nine stay words when they count something ("two things"). Cleanup reads the words first, so "fifty thousand, I mean sixty thousand" still becomes "60,000". **Undo AI edit** puts the words back, and None and Light keep them. [Cleanup](https://github.com/Nerdstorm/LiveTranscribe/blob/main/docs/cleanup.md) has the full list ([#58](https://github.com/Nerdstorm/LiveTranscribe/pull/58))
+- Deep was retrained on text as the speech model writes it: with its punctuation, without any, and with full stops where you paused. In our tests on such transcripts, Deep gets 1,073 of 1,158 right, up from 1,019. On our hand-written cases it gets slightly fewer, 299 of 343, down from 314 ([#58](https://github.com/Nerdstorm/LiveTranscribe/pull/58))
+- Deep no longer takes the speech model's full stops and capitals as yours:
+  - a correction may follow a full stop ("I left it in the garage. Actually, the lobby." → "I left it in the lobby.");
+  - letters you spell out are joined ("P R" → "PR");
+  - a word misheard at the start of a list item may be fixed ("First, Madge the PR" → "1. Merge the PR").
+
+  It also keeps a correction's meaning: "book the blue room, sorry, the green room" is never "Book the blue room" ([#58](https://github.com/Nerdstorm/LiveTranscribe/pull/58))
+- Drop a word you broke off and said again in full ("few ex explanations" → "few explanations") at Medium, High and Deep, where the check used to keep what you said ([#58](https://github.com/Nerdstorm/LiveTranscribe/pull/58))
+- Write an email address said on its own: "alex at gmail dot com" → "alex@gmail.com", for Gmail, Outlook, iCloud, Yahoo, Proton and other mail providers. Some ordinary phrases still become addresses ("it's free at outlook.com" → "it's free@outlook.com"); a fix is planned ([#58](https://github.com/Nerdstorm/LiveTranscribe/pull/58))
+- Lay out a list whose numbers you say in different ways: "One, … Number two, …" or "First, … Two, … Three, …" ([#58](https://github.com/Nerdstorm/LiveTranscribe/pull/58))
+- When Deep's answer doesn't pass its check, Medium's is shown only if it passes Deep's check too; otherwise you get what you said. Before, Medium's answer could change the meaning ("Kofi's brother, no wait, not brother, cousin, is hosting" → "Cousin is hosting") ([#58](https://github.com/Nerdstorm/LiveTranscribe/pull/58))
+
+[Every commit since v1.1.0](https://github.com/Nerdstorm/LiveTranscribe/compare/v1.1.0...v1.2.0)
+
 ## 1.1.0 - 2026-10-01
 
 - Deep lays out spoken lists more often and more reliably, on every system. In our 229 hand-written layout cases (lists, email bodies, and the emoji, snippets and line breaks said around them), Deep now gets 216 right; it got 181 before. It was retrained for this on lists, email bodies and the placeholders for emoji, snippets and addresses, and is told that it gets only an email's body, which has no greeting or sign-off to write. It still doesn't split a longer email's body into paragraphs ([#46](https://github.com/Nerdstorm/LiveTranscribe/pull/46))
