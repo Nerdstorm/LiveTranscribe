@@ -195,13 +195,15 @@ def read(text):
     lines = parse(text)
     tokens, endings = [], []
     for number, line in enumerate(lines):
-        first, gap = len(tokens), ""
+        first, gap, led = len(tokens), "", False
         for word in line.words:
             if word.placeholder:
                 gap += word.before + HOLD
                 continue
             if len(tokens) > first:
                 tokens[-1].after = gap + word.before
+            else:
+                led = HOLD in gap
             tokens.append(Token(word.text, number))
             gap = ""
         if len(tokens) == first:
@@ -214,7 +216,10 @@ def read(text):
             if DOTTED.fullmatch(token.text) and (token.last or tokens[index + 1].text[:1].isupper()):
                 token.after = "." + token.after
             if index == first:
-                token.start, token.loose = line.marker is None, line.marker is not None
+                # After a placeholder that opens the line, the word may be the token's verb ("⟦S1⟧
+                # takes you to the form"), so either case is right, as after one inside a line.
+                token.start = line.marker is None and not led
+                token.loose = line.marker is not None or led
             else:
                 before = tokens[index - 1].after
                 token.start = gap_kind(before) == END
