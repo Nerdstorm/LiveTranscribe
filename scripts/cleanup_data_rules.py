@@ -10,7 +10,7 @@ import cleanup_scoring
 
 TOKEN = re.compile(
     r"⟦[^⟧]+⟧|\b[STU]\d+\b|https?://[^\s]+|www\.[^\s]+|"
-    r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|\bv\d+(?:\.\d+)+\b|\d{4}-\d{2}-\d{2}|"
+    r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|\bv\d+(?:\.\d+)+\b|\b\d+(?:\.\d+){2,}\b|\d{4}-\d{2}-\d{2}|"
     r"\d{1,2}:\d{2}(?::\d{2})?|[+-]?\d+(?:,\d{3})*(?:\.\d+)?(?:st|nd|rd|th)?|"
     r"(?:[A-Za-z]\.){2,}|[^\W\d_]+(?:['’][^\W\d_]+)*", re.UNICODE
 )
@@ -29,6 +29,7 @@ CONTRACTIONS = {
     "they've": "they have", "shouldn't": "should not", "couldn't": "could not",
 }
 ARTICLES = {"a", "an", "the"}
+SIGNS = {"%": "percent", "¢": "cents"}
 FILLERS = {"um", "uh", "erm", "ah", "er", "hmm"}
 AMBIGUOUS_NAME_WORDS = set("you your yours me my mine we our us they their them he him his she her it its beyond to too no not yes and or actually sorry said called may will can do go macs merge".split())
 
@@ -44,6 +45,9 @@ def number_value(words):
             hour, minute = map(int, token.split(":"))
             if hour < 24 and minute < 60:
                 return f"clock:{hour}:{minute:02d}"
+        # A version written without a "v" ("2.3.1") is one value, kept as written.
+        if re.fullmatch(r"\d+(?:\.\d+){2,}", token):
+            return "literal:" + token
         if re.fullmatch(r"[+-]?\d+(?:,\d{3})*(?:\.\d+)?(?:st|nd|rd|th)?", token):
             ordinal = re.search(r"(st|nd|rd|th)$", token)
             digits = (token[:ordinal.start()] if ordinal else token).replace(",", "")
@@ -143,9 +147,15 @@ def units(text, policy):
         dollars = kind == "number" and start > 0 and text[start - 1] == "$"
         if dollars:
             start -= 1
+        # "25%" is "twenty-five percent" and "50¢" "fifty cents": the sign joins the number, and
+        # the word it stands for follows, as for "$".
+        sign = text[stop:stop + 1] if kind == "number" and text[stop:stop + 1] in SIGNS else ""
+        stop += len(sign)
         output.append(Unit(key, text[start:stop], start, stop, kind))
         if dollars:
             output.append(Unit("unit:dollar", "", stop, stop, "number"))
+        if sign:
+            output.append(Unit(SIGNS[sign], "", stop, stop, "number"))
         index = end
     # With an explicit am/pm marker, two and 2:00 denote the same clock value.
     for index, unit in enumerate(output[:-1]):
@@ -153,6 +163,64 @@ def units(text, policy):
             value = Decimal(unit.key.split(":", 1)[1])
             if value == int(value) and 1 <= value <= 12:
                 output[index] = Unit(f"clock:{int(value)}:00", unit.text, unit.start, unit.end, "number")
+    return output
+
+
+def _spoken_figure(chunk):
+    """The figure number words say together, as speech-to-text may write them: "zero four four
+    six" (0446), "two point three point one" (2.3.1), "twenty twenty-six" (2026); None otherwise."""
+    def digits(units_):
+        values = ["0" if unit.key == "oh" else unit.key.split(":", 1)[1] if re.fullmatch(r"number:\d", unit.key) else None
+                  for unit in units_]
+        return "".join(values) if units_ and None not in values else None
+
+    def whole(units_):
+        if len(units_) == 1 and re.fullmatch(r"number:\d+", units_[0].key):
+            return units_[0].key.split(":", 1)[1]
+        return digits(units_) if len(units_) > 1 else None
+
+    keys = [unit.key for unit in chunk]
+    if "point" in keys:
+        groups, current = [], []
+        for unit in chunk:
+            if unit.key == "point":
+                groups.append(current)
+                current = []
+            else:
+                current.append(unit)
+        groups.append(current)
+        values = [whole(group) for group in groups]
+        return ".".join(values) if None not in values else None
+    if len(chunk) == 2 and all(re.fullmatch(r"number:\d+", key) for key in keys):
+        century, year = (int(key.split(":", 1)[1]) for key in keys)
+        if 10 <= century <= 20 and 10 <= year <= 99:
+            return f"{century}{year}"
+    if len(chunk) == 3 and keys[1] == "oh" and all(re.fullmatch(r"number:\d+", key) for key in (keys[0], keys[2])):
+        century, year = (int(key.split(":", 1)[1]) for key in (keys[0], keys[2]))
+        if 10 <= century <= 20 and year < 10:
+            return f"{century}0{year}"
+    return digits(chunk) if len(chunk) > 1 else None
+
+
+def merge_figures(units_, text, figures):
+    """``units_`` with the words of each figure in ``figures`` (keys) said in parts made one unit.
+
+    Only a figure speech-to-text wrote is merged, so words it wrote as words keep their units."""
+    output, index = [], 0
+    while index < len(units_):
+        for length in range(min(12, len(units_) - index), 1, -1):
+            chunk = units_[index:index + length]
+            if any(text[a.end:b.start].strip() not in ("", "-") for a, b in zip(chunk, chunk[1:])):
+                continue
+            figure = _spoken_figure(chunk)
+            key = figure and number_value([figure])
+            if key in figures:
+                output.append(Unit(key, text[chunk[0].start:chunk[-1].end], chunk[0].start, chunk[-1].end, "number"))
+                index += length
+                break
+        else:
+            output.append(units_[index])
+            index += 1
     return output
 
 
@@ -168,6 +236,11 @@ def reconcile(original, spoken, observed, policy):
     """Return a target, an audit trail and unresolved changes. Never alter the ASR input."""
     before, after = units(spoken, policy), units(observed, policy)
     expected = units(original["target"], policy)
+    # A number said in parts that speech-to-text wrote as one figure ("zero four four six" as
+    # "0446", "two point five" as "2.5") is one value on each side, so it reconciles as a number.
+    figures = {unit.key for unit in after if unit.kind == "number" and re.fullmatch(r"[\d.]+[%¢]?", unit.text)}
+    before = merge_figures(before, spoken, figures)
+    expected = merge_figures(expected, original["target"], figures)
     expected_keys = [unit.key for unit in expected]
     names = {name.lower() for name in policy.get("names", [])}
     name_variants = [{word(name) for name in group} for group in policy.get("name_variants", [])]
