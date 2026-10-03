@@ -141,9 +141,42 @@ fn keeps_the_rest_of_the_corrected_sentence() {
             "Karen is presenting at the all hands.",
             "Karen is presenting.",
         ),
+        ("Bring two chairs. No, three.", "Bring three chairs.", "Bring three."),
     ] {
         assert_eq!(review(raw, kept), accepted(kept), "{raw:?}");
         assert_eq!(review(raw, dropped), INVALID, "{raw:?}");
+    }
+}
+
+/// The Mac app's `resolvesACorrectionOfTheEndOfTheSentenceBefore`.
+#[test]
+fn a_cue_after_a_full_stop_corrects_the_end_of_the_sentence_before() {
+    for (raw, cleaned) in [
+        (
+            "I left my charger in the garage. Actually, the lobby.",
+            "I left my charger in the lobby.",
+        ),
+        (
+            "The alert came from the billing service. Sorry, the database.",
+            "The alert came from the database.",
+        ),
+        (
+            "The team is replacing the laptop. No, the printer next week.",
+            "The team is replacing the printer next week.",
+        ),
+        (
+            "I'm making pasta. Actually, tacos for dinner.",
+            "I'm making tacos for dinner.",
+        ),
+        ("Paint the door red. Actually, blue.", "Paint the door blue."),
+    ] {
+        assert_eq!(review(raw, cleaned), accepted(cleaned), "{raw:?}");
+        let commas = raw.replace(". ", ", ");
+        assert_eq!(
+            review(&commas, cleaned),
+            accepted(cleaned),
+            "{commas:?}, as after a comma"
+        );
     }
 }
 
@@ -294,6 +327,30 @@ fn a_cue_followed_by_not_and_the_corrected_words_said_again_goes_with_them() {
 }
 
 #[test]
+fn resolves_a_correction_broken_into_sentences() {
+    let cases = [
+        (
+            "My shift starts on Sunday. No, sorry, not Sunday. Thursday.",
+            "My shift starts on Thursday.",
+            "My shift starts on Sunday. Thursday.",
+        ),
+        (
+            "For the overnight trek, we'll need compasses. Sorry, not compasses. Stoves and plenty of water.",
+            "For the overnight trek we'll need stoves and plenty of water.",
+            "For the overnight trek, we'll need compasses. Stoves and plenty of water.",
+        ),
+    ];
+    for (raw, cleaned, cue_dropped) in cases {
+        assert_eq!(review(raw, cleaned), accepted(cleaned), "{raw:?}");
+        assert_eq!(
+            review(raw, cue_dropped),
+            INVALID,
+            "the cue and the words said again go only with the correction"
+        );
+    }
+}
+
+#[test]
 fn a_not_goes_with_a_correction_only_when_it_says_corrected_words_again() {
     assert_rejected(&[
         // Drops the contrast the speaker made.
@@ -390,12 +447,60 @@ fn keeps_names_as_said() {
             "remind xavier about the dentist no sorry uma",
             "Remind Xavier about the dentist. No, sorry, um...",
         ),
+        // A name that started the sentence as said, where either capital may be a name's.
+        ("Uma will bring the cake.", "Una will bring the cake."),
+        // Another name where no sentence starts.
+        ("Can you ask Madge to review it?", "Can you ask Marge to review it?"),
     ]);
 }
 
 #[test]
 fn a_name_may_take_its_possessive() {
     assert_accepted(&[("that is kirk car", "That is Kirk's car.")]);
+}
+
+#[test]
+fn fixes_a_word_taken_for_a_name() {
+    assert_accepted(&[
+        (
+            "Can you Madge the PR before lunch?",
+            "Can you merge the PR before lunch?",
+        ),
+        (
+            "Can you review the P R before lunch?",
+            "Can you review the PR before lunch?",
+        ),
+        ("The A P I is down again.", "The API is down again."),
+        (
+            "Plan for the release tomorrow. First, Madge, P R thirty one, Sam get the notes once the build has finished. Two follow up for the sign off. Three, the export screen needs a fix. Four, Ellis review should come last.",
+            "Plan for the release tomorrow. First, merge PR 31, Sam get the notes once the build has finished. Two, follow up for the sign-off. Three, the export screen needs a fix. Four, Ellis review should come last.",
+        ),
+    ]);
+}
+
+#[test]
+fn fixes_a_word_taken_for_a_name_that_starts_a_list_item() {
+    let raw = "Two things for today. First, Madge the PR. Second, John updates the website.";
+    let cleaned = "Two things for today:\n1. Merge the PR.\n2. John updates the website.";
+    assert_eq!(review_in(raw, cleaned, true), accepted(cleaned));
+    let renamed = "Two things for today:\n1. Merge the PR.\n2. Pete updates the website.";
+    assert_eq!(
+        review_in(raw, renamed, true),
+        INVALID,
+        "a name isn't swapped for another"
+    );
+}
+
+#[test]
+fn keeps_the_letters_spelled_out() {
+    let raw = "Can you review the P R before lunch?";
+    for cleaned in [
+        "Can you review the RP before lunch?",
+        "Can you review the PRs before lunch?",
+        "Can you review the P before lunch?",
+    ] {
+        assert_eq!(review(raw, cleaned), INVALID, "{cleaned:?}");
+    }
 }
 
 #[test]
@@ -419,6 +524,7 @@ fn keeps_a_cue_that_starts_a_new_thought() {
         ),
         ("I finished the report. Sorry, I was late.", "I was late."),
         ("It works. Actually, it's quite fast.", "It's quite fast."),
+        ("I finished the report. Sorry, I was late.", "I finished. I was late."),
         (
             "We shipped version two. Actually, we shipped it a week early.",
             "We shipped it a week early.",
@@ -553,6 +659,35 @@ fn rejects_a_bulleted_list_of_two_things_said_in_a_sentence() {
 }
 
 #[test]
+fn allows_two_things_set_off_with_a_full_stop_or_counted_before_a_comma() {
+    let cleaned = "Two things:\n- Call the bank\n- Email Sarah";
+    for raw in [
+        "Two things. Call the bank and email Sarah.",
+        "Two things, call the bank and email Sarah.",
+    ] {
+        assert_eq!(review_in(raw, cleaned, true), accepted(cleaned), "{raw:?}");
+    }
+    assert_eq!(
+        review_in(
+            "I've attached, the invoice and the signed agreement.",
+            "I've attached:\n- The invoice\n- The signed agreement",
+            true
+        ),
+        GuardVerdict::Rejected(FallbackReason::ShortList),
+        "a comma sets them off only after words that count them"
+    );
+    assert_eq!(
+        review_in(
+            "Reminder. I've attached the invoice and the signed agreement.",
+            "Reminder. I've attached:\n- The invoice\n- The signed agreement",
+            true
+        ),
+        GuardVerdict::Rejected(FallbackReason::ShortList),
+        "a full stop elsewhere doesn't set them off"
+    );
+}
+
+#[test]
 fn each_bulleted_list_has_the_line_before_it() {
     let lists = super::bulleted_lists("Two things:\n- a\n- b\n\n- c\n- d\nAnd also:\n- e");
     let leads: Vec<Option<&str>> = lists.iter().map(|list| list.lead.as_deref()).collect();
@@ -626,4 +761,276 @@ fn a_policy_that_retracts_nothing_resolves_no_correction() {
 #[test]
 fn words_are_canonically_equivalent() {
     assert_accepted(&[("We met at the caf\u{E9}.", "We met at the cafe\u{301}.")]);
+}
+
+/// A correction keeps its meaning: the word it says instead stays, as itself or a word like it,
+/// and what it takes back isn't written again, however a repair could otherwise line them up.
+#[test]
+fn a_correction_keeps_its_meaning() {
+    let green = "book the blue room sorry the green room for friday";
+    assert_rejected(&[
+        (green, "Book the blue room for Friday."),
+        (green, "Book the room for Friday."),
+        (green, "Book the blue green room for Friday."),
+        (
+            "Book the blue room, sorry, the green room for Friday.",
+            "Book the blue room for Friday.",
+        ),
+        (
+            "send it to the finance team make that the legal team today",
+            "Send it to the finance team today.",
+        ),
+        (
+            "ask the designer i mean the developer to check it",
+            "Ask the designer to check it.",
+        ),
+        (
+            "we're migrating the load balancer make that the scheduler next week",
+            "We're migrating the load balancer next week.",
+        ),
+        ("paint the fence red no wait blue", "Paint the fence red."),
+        ("we need three servers sorry four", "We need four three servers."),
+        ("send it to sam sorry to priya", "Send it to Priya Sam."),
+        (
+            "I left my charger in the garage. Actually, the lobby.",
+            "I left my charger in the garage lobby.",
+        ),
+        (
+            "The demo is on Tuesday at noon. Sorry, Wednesday.",
+            "The demo is on Tuesday Wednesday at noon.",
+        ),
+        (
+            "Invite Sam to the launch. Sorry, Priya.",
+            "Invite Sam and Priya to the launch.",
+        ),
+        ("fuel efficiency in cars sorry busses", "Fuel efficiency in trains."),
+        ("i wanted to say sorry to jo", "I wanted to say it to Jo."),
+    ]);
+    assert_accepted(&[
+        (green, "Book the green room for Friday."),
+        (
+            "send it to the finance team make that the legal team today",
+            "Send it to the legal team today.",
+        ),
+        (
+            "ask the designer i mean the developer to check it",
+            "Ask the developer to check it.",
+        ),
+        (
+            "we're migrating the load balancer make that the scheduler next week",
+            "We're migrating the scheduler next week.",
+        ),
+        ("paint the fence red no wait blue", "Paint the fence blue."),
+        ("we need three servers sorry four", "We need four servers."),
+        ("send it to sam sorry to priya", "Send it to Priya."),
+        (
+            "the demo is next week sorry the after next",
+            "The demo is the week after next.",
+        ),
+        (
+            "i'm meeting divya at the station actually nikhil",
+            "I'm meeting Nikhil at the station.",
+        ),
+        (
+            "The billing service goes live next Tuesday. Sorry, I mean the login service.",
+            "The login service goes live next Tuesday.",
+        ),
+        ("fuel efficiency in cars sorry busses", "Fuel efficiency in buses."),
+    ]);
+}
+
+/// A fact or a name a correction says instead takes back one of its own sort, so no reading of it
+/// keeps that one beside it: one that takes back only the words after it is no reading at all.
+#[test]
+fn a_correction_never_keeps_what_it_takes_back_beside_it() {
+    let servers = "we need three servers sorry four";
+    let launch = "Invite Sam to the launch. Sorry, Priya.";
+    let station = "I am meeting Divya at the station. Actually, Nikhil.";
+    assert_rejected(&[
+        (servers, "We need three four servers."),
+        (servers, "We need three or four servers."),
+        (
+            "we need three of the servers sorry four",
+            "We need three of the four servers.",
+        ),
+        (launch, "Invite Sam and Priya to the launch."),
+        (launch, "Invite Sam, Priya to the launch."),
+        (
+            "Invite Sam to the launch, sorry, Priya.",
+            "Invite Sam and Priya to the launch.",
+        ),
+        (station, "I am meeting Divya and Nikhil at the station."),
+        (station, "I am meeting Divya Nikhil at the station."),
+        ("Call me on Tuesday, no, Wednesday.", "Call me on Tuesday or Wednesday."),
+        (
+            "We have two weeks left. Sorry, three.",
+            "We have two or three weeks left.",
+        ),
+    ]);
+    assert_accepted(&[
+        (servers, "We need four servers."),
+        (
+            "two people said we need servers sorry four",
+            "Two people said we need four servers.",
+        ),
+        (
+            "we need three of the servers sorry four",
+            "We need four of the servers.",
+        ),
+        (launch, "Invite Priya to the launch."),
+        ("Invite Sam to the launch, sorry, Priya.", "Invite Priya to the launch."),
+        (station, "I am meeting Nikhil at the station."),
+        ("meet me at the station sorry at six", "Meet me at six."),
+        ("Ask Sam to email Ana, sorry, Priya.", "Ask Sam to email Priya."),
+        ("Ask Sam to email Ana, sorry, Priya.", "Ask Priya to email Ana."),
+        ("We have two weeks left. Sorry, three.", "We have three weeks left."),
+    ]);
+}
+
+/// A cue speech-to-text misheard just after one it heard goes with it, and a misheard word that only
+/// holds the grammar together says nothing a correction says instead.
+#[test]
+fn misheard_cues_and_small_words_say_nothing_a_correction_says() {
+    assert_accepted(&[
+        (
+            "Can you bring the monitor, wait node, the router to the meeting?",
+            "Can you bring the router to the meeting?",
+        ),
+        (
+            "The city is buying more electric buses, no weight vans.",
+            "The city is buying more electric vans.",
+        ),
+        (
+            "Dinner is on Saturday. Sorry, no theon Tuesday.",
+            "Dinner is on Tuesday.",
+        ),
+        (
+            "The product review is on the 12th of October. No sorry thee of November.",
+            "The product review is on the 12th of November.",
+        ),
+    ]);
+}
+
+/// "No" in "no one" is a cue too, so one correction can take words out of the phrase another moved
+/// back, and that phrase then ends where its words do.
+#[test]
+fn a_phrase_a_later_correction_cuts_ends_where_its_words_do() {
+    let raw = "I'll call no one now. Scratch that. I'll email no one instead.";
+    assert_accepted(&[(raw, "I'll email no one instead.")]);
+    assert_rejected(&[(raw, "I'll email Noah instead.")]);
+}
+
+/// An abbreviation's full stop ends a sentence only before a capital, so "at 3 p.m. today" is one
+/// sentence and its time can be corrected.
+#[test]
+fn an_abbreviation_ends_a_sentence_only_before_a_capital() {
+    assert_accepted(&[(
+        "The shop closes at 3 p.m. today. Sorry, I meant at 10 a.m.",
+        "The shop closes at 10 a.m. today.",
+    )]);
+}
+
+#[test]
+fn a_phrase_that_opens_the_way_its_sentence_did_starts_it_again() {
+    let prague = "Ship it to Prague, scratch that, hold it until September.";
+    let june = "ship it to prague scratch that hold it until june";
+    let lisbon = "Ship it to Lisbon, scratch that, hold it until November.";
+    assert_rejected(&[
+        (prague, "Ship it to hold it until September."),
+        (june, "Ship it to hold it until June."),
+        (lisbon, "Ship it to Hold it until November."),
+    ]);
+    assert_accepted(&[
+        (prague, "Hold it until September."),
+        (june, "Hold it until June."),
+        (lisbon, "Hold it until November."),
+        ("Ship it to Prague, scratch that, Vienna.", "Ship it to Vienna."),
+        (
+            "Book the early flight. Scratch that. Book the afternoon one.",
+            "Book the afternoon one.",
+        ),
+        (
+            "Put the box on the table, sorry, under the table.",
+            "Put the box under the table.",
+        ),
+        (
+            "We need to restart the off service. Actually, the database.",
+            "We need to restart the database.",
+        ),
+        (
+            "The leak is under the sink, rather, behind the dishwasher.",
+            "The leak is behind the dishwasher.",
+        ),
+    ]);
+}
+
+#[test]
+fn a_correction_takes_back_no_more_than_the_corrected_words_said_again() {
+    let physio = "the physio team sorry not physio nursing will join the call at noon";
+    let kofi = "Kofi's brother, no wait, not brother, cousin, is hosting the barbecue.";
+    let nikhil = "nikhil's team sorry not nikhil's siobhan's owns the billing service";
+    assert_rejected(&[
+        (physio, "The nursing will join the call at noon."),
+        (kofi, "Cousin is hosting the barbecue."),
+        (nikhil, "Siobhan's owns the billing service."),
+    ]);
+    assert_accepted(&[
+        (physio, "The nursing team will join the call at noon."),
+        (kofi, "Kofi's cousin is hosting the barbecue."),
+        (nikhil, "Siobhan's team owns the billing service."),
+    ]);
+}
+
+#[test]
+fn the_start_of_a_word_broken_off_and_said_again_in_full_may_go() {
+    assert_accepted(&[
+        (
+            "She wants few ex expenses paid back.",
+            "She wants few expenses paid back.",
+        ),
+        (
+            "We should con consider the budget first.",
+            "We should consider the budget first.",
+        ),
+        (
+            "can you send the rep report by friday",
+            "Can you send the report by Friday?",
+        ),
+        (
+            "We should con- consider the budget first.",
+            "We should consider the budget first.",
+        ),
+    ]);
+}
+
+#[test]
+fn a_word_that_only_starts_the_next_by_chance_stays() {
+    assert_rejected(&[
+        // A negation, a number, a function word.
+        ("there is not nothing left", "There is nothing left."),
+        ("Bring ten tennis balls.", "Bring tennis balls."),
+        ("Can he help us move?", "Can help us move?"),
+        // Across the end of a sentence.
+        (
+            "We met the new rep. Reports are due on Monday.",
+            "We met the new. Reports are due on Monday.",
+        ),
+        // Not the start of the next word.
+        (
+            "can you send the rap report by friday",
+            "Can you send the report by Friday?",
+        ),
+        // Not written as a word broken off: part of a word, or set off by a comma.
+        (
+            "please re-read the contract before signing",
+            "Please read the contract before signing.",
+        ),
+        ("Bring a pen, pencil and paper.", "Bring a pencil and paper."),
+        // A single letter, and a name's first part where it starts a sentence.
+        (
+            "vitamin d deficiency is common in winter",
+            "Vitamin deficiency is common in winter.",
+        ),
+        ("Ed Edwards will lead.", "Edwards will lead."),
+    ]);
 }

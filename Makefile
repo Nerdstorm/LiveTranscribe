@@ -34,7 +34,7 @@ check-version = @echo '$(VERSION)' | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$$' \
 	|| { echo 'Set VERSION to the release, for example: make $@ VERSION=0.1.0' >&2; exit 2; }
 
 .PHONY: help build run resolve test test-integration prompt-probe golden audio dictation-audio bench eval \
-	train doctor release-test changelog tag appcast acknowledgements icons logs site clean
+	train prepare-data prepare-stress-data doctor release-test changelog tag appcast acknowledgements icons logs site clean
 
 help: ## List the targets
 	@echo 'Usage: make <target> [VERSION=x.y.z] [ARGS="..."]'
@@ -67,6 +67,8 @@ test: ## Unit tests, which need no models
 	scripts/tests/release-notes-tests.sh
 	scripts/tests/fetch-release-tests.sh
 	scripts/tests/check-swift-runtime-tests.sh
+	python3 scripts/tests/prepare-cleanup-data-tests.py
+	python3 scripts/tests/cleanup-scoring-tests.py
 
 test-integration: audio ## End-to-end tests with the real models, which they download (about 2 GB)
 	cd $(PACKAGE) && TEST_RUNNER_LT_RUN_MODEL_TESTS=1 $(PACKAGE_TESTS) -only-testing:IntegrationTests
@@ -105,6 +107,17 @@ train: ## Run the adapter's Train tool (ARGS="generate", "validate", "train" or 
 	@[ -n "$(ARGS)" ] || { echo 'Say what to run, for example: make train ARGS="evaluate --no-adapter"' >&2; exit 2; }
 	$(call build-tool,Train)
 	cd $(PACKAGE) && $(TOOLS)/Train $(ARGS)
+
+prepare-data: ## Regenerate speech seeds for measured cleanup data; no model training
+	$(call build-tool,Train)
+	cd $(PACKAGE) && $(TOOLS)/Train generate
+	cd $(PACKAGE) && $(TOOLS)/Train generate --deep
+	python3 scripts/prepare-cleanup-data.py prepare --kind medium --output $(PACKAGE)/Training/prepared/standard
+	python3 scripts/prepare-cleanup-data.py prepare --kind deep --output $(PACKAGE)/Training/prepared/deep
+
+prepare-stress-data: ## Optional punctuation stress cases, separate from the training recipe
+	python3 scripts/prepare-cleanup-data.py prepare --kind medium --stress-profiles --output $(PACKAGE)/Training/prepared/stress-standard
+	python3 scripts/prepare-cleanup-data.py prepare --kind deep --stress-profiles --output $(PACKAGE)/Training/prepared/stress-deep
 
 ##@ Release (docs/releasing.md)
 

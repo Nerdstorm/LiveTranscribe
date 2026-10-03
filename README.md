@@ -101,8 +101,9 @@ on a Mac.
 ## Features
 
 - **Say it naturally, get what you meant.** At the default **Medium** level, fillers disappear,
-  spoken self-corrections are resolved and spoken lists and letters are laid out; say emoji,
-  punctuation and line breaks at any level. Every edit is checked against what you said, and on
+  spoken self-corrections are resolved, spoken lists and letters are laid out and numbers are
+  written in digits ("twenty one chairs" → "21 chairs"); say emoji, punctuation and line breaks at
+  any level. Every edit is checked against what you said, and on
   the Mac ⌃⌥Z puts your own words back.
 - **Dictate from any app.** Hold the key, or double-tap it for hands-free. A small circle by the
   mouse pointer shows what is happening, and Esc cancels. On the Mac the key is **fn (🌐)** or a

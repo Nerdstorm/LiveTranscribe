@@ -4,7 +4,7 @@
 # The intended column is laid out as in a field that takes several lines (Bench --dictation --multiline),
 # with \n for a line break.
 plain01	plain	Can you send me the slides from this morning's meeting	Can you send me the slides from this morning's meeting?
-plain02	plain	I'll be about ten minutes late, the train is running slow today	I'll be about ten minutes late, the train is running slow today.
+plain02	plain	I'll be about ten minutes late, the train is running slow today	I'll be about 10 minutes late, the train is running slow today.
 plain03	plain	Thanks for the quick turnaround on the contract	Thanks for the quick turnaround on the contract.
 plain04	plain	Let's move the design review to Thursday afternoon	Let's move the design review to Thursday afternoon.
 plain05	plain	The new build fixes the crash when you open a large file	The new build fixes the crash when you open a large file.
@@ -29,7 +29,7 @@ fillers09	fillers	The meeting went well, um, better than I expected	The meeting 
 fillers10	fillers	So, uh, what time does the, um, the train leave	So what time does the train leave?
 correction01	correction	Let's meet on Monday, no wait, Tuesday	Let's meet on Tuesday.
 correction02	correction	Send it to Sarah, sorry, to Priya	Send it to Priya.
-correction03	correction	The budget is fifty thousand, I mean sixty thousand	The budget is sixty thousand.
+correction03	correction	The budget is fifty thousand, I mean sixty thousand	The budget is 60,000.
 correction04	correction	Book a table for four, actually, make that six	Book a table for six.
 correction05	correction	We're flying into Boston, scratch that, into New York	We're flying into New York.
 correction06	correction	The deadline is Friday, or rather Thursday	The deadline is Thursday.

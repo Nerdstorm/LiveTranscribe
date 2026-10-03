@@ -116,7 +116,14 @@ func trainDeep(_ options: TrainCommandOptions) async throws {
     guard let revision = options.revision ?? CleanupModelLoader.cachedCommit(modelID: modelID) else {
         throw TrainError.noRevision(modelID)
     }
-    guard try validateDeep() else { throw TrainError.invalidData }
+    if let directory = options.dataDirectory {
+        guard try validatePreparedData(directory: directory, deep: true, report: directory.appending(path: "audit.json")) else {
+            throw TrainError.invalidData
+        }
+        try recordPreparedData(directory, output: options.output)
+    } else {
+        guard try validateDeep() else { throw TrainError.invalidData }
+    }
 
     let executor = CleanupExecutor(
         contextLimit: settings.contextSegments,
@@ -124,8 +131,12 @@ func trainDeep(_ options: TrainCommandOptions) async throws {
         prompts: PromptBuilder(adapted: true),
         deep: .shipped
     )
-    let train = try DeepExample.read(from: DeepPaths.generated(.train)).map { TrainingItem($0, executor: executor) }
-    let valid = try DeepExample.read(from: DeepPaths.generated(.valid)).map { TrainingItem($0, executor: executor) }
+    let trainFile = options.dataDirectory?.appending(path: "train.jsonl") ?? DeepPaths.generated(.train)
+    let validFile = options.dataDirectory?.appending(path: "valid.jsonl") ?? DeepPaths.generated(.valid)
+    let examples = try DeepExample.read(from: trainFile)
+    let weighted = try options.dataDirectory.map { try expandPreparedData(examples, directory: $0, split: .train) } ?? examples
+    let train = weighted.map { TrainingItem($0, executor: executor) }
+    let valid = try DeepExample.read(from: validFile).map { TrainingItem($0, executor: executor) }
     print("Training Deep's adapter on \(train.count) examples; validating on \(valid.count)")
 
     print("Loading \(modelID) at \(revision)")
@@ -150,7 +161,7 @@ func trainDeep(_ options: TrainCommandOptions) async throws {
 
 /// The raw texts of the hand-written eval cases (every `.jsonl` file in `eval/`), normalized, which
 /// no generated example may repeat.
-private func heldOutRaws() throws -> Set<String> {
+func heldOutRaws() throws -> Set<String> {
     // An unreadable folder is an error: with no cases held out, generation would train on them.
     let files = try FileManager.default.contentsOfDirectory(at: DeepPaths.evalDirectory, includingPropertiesForKeys: nil)
     return Set(try files.filter { $0.pathExtension == "jsonl" }.flatMap { try EvalCase.read(from: $0) }.map { EditDistance.normalize($0.raw) })
@@ -158,6 +169,6 @@ private func heldOutRaws() throws -> Set<String> {
 
 /// The raw texts of Medium's test cases, normalized, which measure Deep against Medium and so
 /// are never trained on either.
-private func mediumTestRaws() throws -> Set<String> {
+func mediumTestRaws() throws -> Set<String> {
     Set(try Paths.testFiles().flatMap { try EvalCase.read(from: $0) }.map { EditDistance.normalize($0.raw) })
 }

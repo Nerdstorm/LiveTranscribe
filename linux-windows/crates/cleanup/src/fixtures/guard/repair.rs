@@ -34,6 +34,8 @@ struct SaidWordJson {
     #[serde(default)]
     may_be_name: bool,
     #[serde(default)]
+    starts_sentence: bool,
+    #[serde(default)]
     is_cue: bool,
     #[serde(default)]
     opens_phrase: usize,
@@ -50,6 +52,7 @@ impl From<&SaidWord> for SaidWordJson {
             is_name: said.is_name,
             is_capitalised: said.is_capitalised,
             may_be_name: said.may_be_name,
+            starts_sentence: said.starts_sentence,
             is_cue: said.is_cue,
             opens_phrase: said.opens_phrase,
             spare: said.spare.clone(),

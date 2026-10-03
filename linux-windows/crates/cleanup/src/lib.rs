@@ -34,6 +34,7 @@ mod spoken_names;
 mod thinking_output;
 mod word_alignment;
 mod word_forms;
+mod word_fragments;
 mod words;
 
 #[cfg(test)]

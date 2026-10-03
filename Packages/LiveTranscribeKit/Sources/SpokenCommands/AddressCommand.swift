@@ -7,11 +7,14 @@ import Shared
 ///
 /// A domain must end in a known top-level domain ("com", "org", "io", …), so "dot" in ordinary
 /// speech stays a word. "at" makes an email only when the name before it looks like one: it has
-/// a dot, underscore, hyphen or digit ("john.smith"), or follows a word such as "email", "to" or
-/// "is" ("email support at example.com"); "look at example.com" and "contact us at example.com"
-/// keep their "at". A domain speech-to-text already wrote as one word is left as it is unless it
-/// gains a name before it or a path after it; an email address it already wrote
-/// ("John.Smith@example.com") is taken whole.
+/// a dot, underscore, hyphen or digit ("john.smith"), follows a word such as "email", "to" or
+/// "is" ("email support at example.com"), or comes before a mail provider's domain ("alex at
+/// gmail dot com"). "look at example.com" and "contact us at example.com" keep their "at", and
+/// so do a pronoun, a verb that takes "at", a word after a determiner or the provider's own name
+/// before a mail provider ("look at gmail.com", "she works at outlook.com", "my account at
+/// gmail.com", "open Gmail at gmail.com"). A domain speech-to-text already wrote as one word is
+/// left as it is unless it gains a name before it or a path after it; an email address it
+/// already wrote ("John.Smith@example.com") is taken whole.
 ///
 /// The address goes behind a placeholder, lowercased except for its path, so the model cannot
 /// capitalise or split it.
@@ -36,6 +39,27 @@ public struct AddressCommand: PhraseMatcher {
     /// Plain names that are never email names: "contact us at example.com".
     static let pronouns: Set<String> = [
         "me", "us", "you", "him", "her", "them", "it", "we", "i", "they", "she", "he", "one", "everyone", "someone", "anyone",
+        "everybody", "somebody", "anybody", "nobody", "everything", "something", "anything", "nothing",
+    ]
+    /// Domains of mail providers, before which a plain name is an email name: "alex at gmail dot
+    /// com".
+    static let mailProviders: Set<String> = [
+        "gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "msn.com", "icloud.com", "me.com",
+        "mac.com", "yahoo.com", "proton.me", "protonmail.com", "fastmail.com", "hey.com",
+    ]
+    /// Words before "at" that are never an email name, even before a mail provider: verbs that
+    /// take "at", with the forms of "be" ("look at gmail.com", "she works at outlook.com", "it is
+    /// at icloud.com"), and the words that end such a verb ("sign up at gmail.com", "log in at …").
+    static let notEmailNames: Set<String> = [
+        "look", "looks", "looked", "looking", "stare", "stares", "stared", "staring", "glance", "glances",
+        "glanced", "glancing", "point", "points", "pointed", "pointing", "aim", "aims", "aimed", "aiming",
+        "laugh", "laughs", "laughed", "laughing", "smile", "smiles", "smiled", "smiling", "wave", "waves",
+        "waved", "waving", "shout", "shouts", "shouted", "shouting", "yell", "yells", "yelled", "yelling",
+        "arrive", "arrives", "arrived", "arriving", "work", "works", "worked", "working", "meet", "meets", "met",
+        "meeting", "stay", "stays", "stayed", "staying", "live", "lives", "lived", "living", "shop", "shops",
+        "shopped", "shopping", "study", "studies", "studied", "studying", "start", "starts", "started",
+        "starting", "is", "was", "are", "were", "be", "been", "being", "am", "up", "in", "on", "out", "off",
+        "back", "down", "over", "here", "there", "now", "only", "just", "even", "also", "still", "right",
     ]
     /// A spoken domain never starts with these: "the dot com bubble" is not the.com.
     static let notDomainStarts: Set<String> = [
@@ -73,7 +97,7 @@ public struct AddressCommand: PhraseMatcher {
             }
             let address: String
             var start = index
-            if let name = emailName(before: index, in: tokens) {
+            if let name = emailName(before: index, host: domain.host, in: tokens) {
                 start = name.start
                 address = name.text + "@" + domain.host
             } else if domain.spoken || !domain.path.isEmpty {
@@ -172,9 +196,9 @@ public struct AddressCommand: PhraseMatcher {
         return token.core
     }
 
-    /// The email name before "at" and the domain at `domainStart`, and the index of its first
-    /// token.
-    private func emailName(before domainStart: Int, in tokens: [AddressToken]) -> (start: Int, text: String)? {
+    /// The email name before "at" and the domain `host` at `domainStart`, and the index of its
+    /// first token.
+    private func emailName(before domainStart: Int, host: String, in tokens: [AddressToken]) -> (start: Int, text: String)? {
         let at = domainStart - 1
         guard at >= 1, tokens[at].core == "at", tokens[at].isBare else { return nil }
         var index = at - 1
@@ -189,11 +213,21 @@ public struct AddressCommand: PhraseMatcher {
         let name = parts.joined()
         let looksLikeAnAddress = name.contains { ".-_+".contains($0) || $0.isNumber }
         if !looksLikeAnAddress {
-            guard index >= 1, tokens[index - 1].trailing.isEmpty, Self.emailCues.contains(tokens[index - 1].core),
-                  !Self.pronouns.contains(name)
+            let wordBefore = index >= 1 && tokens[index - 1].trailing.isEmpty ? tokens[index - 1].core : nil
+            let cued = wordBefore.map(Self.emailCues.contains) ?? false
+            guard !Self.pronouns.contains(name), cued || Self.namesAMailbox(name, at: host, after: wordBefore)
             else { return nil }
         }
         return (index, name)
+    }
+
+    /// Whether `name`, a plain word said before "at" and `host`, is a mailbox there: `host` is a
+    /// mail provider's, and `name` is no verb that takes "at" ("look at gmail.com"), nor a word
+    /// after a determiner ("my account at gmail.com"), nor the provider's own name ("open Gmail at
+    /// gmail.com"). `wordBefore` is the word before `name` in the same clause, if any.
+    private static func namesAMailbox(_ name: String, at host: String, after wordBefore: String?) -> Bool {
+        guard mailProviders.contains(host), !notEmailNames.contains(name), !host.hasPrefix(name + ".") else { return false }
+        return !(wordBefore.map(PhraseGrammar.determiners.contains) ?? false)
     }
 
     // MARK: - Characters

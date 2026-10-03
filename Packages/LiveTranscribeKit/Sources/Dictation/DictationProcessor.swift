@@ -7,18 +7,20 @@ import Transcription
 import Vocabulary
 
 /// Turns one recording into the text to insert: speech-to-text, snippets, spoken commands and
-/// vocabulary, cleanup at the chosen level, then layout and the snippets' expansions.
+/// vocabulary, cleanup at the chosen level, then layout, numbers and the snippets' expansions.
 ///
 /// Snippet triggers, emoji, addresses and spoken line breaks become opaque placeholders before
 /// the language model runs, so the model can neither see nor change them (see
 /// ``PreparedDictation``). From Medium up, in fields that take several lines, spoken lists
 /// and letters are laid out; a letter's greeting and sign-off are laid out before the model
 /// runs, and only its body is cleaned. Deep's model may also lay out what was not spoken as a
-/// list or letter, which the same layout rules then tidy. If cleanup is rejected or times out,
-/// the text before cleanup is used, with snippets, commands, vocabulary and layout still applied.
+/// list or letter, which the same layout rules then tidy. From Medium up, in every field, the
+/// numbers are then written in digits (``NumberStyle``); the model sees and writes them as words.
+/// If cleanup is rejected or times out, the text before cleanup is used, with snippets, commands,
+/// vocabulary, layout and numbers still applied.
 ///
 /// Without a cleaner (cleanup turned off in Settings › Advanced) each level still applies its
-/// rules that need no model, filler removal and layout from Medium up, and nothing is
+/// rules that need no model, filler removal, layout and numbers from Medium up, and nothing is
 /// reworded. That was chosen, so it is not reported as a fallback.
 public struct DictationProcessor: Sendable {
     /// Everything that shapes one dictation's text, read fresh for each dictation.

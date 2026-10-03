@@ -33,23 +33,45 @@
 - **Deep's repairs are learnt from synthetic data**, and were checked on 114 hand-written cases and
   on dictations of the owner's own; expect less on real speech. The model doesn't always fix what it
   could, and the check lets through any other form of a word that was said, so a wrong tense or
-  plural would pass as a repair. The check turns down repairs that reorder words ("Friday night.
-  Sorry, the night Saturday." → "Saturday night"), or that replace a word across a sentence end with
-  one that has nothing in common with it, and then Medium's cleanup is shown. A correction inside a
-  mention ("words like Docker, sorry, not Docker, Kubernetes") the model may leave as said, or read
-  the wrong way round, which the check turns down. Deep is slower than Medium (379 ms against 288 ms
-  at p50, speech-to-text plus cleanup, on an M4 Pro; [Development](development.md#bench-and-eval)),
-  and a rejected answer adds Medium's pass.
-- Spoken lists are laid out only when you say their markers ("first…", "one is…", "number one…" with
-  the later numbers said bare, "bullet point…"), and lists and letters only where line breaks are
-  allowed. The model sometimes drops or rewrites a list item; the check then inserts your words,
-  still laid out. **Deep** also makes lists you didn't mark, in fields that take several lines:
-  things you need or steps to take become a list of three or more ("We need milk, eggs and bread."),
-  and it may do the same for two after a colon you said ("A few things: fixing the feeds and
-  releasing the patch."), which in a chat box may be more than you wanted. For a longer
-  letter, the rules put the greeting and sign-off on lines of their own and the model gets only
-  the body, with a line saying so: Deep lays out the lists in it, but doesn't split it into
-  paragraphs.
+  plural would pass as a repair. Nor can the check tell a misheard word from a name except by its
+  capital: a word speech-to-text capitalised may be respelled into a similar one at the start of a
+  list item ("First, Madge the PR" → "1. Merge the PR"), and so, in principle, may a name ("John" →
+  "Joan"). A misheard word that doesn't look like the right one ("Max" for "Macs", "Russell" for
+  "Rust") stays as speech-to-text wrote it. The check turns down repairs that reorder words ("Friday
+  night. Sorry, the night Saturday." → "Saturday night"), or that replace a word across a sentence
+  end with one that has nothing in common with it, and then Medium's cleanup is shown. A correction
+  inside a mention ("words like Docker, sorry, not Docker, Kubernetes") the model may leave as said,
+  or read the wrong way round, which the check turns down. Deep is slower than Medium (379 ms
+  against 288 ms at p50, speech-to-text plus cleanup, on an M4 Pro;
+  [Development](development.md#bench-and-eval)), and a rejected answer adds Medium's pass.
+- Spoken lists are laid out only when you say their markers ("first…", "one is…", "number one…", or
+  a mix of them in order, "bullet point…"), and lists and letters only where line breaks are
+  allowed. A number said alone is a marker only with "is", a comma, a colon or a full stop after it:
+  "one, go to the shops, two talk to the mechanic" stays as said unless the model puts a comma after
+  "two", while "number two talk to the mechanic" is laid out. The model sometimes drops or rewrites
+  a list item; the check then inserts your words, still laid out. **Deep** also makes lists you
+  didn't mark, in fields that take several lines: things you need or steps to take become a list of
+  three or more ("We need milk, eggs and bread."), and it may do the same for two you set off with a
+  colon or a pause ("A few things: fixing the feeds and releasing the patch."), which in a chat box
+  may be more than you wanted. For a longer letter, the rules put the greeting and sign-off on lines
+  of their own and the model gets only the body, with a line saying so: Deep lays out the lists in
+  it, but doesn't split it into paragraphs.
+- Spoken numbers are written in digits by rules, which read the words around a number but not its
+  meaning ([Cleanup](cleanup.md#what-cleanup-does)). A time needs "at", "by", "from" or the like
+  before it, or "am" or "pm" after it, so "moved to ten fifteen" stays words; three digits said
+  one by one are always a number, so "testing one two three" becomes "testing 123". A range or
+  series with a number below ten stays words ("five to ten"), which also keeps "ten to twelve"
+  whether it was a range or a time. A number word after "point" makes a decimal, so "at one point
+  two people left" becomes "at 1.2 people left" unless the model puts a comma after "point". Dates
+  and ordinals ("March twenty first"), 24-hour times, "a hundred" alone before anything but dollars
+  or percent, and words such as "dozen" stay as said, and other currencies are counts ("five
+  euros", "20 euros").
+- Before a mail provider's domain (gmail.com, outlook.com, …), the word said before "at" becomes the
+  email name unless it is a pronoun, a verb that takes "at", a word after "my", "the" and the like,
+  or the provider's own name ([Cleanup](cleanup.md#spoken-commands)). Other words are taken as
+  names: "the best people at gmail.com" becomes "the best people@gmail.com", and "it's free at
+  outlook.com" becomes "it's free@outlook.com". Only the last word is the name, so "alex smith at
+  gmail dot com" becomes "alex smith@gmail.com".
 
 ## Mac
 

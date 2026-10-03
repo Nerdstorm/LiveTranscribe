@@ -193,7 +193,7 @@ extension DeepLayoutFrames {
         "In short: we move the launch to March.",
         "There is one thing I know: she never forgets a birthday.",
         "The rule is clear: visitors sign in at reception.",
-        "Don't forget: the library books are due on Monday.",
+        "Library notice: the books are due on Monday.",
         "Important: the meeting room has moved to level two.",
         "Result: the new build passes every test.",
         "My advice: sleep on it before you reply.",

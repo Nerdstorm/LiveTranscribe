@@ -42,7 +42,7 @@ struct ContentWordsTests {
     ])
     func acceptsRewording(raw: String, cleaned: String) {
         let contentWords = ContentWords(policy: .default)
-        #expect(contentWords.droppedCount(in: WordAlignment(raw: words(raw), cleaned: words(cleaned)), ignoring: []) == 0)
+        #expect(contentWords.droppedCount(in: WordAlignment(raw: words(raw), cleaned: words(cleaned)), ignoring: [], fragments: []) == 0)
     }
 
     @Test func highAcceptsRewordingThatKeepsTheContent() {
@@ -67,7 +67,7 @@ struct ContentWordsTests {
             raw: words("hi john thanks for the update cheers sam"),
             cleaned: words("Hi Sam, thanks for the update. Cheers.")
         )
-        #expect(contentWords.droppedCount(in: alignment, ignoring: []) == 1)
+        #expect(contentWords.droppedCount(in: alignment, ignoring: [], fragments: []) == 1)
     }
 
     @Test func fallbackReasonsCountWordsInPlainWords() {

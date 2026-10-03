@@ -12,8 +12,8 @@ pub enum CleanupLevel {
     /// Punctuation, casing and misheard words. Every spoken word stays, including fillers and
     /// self-corrections.
     Light,
-    /// Light, plus fillers removed, spoken self-corrections resolved and spoken lists and letters
-    /// laid out where the text field allows lines.
+    /// Light, plus fillers removed, spoken self-corrections resolved, spoken lists and letters laid
+    /// out where the text field allows lines, and spoken numbers written in digits.
     Medium,
     /// Medium, plus light rewording for grammar and clarity.
     High,
@@ -85,6 +85,12 @@ impl CleanupLevel {
         self >= Self::Medium
     }
 
+    /// Spoken numbers are written in digits after cleanup ("twenty one chairs" → "21 chairs"), in
+    /// every field: from Medium up, the levels that lay out lists.
+    pub fn writes_numbers(self) -> bool {
+        self >= Self::Medium
+    }
+
     /// The model may reword for grammar and clarity, not only correct: High only. Deep fixes
     /// grammar without rewording.
     pub fn allows_rewording(self) -> bool {
@@ -124,12 +130,13 @@ mod tests {
     }
 
     #[test]
-    fn levels_from_medium_up_remove_fillers_resolve_corrections_and_lay_out_text() {
+    fn levels_from_medium_up_remove_fillers_resolve_corrections_lay_out_text_and_write_numbers() {
         for level in CleanupLevel::ALL {
             let expected = matches!(level, CleanupLevel::Medium | CleanupLevel::High | CleanupLevel::Deep);
             assert_eq!(level.removes_fillers(), expected);
             assert_eq!(level.resolves_self_corrections(), expected);
             assert_eq!(level.formats_layout(), expected);
+            assert_eq!(level.writes_numbers(), expected);
         }
         let only = |predicate: fn(CleanupLevel) -> bool| -> Vec<CleanupLevel> {
             CleanupLevel::ALL

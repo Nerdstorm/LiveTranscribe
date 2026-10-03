@@ -6,7 +6,7 @@
 |---|---|
 | **None** | Nothing. The transcript is inserted as heard, with spoken commands applied (and, on the Mac, your snippets and vocabulary). |
 | **Light** | Punctuation, casing and misheard words. Fillers and self-corrections are kept as spoken; the model is told not to add or remove words (it may drop a repeated word such as "the the"). |
-| **Medium** (default) | Light, plus: fillers such as "um" are removed, spoken self-corrections are resolved ("Monday, no wait, Tuesday" → "Tuesday"), and spoken lists and letters are laid out wherever line breaks are allowed. |
+| **Medium** (default) | Light, plus: fillers such as "um" are removed, spoken self-corrections are resolved ("Monday, no wait, Tuesday" → "Tuesday"), spoken lists and letters are laid out wherever line breaks are allowed, and spoken numbers are written in digits ("twenty one chairs" → "21 chairs"). |
 | **High** | Medium, plus light rewording for grammar and clarity. On a 1.7B model it behaves close to Medium. A dictation with a word that can cue a correction ("no", "actually", …, whether or not it is one) is cleaned twice: Medium's pass resolves the correction, then High's rewords the result, and if that rewording is rejected, Medium's result is used. |
 | **Deep** | Medium, plus repairs that need the whole dictation: a correction that reaches back into an earlier sentence ("…whether the release is tomorrow. No, sorry, the after tomorrow." → "…whether the release is the day after tomorrow."), a garbled correction phrase read as meant, grammar ("he actually check" → "he actually checked") and misheard words fixed from what the rest says, and emails, letters and lists laid out wherever line breaks are allowed. It doesn't reword as High does: every change must be one of those repairs. Slower, and never the default. |
 
@@ -14,8 +14,8 @@ The levels work the same on the Mac, Linux and Windows: Linux and Windows run a 
 Mac app's prompts, checks and executor, held to the Swift code by test fixtures, with the same two
 adapters ([Architecture](architecture.md)). Choose the level from the menu bar (Mac) or the tray
 (Linux and Windows), or in **Settings › General**. It applies to dictation and, on the Mac, to the
-live transcript. Spoken commands and layout apply to dictation only, as do the Mac's snippets and
-vocabulary (Linux and Windows have none yet).
+live transcript. Spoken commands, layout and numbers in digits apply to dictation only, as do the
+Mac's snippets and vocabulary (Linux and Windows have none yet).
 
 ## What cleanup does
 
@@ -26,29 +26,79 @@ vocabulary (Linux and Windows have none yet).
   synthetic data, resolves them at Medium and High; Deep has an adapter of its own. On the Mac,
   **Resolve spoken self-corrections** in **Settings › Advanced** (on by default) switches both
   adapters off, and then corrections are kept as spoken.
-- **Deep** cares about what a cue follows: "No" that answers a question, "sorry" that apologises
-  and "actually" that starts a new point stay ("Is the release tomorrow? No, it's the day after."
-  is unchanged). Names, numbers, dates, times and negations are kept as said outside the words a
-  correction takes back, and nothing is added that wasn't said. In a field that takes several
-  lines, it lays out what you didn't: a short email's greeting, body and sign-off, and things you
-  need or steps to take as a list, even when you didn't announce one ("We need milk, eggs and
-  bread." becomes three bullets). It doesn't yet split a longer letter's body into paragraphs
-  ([Known limitations](limitations.md)). What you lay out yourself, by saying "new line", "bullet
-  point" or "number one", the layout rules lay out as at Medium.
+- **Deep** cares about what a cue follows: "No" that answers a question, "sorry" that apologises and
+  "actually" that starts a new point stay ("Is the release tomorrow? No, it's the day after." is
+  unchanged). A cue after a full stop corrects the end of the sentence before as it would after a
+  comma, since speech-to-text writes a full stop where the speaker paused ("I left my charger in the
+  garage. Actually, the lobby." → "I left my charger in the lobby."), but not a whole sentence ("I
+  finished the report. Sorry, I was late." stays). Names, numbers, dates, times and negations are
+  kept as said outside the words a correction takes back, and nothing is added that wasn't said. In
+  a field that takes several lines, it lays out what you didn't: a short email's greeting, body and
+  sign-off, and things you need or steps to take as a list, even when you didn't announce one ("We
+  need milk, eggs and bread." becomes three bullets). It doesn't yet split a longer letter's body
+  into paragraphs ([Known limitations](limitations.md)). What you lay out yourself, by saying "new
+  line", "bullet point" or "number one", the layout rules lay out as at Medium.
 - **Lists.** A list needs at least two items, marked by spoken ordinals in order from "first"
   ("first", "second", … to "tenth", or "firstly", …; "finally" or "lastly" may end it), by the
   numbers one, two, … to ten in order, each starting a clause and followed by "is" or "was", a
   comma, a colon or a full stop ("one is the launch, two, the marketing"), by "number", "item" or
   "step" with the numbers one, two, … to twenty in order (after "number one", the later numbers may
-  be said bare: "Number one, the form. Two, the sign-in."; each then starts a clause after an item
-  and is followed by a comma, colon, full stop or "is", so "number one, two, three" stays as said),
-  or by "bullet point". A marker that is talked about stays as said: after a determiner or
-  possessive ("the", "my", "Apple's") or a form of "be" ("cost is number two", "we're number one"),
-  and a bullet marker also after an ordinal or "last", "next", "previous", "final" or "other" ("the
-  second bullet point is wrong"). The markers become "1." or "-", each item starts with a capital,
-  the line before the list ends with a colon, text after the list starts a new paragraph, and items
-  keep their full stops only if every item is a sentence of four words or more. No other words
-  change.
+  be said bare or as ordinals: "Number one, the form. Two, the sign-in. Third, the emails."; each
+  then starts a clause after an item and is followed by a comma, colon, full stop or "is", so
+  "number one, two, three" stays as said), or by "bullet point". The numbers of one list may be said
+  in different ways, each starting a clause, in order: "One, the venue. Number two, the invites."
+  and "First, the venue. Two, the invites. Three, the food." are lists. A number said again at the
+  start of a sentence takes over from the same number inside the sentence before, so numbers inside
+  an item stay there: "One, when we fix one, and two, does it pass? Number two, what does it cost?" is
+  a list of two. Otherwise a list keeps the way it says its numbers, as ordinals or as numbers, so
+  a number said the other way inside an item stays there: "One, the shops. First thing tomorrow,
+  the car. Two, the eggs." is a list of two from "One", and "Number one, the logs. Second, the
+  server. Number two, the team." a list of two from "Number one". A marker that is talked about
+  stays as said: after a determiner or possessive ("the", "my", "Apple's") or a form of "be" ("cost
+  is number two", "we're number one"), and a bullet marker also after an ordinal or "last", "next",
+  "previous", "final" or "other" ("the second bullet point is wrong"). The markers become "1." or
+  "-", each item starts with a capital, the line before the list ends with a colon, text after the
+  list starts a new paragraph, and items keep their full stops only if every item is a sentence of
+  four words or more. No other words change.
+- **Numbers.** From Medium up, in every field, rules write spoken numbers in digits once the model
+  and the list layout are done. The model sees and writes numbers as words, so it can still resolve
+  a correction between them ("fifty thousand, I mean sixty thousand" → "60,000"); speech-to-text
+  writes them as words too. These always become digits:
+
+  | Said | Written |
+  |---|---|
+  | digits said one by one, three or more ("oh" is zero there) | "zero four four six" → 0446, "room three oh two" → room 302 |
+  | decimals and versions, and any number after "version" | "two point five" → 2.5, "version two point four point one" → version 2.4.1, "version two" → version 2 |
+  | percentages | "twenty five percent" → 25%, "five percent" → 5% |
+  | dollars and cents | "one hundred and twenty five dollars" → $125, "five dollars and fifty cents" → $5.50, "two dollars fifty" → $2.50, "fifty cents" → 50 cents |
+  | times after "at", "by", "from", "until", "till", "around", "before" or "after", or before "am" or "pm" | "at nine fifteen" → at 9:15, "seven thirty pm" → 7:30 pm, "at twelve oh five" → at 12:05 |
+  | years said in halves, 1900 to 2099 | "in twenty twenty six" → in 2026, "nineteen oh five" → 1905 |
+  | decades and centuries said with their first two digits | "the nineteen nineties" → the 1990s, "the eighteen hundreds" → the 1800s |
+
+  Any other number is a count: one to nine stay words ("two things"), and 10 and up become digits
+  ("twenty one chairs" → "21 chairs"), at the start of a sentence too ("Twenty people came." →
+  "20 people came."). Numbers of five digits or more take commas and four-digit ones don't, so a
+  count reads like a year: 1500, 2026, 50,000, 1,200,000. Whole millions and billions keep the
+  word: "five million dollars" → "$5 million". "A hundred" with more number words after it is a
+  count too: "a hundred and fifty people" → "150 people". Number words are read in any case ("Zero
+  Four Four Six") and hyphenated ("twenty-five-year-old" → "25-year-old"), and a number that
+  runs into a word that way is a count, not a year: "twenty twelve-year-olds" → "20
+  12-year-olds". Punctuation or a line break ends a number, except a comma after "thousand",
+  "million" or "billion" before more hundreds ("two thousand, five hundred" → 2500). In a range,
+  the scale word and the unit after the last number carry back to the first: "twenty to thirty
+  thousand" → "20,000 to 30,000", "ten to twenty million dollars" → "$10 million to $20 million".
+
+  These stay as said: "one" as a word ("the one I want", "one of them", "one day"); list markers
+  that were not laid out, which are below ten ("One, go to shops, two, …"), while laid-out lists
+  start with digits already; number words that make no one number ("nine eleven", "twenty four
+  seven", or "nine fifteen" without "at" or "pm"); a number before an ordinal ("the twenty first
+  century"), "o'clock" or "and a half"; clock phrases ("half past ten", "twenty to eleven");
+  "a hundred" and "a thousand" alone, except before "dollars" or "percent" ("a hundred dollars" →
+  $100); and a range or series with a number below ten ("five to ten", "nine or ten", "eight,
+  nine, ten"), while "ten to fifteen" becomes "10 to 15" and "five to ten percent" "5% to 10%". A
+  vocabulary term keeps its numbers as you wrote it ("Studio Fifty-Four"), and so do a few idioms
+  ("forty winks", "a thousand and one", "hindsight is twenty twenty"). Undo AI edit puts the words
+  back.
 - **Letters.** A letter needs a greeting at the start ("Dear…", "Hi…", "Hello…", "Hey…", "Good
   morning…", "To whom it may concern") and a sign-off at the end ("Kind regards", "Sincerely",
   "Best wishes", …). An everyday sign-off ("Thanks", "Thank you", "Cheers", "Best", "Love", "Take
@@ -64,8 +114,8 @@ vocabulary (Linux and Windows have none yet).
   only the system's own edit controls (Notepad's, older programs') are known to take several
   lines; browser, Electron and Office fields are typed on one line, with line breaks as spaces.
 - **A check on every answer.** The model's answer is used only if it passes. Otherwise your own
-  words are typed instead, with fillers still removed from Medium up and lists and letters still
-  laid out. Below Deep, an answer fails if it:
+  words are typed instead, with fillers still removed from Medium up, lists and letters still
+  laid out, and numbers still written in digits. Below Deep, an answer fails if it:
   - is empty or chatty;
   - drops a correction cue without a genuine self-correction;
   - deletes a run of spoken words (below High), or leaves out a word that carries meaning at any
@@ -81,15 +131,20 @@ vocabulary (Linux and Windows have none yet).
   own (`SelfRepair`) in place of those on words, names, length and similarity: every difference from
   what was said must be one of the repairs Deep may make, numbers, negations, words of time and
   placeholders may never be added, dropped or changed outside what a correction takes back, and no
-  other new word may appear. It also turns down a line break in a field that takes one line, a
-  bulleted list of fewer than three items (two are a list only when you set them off with a colon,
-  "a few things we need: getting the feeds working and releasing the fix"), and a placeholder alone
-  on a line. When Deep's answer is turned down, Medium's pass runs in the time left, so Deep never
-  shows less than Medium would.
-- **With the language model off**, nothing is reworded. Medium, High and Deep still remove fillers
-  and lay out lists and letters in dictation, and snippets, vocabulary and spoken commands still
-  apply. The switch is **Clean up transcripts with the LLM** in **Settings › Advanced**; on the
-  Mac it applies at the next launch, on Linux and Windows at once.
+  other new word may appear. A name is kept as said, but a capital alone doesn't make one:
+  speech-to-text capitalises letters you spell out and words it mishears, so Deep may join the
+  letters ("P R" → "PR") and respell a misheard word where it writes it without a capital or at the
+  start of a list item ("can you Madge it" → "can you merge it", "First, Madge the PR" → "1. Merge
+  the PR"). It also turns down a line break in a field that takes one line, a bulleted list of
+  fewer than three items (two are a list only when you set them off: with a colon or a pause that
+  speech-to-text writes as a full stop, "a few things we need. Getting the feeds working and
+  releasing the fix", or with a comma after words that count them, "two things, …"), and a
+  placeholder alone on a line. When Deep's answer is turned down, Medium's pass runs in the time
+  left, and its answer is shown if Deep's check accepts it too; otherwise you get what you said.
+- **With the language model off**, nothing is reworded. Medium, High and Deep still remove fillers,
+  lay out lists and letters and write numbers in digits in dictation, and snippets, vocabulary and
+  spoken commands still apply. The switch is **Clean up transcripts with the LLM** in **Settings ›
+  Advanced**; on the Mac it applies at the next launch, on Linux and Windows at once.
 
 ## Spoken commands
 
@@ -110,8 +165,13 @@ never sees an emoji, an address or a line break, only a placeholder it must copy
 - A comma or semicolon needs a word on each side. Quotes and brackets work only in pairs, so a lone
   "end quote" or the idiom "quote unquote" stays as said.
 - An address needs a known ending (.com, .org, .io, .co.uk, …). An email address needs a dot,
-  underscore, hyphen, plus sign or digit in its name, or a word such as "email", "to" or "at" before
-  it. One that speech-to-text writes out itself is kept too, in lower case.
+  underscore, hyphen, plus sign or digit in its name, a word such as "email", "to" or "at" before
+  it, or a mail provider's domain after it (gmail.com, outlook.com, hotmail.com, icloud.com,
+  yahoo.com, proton.me and a few others): "alex at gmail dot com" → alex@gmail.com. There, "at"
+  stays when the word before it is a pronoun ("somebody" too), a verb that takes "at" ("look",
+  "work", "is", …), a word after "my", "the" and the like, or the provider's own name: "look at
+  gmail.com", "my account at gmail.com", "open Gmail at gmail.com". One that speech-to-text writes
+  out itself is kept too, in lower case.
 - "Fireworks" is 🎆 (Unicode's FIREWORKS); 🎇 is "sparkler". A snippet with the same words wins
   over a command, so you can map any phrase to the emoji you prefer. An emoji said on its own
   after a sentence takes no full stop: "See you soon. 🙂".

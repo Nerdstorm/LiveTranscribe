@@ -7,8 +7,8 @@ import Shared
 /// limits, and both change what the speaker said.
 ///
 /// Words are aligned exactly, so a respelling or a number written as digits ("twenty five" →
-/// "25") counts as a replacement, not a deletion. Fillers and a word repeated straight after
-/// itself may always go.
+/// "25") counts as a replacement, not a deletion. Fillers, a word repeated straight after itself
+/// and the start of a word broken off and said again in full (``WordFragments``) may always go.
 struct DroppedWords: Sendable {
     private let fillers: Set<String>
     private let negations: Set<String>
@@ -21,10 +21,11 @@ struct DroppedWords: Sendable {
     }
 
     /// The longest run of spoken words deleted without replacement, beyond the allowed run.
-    func droppedRun(in alignment: WordAlignment) -> Int? {
+    /// `fragments` are the raw indices of the starts of words broken off (``WordFragments``).
+    func droppedRun(in alignment: WordAlignment, fragments: Set<Int>) -> Int? {
         let longest = alignment.gaps
             .filter(\.inserted.isEmpty)
-            .map { gap in gap.deleted.filter { !isDroppable(at: $0, in: alignment.raw) }.count }
+            .map { gap in gap.deleted.filter { !fragments.contains($0) && !isDroppable(at: $0, in: alignment.raw) }.count }
             .max() ?? 0
         return longest > maxDroppedRun ? longest : nil
     }

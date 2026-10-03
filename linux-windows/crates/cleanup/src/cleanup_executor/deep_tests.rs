@@ -136,6 +136,49 @@ fn when_mediums_cleanup_is_rejected_too_what_was_said_is_shown() {
     assert_eq!(cleaned.text, LEASE);
 }
 
+/// Medium's guard accepts a correction that takes back the name with the word it corrects; Deep's
+/// check doesn't, so Deep shows what was said, not Medium's answer.
+#[test]
+fn mediums_cleanup_must_pass_deeps_check_too() {
+    let raw = "Kofi's brother, no wait, not brother, cousin, is hosting the barbecue.";
+    let medium = "Cousin is hosting the barbecue.";
+    let review = |level| {
+        OutputGuard::default().review(
+            raw,
+            &GenerationOutcome::Completed(medium.to_owned()),
+            &CleanupOptions::new(level),
+        )
+    };
+    assert_eq!(review(CleanupLevel::Medium), GuardVerdict::Accepted(medium.to_owned()));
+    assert_eq!(
+        review(CleanupLevel::Deep),
+        GuardVerdict::Rejected(FallbackReason::InvalidRepair)
+    );
+
+    let deep = DeepCleanup {
+        adapter: Adapter::Deep,
+        falls_back_to_medium: true,
+        ..deep()
+    };
+    let (executor, _) = executor(deep, 30.0);
+    let mut model = ScriptedModel::new(|_, request: &CleanupRequest, _| {
+        Ok::<_, ScriptedFailure>(if request.adapter == Adapter::Deep {
+            "Here is the text: Kofi's cousin is hosting the barbecue.".to_owned()
+        } else {
+            medium.to_owned()
+        })
+    });
+    let cleaned = run(&executor, raw, &mut model);
+    assert_eq!(adapters(&model), [Adapter::Deep, Adapter::Medium]);
+    assert!(cleaned.fell_back());
+    assert_eq!(
+        cleaned.fallback_reason.as_ref().map(ToString::to_string).as_deref(),
+        Some("preamble in output (here is)"),
+        "the reason is Deep's, for its own answer"
+    );
+    assert_eq!(cleaned.text, raw);
+}
+
 #[test]
 fn no_answer_in_time_is_not_retried() {
     let deep = DeepCleanup {

@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use lt_shared::phrase_grammar::is_word_in;
+use lt_shared::phrase_grammar::{self, is_word_in};
 use lt_shared::swift_string::{self as s};
 use lt_shared::{PhraseMatch, PhraseMatcher, Replacement, Role, TokenizedText, token_edges};
 
@@ -117,8 +117,61 @@ const EMAIL_CUES: &[&str] = &[
 ];
 /// Plain names that are never email names: "contact us at example.com".
 const PRONOUNS: &[&str] = &[
-    "me", "us", "you", "him", "her", "them", "it", "we", "i", "they", "she", "he", "one", "everyone", "someone",
+    "me",
+    "us",
+    "you",
+    "him",
+    "her",
+    "them",
+    "it",
+    "we",
+    "i",
+    "they",
+    "she",
+    "he",
+    "one",
+    "everyone",
+    "someone",
     "anyone",
+    "everybody",
+    "somebody",
+    "anybody",
+    "nobody",
+    "everything",
+    "something",
+    "anything",
+    "nothing",
+];
+/// Domains of mail providers, before which a plain name is an email name: "alex at gmail dot com".
+const MAIL_PROVIDERS: &[&str] = &[
+    "gmail.com",
+    "googlemail.com",
+    "outlook.com",
+    "hotmail.com",
+    "live.com",
+    "msn.com",
+    "icloud.com",
+    "me.com",
+    "mac.com",
+    "yahoo.com",
+    "proton.me",
+    "protonmail.com",
+    "fastmail.com",
+    "hey.com",
+];
+/// Words before "at" that are never an email name, even before a mail provider: verbs that take
+/// "at", with the forms of "be" ("look at gmail.com", "she works at outlook.com", "it is at
+/// icloud.com"), and the words that end such a verb ("sign up at gmail.com", "log in at …").
+const NOT_EMAIL_NAMES: &[&str] = &[
+    "look", "looks", "looked", "looking", "stare", "stares", "stared", "staring", "glance", "glances", "glanced",
+    "glancing", "point", "points", "pointed", "pointing", "aim", "aims", "aimed", "aiming", "laugh", "laughs",
+    "laughed", "laughing", "smile", "smiles", "smiled", "smiling", "wave", "waves", "waved", "waving", "shout",
+    "shouts", "shouted", "shouting", "yell", "yells", "yelled", "yelling", "arrive", "arrives", "arrived", "arriving",
+    "work", "works", "worked", "working", "meet", "meets", "met", "meeting", "stay", "stays", "stayed", "staying",
+    "live", "lives", "lived", "living", "shop", "shops", "shopped", "shopping", "study", "studies", "studied",
+    "studying", "start", "starts", "started", "starting", "is", "was", "are", "were", "be", "been", "being", "am",
+    "up", "in", "on", "out", "off", "back", "down", "over", "here", "there", "now", "only", "just", "even", "also",
+    "still", "right",
 ];
 /// A spoken domain never starts with these: "the dot com bubble" is not the.com.
 const NOT_DOMAIN_STARTS: &[&str] = &[
@@ -134,10 +187,13 @@ const NAME_SEPARATORS: [(&str, &str); 4] = [("dot", "."), ("underscore", "_"), (
 ///
 /// A domain must end in a known top-level domain ("com", "org", "io", …), so "dot" in ordinary
 /// speech stays a word. "at" makes an email only when the name before it looks like one: it has a
-/// dot, underscore, hyphen or digit ("john.smith"), or follows a word such as "email", "to" or
-/// "is" ("email support at example.com"); "look at example.com" and "contact us at example.com"
-/// keep their "at". A domain speech-to-text already wrote as one word is left as it is unless it
-/// gains a name before it or a path after it; an email address it already wrote
+/// dot, underscore, hyphen or digit ("john.smith"), follows a word such as "email", "to" or "is"
+/// ("email support at example.com"), or comes before a mail provider's domain ("alex at gmail dot
+/// com"). "look at example.com" and "contact us at example.com" keep their "at", and so do a
+/// pronoun, a verb that takes "at", a word after a determiner or the provider's own name before a
+/// mail provider ("look at gmail.com", "she works at outlook.com", "my account at gmail.com",
+/// "open Gmail at gmail.com"). A domain speech-to-text already wrote as one word is left as it is
+/// unless it gains a name before it or a path after it; an email address it already wrote
 /// ("John.Smith@example.com") is taken whole.
 ///
 /// The address goes behind a placeholder, lowercased except for its path, so the model cannot
@@ -165,7 +221,7 @@ impl PhraseMatcher for AddressCommand {
                 index += 1;
                 continue;
             };
-            let (start, address) = if let Some((start, name)) = email_name(index, &tokens) {
+            let (start, address) = if let Some((start, name)) = email_name(index, &domain.host, &tokens) {
                 (start, format!("{name}@{}", domain.host))
             } else if domain.spoken || !domain.path.is_empty() {
                 (index, format!("{}{}", domain.host, domain.path))
@@ -318,8 +374,9 @@ fn written_email(token: &AddressToken) -> Option<String> {
     Some(token.core.clone())
 }
 
-/// The email name before "at" and the domain at `domain_start`, and the index of its first token.
-fn email_name(domain_start: usize, tokens: &[AddressToken]) -> Option<(usize, String)> {
+/// The email name before "at" and the domain `host` at `domain_start`, and the index of its first
+/// token.
+fn email_name(domain_start: usize, host: &str, tokens: &[AddressToken]) -> Option<(usize, String)> {
     let at = domain_start.checked_sub(1).filter(|&at| at >= 1)?;
     if !(tokens[at].is("at") && tokens[at].is_bare()) {
         return None;
@@ -341,15 +398,26 @@ fn email_name(domain_start: usize, tokens: &[AddressToken]) -> Option<(usize, St
     }
     let name = parts.concat();
     let looks_like_an_address = s::any_character(&name, |c| s::is_one_of(c, &[".", "-", "_", "+"]) || s::is_number(c));
-    if !looks_like_an_address
-        && !(index >= 1
-            && tokens[index - 1].trailing.is_empty()
-            && is_word_in(&tokens[index - 1].core, EMAIL_CUES)
-            && !is_word_in(&name, PRONOUNS))
-    {
-        return None;
+    if !looks_like_an_address {
+        let word_before =
+            (index >= 1 && tokens[index - 1].trailing.is_empty()).then(|| tokens[index - 1].core.as_str());
+        let cued = word_before.is_some_and(|word| is_word_in(word, EMAIL_CUES));
+        if is_word_in(&name, PRONOUNS) || !(cued || names_a_mailbox(&name, host, word_before)) {
+            return None;
+        }
     }
     Some((index, name))
+}
+
+/// Whether `name`, a plain word said before "at" and `host`, is a mailbox there: `host` is a mail
+/// provider's, and `name` is no verb that takes "at" ("look at gmail.com"), nor a word after a
+/// determiner ("my account at gmail.com"), nor the provider's own name ("open Gmail at
+/// gmail.com"). `word_before` is the word before `name` in the same clause, if any.
+fn names_a_mailbox(name: &str, host: &str, word_before: Option<&str>) -> bool {
+    is_word_in(host, MAIL_PROVIDERS)
+        && !is_word_in(name, NOT_EMAIL_NAMES)
+        && !s::has_prefix(host, &format!("{name}."))
+        && !word_before.is_some_and(|word| is_word_in(word, &phrase_grammar::DETERMINERS))
 }
 
 fn name_separator(word: &str) -> Option<&'static str> {
@@ -430,5 +498,59 @@ impl<'t> AddressToken<'t> {
 
     fn is(&self, word: &str) -> bool {
         s::canonically_equal(&self.core, word)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use lt_shared::PhraseProtector;
+
+    use super::*;
+
+    fn expanded(spoken: &str) -> String {
+        PhraseProtector::new(vec![Box::new(AddressCommand)])
+            .protect(spoken)
+            .expanded()
+    }
+
+    #[test]
+    fn a_plain_name_before_a_mail_provider_is_an_email_name() {
+        for (spoken, expected) in [
+            ("alex at gmail dot com", "alex@gmail.com"),
+            ("Sam at Outlook.com.", "sam@outlook.com."),
+            ("Hi, alex at icloud dot com is best.", "Hi, alex@icloud.com is best."),
+            ("write to me or sam at proton dot me", "write to me or sam@proton.me"),
+            (
+                "alex at yahoo.com or sam at hey dot com",
+                "alex@yahoo.com or sam@hey.com",
+            ),
+        ] {
+            assert_eq!(expanded(spoken), expected, "{spoken}");
+        }
+    }
+
+    #[test]
+    fn keeps_at_before_a_mail_provider_after_a_pronoun_a_verb_that_takes_it_or_a_determiner() {
+        for (spoken, expected) in [
+            ("look at gmail.com", "look at gmail.com"),
+            ("look at gmail dot com", "look at gmail.com"),
+            ("she works at outlook dot com", "she works at outlook.com"),
+            ("I signed up at gmail.com", "I signed up at gmail.com"),
+            ("the app is at icloud.com", "the app is at icloud.com"),
+            ("my account at gmail dot com is full", "my account at gmail.com is full"),
+            ("find us at hotmail.com", "find us at hotmail.com"),
+            (
+                "somebody at gmail dot com wrote back",
+                "somebody at gmail.com wrote back",
+            ),
+            ("open Gmail at gmail.com", "open Gmail at gmail.com"),
+            (
+                "sign up for iCloud at icloud dot com",
+                "sign up for iCloud at icloud.com",
+            ),
+            ("alex at example.com", "alex at example.com"),
+        ] {
+            assert_eq!(expanded(spoken), expected, "{spoken}");
+        }
     }
 }

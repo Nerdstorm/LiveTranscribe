@@ -36,6 +36,8 @@ struct BenchOptions {
     /// The Language setting, for a model that is told the language to write (Cohere Transcribe): a
     /// code, such as `de`.
     var sttLanguage: String?
+    /// Export untouched ASR inputs for synthetic cleanup-data preparation, without cleanup.
+    var asrOutput: URL?
 
     static func parse(_ arguments: [String]) throws -> BenchOptions {
         var options = BenchOptions()
@@ -77,8 +79,17 @@ struct BenchOptions {
             case "--stt-language":
                 guard let code = iterator.next(), !code.isEmpty else { throw BenchError.usage("--stt-language needs a language's code, such as de") }
                 options.sttLanguage = code
+            case "--asr-output":
+                guard let path = iterator.next(), !path.isEmpty else { throw BenchError.usage("--asr-output needs a JSONL file") }
+                options.asrOutput = URL(fileURLWithPath: path)
             default:
                 throw BenchError.usage("unknown argument \(argument)")
+            }
+        }
+        if options.asrOutput != nil {
+            guard options.dictation, let model = options.sttModel,
+                  case .folder = try SpeechModelLocation(setting: model) else {
+                throw BenchError.usage("--asr-output needs --dictation and --stt-model <local pinned model folder>")
             }
         }
         return options
@@ -97,6 +108,7 @@ enum BenchError: LocalizedError {
             \(detail)
             usage: Bench [--fixtures <dir>] [--level none|light|medium|high|deep] [--no-cleanup] [--no-adapter] [--fast] [--stt-model <repo or folder>] [--stt-language <code>]
                    Bench --dictation [--clips <dir>] [--level <level>]... [--multiline] [--p95-target-ms <ms>] [--verbose] [--no-adapter] [--stt-model <repo or folder>] [--stt-language <code>]
+                   Bench --dictation --clips <dir> --stt-model <local pinned model folder> --asr-output <file.jsonl>
             """
         case .noFixtures(let path):
             "No .wav files with matching .txt references in \(path). Run scripts/generate-test-audio.sh first."

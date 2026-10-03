@@ -1,6 +1,6 @@
 [package]
 name = "lt-styles"
-description = "The deterministic text rules the cleanup levels turn on: fillers, lists and letters."
+description = "The deterministic text rules the cleanup levels turn on: fillers, lists, letters and numbers."
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true

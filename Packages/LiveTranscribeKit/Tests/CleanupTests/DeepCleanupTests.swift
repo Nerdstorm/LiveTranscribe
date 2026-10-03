@@ -91,6 +91,28 @@ struct DeepCleanupTests {
         #expect(cleaned.cleanedText == raw)
     }
 
+    /// Medium's guard accepts a correction that takes back the name with the word it corrects;
+    /// Deep's check doesn't, so Deep shows what was said, not Medium's answer.
+    @Test func mediumsCleanupMustPassDeepsCheckToo() async {
+        let raw = "Kofi's brother, no wait, not brother, cousin, is hosting the barbecue."
+        let medium = "Cousin is hosting the barbecue."
+        let outputGuard = OutputGuard()
+        #expect(outputGuard.review(raw: raw, outcome: .completed(medium), options: CleanupOptions(level: .medium)) == .accepted(medium))
+        #expect(outputGuard.review(raw: raw, outcome: .completed(medium), options: CleanupOptions(level: .deep)) == .rejected(.invalidRepair))
+
+        let requests = Requests()
+        let cleaned = await executor(Self.deep(adapter: .deep, fallsBackToMedium: true)).run(
+            segment(raw), context: [], options: CleanupOptions(level: .deep)
+        ) { request in
+            await requests.record(request)
+            return request.adapter == .deep ? "Here is the text: Kofi's cousin is hosting the barbecue." : medium
+        }
+        #expect(await requests.all.map(\.adapter) == [.deep, .medium])
+        #expect(cleaned.fellBack)
+        #expect(cleaned.fallbackReason == "preamble in output (here is)", "the reason is Deep's, for its own answer")
+        #expect(cleaned.cleanedText == raw)
+    }
+
     @Test func noAnswerInTimeIsNotRetried() async {
         let requests = Requests()
         let cleaned = await executor(Self.deep(fallsBackToMedium: true, minimumTimeoutSeconds: 0.1), timeout: 0.1).run(

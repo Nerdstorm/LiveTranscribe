@@ -1,6 +1,8 @@
 //! The search behind [`SelfRepair::accepts`], as the Mac app's `SelfRepair.Alignment`
 //! (Cleanup/SelfRepairAlignment.swift).
 
+use std::collections::HashSet;
+
 use lt_shared::edit_distance;
 use lt_shared::swift_string::{self as s};
 
@@ -22,6 +24,12 @@ const _: () = assert!(
 /// An edit the search can make: how many said and written words it takes, and the state after it.
 type Step = (usize, usize, usize);
 
+/// Most letters spelled out that may be written as one word.
+const MAX_ACRONYM_LETTERS: usize = 6;
+/// How alike a correction's key word and a word a repair puts in its place must be: a garbled key
+/// word may be read as meant ("busses" → "buses"), never as another word ("busses" → "trains").
+const MIN_KEY_WORD_SIMILARITY: f64 = 0.5;
+
 /// Whether some sequence of a repair's edits turns the words said into the words written.
 ///
 /// Positions are pairs of said and written word indices, visited in order. At each, the search
@@ -32,7 +40,9 @@ type Step = (usize, usize, usize);
 /// ([`corrections`]). Once a word of a phrase has been written, the words it corrected may be
 /// written too ("three servers, sorry, four" → "four servers"; "next week, sorry, the after next"
 /// → "the week after next"), until the word after the phrase is read; never before, which would
-/// keep what was taken back and drop only the cue.
+/// keep what was taken back and drop only the cue. The words its key word takes back are never
+/// written again, and the key word itself is changed only into a word like it
+/// ([`SelfRepair::key_word`](super::SelfRepair::key_word)).
 pub(super) struct Alignment<'a> {
     repair: &'a SelfRepair,
     said: &'a [SaidWord],
@@ -48,8 +58,17 @@ pub(super) struct Alignment<'a> {
     /// For each said index, the words corrected by the phrase that covers it, which a repair may
     /// not add there as new words.
     corrected: Vec<WordSet>,
+    /// For each said index, the corrected words the key word of the phrase that covers it takes
+    /// back, which a repair may not write there either.
+    taken: Vec<WordSet>,
+    /// Whether each said word is the key word of a correction phrase, which a repair may not
+    /// change.
+    key: Vec<bool>,
     /// The words of the cues said, whose forms a repair may not add ("make that" → "made that").
     cue_words: Vec<String>,
+    /// The said indices of the starts of words broken off and said again in full
+    /// (`WordFragments`).
+    fragments: HashSet<usize>,
 }
 
 impl<'a> Alignment<'a> {
@@ -75,10 +94,42 @@ impl<'a> Alignment<'a> {
         for (start, words) in corrections.corrected.iter().enumerate() {
             cover(&mut corrected, start, phrase_length(start, said).min(PHRASE), words);
         }
+        let mut taken = vec![WordSet::default(); n + 1];
+        for (start, words) in corrections.taken.iter().enumerate() {
+            cover(&mut taken, start, phrase_length(start, said).min(PHRASE), words);
+        }
+        let mut keys = corrections.keys;
         for (start, word) in said.iter().enumerate().filter(|(_, word)| word.opens_phrase > 0) {
             let words = WordSet::new(&word.spare);
             cover(&mut spare, start, word.opens_phrase, &words);
             cover(&mut corrected, start, word.opens_phrase, &words);
+            let phrase = &said[start..(start + word.opens_phrase).min(said.len())];
+            let spare_words: Vec<SaidWord> = word
+                .spare
+                .iter()
+                .map(|text| SaidWord {
+                    word: text.clone(),
+                    ..SaidWord::default()
+                })
+                .collect();
+            if let Some(key) = repair.key_word(phrase, &spare_words) {
+                keys.push(start + key);
+                cover(
+                    &mut taken,
+                    start,
+                    word.opens_phrase,
+                    &repair.taken_back(phrase, &spare_words),
+                );
+            }
+        }
+        // The key word said again in a row is the key word too: either copy may be the one kept.
+        let mut key = vec![false; n];
+        for index in keys {
+            let mut end = index;
+            while end + 1 < n && same(&said[end + 1].word, &said[index].word) {
+                end += 1;
+            }
+            key[index..=end].fill(true);
         }
         Self {
             repair,
@@ -89,11 +140,14 @@ impl<'a> Alignment<'a> {
             spans: corrections.ends,
             spare,
             corrected,
+            taken,
+            key,
             cue_words: said
                 .iter()
                 .filter(|word| word.is_cue)
                 .map(|word| word.word.clone())
                 .collect(),
+            fragments: repair.fragments.indices(said),
         }
     }
 
@@ -149,12 +203,22 @@ impl<'a> Alignment<'a> {
             let (left, repairs_left, begun) = decode(state);
             let word = &self.written[j].word;
             let new = self.is_repair(&self.written[j]) && !self.corrected[i].contains(word);
-            if begun && self.spare[i].contains(word) && !self.placeholders.contains(word) {
+            if begun
+                && self.spare[i].contains(word)
+                && !self.taken[i].contains(word)
+                && !self.placeholders.contains(word)
+            {
                 steps.push((0, 1, state));
             } else if left > 0 && repairs_left > 0 && new {
                 steps.push((0, 1, encode(left, repairs_left - 1, begun)));
             }
-            if left > 0 && repairs_left > 0 && i < n && self.is_replaceable(&self.said[i]) && new {
+            if left > 0
+                && repairs_left > 0
+                && i < n
+                && self.may_stand_in(word, i)
+                && self.is_replaceable(&self.said[i])
+                && new
+            {
                 let after = self.consuming(1, i, encode(left, repairs_left - 1, begun), true);
                 steps.push((1, 1, after));
             }
@@ -166,7 +230,33 @@ impl<'a> Alignment<'a> {
             steps.push((1, 2, self.consuming(1, i, state, true)));
         }
         self.number_steps(i, j, state, &mut steps);
+        if let Some(step) = self.acronym_step(i, j, state) {
+            steps.push(step);
+        }
         steps
+    }
+
+    /// Letters spelled out and written as one word, in order ("p r" → "PR", "A P I" → "API"): two
+    /// to [`MAX_ACRONYM_LETTERS`] said words of one letter each. Speech-to-text gives them
+    /// capitals, as it does names, so a spelled letter is kept as a letter either way.
+    fn acronym_step(&self, i: usize, j: usize, state: usize) -> Option<Step> {
+        let letters = self.written.get(j)?.word.as_str();
+        let count = s::character_count(letters);
+        if !(2..=MAX_ACRONYM_LETTERS).contains(&count)
+            || i + count > self.said.len()
+            || !s::characters(letters).all(s::is_letter)
+        {
+            return None;
+        }
+        let run = &self.said[i..i + count];
+        let spelled = run
+            .iter()
+            .all(|word| s::character_count(&word.word) == 1 && !word.is_cue);
+        if !spelled || run[..count - 1].iter().any(|word| word.ends_sentence) {
+            return None;
+        }
+        let joined: String = run.iter().map(|word| word.word.as_str()).collect();
+        same(&joined, letters).then(|| (count, 1, self.consuming(count, i, state, true)))
     }
 
     /// A number said in words and written in digits, or the other way round ("twenty five" →
@@ -202,9 +292,15 @@ impl<'a> Alignment<'a> {
     /// Whether `written_word` keeps `said_word`: the same word or another form of it, a word
     /// speech-to-text confuses with it ("weather", "whether"), or a respelling; a protected word
     /// only as itself, as another way of writing its number, or, for a negated verb, in another
-    /// form that keeps its negation ("don't" → "doesn't"); a cue only as itself; a name only as
-    /// itself or its possessive. A respelling is never written with a capital, which could make it
-    /// a name the speaker didn't say ("uma" is not "Una", "jura" not "Jira"), nor as a filler.
+    /// form that keeps its negation ("don't" → "doesn't"); a cue only as itself. A respelling is
+    /// never a filler, nor a name the speaker didn't say: a word written with a capital where no
+    /// sentence starts is a name, which keeps only itself or takes its possessive ("uma" is not
+    /// "Una", "jura" not "Jira", "Kirk" not "Kurt"), and one that starts a sentence may be, so only
+    /// another form is written there ("uma hasn't" is not "Una hasn't"). Where a list item starts,
+    /// the capital is the layout's, so a word said within a sentence is respelled there as anywhere
+    /// else. A capital a word had as said shows only that speech-to-text took it for a name, which
+    /// a misheard word often isn't: "can you Madge it" may be "can you merge it", and "First, Madge
+    /// the PR" "1. Merge the PR".
     fn keeps(&self, said_word: &SaidWord, written_word: &WrittenWord) -> bool {
         let (said, word) = (said_word.word.as_str(), written_word.word.as_str());
         if same(said, word) {
@@ -222,21 +318,24 @@ impl<'a> Alignment<'a> {
             return is_negated_verb(said) && is_negated_verb(word) && word_forms::are_forms(said, word);
         }
         let pronoun = same(word, "i") || s::has_prefix(word, "i'");
-        if said_word.is_name || (written_word.is_capitalised && !written_word.starts_sentence && !pronoun) {
+        let laid_out = written_word.starts_list_item && !said_word.starts_sentence;
+        let may_be_name = written_word.is_capitalised && !pronoun && !laid_out;
+        if may_be_name && !written_word.starts_sentence {
             return !self.spoken.contains(word) && possessives(said).iter().any(|possessive| same(possessive, word));
         }
         if word_forms::are_forms(said, word) {
             return true;
         }
-        (!written_word.is_capitalised || pronoun)
+        !may_be_name
             && !self.repair.is_cue(word)
             && !self.spoken.contains(word)
             && edit_distance::normalized_similarity(said, word) >= self.repair.min_respelling_similarity
     }
 
-    /// A filler, a word said twice in a row, a word that only holds the grammar together, a unit
-    /// whose number is now written with its symbol ("dollars" in "twenty five dollars" → "$25"),
-    /// or a word said to mark the list item that is written next.
+    /// A filler, a word said twice in a row, a word that only holds the grammar together, the start
+    /// of a word broken off and said again in full ("con" in "con consider"), a unit whose number
+    /// is now written with its symbol ("dollars" in "twenty five dollars" → "$25"), or a word said
+    /// to mark the list item that is written next.
     fn is_droppable(&self, i: usize, j: usize) -> bool {
         let said = &self.said[i];
         let word = said.word.as_str();
@@ -256,7 +355,7 @@ impl<'a> Alignment<'a> {
         if said.is_cue || said.is_name || self.repair.is_protected(word, self.placeholders) {
             return false;
         }
-        word_forms::is_droppable(word)
+        word_forms::is_droppable(word) || self.fragments.contains(&i)
     }
 
     fn is_list_marker(&self, i: usize) -> bool {
@@ -282,12 +381,20 @@ impl<'a> Alignment<'a> {
                 .any(|cue| same(cue, text) || word_forms::are_forms(cue, text))
     }
 
+    /// Whether a repair may put `word` in place of said word `i`: any word, unless that is a
+    /// correction's key word, which only a word like it may stand in for.
+    fn may_stand_in(&self, word: &str, i: usize) -> bool {
+        !self.key[i] || edit_distance::normalized_similarity(&self.said[i].word, word) >= MIN_KEY_WORD_SIMILARITY
+    }
+
     fn is_replaceable(&self, word: &SaidWord) -> bool {
         !self.repair.is_protected(&word.word, self.placeholders) && !word.is_name && !word.is_cue
     }
 
+    /// Two words said as one written: a contraction, the two run together, or a respelling of both;
+    /// never across the end of a sentence ("plan A. I think" is not "plan AI think").
     fn merges(&self, first: &SaidWord, second: &SaidWord, written: &WrittenWord) -> bool {
-        if first.is_cue || second.is_cue || first.is_name || second.is_name {
+        if first.is_cue || second.is_cue || first.is_name || second.is_name || first.ends_sentence {
             return false;
         }
         let (a, b, word) = (first.word.as_str(), second.word.as_str(), written.word.as_str());

@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::sync::LazyLock;
 
 use lt_shared::edit_distance;
@@ -35,6 +35,9 @@ static NUMBER_WORD_SET: LazyLock<WordSet> = LazyLock::new(|| WordSet::new(NUMBER
 /// - its gap in the alignment puts back at least as many words as it deletes content words: a
 ///   rewording ("I got the tickets" → "I have the tickets").
 ///
+/// The start of a word broken off and said again in full ("rep" in "the rep report") is not
+/// content: the word it starts carries it (`WordFragments`).
+///
 /// What is left was deleted with nothing in its place.
 #[derive(Clone, Debug)]
 pub(crate) struct ContentWords {
@@ -54,8 +57,14 @@ impl ContentWords {
 
     /// How many content words in `alignment`'s raw text were deleted with nothing in their place.
     /// Words in `ignored` (the normalised placeholder tokens, which are checked on their own) are
-    /// neither content nor a replacement for it.
-    pub(crate) fn dropped_count(&self, alignment: &WordAlignment, ignored: &WordSet) -> usize {
+    /// neither content nor a replacement for it, and `fragments`, the raw indices of the starts of
+    /// words broken off (`WordFragments`), are not content.
+    pub(crate) fn dropped_count(
+        &self,
+        alignment: &WordAlignment,
+        ignored: &WordSet,
+        fragments: &HashSet<usize>,
+    ) -> usize {
         let (raw, cleaned) = (&alignment.raw, &alignment.cleaned);
         let spoken = WordSet::new(raw);
         // Output words the alignment left unmatched and nothing has claimed yet, in order.
@@ -73,7 +82,7 @@ impl ContentWords {
                 .deleted
                 .iter()
                 .copied()
-                .filter(|&index| self.is_content(index, raw, ignored))
+                .filter(|&index| !fragments.contains(&index) && self.is_content(index, raw, ignored))
             {
                 let stands_in = |stand_in: usize| self.stands_in(&raw[index], &cleaned[stand_in], &spoken);
                 // Merged words and the parts of a number share one stand-in ("twenty five" → "25").
@@ -185,6 +194,7 @@ mod tests {
         ContentWords::new(&GuardPolicy::default()).dropped_count(
             &WordAlignment::new(normalized_words(raw), normalized_words(cleaned)),
             &WordSet::default(),
+            &HashSet::new(),
         )
     }
 
