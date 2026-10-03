@@ -556,4 +556,34 @@ struct SelfRepairTests {
             "a list of placeholders alone is turned down too, and Medium's sentence shown"
         )
     }
+
+    @Test("The start of a word broken off and said again in full may go", arguments: [
+        ("She wants few ex expenses paid back.", "She wants few expenses paid back."),
+        ("We should con consider the budget first.", "We should consider the budget first."),
+        ("can you send the rep report by friday", "Can you send the report by Friday?"),
+        ("We should con- consider the budget first.", "We should consider the budget first."),
+    ])
+    func dropsAWordFragment(raw: String, cleaned: String) {
+        #expect(review(raw, cleaned) == .accepted(cleaned))
+    }
+
+    @Test("A word that only starts the next by chance stays", arguments: [
+        // A negation, a number, a function word.
+        ("there is not nothing left", "There is nothing left."),
+        ("Bring ten tennis balls.", "Bring tennis balls."),
+        ("Can he help us move?", "Can help us move?"),
+        // Across the end of a sentence.
+        ("We met the new rep. Reports are due on Monday.", "We met the new. Reports are due on Monday."),
+        // Not the start of the next word.
+        ("can you send the rap report by friday", "Can you send the report by Friday?"),
+        // Not written as a word broken off: part of a word, or set off by a comma.
+        ("please re-read the contract before signing", "Please read the contract before signing."),
+        ("Bring a pen, pencil and paper.", "Bring a pencil and paper."),
+        // A single letter, and a name's first part where it starts a sentence.
+        ("vitamin d deficiency is common in winter", "Vitamin deficiency is common in winter."),
+        ("Ed Edwards will lead.", "Edwards will lead."),
+    ])
+    func keepsAWordThatIsNoFragment(raw: String, cleaned: String) {
+        #expect(review(raw, cleaned) == .rejected(.invalidRepair))
+    }
 }

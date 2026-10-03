@@ -40,6 +40,9 @@ extension SelfRepair {
         private let key: [Bool]
         /// The words of the cues said, whose forms a repair may not add ("make that" → "made that").
         private let cueWords: Set<String>
+        /// The said indices of the starts of words broken off and said again in full
+        /// (``WordFragments``).
+        private let fragments: Set<Int>
 
         private static let phrase = SelfRepair.correctionPhraseWords
         private static let repairs = SelfRepair.maxRepairWords
@@ -95,6 +98,7 @@ extension SelfRepair {
             self.taken = taken
             self.key = key
             cueWords = Set(said.filter(\.isCue).map(\.word))
+            fragments = repair.fragments.indices(in: said)
         }
 
         func reachesEnd() -> Bool {
@@ -252,9 +256,10 @@ extension SelfRepair {
             [name + "'s", name.hasSuffix("s") ? name + "'" : name + "s'"]
         }
 
-        /// A filler, a word said twice in a row, a word that only holds the grammar together, a
-        /// unit whose number is now written with its symbol ("dollars" in "twenty five dollars" →
-        /// "$25"), or a word said to mark the list item that is written next.
+        /// A filler, a word said twice in a row, a word that only holds the grammar together, the
+        /// start of a word broken off and said again in full ("con" in "con consider"), a unit whose
+        /// number is now written with its symbol ("dollars" in "twenty five dollars" → "$25"), or a
+        /// word said to mark the list item that is written next.
         private func isDroppable(_ i: Int, before j: Int) -> Bool {
             let word = said[i].word
             if repair.isFiller(word) { return true }
@@ -263,7 +268,7 @@ extension SelfRepair {
             if WordForms.unitWords.contains(word), i > 0, WordForms.isNumber(said[i - 1].word) { return true }
             if said[i].isCue { return false }
             guard !repair.isProtected(word, placeholders: placeholders), !said[i].isName, !said[i].isCue else { return false }
-            return WordForms.droppable.contains(word)
+            return WordForms.droppable.contains(word) || fragments.contains(i)
         }
 
         private func isListMarker(at i: Int) -> Bool {

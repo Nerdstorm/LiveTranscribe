@@ -980,3 +980,57 @@ fn a_correction_takes_back_no_more_than_the_corrected_words_said_again() {
         (nikhil, "Siobhan's team owns the billing service."),
     ]);
 }
+
+#[test]
+fn the_start_of_a_word_broken_off_and_said_again_in_full_may_go() {
+    assert_accepted(&[
+        (
+            "She wants few ex expenses paid back.",
+            "She wants few expenses paid back.",
+        ),
+        (
+            "We should con consider the budget first.",
+            "We should consider the budget first.",
+        ),
+        (
+            "can you send the rep report by friday",
+            "Can you send the report by Friday?",
+        ),
+        (
+            "We should con- consider the budget first.",
+            "We should consider the budget first.",
+        ),
+    ]);
+}
+
+#[test]
+fn a_word_that_only_starts_the_next_by_chance_stays() {
+    assert_rejected(&[
+        // A negation, a number, a function word.
+        ("there is not nothing left", "There is nothing left."),
+        ("Bring ten tennis balls.", "Bring tennis balls."),
+        ("Can he help us move?", "Can help us move?"),
+        // Across the end of a sentence.
+        (
+            "We met the new rep. Reports are due on Monday.",
+            "We met the new. Reports are due on Monday.",
+        ),
+        // Not the start of the next word.
+        (
+            "can you send the rap report by friday",
+            "Can you send the report by Friday?",
+        ),
+        // Not written as a word broken off: part of a word, or set off by a comma.
+        (
+            "please re-read the contract before signing",
+            "Please read the contract before signing.",
+        ),
+        ("Bring a pen, pencil and paper.", "Bring a pencil and paper."),
+        // A single letter, and a name's first part where it starts a sentence.
+        (
+            "vitamin d deficiency is common in winter",
+            "Vitamin deficiency is common in winter.",
+        ),
+        ("Ed Edwards will lead.", "Edwards will lead."),
+    ]);
+}

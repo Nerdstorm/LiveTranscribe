@@ -1,6 +1,8 @@
 //! The search behind [`SelfRepair::accepts`], as the Mac app's `SelfRepair.Alignment`
 //! (Cleanup/SelfRepairAlignment.swift).
 
+use std::collections::HashSet;
+
 use lt_shared::edit_distance;
 use lt_shared::swift_string::{self as s};
 
@@ -64,6 +66,9 @@ pub(super) struct Alignment<'a> {
     key: Vec<bool>,
     /// The words of the cues said, whose forms a repair may not add ("make that" → "made that").
     cue_words: Vec<String>,
+    /// The said indices of the starts of words broken off and said again in full
+    /// (`WordFragments`).
+    fragments: HashSet<usize>,
 }
 
 impl<'a> Alignment<'a> {
@@ -142,6 +147,7 @@ impl<'a> Alignment<'a> {
                 .filter(|word| word.is_cue)
                 .map(|word| word.word.clone())
                 .collect(),
+            fragments: repair.fragments.indices(said),
         }
     }
 
@@ -326,9 +332,10 @@ impl<'a> Alignment<'a> {
             && edit_distance::normalized_similarity(said, word) >= self.repair.min_respelling_similarity
     }
 
-    /// A filler, a word said twice in a row, a word that only holds the grammar together, a unit
-    /// whose number is now written with its symbol ("dollars" in "twenty five dollars" → "$25"),
-    /// or a word said to mark the list item that is written next.
+    /// A filler, a word said twice in a row, a word that only holds the grammar together, the start
+    /// of a word broken off and said again in full ("con" in "con consider"), a unit whose number
+    /// is now written with its symbol ("dollars" in "twenty five dollars" → "$25"), or a word said
+    /// to mark the list item that is written next.
     fn is_droppable(&self, i: usize, j: usize) -> bool {
         let said = &self.said[i];
         let word = said.word.as_str();
@@ -348,7 +355,7 @@ impl<'a> Alignment<'a> {
         if said.is_cue || said.is_name || self.repair.is_protected(word, self.placeholders) {
             return false;
         }
-        word_forms::is_droppable(word)
+        word_forms::is_droppable(word) || self.fragments.contains(&i)
     }
 
     fn is_list_marker(&self, i: usize) -> bool {

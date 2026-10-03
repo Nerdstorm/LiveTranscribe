@@ -10,6 +10,7 @@ use lt_shared::swift_string::{self as s};
 
 use crate::GuardPolicy;
 use crate::word_forms;
+use crate::word_fragments::WordFragments;
 use crate::words::{WordSet, normalized_words, same, starts_with};
 use alignment::Alignment;
 
@@ -38,7 +39,8 @@ pub(crate) const MIN_BULLETED_ITEMS: usize = 3;
 ///   a word it misheard ("Madge the PR"), which may be respelled where it is written without a
 ///   capital, or with the one a list item starts with ("merge the PR", "1. Merge the PR");
 /// - a filler, a repeated word, or a word that only holds the grammar together dropped or added
-///   ("I going" → "I am going");
+///   ("I going" → "I am going"); the start of a word broken off and said again in full dropped
+///   ("con consider" → "consider", `WordFragments`);
 /// - a self-correction resolved ([`corrections`]): as at Medium, up to
 ///   [`GuardPolicy::max_retracted_words`] words and the cue after them taken out, with "not" and
 ///   the words taken back when the speaker says them again ("four, no, not four, five"); from a
@@ -74,6 +76,8 @@ pub(crate) struct SelfRepair {
     function_words: WordSet,
     max_retracted_words: usize,
     min_respelling_similarity: f64,
+    /// The starts of words broken off and said again in full, which a repair may drop.
+    fragments: WordFragments,
 }
 
 impl SelfRepair {
@@ -101,6 +105,7 @@ impl SelfRepair {
             function_words: WordSet::normalized(&policy.function_words),
             max_retracted_words: policy.max_retracted_words,
             min_respelling_similarity: policy.min_respelling_similarity,
+            fragments: WordFragments::new(policy),
         }
     }
 
@@ -220,6 +225,10 @@ pub(crate) struct SaidWord {
     pub(crate) may_be_name: bool,
     /// The first word of a sentence or line, whose capital says nothing about it.
     pub(crate) starts_sentence: bool,
+    /// Written as speech-to-text writes the start of a word broken off: on its own, with nothing
+    /// after it but a hyphen or dash, and not in capitals ("con" in "con consider" or "con-
+    /// consider"; not "re" in "re-read", "pen" in "pen, pencil" or "PR").
+    pub(crate) may_be_broken_off: bool,
     /// Where a correction from a later sentence was put in place of what it corrects, how many
     /// words its phrase has, starting here; 0 elsewhere (see [`corrections`]).
     pub(crate) opens_phrase: usize,
@@ -239,6 +248,7 @@ impl PartialEq for SaidWord {
             && self.is_capitalised == other.is_capitalised
             && self.may_be_name == other.may_be_name
             && self.starts_sentence == other.starts_sentence
+            && self.may_be_broken_off == other.may_be_broken_off
             && self.opens_phrase == other.opens_phrase
             && self.spare.len() == other.spare.len()
             && self.spare.iter().zip(&other.spare).all(|(a, b)| same(a, b))
@@ -270,6 +280,15 @@ pub(crate) fn said_words(text: &str, function_words: &WordSet, placeholders: &Wo
         let mut starts_sentence = true;
         let line_start = words.len();
         let parts: Vec<&str> = parts(line).collect();
+        // Only the last part between two spaces may be a word broken off: "con-", not "re-read".
+        let last_of_token: Vec<bool> = s::split_whitespace(line)
+            .into_iter()
+            .flat_map(|token| {
+                let count =
+                    s::split_where(token, usize::MAX, true, |character| s::is_one_of(character, &HYPHENS)).len();
+                (0..count).map(move |index| index == count - 1)
+            })
+            .collect();
         for (index, &part) in parts.iter().enumerate() {
             let trailing = trailing_marks(part);
             // An abbreviation's own full stop ("at 3 p.m. today") ends a sentence only before a
@@ -301,6 +320,7 @@ pub(crate) fn said_words(text: &str, function_words: &WordSet, placeholders: &Wo
                     is_capitalised: upper && !starts_sentence,
                     may_be_name: could_be_name,
                     starts_sentence: starts_sentence && offset == 0,
+                    may_be_broken_off: is_last_of_part && last_of_token[index] && may_be_broken_off(part),
                     ..SaidWord::default()
                 });
             }
@@ -506,6 +526,17 @@ fn starts_with_uppercase(part: &str) -> bool {
     s::characters(part)
         .find(|&character| s::is_letter(character))
         .is_some_and(s::is_uppercase)
+}
+
+/// Whether `part`, the last part between two spaces, is written as the start of a word broken off
+/// may be: ending in a letter, so with nothing after it but the hyphen or dash split off ("con-",
+/// not "pen," or "rep:"), and not in capitals, as an abbreviation is ("PR").
+fn may_be_broken_off(part: &str) -> bool {
+    let letters: Vec<&str> = s::characters(part)
+        .filter(|&character| s::is_letter(character))
+        .collect();
+    s::last_character(part).is_some_and(s::is_letter)
+        && !(letters.len() > 1 && letters.iter().all(|&letter| s::is_uppercase(letter)))
 }
 
 /// Words from `start` to the end of its sentence, inclusive; 0 past the end.
