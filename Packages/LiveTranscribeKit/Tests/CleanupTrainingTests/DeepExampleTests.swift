@@ -102,6 +102,8 @@ struct DeepExampleValidatorTests {
         #expect(validator.problems(in: example(.crossSentence, "The demo is on Tuesday. Sorry, Wednesday.", "The demo is on Wednesday.")).isEmpty)
         #expect(validator.problems(in: example(.control, "Sorry I'm late.", "Sorry, I'm late.")).isEmpty)
         #expect(validator.problems(in: example(.grammar, "He go to the gym.", "He goes to the gym.")).isEmpty)
+        // A common word speech-to-text wrote as a name is fixed by its capital alone.
+        #expect(validator.problems(in: example(.recognition, "We left at Dawn to beat the traffic.", "We left at dawn to beat the traffic.")).isEmpty)
         #expect(validator.problems(in: example(.layout, "I need milk, eggs and bread.", "I need:\n- Milk\n- Eggs\n- Bread", multiline: true)).isEmpty)
     }
 
@@ -114,6 +116,8 @@ struct DeepExampleValidatorTests {
         #expect(validator.problems(in: example(.crossSentence, "It works. Sorry, it's fast.", "It works. Sorry, it's fast.")).contains("a correction must take its cue out"))
         #expect(validator.problems(in: example(.control, "It works.", "It works.")).contains("must contain a correction cue"))
         #expect(validator.problems(in: example(.grammar, "He goes to the gym.", "He goes to the gym.")).contains("must fix a word"))
+        #expect(validator.problems(in: example(.recognition, "we left at dawn. Then we ate.", "We left at dawn. then we ate.")).contains("must fix a word"))
+        #expect(validator.problems(in: example(.grammar, "We left at Dawn to beat the traffic.", "We left at dawn to beat the traffic.")).contains("must fix a word"))
         #expect(validator.problems(in: example(.layout, "I need milk, eggs and bread.", "I need milk, eggs and bread.", multiline: true))
             .contains("must lay the text out in a field that takes several lines"))
         #expect(validator.problems(in: example(.oneLine, "I need milk, eggs and bread.", "I need:\n- Milk\n- Eggs\n- Bread"))

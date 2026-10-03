@@ -121,6 +121,8 @@ public struct DeepExampleGenerator: Sendable {
             return placeholder()
         case .mention:
             return mention()
+        case .composite:
+            preconditionFailure("composite examples are joined from others by the measured preparation, not generated")
         }
     }
 

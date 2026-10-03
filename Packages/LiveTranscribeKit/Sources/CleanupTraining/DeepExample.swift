@@ -46,6 +46,10 @@ public struct DeepExample: Codable, Sendable, Equatable {
         /// A correction said inside a mention ("words like X, sorry, not X, Y"), and an ordinary
         /// contrast ("three, not four") that stays.
         case mention
+        /// Several dictations said one after another, each as its own category has it: the
+        /// measured preparation joins them so the model reads longer text. Never generated, and
+        /// last, so the generator's seeded output doesn't change.
+        case composite
     }
 
     public var category: Category

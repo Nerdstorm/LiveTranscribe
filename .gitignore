@@ -35,3 +35,5 @@ Packages/LiveTranscribeKit/Tests/IntegrationTests/Fixtures/Dictation/*.wav
 # (see Packages/LiveTranscribeKit/Training/README.md).
 Packages/LiveTranscribeKit/Training/generated/
 Packages/LiveTranscribeKit/Training/runs/
+Packages/LiveTranscribeKit/Training/prepared/
+__pycache__/

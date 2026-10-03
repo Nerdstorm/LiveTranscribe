@@ -30,9 +30,11 @@ do {
         try generate(seed: seed)
     case .generate(let seed, deep: true):
         try generateDeep(seed: seed)
-    case .validate(deep: false):
+    case .validate(let deep, let directory?, let report):
+        exit(try validatePreparedData(directory: directory, deep: deep, report: report) ? 0 : 1)
+    case .validate(deep: false, directory: nil, report: _):
         exit(try validate() ? 0 : 1)
-    case .validate(deep: true):
+    case .validate(deep: true, directory: nil, report: _):
         exit(try validateDeep() ? 0 : 1)
     case .train(let options) where options.deep:
         try await trainDeep(options)
@@ -117,13 +119,23 @@ func train(_ options: TrainCommandOptions) async throws {
     guard let revision = options.revision ?? CleanupModelLoader.cachedCommit(modelID: modelID) else {
         throw TrainError.noRevision(modelID)
     }
-    guard try validate() else { throw TrainError.invalidData }
-
-    let curated = try Paths.curatedFiles(.train).flatMap { try TrainingData.read(from: $0) }
-    let generated = try TrainingData.read(from: Paths.generated(.train))
-    let trainSet = generated + Array(repeating: curated, count: options.curatedRepeats).flatMap { $0 }
-    let validSet = try TrainingData.read(from: Paths.generated(.valid))
-    print("Training on \(generated.count) generated + \(curated.count) curated (x\(options.curatedRepeats)) examples; validating on \(validSet.count)")
+    let trainSet: [TrainingExample]
+    let validSet: [TrainingExample]
+    if let directory = options.dataDirectory {
+        guard try validatePreparedData(directory: directory, deep: false, report: directory.appending(path: "audit.json")) else {
+            throw TrainError.invalidData
+        }
+        trainSet = try expandPreparedData(TrainingData.read(from: directory.appending(path: "train.jsonl")), directory: directory, split: .train)
+        validSet = try TrainingData.read(from: directory.appending(path: "valid.jsonl"))
+        try recordPreparedData(directory, output: options.output)
+    } else {
+        guard try validate() else { throw TrainError.invalidData }
+        let curated = try Paths.curatedFiles(.train).flatMap { try TrainingData.read(from: $0) }
+        let generated = try TrainingData.read(from: Paths.generated(.train))
+        trainSet = generated + Array(repeating: curated, count: options.curatedRepeats).flatMap { $0 }
+        validSet = try TrainingData.read(from: Paths.generated(.valid))
+    }
+    print("Training on \(trainSet.count) examples; validating on \(validSet.count)")
 
     print("Loading \(modelID) at \(revision)")
     let container = try await CleanupModelLoader.loadContainer(modelID: modelID, revision: revision) { _ in }
@@ -234,6 +246,7 @@ struct TrainCommandOptions {
     var deep = false
     var output = Paths.defaultAdapterOutput
     var revision: String?
+    var dataDirectory: URL?
     var curatedRepeats = 2
     var training = TrainingOptions()
 }
@@ -252,7 +265,7 @@ struct EvaluateCommandOptions {
 
 enum Command {
     case generate(seed: UInt64, deep: Bool)
-    case validate(deep: Bool)
+    case validate(deep: Bool, directory: URL?, report: URL?)
     case train(TrainCommandOptions)
     case evaluate(EvaluateCommandOptions)
     case measure(MeasureCommandOptions)
@@ -286,11 +299,18 @@ enum Command {
             return .generate(seed: seed, deep: deep)
         case "validate":
             var deep = false
+            var directory: URL?
+            var report: URL?
             while let argument = iterator.next() {
-                guard argument == "--deep" else { throw TrainError.usage("unknown argument \(argument)") }
-                deep = true
+                switch argument {
+                case "--deep": deep = true
+                case "--data-dir": directory = URL(fileURLWithPath: try value(argument), isDirectory: true)
+                case "--report": report = URL(fileURLWithPath: try value(argument))
+                default: throw TrainError.usage("unknown argument \(argument)")
+                }
             }
-            return .validate(deep: deep)
+            if report != nil && directory == nil { throw TrainError.usage("--report needs --data-dir") }
+            return .validate(deep: deep, directory: directory, report: report)
         case "train":
             var options = TrainCommandOptions()
             var output: URL?
@@ -299,6 +319,7 @@ enum Command {
                 case "--deep": options.deep = true
                 case "--output": output = URL(fileURLWithPath: try value(argument), isDirectory: true)
                 case "--revision": options.revision = try value(argument)
+                case "--data-dir": options.dataDirectory = URL(fileURLWithPath: try value(argument), isDirectory: true)
                 case "--iterations": options.training.iterations = try number(argument)
                 case "--batch-size": options.training.batchSize = try number(argument)
                 case "--learning-rate": options.training.learningRate = try number(argument)
@@ -311,6 +332,12 @@ enum Command {
                 }
             }
             options.output = output ?? (options.deep ? DeepPaths.defaultAdapterOutput : Paths.defaultAdapterOutput)
+            if options.dataDirectory != nil {
+                guard let revision = options.revision,
+                      revision.range(of: "^[0-9a-fA-F]{40}$", options: .regularExpression) != nil else {
+                    throw TrainError.usage("prepared-data training needs --revision <full 40-character base commit>")
+                }
+            }
             return .train(options)
         case "evaluate":
             var options = EvaluateCommandOptions()
@@ -363,10 +390,10 @@ enum TrainError: LocalizedError {
             """
             \(detail)
             usage: Train generate [--deep] [--seed <n>]
-                   Train validate [--deep]
+                   Train validate [--deep] [--data-dir <prepared-dir> --report <file.json>]
                    Train train [--deep] [--output <dir>] [--revision <commit>] [--iterations <n>] [--batch-size <n>]
                                [--learning-rate <x>] [--rank <n>] [--scale <x>] [--layers <n>]
-                               [--curated-repeats <n>] [--seed <n>]
+                               [--curated-repeats <n>] [--seed <n>] [--data-dir <prepared-dir>]
                    Train evaluate [--adapter <dir> | --no-adapter] [--data <file.jsonl>]... [--report <file>]
                    Train measure --level <level> [--data <file.jsonl>]... [--adapter <dir> | --no-adapter] [--timeout <s>]
                                  [--thinking | --no-thinking] [--thinking-tokens <n>] [--deep-passes one|after-medium]
