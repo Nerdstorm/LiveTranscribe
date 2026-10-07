@@ -43,12 +43,6 @@ The timing comes from the existing 65-clip synthetic-speech benchmark: 280 ms at
 Speed and memory use vary with hardware, model and recording length; Linux can use more memory.
 See the [benchmark details](docs/development.md#bench-and-eval) and [system requirements](#status).
 
-Wispr Flow details checked on 7 October 2026 against its
-[pricing](https://wisprflow.ai/pricing) and
-[privacy documentation](https://docs.wisprflow.ai/articles/3467817258-security-and-compliance-faq).
-Live Transcribe uses the network for model downloads and optional Mac update checks;
-[dictation stays local](docs/privacy.md).
-
 ## Download
 
 | | Get | Notes |
