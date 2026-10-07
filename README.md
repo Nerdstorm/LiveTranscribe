@@ -25,6 +25,24 @@ Free and open source (MIT) · Mac, Linux and Windows · [31 languages](#language
 [Download](https://github.com/Nerdstorm/LiveTranscribe/releases/latest) or
 [build from source](#build-and-run)
 
+## Why Live Transcribe?
+
+**Free, private dictation that works offline.** Speech recognition and cleanup run on your
+computer, with no account, subscription or word limit.
+
+| Feature | Wispr Flow | Live Transcribe |
+|---|---|---|
+| **Price** | Limited free tier; paid plans available | **Free, with no subscription or usage caps.** The app is MIT-licensed. |
+| **Data privacy** | Dictation is processed in the cloud | **Speech recognition and cleanup stay on your computer.** Audio and transcripts are never uploaded. |
+| **Offline use** | Internet needed for cloud transcription | **Works offline** once the models are downloaded. |
+| **Speed** | Cloud processing involves network round trips | **About 0.3 seconds at the median** for short dictations on an M4 Pro, at Medium cleanup. |
+| **System impact** | Cloud inference, plus the local app's memory and storage | Local inference; **about 2 GB for the default models** and **about 3 GB of memory on a Mac**. |
+
+The timing comes from the existing 65-clip synthetic-speech benchmark: 280 ms at the median and
+641 ms at p95 for speech-to-text plus cleanup, excluding recorder shutdown and text insertion.
+Speed and memory use vary with hardware, model and recording length; Linux can use more memory.
+See the [benchmark details](docs/development.md#bench-and-eval) and [system requirements](#status).
+
 ## Download
 
 | | Get | Notes |
@@ -166,7 +184,7 @@ Models tab in Settings offers others.
 
 ## Status
 
-Version 1.0, free and open source under the [MIT License](LICENSE).
+Version 1.3.0, free and open source under the [MIT License](LICENSE).
 
 - Download it from [GitHub Releases](https://github.com/Nerdstorm/LiveTranscribe/releases/latest),
   or build it from source (below). What changed in each release is in the
