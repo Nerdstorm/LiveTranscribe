@@ -104,6 +104,16 @@ prompt (`PromptBuilder.deepRules`), which gives general rules and no examples. I
 self-correction adapter's shape (rank 8, scale 20, the last 16 layers), so the app swaps one
 for the other per request. Its answers are checked by `SelfRepair`, not by OutputGuard's limits.
 
+Release 1.3.0 bundles **F4 checkpoint 1950**, selected by validation loss after training stopped
+at iteration 2400. It includes the measured synthetic transcript pool, public written pairs
+from Disfl-QA/SQuAD and ErAConD, and synthetic app requests. The completed development checks
+found correction gains and grammar, list and vocabulary regressions; it did not pass the
+original promotion gates. The owner subsequently chose to release this checkpoint.
+[The release record](../../../docs/deep-f4-release.md) preserves the exact identities,
+comparison and limitations, and [the bundled notice](../Sources/Cleanup/DeepAdapter/NOTICE.md)
+credits the public sources. No private dictation history was used. The recipes and results
+below describe the earlier adapters; they do not recreate F4's frozen composition.
+
 ### Data
 
 `DeepExampleGenerator` builds every example from sentence frames and word pools
@@ -175,7 +185,7 @@ cd Packages/LiveTranscribeKit
 
 - `train --deep` trains on `generated/deep-train.jsonl` and writes to `Training/runs/deep-adapter`;
   the other options are `train`'s, except `--curated-repeats`, which Deep ignores. The bundled
-  adapter is candidate E, trained with the defaults (batch 8, learning rate 2e-5, seed 1) for
+  adapter in release 1.2.0 was candidate E, trained with the defaults (batch 8, learning rate 2e-5, seed 1) for
   1,859 iterations on the 11,440 measured examples of
   [Preparing speech-to-text training data](#preparing-speech-to-text-training-data), with E's
   families and recipe (`train --deep --data-dir Training/prepared/deep-measured-e`, about 5.5

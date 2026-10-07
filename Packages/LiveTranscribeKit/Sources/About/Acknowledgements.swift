@@ -60,7 +60,7 @@ public struct ModelCredit: Equatable, Sendable {
         ModelCredit(
             role: "Cleanup",
             repository: "mlx-community/Qwen3-1.7B-4bit",
-            original: "Qwen3-1.7B by the Qwen team, Alibaba Cloud, with this app's own self-correction adapter (MIT)",
+            original: "Qwen3-1.7B by the Qwen team, Alibaba Cloud, with Nerdstorm's self-correction and Deep adapters (MIT). Deep's public training sources: Disfl-QA by Aditya Gupta and coauthors (CC BY 4.0), SQuAD by Pranav Rajpurkar and coauthors (CC BY-SA 4.0), and ErAConD by YUAN Xun and contributors (MIT). Full source notices ship in the DeepAdapter resource folder",
             licence: "Apache-2.0"
         ),
         ModelCredit(

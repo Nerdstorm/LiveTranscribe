@@ -4,6 +4,14 @@ What changed in each release of Live Transcribe, newest first. Before a release,
 `make changelog VERSION=x.y.z` summarises what was merged since the last one
 ([Releasing](docs/releasing.md)).
 
+## 1.3.0 - 2026-10-07
+
+- Update Deep's bundled cleanup model on Mac, Linux and Windows to the F4 adapter, with more training on written corrections, grammar, compound requests, email bodies and lists. In the completed development checks, it gets 76 of 108 external correction and preservation cases right, up from 62, and 43 of 48 app requests right, up from 41. Medium and High keep their existing adapter.
+- This model has tradeoffs: the broader transcript check falls from 1,073 to 1,065 of 1,158, and the vocabulary check from 191 to 186 of 216. Known regressions include joined words or clauses and lost list bullets. The model failed the original promotion gates; this release follows the owner's decision to ship the tested checkpoint. These development checks are not independent human acceptance. [The model's release record](https://github.com/Nerdstorm/LiveTranscribe/blob/main/docs/deep-f4-release.md) has the full comparison and limitations. **Undo AI edit** restores the transcript before cleanup.
+- Include the Deep model's public training-data credits and licence notices in every platform's app package.
+
+[Every commit since v1.2.0](https://github.com/Nerdstorm/LiveTranscribe/compare/v1.2.0...v1.3.0)
+
 ## 1.2.0 - 2026-10-03
 
 - Write spoken numbers in digits at Medium, High and Deep, on every system: "version two point four point one" → "version 2.4.1", "zero four four six" → "0446", "twenty five percent" → "25%", "at nine fifteen" → "at 9:15", "twenty one chairs" → "21 chairs". One to nine stay words when they count something ("two things"). Cleanup reads the words first, so "fifty thousand, I mean sixty thousand" still becomes "60,000". **Undo AI edit** puts the words back, and None and Light keep them. [Cleanup](https://github.com/Nerdstorm/LiveTranscribe/blob/main/docs/cleanup.md) has the full list ([#58](https://github.com/Nerdstorm/LiveTranscribe/pull/58))
