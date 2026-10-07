@@ -24,6 +24,7 @@ here=$(cd "$(dirname "$0")/../.." && pwd)
 packages=$(cd "$1" && pwd)
 runtime=$(cd "${2:-$here/target/openvino-runtime}" && pwd)
 sherpa_onnx=$(cd "${3:-$here/target/sherpa-onnx}" && pwd)
+deep_notice="$here/../Packages/LiveTranscribeKit/Sources/Cleanup/DeepAdapter/NOTICE.md"
 
 # The one file in PACKAGES with this extension.
 package() {
@@ -104,6 +105,16 @@ starts() {
     echo "$label: the app finds sherpa-onnx's libraries in the package, and lists $(grep -c . <<<"$listed") speech models"
 }
 
+# The embedded Deep weights must be distributed with their training-source credits.
+adapter_notice() {
+    local label=$1 root=$2
+    cmp -s "$deep_notice" "$root/usr/share/doc/live-transcribe/deep-adapter/NOTICE.md" || {
+        echo "$label: Deep's source notice is missing or differs from the bundled adapter's" >&2
+        return 1
+    }
+    echo "$label: carries Deep's source notice"
+}
+
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 status=0
@@ -112,6 +123,7 @@ dpkg-deb --extract "$(package deb)" "$work/deb"
 compare deb "$work/deb/usr/lib/live-transcribe/openvino" || status=1
 fetched deb "$sherpa_onnx/lib" "$work/deb/usr/lib/live-transcribe/sherpa-onnx" || status=1
 fetched deb "$sherpa_onnx/licenses" "$work/deb/usr/share/doc/live-transcribe/sherpa-onnx" || status=1
+adapter_notice deb "$work/deb" || status=1
 starts deb "$work/deb" "$work/deb/usr/bin/livetranscribe" || status=1
 
 # bsdtar reads an rpm's payload itself. (Ubuntu 22.04's rpm2cpio, from rpm 4.17, copies all of it
@@ -121,12 +133,14 @@ bsdtar --extract --file "$(package rpm)" --directory "$work/rpm"
 compare rpm "$work/rpm/usr/lib/live-transcribe/openvino" || status=1
 fetched rpm "$sherpa_onnx/lib" "$work/rpm/usr/lib/live-transcribe/sherpa-onnx" || status=1
 fetched rpm "$sherpa_onnx/licenses" "$work/rpm/usr/share/doc/live-transcribe/sherpa-onnx" || status=1
+adapter_notice rpm "$work/rpm" || status=1
 starts rpm "$work/rpm" "$work/rpm/usr/bin/livetranscribe" || status=1
 
 appimage=$(package AppImage)
 (cd "$work" && "$appimage" --appimage-extract >/dev/null)
 compare AppImage "$work/squashfs-root/usr/share/live-transcribe/openvino" || status=1
 fetched AppImage "$sherpa_onnx/licenses" "$work/squashfs-root/usr/share/doc/live-transcribe/sherpa-onnx" || status=1
+adapter_notice AppImage "$work/squashfs-root" || status=1
 starts AppImage "$work/squashfs-root" "$work/squashfs-root/usr/bin/livetranscribe" || status=1
 
 exit $status

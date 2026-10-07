@@ -14,7 +14,8 @@
           "/usr/lib/live-transcribe/sherpa-onnx": "../../target/sherpa-onnx/lib",
           "/usr/share/doc/live-transcribe/sherpa-onnx": "../../target/sherpa-onnx/licenses",
           "/usr/lib/udev/rules.d/70-live-transcribe-keyboard.rules": "../../packaging/linux/70-live-transcribe-keyboard.rules",
-          "/usr/share/doc/live-transcribe/README.Linux": "../../packaging/linux/README.Linux"
+          "/usr/share/doc/live-transcribe/README.Linux": "../../packaging/linux/README.Linux",
+          "/usr/share/doc/live-transcribe/deep-adapter/NOTICE.md": "../../../Packages/LiveTranscribeKit/Sources/Cleanup/DeepAdapter/NOTICE.md"
         },
         "postInstallScript": "../../packaging/linux/postinst.sh",
         "postRemoveScript": "../../packaging/linux/postrm.sh"
@@ -27,7 +28,8 @@
           "/usr/lib/live-transcribe/sherpa-onnx": "../../target/sherpa-onnx/lib",
           "/usr/share/doc/live-transcribe/sherpa-onnx": "../../target/sherpa-onnx/licenses",
           "/usr/lib/udev/rules.d/70-live-transcribe-keyboard.rules": "../../packaging/linux/70-live-transcribe-keyboard.rules",
-          "/usr/share/doc/live-transcribe/README.Linux": "../../packaging/linux/README.Linux"
+          "/usr/share/doc/live-transcribe/README.Linux": "../../packaging/linux/README.Linux",
+          "/usr/share/doc/live-transcribe/deep-adapter/NOTICE.md": "../../../Packages/LiveTranscribeKit/Sources/Cleanup/DeepAdapter/NOTICE.md"
         },
         "postInstallScript": "../../packaging/linux/postinst.sh",
         "postRemoveScript": "../../packaging/linux/postrm.sh"
@@ -38,7 +40,8 @@
           "/usr/share/live-transcribe/openvino": "../../target/openvino-runtime",
           "/usr/share/doc/live-transcribe/sherpa-onnx": "../../target/sherpa-onnx/licenses",
           "/usr/share/live-transcribe/70-live-transcribe-keyboard.rules": "../../packaging/linux/70-live-transcribe-keyboard.rules",
-          "/usr/share/doc/live-transcribe/README.Linux": "../../packaging/linux/README.Linux"
+          "/usr/share/doc/live-transcribe/README.Linux": "../../packaging/linux/README.Linux",
+          "/usr/share/doc/live-transcribe/deep-adapter/NOTICE.md": "../../../Packages/LiveTranscribeKit/Sources/Cleanup/DeepAdapter/NOTICE.md"
         }
       }
     }

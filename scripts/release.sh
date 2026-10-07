@@ -239,6 +239,12 @@ verify_app() {
   run verify codesign --verify --strict --deep --verbose=2 "$app"
   # dyld won't launch an app that needs a symbol the Swift runtime of the Mac's macOS lacks.
   run verify "$root/scripts/check-swift-runtime.sh" "$app"
+  local deep="$app/Contents/Resources/LiveTranscribeKit_Cleanup.bundle/Contents/Resources/DeepAdapter"
+  local resource
+  for resource in adapters.safetensors adapter_config.json NOTICE.md; do
+    cmp -s "$root/Packages/LiveTranscribeKit/Sources/Cleanup/DeepAdapter/$resource" "$deep/$resource" \
+      || fail "${app:t} has missing or different Deep adapter $resource"
+  done
   local info="$app/Contents/Info.plist"
   [[ "$(plutil -extract CFBundleShortVersionString raw -o - "$info")" == "$version" ]] \
     || fail "${app:t} isn't version $version"

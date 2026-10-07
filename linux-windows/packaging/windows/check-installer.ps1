@@ -68,6 +68,7 @@ function Compare-Files([string]$Label, [string]$Fetched, [string]$Folder, [strin
 
 $installer = (Resolve-Path -LiteralPath $Installer).Path
 $licence = Join-Path $PSScriptRoot '../../../LICENSE'
+$deepAdapter = Join-Path $PSScriptRoot '../../../Packages/LiveTranscribeKit/Sources/Cleanup/DeepAdapter'
 $work = Join-Path ([IO.Path]::GetTempPath()) "lt-installer-check-$PID"
 $folder = Join-Path $work 'Live Transcribe'
 $app = Join-Path $folder 'livetranscribe.exe'
@@ -88,6 +89,7 @@ try {
     Compare-Files "OpenVINO's licences" (Join-Path $Runtime 'licenses') (Join-Path $folder 'openvino\licenses') '*'
     Compare-Files 'sherpa-onnx' (Join-Path $SherpaOnnx 'lib') $folder '*.dll'
     Compare-Files "sherpa-onnx's licences" (Join-Path $SherpaOnnx 'licenses') (Join-Path $folder 'licenses\sherpa-onnx') '*'
+    Compare-Files "Deep adapter's source notice" $deepAdapter (Join-Path $folder 'licenses\deep-adapter') 'NOTICE.md'
     $missing = @($CppRuntime | Where-Object { -not (Test-Path -LiteralPath (Join-Path $folder $_) -PathType Leaf) })
     if ($missing.Count -gt 0) {
         Fail "the C++ runtime OpenVINO needs isn't beside the app: no $($missing -join ', ')"

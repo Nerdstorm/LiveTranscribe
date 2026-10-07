@@ -7,7 +7,8 @@
       "../../target/openvino-runtime": "openvino",
       "../../target/sherpa-onnx/lib/*.dll": "",
       "../../target/sherpa-onnx/licenses": "licenses/sherpa-onnx",
-      "../../../LICENSE": "LICENSE.txt"
+      "../../../LICENSE": "LICENSE.txt",
+      "../../../Packages/LiveTranscribeKit/Sources/Cleanup/DeepAdapter/NOTICE.md": "licenses/deep-adapter/NOTICE.md"
     },
     "windows": {
       "bundleVCRuntime": true,
