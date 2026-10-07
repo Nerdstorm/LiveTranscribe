@@ -30,7 +30,7 @@ Free and open source (MIT) · Mac, Linux and Windows · [31 languages](#language
 **Free, private dictation that works offline.** Speech recognition and cleanup run on your
 computer, with no account, subscription or word limit.
 
-| Feature | Wispr Flow | Live Transcribe (Nerdstorm) |
+| Feature | Wispr Flow | Live Transcribe |
 |---|---|---|
 | **Price** | Limited free tier; paid plans available | **Free, with no subscription or usage caps.** The app is MIT-licensed. |
 | **Data privacy** | Dictation is processed in the cloud | **Speech recognition and cleanup stay on your computer.** Audio and transcripts are never uploaded. |
