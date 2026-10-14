@@ -5,7 +5,7 @@ use lt_shared::CleanupLevel;
 
 use super::*;
 use crate::test_support::{FakeClock, ScriptedFailure, ScriptedModel, replying};
-use crate::{Adapter, CleanupModelNotLoaded, CleanupRequest, Message, Role};
+use crate::{Adapter, CleanupModelNotLoaded, CleanupPass, CleanupRequest, Message, Role};
 
 const RAW: &str = "i think the build is broken on main";
 const CORRECTED: &str = "meet on tuesday no wait wednesday at the office";
@@ -24,6 +24,14 @@ fn run<M: CleanupModel>(executor: &CleanupExecutor, raw: &str, options: &Cleanup
 
 fn options(level: CleanupLevel) -> CleanupOptions {
     CleanupOptions::new(level)
+}
+
+/// Standard asking for one of its passes alone.
+fn pass(pass: CleanupPass) -> CleanupOptions {
+    CleanupOptions {
+        pass,
+        ..options(CleanupLevel::Standard)
+    }
 }
 
 fn reason(cleaned: &CleanedText) -> Option<String> {
@@ -62,7 +70,7 @@ fn accepted_output_replaces_raw_text() {
     let cleaned = run(
         &executor,
         RAW,
-        &options(CleanupLevel::Medium),
+        &options(CleanupLevel::Standard),
         &mut replying("I think the build is broken on main."),
     );
     assert!(!cleaned.fell_back());
@@ -73,7 +81,7 @@ fn accepted_output_replaces_raw_text() {
 fn generation_error_falls_back_to_raw() {
     let (executor, _) = executor(1.0, false);
     let mut model = ScriptedModel::new(|_, _, _| Err(ScriptedFailure("GPU error".to_owned())));
-    let cleaned = run(&executor, RAW, &options(CleanupLevel::Medium), &mut model);
+    let cleaned = run(&executor, RAW, &options(CleanupLevel::Standard), &mut model);
     assert!(cleaned.fell_back());
     assert_eq!(cleaned.text, RAW);
     assert_eq!(reason(&cleaned).as_deref(), Some("generation failed: GPU error"));
@@ -85,7 +93,7 @@ fn a_model_that_is_not_loaded_falls_back_with_the_mac_apps_reason() {
     let cleaned = run(
         &executor,
         RAW,
-        &options(CleanupLevel::Medium),
+        &options(CleanupLevel::Standard),
         &mut CleanupModelNotLoaded,
     );
     assert_eq!(cleaned.text, RAW);
@@ -100,7 +108,7 @@ fn slow_generation_is_told_to_stop_and_falls_back() {
     let (executor, clock) = executor(0.1, false);
     let model_clock = clock.clone();
     let mut model = ScriptedModel::new(move |_, _, deadline| generate_until_stopped(&model_clock, deadline));
-    let cleaned = run(&executor, RAW, &options(CleanupLevel::Medium), &mut model);
+    let cleaned = run(&executor, RAW, &options(CleanupLevel::Standard), &mut model);
     assert!(cleaned.fell_back());
     assert_eq!(reason(&cleaned).as_deref(), Some("timed out after 0.1s"));
     assert_eq!(cleaned.latency_ms, 100, "the generation stopped at the deadline");
@@ -116,7 +124,7 @@ fn a_reply_after_the_deadline_is_too_late() {
         model_clock.advance(Duration::from_secs(2));
         Ok("I think the build is broken on main.".to_owned())
     });
-    let cleaned = run(&executor, RAW, &options(CleanupLevel::Medium), &mut model);
+    let cleaned = run(&executor, RAW, &options(CleanupLevel::Standard), &mut model);
     assert_eq!(reason(&cleaned).as_deref(), Some("timed out after 0.5s"));
     assert_eq!(cleaned.text, RAW);
 }
@@ -131,7 +139,7 @@ fn a_cancelled_cleanup_falls_back() {
         assert!(deadline.should_stop(), "the model is told to stop");
         Ok("I think the build is broken on main.".to_owned())
     });
-    let cleaned = executor.run(RAW, &[], &options(CleanupLevel::Medium), &mut model, &cancel);
+    let cleaned = executor.run(RAW, &[], &options(CleanupLevel::Standard), &mut model, &cancel);
     assert_eq!(reason(&cleaned).as_deref(), Some("cancelled"));
     assert_eq!(cleaned.text, RAW);
 }
@@ -142,7 +150,7 @@ fn guard_rejection_falls_back() {
     let cleaned = run(
         &executor,
         RAW,
-        &options(CleanupLevel::Medium),
+        &options(CleanupLevel::Standard),
         &mut replying("<think>hmm</think> I think the build is broken."),
     );
     assert!(cleaned.fell_back());
@@ -157,7 +165,7 @@ fn context_is_passed_through_the_window() {
     executor.run(
         RAW,
         &context,
-        &options(CleanupLevel::Medium),
+        &options(CleanupLevel::Standard),
         &mut model,
         &CancelFlag::new(),
     );
@@ -179,9 +187,9 @@ fn context_is_passed_through_the_window() {
 #[test]
 fn empty_raw_text_skips_generation() {
     let (executor, _) = executor(1.0, false);
-    let cleaned = run(&executor, "  ", &options(CleanupLevel::Light), &mut never_asked());
+    let cleaned = run(&executor, "  ", &options(CleanupLevel::Standard), &mut never_asked());
     assert!(!cleaned.fell_back());
-    assert_eq!(cleaned.text, "  ");
+    assert!(cleaned.text.is_empty(), "removing fillers trims the text");
 }
 
 #[test]
@@ -196,7 +204,7 @@ fn level_none_returns_the_raw_text_without_the_model() {
 fn sinhala_skips_the_model_but_keeps_the_levels_rules() {
     let (executor, _) = executor(1.0, false);
     for text in ["ඒකෙ තියෙන magic වැඩ um", "um ඔන්න මගේ film එකතුවට"] {
-        for level in [CleanupLevel::Light, CleanupLevel::Medium, CleanupLevel::High] {
+        for level in [CleanupLevel::Standard, CleanupLevel::Deep] {
             let cleaned = run(&executor, text, &options(level), &mut never_asked());
             assert_eq!(
                 cleaned,
@@ -213,20 +221,20 @@ fn english_still_goes_to_the_model() {
     run(
         &executor,
         "the build is broken",
-        &options(CleanupLevel::Medium),
+        &options(CleanupLevel::Standard),
         &mut model,
     );
     assert_eq!(model.requests.len(), 1);
 }
 
 #[test]
-fn medium_removes_fillers_before_the_model_sees_the_text() {
+fn standard_removes_fillers_before_the_model_sees_the_text() {
     let (executor, _) = executor(1.0, false);
     let mut model = replying("So the build is broken.");
     let cleaned = run(
         &executor,
         "so um the build is uh broken",
-        &options(CleanupLevel::Medium),
+        &options(CleanupLevel::Standard),
         &mut model,
     );
     assert_eq!(
@@ -237,28 +245,12 @@ fn medium_removes_fillers_before_the_model_sees_the_text() {
 }
 
 #[test]
-fn light_keeps_fillers_for_the_model() {
-    let (executor, _) = executor(1.0, false);
-    let mut model = replying("So, um, the build is broken.");
-    run(
-        &executor,
-        "so um the build is broken",
-        &options(CleanupLevel::Light),
-        &mut model,
-    );
-    assert_eq!(
-        model.requests[0].messages.last(),
-        Some(&Message::new(Role::User, "TEXT:\nso um the build is broken"))
-    );
-}
-
-#[test]
 fn a_fallback_keeps_the_fillers_removed() {
     let (executor, _) = executor(1.0, false);
     let cleaned = run(
         &executor,
         "so um the build is uh broken",
-        &options(CleanupLevel::Medium),
+        &options(CleanupLevel::Standard),
         &mut replying("Here is the text: So the build is broken."),
     );
     assert!(cleaned.fell_back());
@@ -268,7 +260,7 @@ fn a_fallback_keeps_the_fillers_removed() {
 #[test]
 fn only_fillers_leaves_nothing_to_clean() {
     let (executor, _) = executor(1.0, false);
-    let cleaned = run(&executor, "um uh", &options(CleanupLevel::Medium), &mut never_asked());
+    let cleaned = run(&executor, "um uh", &options(CleanupLevel::Standard), &mut never_asked());
     assert!(!cleaned.fell_back());
     assert!(cleaned.text.is_empty());
 }
@@ -281,7 +273,7 @@ fn options_shape_the_prompt() {
     let options = CleanupOptions {
         vocabulary: vec!["Nerdstorm".to_owned()],
         placeholders: vec!["⟦S1⟧".to_owned()],
-        ..options(CleanupLevel::High)
+        ..options(CleanupLevel::Standard)
     };
     let mut model = replying("Email S1 to the Nerdstorm team.");
     let cleaned = run(&executor, "email ⟦S1⟧ to the nerd storm team", &options, &mut model);
@@ -309,7 +301,7 @@ fn a_damaged_placeholder_falls_back_to_the_text_with_placeholders() {
     let (executor, _) = executor(1.0, false);
     let options = CleanupOptions {
         placeholders: vec!["⟦S1⟧".to_owned()],
-        ..options(CleanupLevel::Medium)
+        ..options(CleanupLevel::Standard)
     };
     let cleaned = run(
         &executor,
@@ -321,48 +313,51 @@ fn a_damaged_placeholder_falls_back_to_the_text_with_placeholders() {
     assert_eq!(cleaned.text, "email ⟦S1⟧ to the team");
 }
 
-/// Trained to resolve self-corrections whatever the prompt says, the adapter would do so at Light
-/// too, where every word must stay. Deep asks for its own (see `deep_tests`).
+/// Standard's passes run with the self-correction adapter. Deep asks for its own (see
+/// `deep_tests`).
 #[test]
-fn the_adapter_is_on_only_at_the_levels_that_resolve_self_corrections() {
+fn standards_passes_run_with_the_self_correction_adapter() {
     let (executor, _) = executor(1.0, true);
-    for (level, expected) in [
-        (CleanupLevel::Light, vec![Adapter::Off]),
-        (CleanupLevel::Medium, vec![Adapter::Medium]),
-        (CleanupLevel::High, vec![Adapter::Medium, Adapter::Medium]),
+    for (options, expected) in [
+        (pass(CleanupPass::Correcting), vec![Adapter::Medium]),
+        (options(CleanupLevel::Standard), vec![Adapter::Medium, Adapter::Medium]),
     ] {
         let mut model = first_then(RESOLVED, "Let's meet on Wednesday at the office.");
-        run(&executor, CORRECTED, &options(level), &mut model);
+        run(&executor, CORRECTED, &options, &mut model);
         let used: Vec<Adapter> = model.requests.iter().map(|request| request.adapter).collect();
-        assert_eq!(used, expected, "{level:?}");
-        assert!(model.requests.iter().all(|request| !request.thinks()), "{level:?}");
+        assert_eq!(used, expected, "{:?}", options.pass);
+        assert!(
+            model.requests.iter().all(|request| !request.thinks()),
+            "{:?}",
+            options.pass
+        );
     }
 }
 
-// MARK: High with a self-correction
+// MARK: Standard with a self-correction
 
 #[test]
-fn high_resolves_a_correction_at_medium_then_rewords() {
+fn standard_resolves_a_correction_in_its_correcting_pass_then_rewords() {
     let (executor, _) = executor(1.0, true);
-    let high = CleanupOptions {
+    let standard = CleanupOptions {
         vocabulary: vec!["Acme".to_owned()],
-        ..options(CleanupLevel::High)
+        ..options(CleanupLevel::Standard)
     };
     let mut model = first_then(RESOLVED, "Let's meet on Wednesday at the office.");
-    let cleaned = run(&executor, CORRECTED, &high, &mut model);
+    let cleaned = run(&executor, CORRECTED, &standard, &mut model);
     let prompts = PromptBuilder::new(true);
     let systems: Vec<&str> = model
         .requests
         .iter()
         .map(|request| request.messages[0].content.as_str())
         .collect();
-    let medium = CleanupOptions {
-        level: CleanupLevel::Medium,
-        ..high.clone()
+    let correcting = CleanupOptions {
+        pass: CleanupPass::Correcting,
+        ..standard.clone()
     };
     assert_eq!(
         systems,
-        [prompts.template(&medium).system, prompts.template(&high).system]
+        [prompts.template(&correcting).system, prompts.template(&standard).system]
     );
     assert_eq!(
         model.requests[1].messages.last(),
@@ -376,9 +371,12 @@ fn high_resolves_a_correction_at_medium_then_rewords() {
 fn a_rejected_rewording_keeps_the_resolved_text() {
     let (executor, _) = executor(1.0, true);
     let mut model = first_then(RESOLVED, "Here is the text: Let's meet on Wednesday.");
-    let cleaned = run(&executor, CORRECTED, &options(CleanupLevel::High), &mut model);
+    let cleaned = run(&executor, CORRECTED, &options(CleanupLevel::Standard), &mut model);
     assert_eq!(cleaned.text, RESOLVED);
-    assert!(!cleaned.fell_back(), "the resolved text passed Medium's review");
+    assert!(
+        !cleaned.fell_back(),
+        "the resolved text passed the correcting pass's review"
+    );
     assert_eq!(model.requests.len(), 2);
 }
 
@@ -386,7 +384,7 @@ fn a_rejected_rewording_keeps_the_resolved_text() {
 fn a_rejected_resolution_falls_back_without_rewording() {
     let (executor, _) = executor(1.0, true);
     let mut model = replying("<think>hmm</think>");
-    let cleaned = run(&executor, CORRECTED, &options(CleanupLevel::High), &mut model);
+    let cleaned = run(&executor, CORRECTED, &options(CleanupLevel::Standard), &mut model);
     assert!(cleaned.fell_back());
     assert_eq!(cleaned.text, CORRECTED);
     assert_eq!(model.requests.len(), 1);
@@ -405,7 +403,7 @@ fn the_rewording_gets_only_the_time_left() {
         }
         generate_until_stopped(&model_clock, deadline)
     });
-    let cleaned = run(&executor, CORRECTED, &options(CleanupLevel::High), &mut model);
+    let cleaned = run(&executor, CORRECTED, &options(CleanupLevel::Standard), &mut model);
     assert_eq!(cleaned.text, RESOLVED);
     assert!(!cleaned.fell_back());
     assert_eq!(given, [1.0, 1.0 - 0.4]);
@@ -423,7 +421,7 @@ fn cancelling_the_rewording_keeps_the_resolved_text() {
         }
         Ok(RESOLVED.to_owned())
     });
-    let cleaned = executor.run(CORRECTED, &[], &options(CleanupLevel::High), &mut model, &cancel);
+    let cleaned = executor.run(CORRECTED, &[], &options(CleanupLevel::Standard), &mut model, &cancel);
     assert_eq!(cleaned.text, RESOLVED);
     assert!(!cleaned.fell_back());
 }
@@ -435,34 +433,41 @@ fn with_no_time_left_the_resolved_text_is_kept_without_rewording() {
     let clock = FakeClock::ticking(Duration::from_secs(1));
     let executor = CleanupExecutor::new(3, 1.5, OutputGuard::default(), PromptBuilder::new(true)).with_clock(clock);
     let mut model = replying(RESOLVED);
-    let cleaned = run(&executor, CORRECTED, &options(CleanupLevel::High), &mut model);
+    let cleaned = run(&executor, CORRECTED, &options(CleanupLevel::Standard), &mut model);
     assert_eq!(cleaned.text, RESOLVED);
     assert!(!cleaned.fell_back());
     assert_eq!(model.requests.len(), 1);
 }
 
+/// One rewording pass without a correction cue; with one, a pass asked for alone, as the
+/// training tools ask for the correcting pass, is the only one.
 #[test]
-fn one_pass_without_a_correction_cue_at_high_and_at_medium_with_one() {
+fn one_pass_without_a_correction_cue_or_when_one_pass_is_asked_for() {
     let (executor, _) = executor(1.0, true);
-    for (level, text) in [(CleanupLevel::High, RAW), (CleanupLevel::Medium, CORRECTED)] {
+    for (options, text) in [
+        (options(CleanupLevel::Standard), RAW),
+        (pass(CleanupPass::Correcting), CORRECTED),
+    ] {
         let mut model = replying(text);
-        run(&executor, text, &options(level), &mut model);
-        assert_eq!(model.requests.len(), 1, "{level:?}");
+        run(&executor, text, &options, &mut model);
+        assert_eq!(model.requests.len(), 1, "{:?}", options.pass);
+        assert_eq!(
+            model.requests[0].messages[0].content,
+            PromptBuilder::new(true).template(&options).system
+        );
     }
 }
 
 /// Dictation with the cleanup model off inserts this, so it must match what a level does without
-/// the model: fillers go only from Medium up.
+/// the model: fillers go at Standard and Deep.
 #[test]
-fn deterministic_cleanup_removes_fillers_only_from_medium_up() {
+fn deterministic_cleanup_removes_fillers_at_standard_and_deep() {
     let raw = "so um the build is uh broken";
     assert_eq!(deterministic_cleanup(raw, CleanupLevel::None), raw);
-    assert_eq!(deterministic_cleanup(raw, CleanupLevel::Light), raw);
     assert_eq!(
-        deterministic_cleanup(raw, CleanupLevel::Medium),
+        deterministic_cleanup(raw, CleanupLevel::Standard),
         "so the build is broken"
     );
-    assert_eq!(deterministic_cleanup(raw, CleanupLevel::High), "so the build is broken");
     assert_eq!(deterministic_cleanup(raw, CleanupLevel::Deep), "so the build is broken");
-    assert_eq!(deterministic_cleanup("Um, hi", CleanupLevel::Medium), "Hi");
+    assert_eq!(deterministic_cleanup("Um, hi", CleanupLevel::Standard), "Hi");
 }

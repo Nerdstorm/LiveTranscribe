@@ -97,7 +97,7 @@ mod tests {
     fn each_part_gets_its_settings() {
         let settings = Settings {
             hands_free_enabled: false,
-            cleanup_level: CleanupLevel::High,
+            cleanup_level: CleanupLevel::Deep,
             hotkey_tap_max_ms: 250,
             dictation_min_utterance_ms: 400,
             dictation_max_recording_seconds: 60,
@@ -112,7 +112,7 @@ mod tests {
         assert_eq!(controller.gesture.tap_max_ms, 250);
         assert_eq!(controller.min_utterance_ms, 400);
         assert_eq!(controller.max_recording_seconds, 60);
-        assert_eq!(controller.text.level, CleanupLevel::High);
+        assert_eq!(controller.text.level, CleanupLevel::Deep);
         let recorder = recorder(&settings);
         assert_eq!(
             recorder.max_duration_seconds, 60,

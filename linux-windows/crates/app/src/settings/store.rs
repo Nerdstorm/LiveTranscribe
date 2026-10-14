@@ -177,10 +177,10 @@ mod tests {
         assert_eq!(store.settings(), Settings::default());
         assert!(!folder.settings().exists(), "reading writes nothing");
 
-        let settings = store.change(&map(json!({"cleanupLevel": "high"}))).unwrap();
-        assert_eq!(settings.cleanup_level, CleanupLevel::High);
+        let settings = store.change(&map(json!({"cleanupLevel": "deep"}))).unwrap();
+        assert_eq!(settings.cleanup_level, CleanupLevel::Deep);
         let (reopened, _) = SettingsStore::open(folder.settings(), Map::new());
-        assert_eq!(reopened.settings().cleanup_level, CleanupLevel::High);
+        assert_eq!(reopened.settings().cleanup_level, CleanupLevel::Deep);
     }
 
     #[cfg(unix)]
@@ -200,14 +200,14 @@ mod tests {
     fn an_invalid_change_saves_nothing() {
         let folder = Folder::new("invalid");
         let (mut store, _) = SettingsStore::open(folder.settings(), Map::new());
-        store.change(&map(json!({"cleanupLevel": "light"}))).unwrap();
+        store.change(&map(json!({"cleanupLevel": "none"}))).unwrap();
         let error = store
-            .change(&map(json!({"cleanupLevel": "high", "dictationHotkey": "KEY_ESC"})))
+            .change(&map(json!({"cleanupLevel": "deep", "dictationHotkey": "KEY_ESC"})))
             .unwrap_err();
         assert!(error.contains("Esc cancels dictation"), "{error}");
-        assert_eq!(store.settings().cleanup_level, CleanupLevel::Light);
+        assert_eq!(store.settings().cleanup_level, CleanupLevel::None);
         let (reopened, _) = SettingsStore::open(folder.settings(), Map::new());
-        assert_eq!(reopened.settings().cleanup_level, CleanupLevel::Light);
+        assert_eq!(reopened.settings().cleanup_level, CleanupLevel::None);
     }
 
     #[test]
@@ -227,11 +227,11 @@ mod tests {
         assert_eq!(store.settings().dictation_hotkey, "KEY_F23");
         let (saved, _) = SettingsStore::open(folder.settings(), Map::new());
         assert_eq!(saved.settings().dictation_hotkey, "KEY_RIGHTALT");
-        assert_eq!(saved.settings().cleanup_level, CleanupLevel::Medium);
+        assert_eq!(saved.settings().cleanup_level, CleanupLevel::Standard);
 
         // Changing it in the app ends the command line's say.
-        let settings = store.change(&map(json!({"cleanupLevel": "high"}))).unwrap();
-        assert_eq!(settings.cleanup_level, CleanupLevel::High);
+        let settings = store.change(&map(json!({"cleanupLevel": "deep"}))).unwrap();
+        assert_eq!(settings.cleanup_level, CleanupLevel::Deep);
         assert_eq!(store.overridden(), ["dictationHotkey"]);
     }
 
@@ -282,6 +282,6 @@ mod tests {
         assert!(!store.settings().hands_free_enabled);
         store.change(&map(json!({"dictationEnabled": true}))).unwrap();
         let text = fs::read_to_string(folder.settings()).unwrap();
-        assert!(text.contains(r#""cleanupLevel": "medium""#), "{text}");
+        assert!(text.contains(r#""cleanupLevel": "standard""#), "{text}");
     }
 }

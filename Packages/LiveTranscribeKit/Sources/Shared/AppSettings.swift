@@ -100,7 +100,7 @@ public struct AppSettings: Sendable, Equatable {
         vadModel: "mlx-community/silero-vad",
         cleanupEnabled: true,
         cleanupAdapterEnabled: true,
-        cleanupLevel: .medium,
+        cleanupLevel: .standard,
         vadSilenceMs: 600,
         vadSpeechThreshold: 0.5,
         vadPreRollMs: 200,

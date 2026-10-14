@@ -11,8 +11,8 @@ uses none of them, and the field itself decides how text goes in
 - **Settings › Vocabulary**: a **Term**, spelled as you want it written, and optional **Spoken
   variants**, one per line. Each variant is replaced by the term at every level ("I work at nerd
   storm." → "I work at Nerdstorm."). Terms with distinctive casing, such as GitHub or macOS, are
-  also re-cased wherever they appear. From Light up, each dictation also gives the cleanup model
-  up to 50 of the most relevant terms (**Vocabulary terms per dictation** in **Timing**).
+  also re-cased wherever they appear. At Standard and Deep, each dictation also gives the cleanup
+  model up to 50 of the most relevant terms (**Vocabulary terms per dictation** in **Timing**).
 - **Settings › Apps**: for any app, **Insert text with** **Accessibility** or **Paste**, and
   **Line breaks** **Multi-line** or **Single-line**. Built in, paste is used for Terminal, iTerm2,
   Warp, Ghostty, Alacritty, kitty, WezTerm, VS Code, Cursor, Slack, Discord, Notion, Figma,

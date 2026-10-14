@@ -61,7 +61,7 @@ public struct TrainingItem: Sendable, Equatable {
         self.target = target
     }
 
-    /// A self-correction example, on the prompt the Medium adapter is trained on.
+    /// A self-correction example, on the prompt the self-correction adapter is trained on.
     public init(_ example: TrainingExample, template: PromptTemplate, contextLimit: Int) {
         request = Prompt.request(for: example.raw, context: example.context, contextLimit: contextLimit, template: template)
         target = example.target

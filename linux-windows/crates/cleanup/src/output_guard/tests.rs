@@ -2,25 +2,27 @@ use lt_shared::CleanupLevel;
 
 use super::*;
 
-fn review(raw: &str, output: &str, level: CleanupLevel, placeholders: &[&str]) -> GuardVerdict {
+fn review(raw: &str, output: &str, pass: CleanupPass, placeholders: &[&str]) -> GuardVerdict {
     review_outcome(
         raw,
         &GenerationOutcome::Completed(output.to_owned()),
-        level,
+        pass,
         placeholders,
     )
 }
 
-fn review_outcome(raw: &str, outcome: &GenerationOutcome, level: CleanupLevel, placeholders: &[&str]) -> GuardVerdict {
+fn review_outcome(raw: &str, outcome: &GenerationOutcome, pass: CleanupPass, placeholders: &[&str]) -> GuardVerdict {
     let options = CleanupOptions {
+        pass,
         placeholders: placeholders.iter().map(|&token| token.to_owned()).collect(),
-        ..CleanupOptions::new(level)
+        ..CleanupOptions::new(CleanupLevel::Standard)
     };
     OutputGuard::default().review(raw, outcome, &options)
 }
 
-fn medium(raw: &str, output: &str) -> GuardVerdict {
-    review(raw, output, CleanupLevel::Medium, &[])
+/// Standard's correcting pass: the one that keeps every spoken word but a correction's.
+fn correcting(raw: &str, output: &str) -> GuardVerdict {
+    review(raw, output, CleanupPass::Correcting, &[])
 }
 
 fn accepted(cleaned: &str) -> GuardVerdict {
@@ -35,21 +37,24 @@ fn words(count: usize) -> String {
 fn accepts_a_correction() {
     let cleaned = "I think we should meet on Tuesday, maybe at three.";
     assert_eq!(
-        medium("i think we should meet on tuesday maybe at three", cleaned),
+        correcting("i think we should meet on tuesday maybe at three", cleaned),
         accepted(cleaned)
     );
 }
 
 #[test]
 fn trims_surrounding_whitespace() {
-    assert_eq!(medium("hello there", "\n  Hello there.  \n"), accepted("Hello there."));
+    assert_eq!(
+        correcting("hello there", "\n  Hello there.  \n"),
+        accepted("Hello there.")
+    );
 }
 
 #[test]
 fn empty_or_blank_output_falls_back() {
     for output in ["", "   ", "\n\n"] {
         assert_eq!(
-            medium("hello there", output),
+            correcting("hello there", output),
             GuardVerdict::Rejected(FallbackReason::EmptyOutput)
         );
     }
@@ -59,16 +64,16 @@ fn empty_or_blank_output_falls_back() {
 fn rejects_leaked_thinking() {
     let leaked = GuardVerdict::Rejected(FallbackReason::ThinkingLeaked);
     assert_eq!(
-        medium("hello there", "<think>\nuser said hi\n</think>\nHello there."),
+        correcting("hello there", "<think>\nuser said hi\n</think>\nHello there."),
         leaked
     );
-    assert_eq!(medium("hello there", "Hello there.</think>"), leaked);
+    assert_eq!(correcting("hello there", "Hello there.</think>"), leaked);
 }
 
 #[test]
 fn rejects_a_preamble() {
     assert_eq!(
-        medium(
+        correcting(
             "the report is due friday",
             "Here is the corrected text: The report is due Friday."
         ),
@@ -79,7 +84,7 @@ fn rejects_a_preamble() {
 #[test]
 fn allows_an_opening_that_was_actually_spoken() {
     assert_eq!(
-        medium("sure, i can do that", "Sure, I can do that."),
+        correcting("sure, i can do that", "Sure, I can do that."),
         accepted("Sure, I can do that.")
     );
 }
@@ -98,14 +103,14 @@ fn a_spoken_opening_is_kept_however_it_is_punctuated() {
         ("certainly not before the review", "Certainly not before the review."),
         ("Here's the plan for the launch", "Here's the plan for the launch."),
     ] {
-        assert_eq!(medium(raw, cleaned), accepted(cleaned), "{raw}");
+        assert_eq!(correcting(raw, cleaned), accepted(cleaned), "{raw}");
     }
 }
 
 #[test]
 fn still_rejects_a_preamble_added_after_a_spoken_opening() {
     let cleaned = "Sure, here's the corrected text: Sure thing.";
-    assert_ne!(medium("sure thing", cleaned), accepted(cleaned));
+    assert_ne!(correcting("sure thing", cleaned), accepted(cleaned));
 }
 
 /// The default policy without the similarity check, which on its own rejects most large
@@ -118,20 +123,23 @@ fn ratio_only_guard() -> OutputGuard {
 }
 
 #[test]
-fn each_level_accepts_output_at_its_word_ratio_bounds_and_rejects_it_just_outside() {
+fn each_of_standards_passes_accepts_output_at_its_word_ratio_bounds_and_rejects_it_just_outside() {
     let guard = ratio_only_guard();
-    for level in [CleanupLevel::Light, CleanupLevel::Medium, CleanupLevel::High] {
-        let options = CleanupOptions::new(level);
+    for pass in [CleanupPass::Correcting, CleanupPass::Rewording] {
+        let options = CleanupOptions {
+            pass,
+            ..CleanupOptions::new(CleanupLevel::Standard)
+        };
         let review = |count: usize| guard.review(&words(100), &GenerationOutcome::Completed(words(count)), &options);
-        let bounds = level.word_ratio_bounds();
+        let bounds = pass.word_ratio_bounds();
         let low = (bounds.start() * 100.0).round() as usize;
         let high = (bounds.end() * 100.0).round() as usize;
         for count in [low, high] {
-            assert_eq!(review(count), accepted(&words(count)), "{level:?} at {count} words");
+            assert_eq!(review(count), accepted(&words(count)), "{pass:?} at {count} words");
         }
         for count in [low - 1, high + 1] {
             let GuardVerdict::Rejected(FallbackReason::WordRatio(ratio)) = review(count) else {
-                panic!("expected a word-ratio rejection at {count} words for {level:?}");
+                panic!("expected a word-ratio rejection at {count} words for {pass:?}");
             };
             assert!((ratio - count as f64 / 100.0).abs() < 1e-9);
         }
@@ -139,29 +147,29 @@ fn each_level_accepts_output_at_its_word_ratio_bounds_and_rejects_it_just_outsid
 }
 
 #[test]
-fn a_policy_can_override_a_levels_bounds() {
+fn a_policy_can_override_a_passes_bounds() {
     let mut policy = GuardPolicy {
         min_similarity: 0.0,
         ..GuardPolicy::default()
     };
-    policy.word_ratio_bounds.insert(CleanupLevel::Light, 0.9..=1.1);
+    policy.word_ratio_bounds.insert(CleanupPass::Rewording, 0.9..=1.1);
     let verdict = OutputGuard::new(policy.clone()).review(
         &words(100),
         &GenerationOutcome::Completed(words(85)),
-        &CleanupOptions::new(CleanupLevel::Light),
+        &CleanupOptions::new(CleanupLevel::Standard),
     );
     assert_eq!(verdict, GuardVerdict::Rejected(FallbackReason::WordRatio(0.85)));
     assert_eq!(
-        policy.word_ratio_bounds_for(CleanupLevel::Medium),
-        CleanupLevel::Medium.word_ratio_bounds()
+        policy.word_ratio_bounds_for(CleanupPass::Correcting),
+        CleanupPass::Correcting.word_ratio_bounds()
     );
     policy.word_ratio_bounds.clear();
-    assert_eq!(policy.word_ratio_bounds_for(CleanupLevel::High), 0.4..=1.3);
+    assert_eq!(policy.word_ratio_bounds_for(CleanupPass::Rewording), 0.4..=1.3);
 }
 
 #[test]
 fn low_similarity_falls_back() {
-    let verdict = medium(
+    let verdict = correcting(
         "the meeting is on tuesday afternoon",
         "A banana smoothie needs frozen fruit.",
     );
@@ -173,7 +181,7 @@ fn low_similarity_falls_back() {
 
 #[test]
 fn a_generation_that_did_not_complete_falls_back() {
-    let rejected = |outcome| review_outcome("hello", &outcome, CleanupLevel::Medium, &[]);
+    let rejected = |outcome| review_outcome("hello", &outcome, CleanupPass::Correcting, &[]);
     assert_eq!(
         rejected(GenerationOutcome::TimedOut { seconds: 3.0 }),
         GuardVerdict::Rejected(FallbackReason::TimedOut { seconds: 3.0 })
@@ -198,10 +206,6 @@ fn fallback_reasons_are_readable() {
         FallbackReason::WordRatio(1.31).to_string(),
         "word-count ratio 1.31 outside allowed range"
     );
-    assert_eq!(
-        FallbackReason::SelfCorrectionNotAllowed.to_string(),
-        "resolved a self-correction at a level that keeps every word"
-    );
     assert_eq!(FallbackReason::PlaceholderChanged.to_string(), "changed a placeholder");
     // Rounded as printf rounds the exact value: half to even.
     assert_eq!(
@@ -215,27 +219,18 @@ fn fallback_reasons_are_readable() {
 }
 
 #[test]
-fn light_rejects_a_resolved_self_correction_that_medium_accepts() {
+fn both_of_standards_passes_accept_a_resolved_self_correction() {
     let raw = "we should meet on tuesday sorry wednesday";
     let cleaned = "We should meet on Wednesday.";
-    assert_eq!(
-        review(raw, cleaned, CleanupLevel::Light, &[]),
-        GuardVerdict::Rejected(FallbackReason::SelfCorrectionNotAllowed)
-    );
-    assert_eq!(review(raw, cleaned, CleanupLevel::Medium, &[]), accepted(cleaned));
-    assert_eq!(review(raw, cleaned, CleanupLevel::High, &[]), accepted(cleaned));
+    assert_eq!(review(raw, cleaned, CleanupPass::Correcting, &[]), accepted(cleaned));
+    assert_eq!(review(raw, cleaned, CleanupPass::Rewording, &[]), accepted(cleaned));
 }
 
 #[test]
-fn light_accepts_a_self_correction_kept_as_spoken() {
+fn a_self_correction_kept_as_spoken_is_accepted() {
     let cleaned = "We should meet on Tuesday, sorry, Wednesday.";
     assert_eq!(
-        review(
-            "we should meet on tuesday sorry wednesday",
-            cleaned,
-            CleanupLevel::Light,
-            &[]
-        ),
+        correcting("we should meet on tuesday sorry wednesday", cleaned),
         accepted(cleaned)
     );
 }
@@ -249,7 +244,7 @@ fn accepts_placeholders_that_come_back_intact() {
         review(
             "here's ⟦S1⟧ and the deck is at ⟦S2⟧",
             cleaned,
-            CleanupLevel::Medium,
+            CleanupPass::Correcting,
             &TOKENS
         ),
         accepted(cleaned)
@@ -270,7 +265,7 @@ fn rejects_a_dropped_repeated_altered_or_invented_placeholder() {
             review(
                 "here's ⟦S1⟧ and the deck is at ⟦S2⟧",
                 cleaned,
-                CleanupLevel::Medium,
+                CleanupPass::Correcting,
                 &TOKENS
             ),
             GuardVerdict::Rejected(FallbackReason::PlaceholderChanged),
@@ -285,7 +280,7 @@ fn rejects_a_placeholder_retracted_by_a_self_correction() {
         review(
             "send them ⟦S1⟧ sorry ⟦S2⟧",
             "Send them ⟦S2⟧.",
-            CleanupLevel::Medium,
+            CleanupPass::Correcting,
             &TOKENS
         ),
         GuardVerdict::Rejected(FallbackReason::PlaceholderChanged)
@@ -295,7 +290,7 @@ fn rejects_a_placeholder_retracted_by_a_self_correction() {
 #[test]
 fn rejects_a_token_in_output_when_none_was_given() {
     assert_eq!(
-        medium("see you soon", "See you ⟦S1⟧ soon."),
+        correcting("see you soon", "See you ⟦S1⟧ soon."),
         GuardVerdict::Rejected(FallbackReason::PlaceholderChanged)
     );
 }

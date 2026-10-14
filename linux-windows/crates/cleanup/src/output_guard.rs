@@ -11,7 +11,7 @@ use crate::spoken_names::SpokenNames;
 use crate::word_alignment::WordAlignment;
 use crate::word_fragments::WordFragments;
 use crate::words::{WordSet, normalized_words, starts_with};
-use crate::{CleanupOptions, GuardPolicy};
+use crate::{CleanupOptions, CleanupPass, GuardPolicy};
 
 /// How a cleanup generation ended.
 #[derive(Clone, Debug, PartialEq)]
@@ -32,8 +32,6 @@ pub enum FallbackReason {
     LowSimilarity(f64),
     /// A correction cue was dropped, but the removed words were not a self-correction.
     InvalidSelfCorrection,
-    /// A self-correction was resolved at a level that keeps every spoken word.
-    SelfCorrectionNotAllowed,
     /// A placeholder (for a snippet, emoji, address, line break or list marker) was dropped,
     /// repeated or altered.
     PlaceholderChanged,
@@ -92,9 +90,6 @@ impl fmt::Display for FallbackReason {
             Self::WordRatio(ratio) => write!(f, "word-count ratio {ratio:.2} outside allowed range"),
             Self::LowSimilarity(similarity) => write!(f, "similarity {similarity:.2} below threshold"),
             Self::InvalidSelfCorrection => write!(f, "removed words that were not a self-correction"),
-            Self::SelfCorrectionNotAllowed => {
-                write!(f, "resolved a self-correction at a level that keeps every word")
-            }
             Self::PlaceholderChanged => write!(f, "changed a placeholder"),
             Self::DroppedWords { count } => write!(f, "dropped {count} spoken words"),
             Self::LostNegation => write!(f, "dropped a negation"),
@@ -122,7 +117,7 @@ pub enum GuardVerdict {
 /// Decides whether the language model's output can replace the raw transcript.
 ///
 /// The model is asked only to correct, so output that is empty, chatty, much longer or shorter
-/// than the level allows, or substantially different from the input is treated as a meaning change
+/// than the pass allows, or substantially different from the input is treated as a meaning change
 /// and rejected. So is output that damaged a placeholder, since what it stands for could then not
 /// be put back.
 ///
@@ -130,14 +125,13 @@ pub enum GuardVerdict {
 /// instead of by the length and similarity limits: dropping a cue is acceptable only as part of
 /// removing a spoken self-correction. This catches the model's most harmful mistake, keeping the
 /// words the speaker took back and dropping their correction, which is often short enough to pass
-/// the length and similarity limits. At a level that keeps every word (Light), dropping a cue is
-/// always rejected.
+/// the length and similarity limits.
 ///
-/// Output that keeps every cue may not remove a negation and, unless the level allows rewording
-/// (High), may not delete a run of spoken words outright. At every level, it must keep each name
-/// where the speaker said it and may not delete a word that carries meaning with nothing in its
-/// place: rewording replaces words, it does not leave them out. The start of a word broken off
-/// and said again in full may go (`WordFragments`).
+/// Output that keeps every cue may not remove a negation and, unless the pass allows rewording
+/// (Standard's rewording pass), may not delete a run of spoken words outright. In every pass, it
+/// must keep each name where the speaker said it and may not delete a word that carries meaning
+/// with nothing in its place: rewording replaces words, it does not leave them out. The start of
+/// a word broken off and said again in full may go (`WordFragments`).
 ///
 /// Deep's output is checked instead as a repair of what was said, which may resolve corrections
 /// across sentences and lay the text out, and may change nothing else (`SelfRepair`).
@@ -227,7 +221,7 @@ impl OutputGuard {
 
         // Deep has its own check instead of the limits below: it may repair across sentences and
         // lay the text out, and may change nothing else.
-        if options.level.repairs_across_sentences() {
+        if options.pass == CleanupPass::Repairing {
             if !options.multiline && s::any_character(cleaned, s::is_newline) {
                 return reject(FallbackReason::LayoutNotAllowed);
             }
@@ -262,9 +256,6 @@ impl OutputGuard {
 
         let cleaned_words = normalized_words(cleaned);
         if self.self_correction.drops_cue(&raw_words, &cleaned_words) {
-            if !options.level.resolves_self_corrections() {
-                return reject(FallbackReason::SelfCorrectionNotAllowed);
-            }
             return if self.self_correction.is_correction(&raw_words, &cleaned_words) {
                 GuardVerdict::Accepted(cleaned.to_owned())
             } else {
@@ -274,7 +265,7 @@ impl OutputGuard {
         let alignment = WordAlignment::new(raw_words, cleaned_words);
         let placeholder_words = WordSet::normalized(&options.placeholders);
         let fragments = self.word_fragments.indices_in_text(raw, &placeholder_words);
-        if !options.level.allows_rewording()
+        if !options.pass.allows_rewording()
             && let Some(count) = self.dropped_words.dropped_run(&alignment, &fragments)
         {
             return reject(FallbackReason::DroppedWords { count });
@@ -299,7 +290,7 @@ impl OutputGuard {
         let raw_word_count = edit_distance::words(raw).len();
         if raw_word_count > 0 {
             let ratio = edit_distance::words(cleaned).len() as f64 / raw_word_count as f64;
-            if !self.policy.word_ratio_bounds_for(options.level).contains(&ratio) {
+            if !self.policy.word_ratio_bounds_for(options.pass).contains(&ratio) {
                 return reject(FallbackReason::WordRatio(ratio));
             }
         }

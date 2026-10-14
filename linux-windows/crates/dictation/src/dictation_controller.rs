@@ -586,7 +586,7 @@ mod tests {
                 min_utterance_ms: 300,
                 max_recording_seconds: 300,
                 text: Configuration {
-                    level: CleanupLevel::Medium,
+                    level: CleanupLevel::Standard,
                     snippets: Vec::new(),
                     vocabulary: Vec::new(),
                     vocabulary_prompt_limit: Configuration::VOCABULARY_PROMPT_LIMIT,
@@ -972,7 +972,7 @@ mod tests {
             text, "um ship it on friday no wait monday",
             "fillers go in the model's own step"
         );
-        assert_eq!(options.level, CleanupLevel::Medium);
+        assert_eq!(options.level, CleanupLevel::Standard);
         assert!(!options.multiline);
 
         c.cleaned(job, accepted("Ship it on Monday."));
@@ -1064,7 +1064,11 @@ mod tests {
             )
             .text
         };
-        assert_ne!(at(CleanupLevel::None), at(CleanupLevel::Medium), "fillers stay at None");
+        assert_ne!(
+            at(CleanupLevel::None),
+            at(CleanupLevel::Standard),
+            "fillers stay at None"
+        );
 
         let mut c = controller();
         let job = dictate(&mut c, 0, 500);

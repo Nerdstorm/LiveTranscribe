@@ -69,9 +69,16 @@ public struct EvalCase: Codable, Sendable, Equatable {
     }
 
     /// What the app sends with this case at `level`: the field, whether the text is an email's
-    /// body, and the placeholder tokens (`⟦S1⟧`, …) the raw text holds.
-    public func options(level: CleanupLevel) -> CleanupOptions {
-        CleanupOptions(level: level, placeholders: PlaceholderToken.tokens(in: raw), multiline: multiline, letterBody: letterBody)
+    /// body, and the placeholder tokens (`⟦S1⟧`, …) the raw text holds. `pass` asks for one of
+    /// the level's passes alone; `nil` runs the level as the app does.
+    public func options(level: CleanupLevel, pass: CleanupPass? = nil) -> CleanupOptions {
+        CleanupOptions(
+            level: level,
+            pass: pass,
+            placeholders: PlaceholderToken.tokens(in: raw),
+            multiline: multiline,
+            letterBody: letterBody
+        )
     }
 
     /// Reads JSON Lines of eval cases, or of ``TrainingExample``s, which become cases with their

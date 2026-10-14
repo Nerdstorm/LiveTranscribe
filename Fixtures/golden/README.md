@@ -10,7 +10,7 @@ to text feeds the speech model.
 |---|---|
 | `dictation-inputs.txt` | One transcript per line, as speech-to-text would hand it over. Lines starting with `#` are skipped. |
 | `dictation-settings.json` | The snippets, vocabulary and prompt limits every case runs with. |
-| `dictation-text.jsonl` | What the Mac app makes of each transcript: at each cleanup level (`none`, `light`, `medium`, `high`, `deep`), in a single-line and a multi-line field, the text it types, the text Undo AI edit puts back (`uncleaned`), and whether it fell back. |
+| `dictation-text.jsonl` | What the Mac app makes of each transcript: at each cleanup level (`none`, `standard`, `deep`), in a single-line and a multi-line field, the text it types, the text Undo AI edit puts back (`uncleaned`), and whether it fell back. |
 | `emoji-phrasing.tsv` | The ways people may ask for an emoji ("emoji fireworks", "insert a fireworks emoji", "smiley face") or talk about one ("the fire emoji is my favourite"), the text the speaker wants, and whether dictation makes it yet (`works`) or not (`gap`). Hand-written; edit it, and set a row's status when a rule change flips it. Not written by `make golden`. |
 | `emoji-names.tsv` | Every name an emoji command accepts, before its plural rule, and the emoji it inserts: the Mac app's common names, and each emoji's Unicode name that macOS resolves. |
 | `speech-features/*.f32` | Qwen3-ASR's log-mel features as the Mac app computes them (mlx-audio-swift) for three synthetic test clips, which both tests generate with integer arithmetic: 128 little-endian float32 values per frame. Compared within 1e-4. |

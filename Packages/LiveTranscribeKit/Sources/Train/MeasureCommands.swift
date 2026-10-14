@@ -30,7 +30,7 @@ func measure(_ options: MeasureCommandOptions) async throws {
         throw TrainError.adapterNotApplied
     }
     let report = await CleanupMeasurement.run(
-        cases, with: cleaner, level: options.level, configuration: options.label, recorder: recorder
+        cases, with: cleaner, level: options.level, pass: options.pass, configuration: options.label, recorder: recorder
     ) { print($0) }
     for result in report.results where result.verdict != .right && result.verdict != .unchanged {
         print("\(result.verdict.rawValue.uppercased()) \(result.id)\(result.fallbackReason.map { " (\($0))" } ?? "")")
@@ -51,7 +51,9 @@ func writeRequests(_ options: MeasureCommandOptions, to output: URL) async throw
     let cases = try options.cases()
     let executor = options.executor(settings: settings)
     let adapters = Set(MLXCleaner.compatibleAdapters(in: options.configuration(settings: settings)).keys)
-    let lines = await CleanupMeasurement.requests(cases, executor: executor, level: options.level, adapters: adapters)
+    let lines = await CleanupMeasurement.requests(
+        cases, executor: executor, level: options.level, pass: options.pass, adapters: adapters
+    )
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     let text = try lines.map { String(decoding: try encoder.encode($0), as: UTF8.self) }.joined(separator: "\n") + "\n"
@@ -72,7 +74,7 @@ func replay(_ options: MeasureCommandOptions, outputs: URL) async throws {
         if let text = output.output, output.error == nil { answers[output.id] = text } else { errors += 1 }
     }
     let report = await CleanupMeasurement.replay(
-        cases, outputs: answers, executor: options.executor(settings: settings), level: options.level,
+        cases, outputs: answers, executor: options.executor(settings: settings), level: options.level, pass: options.pass,
         configuration: "\(options.label), replaying \(outputs.lastPathComponent)"
     )
     print(report.summary)
@@ -85,7 +87,10 @@ func replay(_ options: MeasureCommandOptions, outputs: URL) async throws {
 
 /// A cleanup configuration to measure: the level, the model's options and the cases.
 struct MeasureCommandOptions {
-    var level = CleanupLevel.medium
+    var level = CleanupLevel.standard
+    /// One of the level's passes alone (`--pass correcting` measures the prompt the
+    /// self-correction adapter is trained on); `nil` runs the level as the app does.
+    var pass: CleanupPass?
     var data: [URL] = []
     /// Whether to load the adapters; `--no-adapter` measures the base model.
     var adapters = true
@@ -100,10 +105,10 @@ struct MeasureCommandOptions {
     var report: URL?
 
     var label: String {
-        labelOverride ?? "\(level.rawValue)\(adapters ? "" : ", no adapter")"
+        labelOverride ?? "\(level.rawValue)\(pass.map { ", \($0.rawValue) pass only" } ?? "")\(adapters ? "" : ", no adapter")"
             + (level.repairsAcrossSentences
                 ? ", \(deep.passes.rawValue) pass\(deep.passes == .one ? "" : "es"), \(deep.adapter.rawValue) adapter, thinking \(deep.thinking ? "on (\(deep.thinkingTokens) tokens)" : "off")"
-                    + (deep.fallsBackToMedium ? ", Medium on rejection" : "")
+                    + (deep.fallsBackToStandard ? ", Standard on rejection" : "")
                 : "")
     }
 
@@ -142,6 +147,12 @@ struct MeasureCommandOptions {
                 throw TrainError.usage("--level needs one of \(CleanupLevel.allCases.map(\.rawValue).joined(separator: ", "))")
             }
             self.level = level
+        case "--pass":
+            let text = try value()
+            guard let pass = CleanupPass(rawValue: text), pass != .repairing else {
+                throw TrainError.usage("--pass needs correcting or rewording, one of Standard's passes")
+            }
+            self.pass = pass
         case "--data": data.append(URL(fileURLWithPath: try value()))
         case "--no-adapter": adapters = false
         case "--adapter": adapterDirectory = URL(fileURLWithPath: try value(), isDirectory: true)
@@ -156,14 +167,14 @@ struct MeasureCommandOptions {
             deep.thinkingTokens = tokens
         case "--deep-passes":
             let text = try value()
-            guard let passes = DeepCleanup.Passes(argument: text) else { throw TrainError.usage("--deep-passes needs one or after-medium") }
+            guard let passes = DeepCleanup.Passes(argument: text) else { throw TrainError.usage("--deep-passes needs one or after-correcting") }
             deep.passes = passes
         case "--deep-adapter":
             guard let adapter = CleanupRequest.Adapter(rawValue: try value()) else {
                 throw TrainError.usage("--deep-adapter needs one of \(CleanupRequest.Adapter.allCases.map(\.rawValue).joined(separator: ", "))")
             }
             deep.adapter = adapter
-        case "--no-medium-fallback": deep.fallsBackToMedium = false
+        case "--no-standard-fallback": deep.fallsBackToStandard = false
         case "--label": labelOverride = try value()
         case "--report": report = URL(fileURLWithPath: try value())
         default: return false
@@ -176,7 +187,7 @@ extension DeepCleanup.Passes {
     init?(argument: String) {
         switch argument {
         case "one": self = .one
-        case "after-medium": self = .afterMedium
+        case "after-correcting": self = .afterCorrecting
         default: return nil
         }
     }

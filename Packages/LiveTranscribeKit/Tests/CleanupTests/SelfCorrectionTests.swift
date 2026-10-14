@@ -6,7 +6,7 @@ struct SelfCorrectionTests {
     private let outputGuard = OutputGuard()
 
     private func review(_ raw: String, _ cleaned: String) -> GuardVerdict {
-        outputGuard.review(raw: raw, outcome: .completed(cleaned), options: CleanupOptions(level: .medium))
+        outputGuard.review(raw: raw, outcome: .completed(cleaned), options: CleanupOptions(level: .standard, pass: .correcting))
     }
 
     @Test("Keeping only the correction is accepted", arguments: [

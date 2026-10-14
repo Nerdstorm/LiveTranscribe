@@ -201,7 +201,7 @@ public struct DeepExampleGenerator: Sendable {
         return dictation(.malformed, said: said, written: sentence(frame.replacingOccurrences(of: "{X}", with: new)))
     }
 
-    /// Within one sentence, as Medium resolves it: "We need three, sorry, four servers."
+    /// Within one sentence, as Standard resolves it: "We need three, sorry, four servers."
     mutating func sameSentence() -> DeepExample {
         if chance(0.25) { return timeKept(acrossSentences: false) }
         if chance(0.12) {

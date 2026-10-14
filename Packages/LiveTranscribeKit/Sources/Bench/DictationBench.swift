@@ -91,7 +91,7 @@ enum DictationBench {
         let samples = try clips.map { try FileAudioSource.readSamples(from: $0.audio) }
 
         // One untimed pass so the first timed clip does not pay for kernel compilation.
-        _ = try await processor.process(samples[0], configuration: configuration(.medium, options: options, settings: settings))
+        _ = try await processor.process(samples[0], configuration: configuration(.standard, options: options, settings: settings))
 
         var results: [Result] = []
         for level in levels {

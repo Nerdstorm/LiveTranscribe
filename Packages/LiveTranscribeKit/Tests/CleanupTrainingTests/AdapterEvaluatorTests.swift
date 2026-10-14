@@ -34,7 +34,7 @@ struct AdapterEvaluatorTests {
             "cars sorry buses": "buses",  // casing and punctuation are ignored
             "sorry i'm late": "Sorry, I'm late.",
         ])
-        let report = await AdapterEvaluator.evaluate(examples, with: cleaner, options: CleanupOptions(level: .light))
+        let report = await AdapterEvaluator.evaluate(examples, with: cleaner, options: CleanupOptions(level: .standard))
 
         #expect(report.scores[.correction] == EvaluationReport.Score(total: 2, matched: 1, fellBack: 1))
         #expect(report.scores[.control] == EvaluationReport.Score(total: 1, matched: 1, fellBack: 0))
@@ -47,11 +47,11 @@ struct AdapterEvaluatorTests {
     @Test func atALevelThatRemovesFillersTheTargetLosesThemToo() async {
         let examples = [TrainingExample(category: .cleanup, raw: "so um it works", target: "So, um, it works.", source: "test")]
         let cleaner = TableCleaner(["so um it works": "So it works."])
-        let medium = await AdapterEvaluator.evaluate(examples, with: cleaner, options: CleanupOptions(level: .medium))
-        #expect(medium.overall.matched == 1)
-        let light = await AdapterEvaluator.evaluate(examples, with: cleaner, options: CleanupOptions(level: .light))
-        #expect(light.overall.matched == 0)
-        #expect(light.misses.first?.expected == "So, um, it works.")
+        let standard = await AdapterEvaluator.evaluate(examples, with: cleaner, options: CleanupOptions(level: .standard))
+        #expect(standard.overall.matched == 1)
+        let none = await AdapterEvaluator.evaluate(examples, with: cleaner, options: CleanupOptions(level: .none))
+        #expect(none.overall.matched == 0)
+        #expect(none.misses.first?.expected == "So, um, it works.")
     }
 
     @Test func percentilesUseTheNearestRank() {

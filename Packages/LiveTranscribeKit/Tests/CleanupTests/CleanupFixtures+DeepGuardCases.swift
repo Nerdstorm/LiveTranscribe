@@ -59,7 +59,7 @@ extension CleanupFixtures.Guard {
             ("I don't sorry I do want it", "I do want it."),
             ("I don't think he checked, sorry, the tests", "I think he checked the tests."),
             ("The meeting is on Tuesday. Sorry, Wednesday. Bring three chairs. No, sorry, four.", "The meeting is on Wednesday. Bring four chairs."),
-            // Within a sentence, as at Medium.
+            // Within a sentence, as at Standard.
             ("I want to talk about fuel efficiency in cars sorry busses", "I want to talk about fuel efficiency in buses."),
             ("let's meet on tuesday no wait wednesday at ten", "Let's meet on Wednesday at ten."),
             ("we should deploy on monday scratch that let's wait until tuesday", "Let's wait until Tuesday."),

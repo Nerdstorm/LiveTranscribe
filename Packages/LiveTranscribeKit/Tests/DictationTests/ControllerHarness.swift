@@ -55,7 +55,7 @@ struct Harness {
         configure: (inout AppSettings) -> Void = { _ in }
     ) {
         settings.update {
-            $0.cleanupLevel = .medium
+            $0.cleanupLevel = .standard
             $0.dictation.tapMaxMs = 300
             $0.dictation.doubleTapWindowMs = 40
             $0.dictation.minUtteranceMs = 100

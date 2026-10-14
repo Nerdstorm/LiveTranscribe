@@ -85,8 +85,8 @@ than 5% of segments.
 With the default speech model the first check fails: p95 was 1,645 ms in the last real-time run (M4
 Pro, 2026-09-25, four synthetic clips), because Qwen3-ASR writes its text a token at a time, so a
 long segment takes longer; Parakeet TDT 0.6B v3 passed at 1,290 ms. The fix, transcribing during the
-silence that ends a segment, isn't built yet. Dictation is not affected: its p95 is 654 ms at High,
-against a 1.2 s target.
+silence that ends a segment, isn't built yet. Dictation is not affected: its p95 was 654 ms at
+High (now Standard), against a 1.2 s target.
 
 `make eval` measures dictation on the 65 clips (plain sentences, fillers, self-corrections,
 questions, longer passages, emoji, dictated punctuation, addresses, line breaks, spoken lists and
@@ -96,7 +96,7 @@ speech-to-text plus cleanup; stopping the recorder and inserting the text aren't
 
 Both take options with `ARGS`, for example `make eval ARGS="--multiline --level deep"`:
 
-- `--level <none|light|medium|high|deep>` picks the cleanup level (the eval repeats it);
+- `--level <none|standard|deep>` picks the cleanup level (the eval repeats it);
 - `--multiline` (eval) dictates into a field that takes several lines, where lists and letters
   are laid out, and counts the clips that came out with the intended lines;
 - `--no-cleanup` (bench) measures speech-to-text alone, and `--no-adapter` cleans up without the
@@ -114,7 +114,9 @@ rely on the numbers. Speech-to-text and cleanup calls are also marked as signpos
 ("STT", "LLM") for Instruments.
 
 The last `make eval ARGS="--multiline"` (M4 Pro, macOS 27, the macOS voice Samantha, the default
-speech model), dictating into a field that takes several lines:
+speech model), dictating into a field that takes several lines, was run when there were five
+levels. High is Standard now, Light is gone, and Medium's single pass is Standard's correcting
+pass; Standard itself is yet to be measured:
 
 | Level | WER vs said | WER vs meant | Fallbacks | p50 | p95 | Laid out as meant |
 |---|---:|---:|---:|---:|---:|---:|

@@ -29,7 +29,7 @@ struct DictationHotkeyLifecycleTests {
         let settings = SettingsBox()
         let h = Harness(settings: settings)
         h.controller.start()
-        settings.update { $0.cleanupLevel = .high }
+        settings.update { $0.cleanupLevel = .deep }
         h.controller.applySettings()
         #expect(h.hotkeys.startedBindings.count == 1)
 

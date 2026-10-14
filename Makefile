@@ -95,7 +95,7 @@ dictation-audio: ## Make the dictation eval clips with macOS text-to-speech, if 
 
 ##@ Measure and train
 
-bench: audio ## Live transcript bench: word error rate and latency (ARGS="--level high --fast")
+bench: audio ## Live transcript bench: word error rate and latency (ARGS="--level standard --fast")
 	$(call build-tool,Bench)
 	cd $(PACKAGE) && $(TOOLS)/Bench $(ARGS)
 

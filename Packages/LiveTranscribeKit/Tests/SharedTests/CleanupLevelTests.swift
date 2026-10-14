@@ -8,22 +8,22 @@ struct CleanupLevelTests {
         #expect(CleanupLevel.allCases.filter { !$0.usesLanguageModel } == [.none])
     }
 
-    @Test func levelsFromMediumUpRemoveFillersResolveCorrectionsLayOutTextAndWriteNumbers() {
+    @Test func standardAndDeepRemoveFillersResolveCorrectionsLayOutTextAndWriteNumbers() {
         for level in CleanupLevel.allCases {
-            let expected = [.medium, .high, .deep].contains(level)
+            let expected = level != .none
             #expect(level.removesFillers == expected)
             #expect(level.resolvesSelfCorrections == expected)
             #expect(level.formatsLayout == expected)
             #expect(level.writesNumbers == expected)
         }
-        #expect(CleanupLevel.allCases.filter(\.allowsRewording) == [.high])
+        #expect(CleanupLevel.allCases.filter(\.allowsRewording) == [.standard])
         #expect(CleanupLevel.allCases.filter(\.repairsAcrossSentences) == [.deep])
     }
 
     @Test func levelsAreOrderedFromLeastToMostChange() {
-        #expect(CleanupLevel.allCases == [.none, .light, .medium, .high, .deep])
+        #expect(CleanupLevel.allCases == [.none, .standard, .deep])
         #expect(CleanupLevel.allCases.sorted() == CleanupLevel.allCases)
-        #expect(CleanupLevel.deep > .high && CleanupLevel.medium < .high)
+        #expect(CleanupLevel.deep > .standard && CleanupLevel.none < .standard)
     }
 
     /// Snippets, vocabulary and spoken commands run before the level is looked at, so None's line
@@ -39,16 +39,24 @@ struct CleanupLevelTests {
         }
     }
 
-    @Test func wordRatioBoundsWidenWithTheLevel() {
-        #expect(CleanupLevel.light.wordRatioBounds == 0.8...1.2)
-        #expect(CleanupLevel.medium.wordRatioBounds == 0.5...1.2)
-        #expect(CleanupLevel.high.wordRatioBounds == 0.4...1.3)
+    @Test func storesAsItsRawValue() throws {
+        #expect(CleanupLevel(rawValue: "standard") == .standard)
+        #expect(CleanupLevel(rawValue: "deep") == .deep)
+        let data = try JSONEncoder().encode([CleanupLevel.standard])
+        #expect(String(decoding: data, as: UTF8.self) == #"["standard"]"#)
     }
 
-    @Test func storesAsItsRawValue() throws {
-        #expect(CleanupLevel(rawValue: "medium") == .medium)
-        #expect(CleanupLevel(rawValue: "deep") == .deep)
-        let data = try JSONEncoder().encode([CleanupLevel.high])
-        #expect(String(decoding: data, as: UTF8.self) == #"["high"]"#)
+    /// Light, Medium and High became Standard; a stored name of them reads as Standard, and an
+    /// unknown one as nothing.
+    @Test func theEarlierLevelsReadAsStandard() {
+        for name in ["light", "medium", "high"] {
+            #expect(CleanupLevel(storedValue: name) == .standard)
+            #expect(CleanupLevel(rawValue: name) == nil)
+        }
+        for level in CleanupLevel.allCases {
+            #expect(CleanupLevel(storedValue: level.rawValue) == level)
+        }
+        #expect(CleanupLevel(storedValue: "extreme") == nil)
+        #expect(CleanupLevel(storedValue: "Medium") == nil)
     }
 }

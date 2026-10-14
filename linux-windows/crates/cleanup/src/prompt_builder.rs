@@ -1,9 +1,8 @@
 use std::collections::HashSet;
 
-use lt_shared::CleanupLevel;
 use lt_shared::swift_string::{self as s, CharacterSet};
 
-use crate::{CleanupOptions, PromptTemplate};
+use crate::{CleanupOptions, CleanupPass, PromptTemplate};
 
 const BASE_RULES: [&str; 2] = [
     "Correct transcription errors, punctuation, casing and grammar in the TEXT.",
@@ -26,13 +25,14 @@ const DEEP_MULTILINE_RULE: &str = "Lay the text out the way it would be written:
 const DEEP_LETTER_BODY_RULE: &str = "The TEXT is the body of an email; its greeting and sign-off are added separately, so do not write any. Keep the body as it is written, with items or steps laid out as a list, numbered when their order matters, and ordinary sentences left as sentences.";
 const DEEP_ONE_LINE_RULE: &str = "Write it as one paragraph, without line breaks.";
 
-/// Composes the cleanup model's instruction for a request: the base rules, the level's rules, the
+/// Composes the cleanup model's instruction for a request: the base rules, the pass's rules, the
 /// vocabulary and the placeholder rule, each from its own function.
 ///
 /// Without the fine-tuned adapter the model cannot resolve spoken self-corrections reliably (see
-/// [`crate::prompt::cleanup`]), so every level gets the strict keep-every-word rules; with it,
-/// Medium and High ask for the correction only. Medium with the adapter and nothing else to add is
-/// exactly [`crate::prompt::adapted`], the prompt the adapter was trained on.
+/// [`crate::prompt::cleanup`]), so Standard's passes get the strict keep-every-word rules (its
+/// rewording pass may reword, but not remove); with it, they ask for the correction only.
+/// Standard's correcting pass with the adapter and nothing else to add is exactly
+/// [`crate::prompt::adapted`], the prompt the adapter was trained on.
 ///
 /// Deep has its own instruction, with or without the adapter ([`deep_rules`]).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -59,17 +59,18 @@ impl PromptBuilder {
         }
     }
 
-    /// The template for `options`. The None level never reaches the model; it gets Light's rules.
+    /// The template for `options`, by its pass ([`CleanupOptions::pass`]). The None level never
+    /// reaches the model.
     pub fn template(&self, options: &CleanupOptions) -> PromptTemplate {
         if let Some(template) = &self.override_template {
             return template.clone();
         }
-        let mut rules: Vec<String> = if options.level.repairs_across_sentences() {
+        let mut rules: Vec<String> = if options.pass == CleanupPass::Repairing {
             deep_rules(options.multiline, options.letter_body)
         } else {
             BASE_RULES
                 .iter()
-                .chain(level_rules(options.level, self.adapted))
+                .chain(pass_rules(options.pass, self.adapted))
                 .map(|&rule| rule.to_owned())
                 .collect()
         };
@@ -84,10 +85,10 @@ impl PromptBuilder {
     }
 }
 
-/// What the model may change. A self-correction is resolved only with the adapter.
-pub(crate) fn level_rules(level: CleanupLevel, adapted: bool) -> &'static [&'static str] {
-    let resolves = adapted && level.resolves_self_corrections();
-    match (level.allows_rewording(), resolves) {
+/// What the model may change in one of Standard's passes. A self-correction is resolved only with
+/// the adapter.
+pub(crate) fn pass_rules(pass: CleanupPass, adapted: bool) -> &'static [&'static str] {
+    match (pass.allows_rewording(), adapted) {
         (false, false) => &["Do not add, remove, summarise or rephrase content."],
         (false, true) => &["Do not add, summarise or rephrase content.", RESOLVE_RULE],
         (true, false) => &["You may reword lightly for grammar and clarity. Do not add, remove or summarise content."],
@@ -165,6 +166,8 @@ fn unique(values: impl Iterator<Item = String>) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    use lt_shared::CleanupLevel;
+
     use super::*;
     use crate::prompt;
 
@@ -178,6 +181,13 @@ mod tests {
 
     fn options(level: CleanupLevel) -> CleanupOptions {
         CleanupOptions::new(level)
+    }
+
+    fn correcting() -> CleanupOptions {
+        CleanupOptions {
+            pass: CleanupPass::Correcting,
+            ..options(CleanupLevel::Standard)
+        }
     }
 
     /// The adapter was trained on this exact text; changing it silently would degrade the adapter.
@@ -209,37 +219,26 @@ mod tests {
     }
 
     #[test]
-    fn medium_with_the_adapter_is_the_trained_prompt() {
-        assert_eq!(
-            PromptBuilder::new(true).template(&options(CleanupLevel::Medium)),
-            prompt::adapted()
-        );
+    fn the_correcting_pass_with_the_adapter_is_the_trained_prompt() {
+        assert_eq!(PromptBuilder::new(true).template(&correcting()), prompt::adapted());
     }
 
     #[test]
-    fn without_the_adapter_levels_keep_every_word() {
-        for level in [CleanupLevel::None, CleanupLevel::Light, CleanupLevel::Medium] {
-            assert_eq!(PromptBuilder::new(false).template(&options(level)), prompt::cleanup());
-        }
+    fn without_the_adapter_the_correcting_pass_keeps_every_word() {
+        assert_eq!(PromptBuilder::new(false).template(&correcting()), prompt::cleanup());
     }
 
     #[test]
-    fn light_keeps_every_word_even_with_the_adapter() {
-        assert_eq!(
-            PromptBuilder::new(true).template(&options(CleanupLevel::Light)),
-            prompt::cleanup()
-        );
-    }
-
-    #[test]
-    fn high_allows_rewording() {
-        let with_adapter = PromptBuilder::new(true).template(&options(CleanupLevel::High));
+    fn standard_rewords_unless_asked_for_its_correcting_pass() {
+        assert_eq!(options(CleanupLevel::Standard).pass, CleanupPass::Rewording);
+        assert_eq!(options(CleanupLevel::Deep).pass, CleanupPass::Repairing);
+        let with_adapter = PromptBuilder::new(true).template(&options(CleanupLevel::Standard));
         let with_adapter = lines(&with_adapter);
         assert!(
             with_adapter.contains(&"You may reword lightly for grammar and clarity. Do not add or summarise content.")
         );
         assert!(with_adapter.contains(&"When the speaker corrects themselves, keep only the correction."));
-        let without_adapter = PromptBuilder::new(false).template(&options(CleanupLevel::High));
+        let without_adapter = PromptBuilder::new(false).template(&options(CleanupLevel::Standard));
         let without_adapter = lines(&without_adapter);
         assert!(
             without_adapter
@@ -253,7 +252,7 @@ mod tests {
         let options = CleanupOptions {
             vocabulary: strings(&["Nerdstorm", "GitHub"]),
             placeholders: strings(&["⟦S1⟧"]),
-            ..options(CleanupLevel::Medium)
+            ..correcting()
         };
         let template = PromptBuilder::new(true).template(&options);
         let rules = lines(&template);
@@ -302,7 +301,9 @@ mod tests {
         assert_eq!(adapted, PromptBuilder::new(false).template(&deep).system);
         assert_ne!(
             adapted,
-            PromptBuilder::new(true).template(&options(CleanupLevel::High)).system
+            PromptBuilder::new(true)
+                .template(&options(CleanupLevel::Standard))
+                .system
         );
         assert!(adapted.contains("later sentence"));
         assert!(
@@ -333,18 +334,18 @@ mod tests {
     }
 
     #[test]
-    fn the_other_levels_ignore_the_field() {
+    fn standards_passes_ignore_the_field() {
         let builder = PromptBuilder::new(true);
-        for level in [CleanupLevel::Light, CleanupLevel::Medium, CleanupLevel::High] {
+        for pass in [CleanupPass::Correcting, CleanupPass::Rewording] {
+            let one_line = CleanupOptions {
+                pass,
+                ..options(CleanupLevel::Standard)
+            };
             let multiline = CleanupOptions {
                 multiline: true,
-                ..options(level)
+                ..one_line.clone()
             };
-            assert_eq!(
-                builder.template(&multiline),
-                builder.template(&options(level)),
-                "{level:?}"
-            );
+            assert_eq!(builder.template(&multiline), builder.template(&one_line), "{pass:?}");
         }
     }
 

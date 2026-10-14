@@ -4,8 +4,9 @@
 //!
 //! - [`CleanupExecutor`] runs one cleanup: the level's deterministic rules, the prompt, the model
 //!   under a [`Deadline`], and the [`OutputGuard`]'s verdict, falling back to the text the model
-//!   was given when the guard rejects the output. High runs two passes when the text has a
-//!   correction cue; Deep runs as [`DeepCleanup`] says, with Medium's cleanup to fall back on.
+//!   was given when the guard rejects the output. Standard runs two passes ([`CleanupPass`])
+//!   when the text has a correction cue; Deep runs as [`DeepCleanup`] says, with Standard's
+//!   cleanup to fall back on.
 //! - [`PromptBuilder`] and [`prompt`] compose what the model is asked ([`CleanupRequest`]),
 //!   byte for byte as the Mac app asks it.
 //! - [`OutputGuard`] decides whether the model's output may replace the text, with the checks
@@ -18,6 +19,7 @@
 mod cleanup_executor;
 mod cleanup_model;
 mod cleanup_options;
+mod cleanup_pass;
 pub mod cleanup_scripts;
 mod content_words;
 mod deadline;
@@ -45,6 +47,7 @@ mod test_support;
 pub use cleanup_executor::{CleanedText, CleanupExecutor, deterministic_cleanup};
 pub use cleanup_model::{CleanupModel, CleanupModelNotLoaded, WARM_UP_TIMEOUT_SECONDS, warm_up_request};
 pub use cleanup_options::CleanupOptions;
+pub use cleanup_pass::CleanupPass;
 pub use content_words::STANDARD_FUNCTION_WORDS;
 pub use deadline::{CancelFlag, Clock, Deadline, SystemClock};
 pub use deep_cleanup::{DeepCleanup, DeepPasses};

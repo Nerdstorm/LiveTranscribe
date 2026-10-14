@@ -15,18 +15,16 @@ import Shared
 /// the adapter's LoRA layers are loaded alongside its weights. It is not fused into them: fusing
 /// re-quantizes each weight to 4 bits, which rounds away most of the adapter's small change
 /// (held-out self-corrections resolved: 97% unfused, 13% fused). The unfused layers add no
-/// measurable latency. If that fails, the base model is used, and ``PromptBuilder`` gives Light,
-/// Medium and High the strict rules (Deep keeps its own prompt).
+/// measurable latency. If that fails, the base model is used, and ``PromptBuilder`` gives
+/// Standard's passes the strict rules (Deep keeps its own prompt).
 ///
 /// Deep's adapter (``Configuration/deepAdapter``) has the same shape, trained on the same commit,
 /// so it shares the layers: its weights are swapped in for the requests that ask for it.
 ///
 /// An adapter is in the model only for requests that ask for it (``CleanupRequest/adapter``):
-/// the self-correction adapter for the levels that resolve self-corrections (Medium, High),
-/// Deep's for Deep. Trained to resolve them whatever the prompt says, it would otherwise do so at
-/// Light too, where every word must stay, and OutputGuard would reject the result. Otherwise the
-/// layers are turned off before generating, which leaves the base model and costs no model
-/// compute. Without Deep's adapter, Deep uses the self-correction adapter.
+/// the self-correction adapter for Standard's passes, Deep's for Deep. Otherwise the layers are
+/// turned off before generating, which leaves the base model and costs no model compute. Without
+/// Deep's adapter, Deep uses the self-correction adapter.
 ///
 /// Requests are decoded greedily, except Deep's when it thinks, which are sampled as Qwen3
 /// recommends for thinking, from a seed that depends only on the text.
@@ -167,7 +165,7 @@ public actor MLXCleaner: Cleaner {
             for: "this is a warm up sentence",
             context: [],
             contextLimit: 0,
-            template: prompts.template(for: CleanupOptions(level: .medium)),
+            template: prompts.template(for: CleanupOptions(level: .standard, pass: .correcting)),
             adapter: applied[.medium] != nil ? .medium : .deep
         )
         let warmUpLayers = layers

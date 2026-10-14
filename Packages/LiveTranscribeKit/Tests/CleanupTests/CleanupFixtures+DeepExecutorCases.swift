@@ -2,12 +2,13 @@
 import Foundation
 import Shared
 
-/// Deep's cleanups as scripts: DeepCleanupTests, then Medium's fallback and Medium's pass first
-/// whatever each pass does, thinking, layout and placeholders.
+/// Deep's cleanups as scripts: DeepCleanupTests, then Standard's fallback and the correcting pass
+/// first whatever each pass does, thinking, layout and placeholders.
 extension CleanupFixtures.Executor {
     private static let kirk = "I tried to speak with Kirk, but he didn't. I don't think he actually check whether the release is tomorrow. No, sorry, the after tomorrow."
     private static let repaired = "I tried to speak with Kirk, but he didn't. I don't think he actually checked whether the release is the day after tomorrow."
     private static let lease = "the lease ends in april no wait may"
+    private static let brokenBuildSaid = "i think the build is broken on main"
     private static let meeting = "The meeting is on Tuesday. Sorry, Wednesday. We will review the the budget."
     private static let meetingResolved = "The meeting is on Wednesday. We will review the budget."
     private static let deep = CleanupOptions(level: .deep)
@@ -17,39 +18,45 @@ extension CleanupFixtures.Executor {
         passes: DeepCleanup.Passes = .one,
         adapter: CleanupRequest.Adapter = .deep,
         thinking: Bool = false,
-        fallsBackToMedium: Bool = true,
+        fallsBackToStandard: Bool = true,
         minimumTimeoutSeconds: Double = 0.3
     ) -> DeepCleanup {
         DeepCleanup(
             passes: passes, adapter: adapter, thinking: thinking, thinkingTokens: 64,
-            fallsBackToMedium: fallsBackToMedium, minimumTimeoutSeconds: minimumTimeoutSeconds
+            fallsBackToStandard: fallsBackToStandard, minimumTimeoutSeconds: minimumTimeoutSeconds
         )
     }
 
-    /// DeepCleanupTests, as scripts, then Medium's fallback and Medium's pass first whatever
-    /// each pass does, thinking, layout and placeholders.
+    /// DeepCleanupTests, as scripts, then Standard's fallback and the correcting pass first
+    /// whatever each pass does, thinking, layout and placeholders. With a correction cue,
+    /// Standard's fallback is two passes, correcting then rewording.
     static var deepCases: [Case] {
-        let afterMedium = deepCleanup(passes: .afterMedium, adapter: .off, minimumTimeoutSeconds: 8)
-        let thinking = deepCleanup(thinking: true, fallsBackToMedium: false, minimumTimeoutSeconds: 8)
-        let alone = deepCleanup(fallsBackToMedium: false, minimumTimeoutSeconds: 8)
+        let afterCorrecting = deepCleanup(passes: .afterCorrecting, adapter: .off, minimumTimeoutSeconds: 8)
+        let thinking = deepCleanup(thinking: true, fallsBackToStandard: false, minimumTimeoutSeconds: 8)
+        let alone = deepCleanup(fallsBackToStandard: false, minimumTimeoutSeconds: 8)
         return [
             // DeepCleanupTests
             Case(name: "Deep accepts a repair in one pass", options: deep, raw: kirk, script: [.reply(repaired)]),
             Case(name: "Deep without the adapter", deep: deepCleanup(adapter: .off, minimumTimeoutSeconds: 8), options: deep, raw: kirk, script: [.reply(repaired)]),
             Case(name: "Deep with the self-correction adapter", deep: deepCleanup(adapter: .medium, minimumTimeoutSeconds: 8), options: deep, raw: kirk, script: [.reply(repaired)]),
-            Case(name: "a rejected repair gets Medium's cleanup", options: deep, raw: lease, script: [.reply("The lease ends in April."), .reply("The lease ends in May.")]),
-            Case(name: "when Medium's cleanup is rejected too, what was said is shown", options: deep, raw: lease, script: [.reply("The lease ends in April."), .reply("The lease ends in April.")]),
+            Case(
+                name: "a rejected repair gets Standard's cleanup",
+                options: deep,
+                raw: lease,
+                script: [.reply("The lease ends in April."), .reply("The lease ends in May."), .reply("The lease ends in May.")]
+            ),
+            Case(name: "when Standard's cleanup is rejected too, what was said is shown", options: deep, raw: lease, script: [.reply("The lease ends in April."), .reply("The lease ends in April.")]),
             Case(name: "no answer in time is not retried", timeoutSeconds: 0.3, deep: deepCleanup(), options: deep, raw: kirk, script: [.timeOut]),
             Case(name: "without the fallback a rejected repair shows what was said", deep: alone, options: deep, raw: lease, script: [.reply("The lease ends in April.")]),
-            Case(name: "after Medium, Medium resolves first, then Deep repairs", deep: afterMedium, options: deep, raw: meeting, script: [.reply(meetingResolved), .reply(meetingResolved)]),
+            Case(name: "after correcting, the correcting pass resolves first, then Deep repairs", deep: afterCorrecting, options: deep, raw: meeting, script: [.reply(meetingResolved), .reply(meetingResolved)]),
             Case(
-                name: "after Medium, Medium's result stands when the repair is rejected",
-                deep: afterMedium,
+                name: "after correcting, its result stands when the repair is rejected",
+                deep: afterCorrecting,
                 options: deep,
                 raw: "The meeting is on Tuesday. Sorry, Wednesday.",
                 script: [.reply("The meeting is on Wednesday."), .reply("The meeting is on Wednesday, as agreed.")]
             ),
-            Case(name: "after Medium, one pass without a cue", deep: afterMedium, options: deep, raw: "she don't know", script: [.reply("She doesn't know.")]),
+            Case(name: "after correcting, one pass without a cue", deep: afterCorrecting, options: deep, raw: "she don't know", script: [.reply("She doesn't know.")]),
             Case(
                 name: "thinking is sampled and its reasoning removed",
                 deep: thinking,
@@ -62,10 +69,10 @@ extension CleanupFixtures.Executor {
             Case(name: "Deep waits for its own minimum", timeoutSeconds: 0.05, deep: deepCleanup(), options: deep, raw: kirk, script: [.timeOut]),
             Case(name: "the Advanced timeout applies when it is longer", timeoutSeconds: 0.4, deep: deepCleanup(), options: deep, raw: kirk, script: [.timeOut]),
 
-            // Medium's fallback, whatever it does.
+            // Standard's fallback, whatever it does.
             Case(name: "a failed repair is not retried", options: deep, raw: kirk, script: [.fail("GPU error")]),
             Case(name: "a cancelled repair is not retried", options: deep, raw: kirk, script: [.cancel]),
-            Case(name: "an empty repair gets Medium's cleanup", options: deep, raw: lease, script: [.reply(" \n"), .reply("The lease ends in May.")]),
+            Case(name: "an empty repair gets Standard's cleanup", options: deep, raw: lease, script: [.reply(" \n"), .reply("The lease ends in May."), .reply("The lease ends in May.")]),
             Case(name: "a failed fallback keeps Deep's reason", options: deep, raw: lease, script: [.reply("The lease ends in April."), .fail("GPU error")]),
             Case(name: "a cancelled fallback keeps Deep's reason", options: deep, raw: lease, script: [.reply("The lease ends in April."), .cancel]),
             Case(
@@ -76,65 +83,105 @@ extension CleanupFixtures.Executor {
                 raw: lease,
                 script: [.reply("The lease ends in April."), .timeOut]
             ),
-            Case(name: "unfinished thinking gets Medium's cleanup", deep: deepCleanup(thinking: true, minimumTimeoutSeconds: 8), options: deep, raw: lease, script: [.reply("<think>\nApril, then"), .reply("The lease ends in May.")]),
-            Case(name: "leaked thinking tags get Medium's cleanup", options: deep, raw: lease, script: [.reply("<think>April</think> The lease ends in May."), .reply("The lease ends in May.")]),
-            Case(name: "a preamble gets Medium's cleanup", options: deep, raw: lease, script: [.reply("Here is the text: The lease ends in May."), .reply("The lease ends in May.")]),
             Case(
-                name: "Medium's cleanup that fails Deep's check shows what was said",
+                name: "unfinished thinking gets Standard's cleanup",
+                deep: deepCleanup(thinking: true, minimumTimeoutSeconds: 8),
+                options: deep,
+                raw: lease,
+                script: [.reply("<think>\nApril, then"), .reply("The lease ends in May."), .reply("The lease ends in May.")]
+            ),
+            Case(
+                name: "leaked thinking tags get Standard's cleanup",
+                options: deep,
+                raw: lease,
+                script: [.reply("<think>April</think> The lease ends in May."), .reply("The lease ends in May."), .reply("The lease ends in May.")]
+            ),
+            Case(
+                name: "a preamble gets Standard's cleanup",
+                options: deep,
+                raw: lease,
+                script: [.reply("Here is the text: The lease ends in May."), .reply("The lease ends in May."), .reply("The lease ends in May.")]
+            ),
+            Case(
+                name: "Standard's cleanup that fails Deep's check shows what was said",
                 options: deep,
                 raw: "Kofi's brother, no wait, not brother, cousin, is hosting the barbecue.",
-                script: [.reply("Here is the text: Kofi's cousin is hosting the barbecue."), .reply("Cousin is hosting the barbecue.")]
+                script: [
+                    .reply("Here is the text: Kofi's cousin is hosting the barbecue."),
+                    .reply("Cousin is hosting the barbecue."),
+                    .reply("Cousin is hosting the barbecue."),
+                ]
+            ),
+            Case(
+                name: "Standard's rewording that fails Deep's check shows what was said",
+                options: deep,
+                raw: brokenBuildSaid,
+                script: [.reply("Here is the text: I think the build on main is broken."), .reply("I believe the build is broken on main.")]
+            ),
+            Case(
+                name: "a rejected rewording in Standard's fallback keeps the resolved text",
+                options: deep,
+                raw: lease,
+                script: [.reply("The lease ends in April."), .reply("The lease ends in May."), .reply("Here is the text: The lease ends in May.")]
+            ),
+            Case(
+                name: "the fallback's rewording gets only the time left",
+                timeoutSeconds: 0.3,
+                deep: deepCleanup(),
+                options: deep,
+                raw: lease,
+                script: [.reply("The lease ends in April."), .reply("The lease ends in May."), .timeOut]
             ),
 
-            // Medium's pass first, whatever each pass does.
+            // The correcting pass first, whatever each pass does.
             Case(
-                name: "after Medium, a rejected resolution leaves the repair to Deep",
-                deep: afterMedium,
+                name: "after correcting, a rejected resolution leaves the repair to Deep",
+                deep: afterCorrecting,
                 options: deep,
                 raw: lease,
                 script: [.reply("The lease ends in June."), .reply("The lease ends in May.")]
             ),
             Case(
-                name: "after Medium, a rejected resolution and repair fall back without a third pass",
-                deep: afterMedium,
+                name: "after correcting, a rejected resolution and repair fall back without a third pass",
+                deep: afterCorrecting,
                 options: deep,
                 raw: lease,
                 script: [.reply("The lease ends in June."), .reply("The lease ends in April.")]
             ),
             Case(
-                name: "after Medium, a timed-out resolution leaves no time",
+                name: "after correcting, a timed-out resolution leaves no time",
                 timeoutSeconds: 0.3,
-                deep: deepCleanup(passes: .afterMedium),
+                deep: deepCleanup(passes: .afterCorrecting),
                 options: deep,
                 raw: lease,
                 script: [.timeOut]
             ),
             Case(
-                name: "after Medium, a timed-out repair keeps Medium's result",
+                name: "after correcting, a timed-out repair keeps the corrected text",
                 timeoutSeconds: 0.3,
-                deep: deepCleanup(passes: .afterMedium),
+                deep: deepCleanup(passes: .afterCorrecting),
                 options: deep,
                 raw: lease,
                 script: [.reply("The lease ends in May."), .timeOut]
             ),
-            Case(name: "after Medium, a cancelled resolution falls back", deep: afterMedium, options: deep, raw: lease, script: [.cancel]),
+            Case(name: "after correcting, a cancelled resolution falls back", deep: afterCorrecting, options: deep, raw: lease, script: [.cancel]),
             Case(
-                name: "after Medium, a failed repair keeps Medium's result",
-                deep: afterMedium,
+                name: "after correcting, a failed repair keeps the corrected text",
+                deep: afterCorrecting,
                 options: deep,
                 raw: lease,
                 script: [.reply("The lease ends in May."), .fail("GPU error")]
             ),
             Case(
-                name: "after Medium, without a cue a rejected repair gets Medium's cleanup",
-                deep: afterMedium,
+                name: "after correcting, without a cue a rejected repair gets Standard's cleanup",
+                deep: afterCorrecting,
                 options: deep,
                 raw: "she don't know",
                 script: [.reply("She doesn't know anything."), .reply("She doesn't know.")]
             ),
             Case(
-                name: "after Medium, then thinking",
-                deep: deepCleanup(passes: .afterMedium, thinking: true, minimumTimeoutSeconds: 8),
+                name: "after correcting, then thinking",
+                deep: deepCleanup(passes: .afterCorrecting, thinking: true, minimumTimeoutSeconds: 8),
                 options: deep,
                 raw: meeting,
                 script: [.reply(meetingResolved), .reply("<think>\nFine.\n</think>\(meetingResolved)")]
@@ -148,7 +195,7 @@ extension CleanupFixtures.Executor {
                 script: [.reply("I need to buy:\n- Milk\n- Eggs\n- Bread")]
             ),
             Case(
-                name: "lines in a one-line field get Medium's cleanup",
+                name: "lines in a one-line field get Standard's cleanup",
                 options: deep,
                 raw: "I need to buy milk, eggs and bread.",
                 script: [.reply("I need to buy:\n- Milk\n- Eggs\n- Bread"), .reply("I need to buy milk, eggs and bread.")]
@@ -168,13 +215,19 @@ extension CleanupFixtures.Executor {
                 script: [.reply("<think>ok</think>Send S1 to S2 tomorrow.")]
             ),
             Case(
-                name: "Medium's fallback sees the placeholders as words too",
+                name: "Standard's fallback sees the placeholders as words too",
                 options: CleanupOptions(level: .deep, placeholders: ["⟦S1⟧"], multiline: true),
                 raw: "send ⟦S1⟧ to john sorry jane",
-                script: [.reply("Send S1 to John and Jane."), .reply("Send S1 to Jane.")]
+                script: [.reply("Send S1 to John and Jane."), .reply("Send S1 to Jane."), .reply("Send S1 to Jane.")]
             ),
             Case(name: "Deep removes fillers first", options: deep, raw: "um the lease ends in april uh no wait may", script: [.reply("The lease ends in May.")]),
-            Case(name: "Deep without the self-correction adapter loaded", adapted: false, options: deep, raw: lease, script: [.reply("The lease ends in April."), .reply("The lease ends in May.")]),
+            Case(
+                name: "Deep without the self-correction adapter loaded",
+                adapted: false,
+                options: deep,
+                raw: lease,
+                script: [.reply("The lease ends in April."), .reply("The lease ends in May."), .reply("The lease ends in May.")]
+            ),
             Case(name: "Deep with the prompt overridden", override: override, options: deep, raw: kirk, script: [.reply(repaired)]),
             Case(name: "Sinhala skips the model at deep", options: deep, raw: "ඒකෙ තියෙන magic වැඩ um", script: []),
             Case(name: "only fillers leave Deep nothing to clean", options: deep, raw: "um uh", script: []),

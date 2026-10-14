@@ -8,18 +8,18 @@ struct SpokenNamesTests {
     private let spokenNames = SpokenNames(policy: .default)
     private static let letter = "Hi John thanks for the update I will review it tomorrow cheers Sam."
 
-    private func review(_ raw: String, _ cleaned: String, level: CleanupLevel = .medium) -> GuardVerdict {
-        outputGuard.review(raw: raw, outcome: .completed(cleaned), options: CleanupOptions(level: level))
+    private func review(_ raw: String, _ cleaned: String, pass: CleanupPass = .correcting) -> GuardVerdict {
+        outputGuard.review(raw: raw, outcome: .completed(cleaned), options: CleanupOptions(level: .standard, pass: pass))
     }
 
     private func names(in raw: String, ignoring ignored: Set<String> = []) -> [Int] {
         spokenNames.nameIndices(in: raw, words: EditDistance.words(in: EditDistance.normalize(raw)), ignoring: ignored)
     }
 
-    @Test("The sign-off's name moved into the greeting is rejected at every level", arguments: [CleanupLevel.light, .medium, .high])
-    func rejectsTheSignOffsNameInTheGreeting(level: CleanupLevel) {
+    @Test("The sign-off's name moved into the greeting is rejected in both of Standard's passes", arguments: [CleanupPass.correcting, .rewording])
+    func rejectsTheSignOffsNameInTheGreeting(pass: CleanupPass) {
         let cleaned = "Hi Sam, thanks for the update. I will review it tomorrow. Cheers."
-        #expect(review(Self.letter, cleaned, level: level) == .rejected(.movedOrDroppedName))
+        #expect(review(Self.letter, cleaned, pass: pass) == .rejected(.movedOrDroppedName))
     }
 
     @Test("Names swapped, moved or dropped are rejected", arguments: [

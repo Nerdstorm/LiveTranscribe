@@ -95,6 +95,9 @@ public struct AppSettingsStore: Sendable {
     /// equal to its current default only pins it against a later change, so it is removed. So is
     /// the speech model that 0.1.x had as its default: an install that stored it would otherwise
     /// never move to the new one. Anyone who sets it again after this keeps it.
+    ///
+    /// Cleanup had five levels before it had three: a stored Light, Medium or High becomes
+    /// Standard.
     public func migrate() {
         let applied = defaults.integer(forKey: Self.migrationsKey)
         if applied < 1 {
@@ -107,6 +110,11 @@ public struct AppSettingsStore: Sendable {
                 }
             }
         }
+        if applied < 2,
+           let stored = defaults.string(forKey: AppSettingsKey.cleanupLevel.rawValue),
+           let level = CleanupLevel(storedValue: stored), level.rawValue != stored {
+            defaults.set(level.rawValue, forKey: AppSettingsKey.cleanupLevel.rawValue)
+        }
         if applied < Self.migrationCount {
             defaults.set(Self.migrationCount, forKey: Self.migrationsKey)
         }
@@ -114,7 +122,7 @@ public struct AppSettingsStore: Sendable {
 
     /// How many of ``migrate()``'s repairs this install has had. Not a setting.
     private static let migrationsKey = "settingsMigrations"
-    private static let migrationCount = 1
+    private static let migrationCount = 2
 
     /// Reads the current settings, sanitised to runnable ranges. An unset key reads as its
     /// default.
@@ -145,7 +153,7 @@ public struct AppSettingsStore: Sendable {
             vadModel: string(.vadModel),
             cleanupEnabled: bool(.cleanupEnabled),
             cleanupAdapterEnabled: bool(.cleanupAdapterEnabled),
-            cleanupLevel: CleanupLevel(rawValue: string(.cleanupLevel)) ?? AppSettings.defaults.cleanupLevel,
+            cleanupLevel: CleanupLevel(storedValue: string(.cleanupLevel)) ?? AppSettings.defaults.cleanupLevel,
             vadSilenceMs: int(.vadSilenceMs),
             vadSpeechThreshold: double(.vadSpeechThreshold),
             vadPreRollMs: int(.vadPreRollMs),

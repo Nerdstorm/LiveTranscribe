@@ -1,8 +1,8 @@
 use crate::Adapter;
 
-/// How the Deep level asks the model to repair a dictation: in one pass or after Medium's, with
-/// which adapter, thinking or not, what it shows when its repair is turned down, and within what
-/// budget.
+/// How the Deep level asks the model to repair a dictation: in one pass or after Standard's
+/// correcting pass, with which adapter, thinking or not, what it shows when its repair is turned
+/// down, and within what budget.
 ///
 /// The shipped values were chosen by measuring each choice on the same examples (the Mac app's
 /// `Train measure`, docs/design-notes.md). Tools vary them to compare; the app uses
@@ -11,18 +11,18 @@ use crate::Adapter;
 pub struct DeepCleanup {
     pub passes: DeepPasses,
     /// The adapter on during the Deep pass: Deep's own, trained on Deep's prompts; the
-    /// self-correction adapter, trained on Medium's prompt only ([`crate::prompt::adapted`]); or
-    /// none.
+    /// self-correction adapter, trained on Standard's correcting prompt only
+    /// ([`crate::prompt::adapted`]); or none.
     pub adapter: Adapter,
     /// Qwen3 reasons in a `<think>` block before answering. The reasoning is removed before the
     /// answer is checked, and an answer whose reasoning never finished falls back.
     pub thinking: bool,
     /// Tokens the model may spend reasoning, on top of the answer's budget.
     pub thinking_tokens: usize,
-    /// When Deep's repair is turned down and Medium's pass hasn't run, whether Medium's pass runs
-    /// in the time left, so Deep shows what Medium would have. Its answer must pass Deep's check
-    /// too; one that fails it falls back with Deep's reason.
-    pub falls_back_to_medium: bool,
+    /// When Deep's repair is turned down and the correcting pass hasn't run, whether Standard's
+    /// cleanup runs in the time left, so Deep shows what Standard would have. Its answer must pass
+    /// Deep's check too; one that fails it falls back with Deep's reason.
+    pub falls_back_to_standard: bool,
     /// Deep's shortest deadline for the whole cleanup; the Advanced timeout applies when it is
     /// longer.
     pub minimum_timeout_seconds: f64,
@@ -33,19 +33,19 @@ pub struct DeepCleanup {
 pub enum DeepPasses {
     /// One Deep generation of the text.
     One,
-    /// When the text has a correction cue, Medium's pass first (the adapter, on the prompt it was
-    /// trained on) resolves what it can, then the Deep pass repairs the rest.
-    AfterMedium,
+    /// When the text has a correction cue, Standard's correcting pass first (the adapter, on the
+    /// prompt it was trained on) resolves what it can, then the Deep pass repairs the rest.
+    AfterCorrecting,
 }
 
 impl DeepPasses {
-    pub const ALL: [Self; 2] = [Self::One, Self::AfterMedium];
+    pub const ALL: [Self; 2] = [Self::One, Self::AfterCorrecting];
 
-    /// The name the Mac app gives it: `one` or `afterMedium`.
+    /// The name the Mac app gives it: `one` or `afterCorrecting`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::One => "one",
-            Self::AfterMedium => "afterMedium",
+            Self::AfterCorrecting => "afterCorrecting",
         }
     }
 }
@@ -54,13 +54,13 @@ impl DeepCleanup {
     /// What the app runs: one pass with Deep's adapter, without thinking, which was right on 108
     /// of 114 hand-written cases, against 88 with the self-correction adapter and 52 with none;
     /// with thinking and no adapter, 58, taking 20 times as long (docs/design-notes.md). A repair
-    /// `SelfRepair` turns down gets Medium's cleanup instead, if `SelfRepair` accepts that.
+    /// `SelfRepair` turns down gets Standard's cleanup instead, if `SelfRepair` accepts that.
     pub const SHIPPED: Self = Self {
         passes: DeepPasses::One,
         adapter: Adapter::Deep,
         thinking: false,
         thinking_tokens: 768,
-        falls_back_to_medium: true,
+        falls_back_to_standard: true,
         minimum_timeout_seconds: 8.0,
     };
 
@@ -92,7 +92,7 @@ mod tests {
         assert_eq!(shipped.adapter, Adapter::Deep);
         assert_eq!(shipped.passes, DeepPasses::One);
         assert!(!shipped.thinking);
-        assert!(shipped.falls_back_to_medium);
+        assert!(shipped.falls_back_to_standard);
     }
 
     #[test]
@@ -110,6 +110,6 @@ mod tests {
 
     #[test]
     fn passes_have_the_mac_apps_names() {
-        assert_eq!(DeepPasses::ALL.map(DeepPasses::as_str), ["one", "afterMedium"]);
+        assert_eq!(DeepPasses::ALL.map(DeepPasses::as_str), ["one", "afterCorrecting"]);
     }
 }

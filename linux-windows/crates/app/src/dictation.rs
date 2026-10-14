@@ -62,8 +62,8 @@ pub struct Options {
     /// Don't turn a double tap into hands-free recording
     #[arg(long)]
     no_hands_free: bool,
-    /// How much the text rules may change what was said: none, light, medium, high or deep
-    /// [default: Settings', at first medium]
+    /// How much the text rules may change what was said: none, standard or deep
+    /// [default: Settings', at first standard]
     #[arg(long, value_parser = parse_cleanup)]
     cleanup: Option<CleanupLevel>,
 }
@@ -111,7 +111,7 @@ fn parse_cleanup(name: &str) -> Result<CleanupLevel, String> {
     CleanupLevel::ALL
         .into_iter()
         .find(|level| level.as_str() == name)
-        .ok_or_else(|| "one of none, light, medium, high or deep".to_owned())
+        .ok_or_else(|| "one of none, standard or deep".to_owned())
 }
 
 pub fn run(options: &Options) -> anyhow::Result<()> {
@@ -282,7 +282,7 @@ mod tests {
             "KEY_F23",
             "--no-hands-free",
             "--cleanup",
-            "light",
+            "deep",
             "--device",
             "CPU",
             "--model",
@@ -292,7 +292,7 @@ mod tests {
         ]);
         assert_eq!(given["dictationHotkey"], "KEY_F23");
         assert_eq!(given["handsFreeEnabled"], false);
-        assert_eq!(given["cleanupLevel"], "light");
+        assert_eq!(given["cleanupLevel"], "deep");
         assert_eq!(given["sttDevice"], "CPU");
         assert_eq!(given["sttModel"], FOLDER);
         // The settings keep it by its code (Settings::changed).

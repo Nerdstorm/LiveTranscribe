@@ -76,10 +76,10 @@ mod tests {
             Value::Object(map) => map,
             _ => unreachable!(),
         };
-        service.change(&change(json!({"cleanupLevel": "high"}))).unwrap();
+        service.change(&change(json!({"cleanupLevel": "deep"}))).unwrap();
         assert!(service.change(&change(json!({"cleanupLevel": "loud"}))).is_err());
         service.change(&change(json!({"cleanupLevel": "none"}))).unwrap();
-        assert_eq!(*lock(&heard), ["high", "none"]);
+        assert_eq!(*lock(&heard), ["deep", "none"]);
         assert_eq!(service.current().0.cleanup_level.as_str(), "none");
         let _ = std::fs::remove_dir_all(folder);
     }

@@ -73,13 +73,16 @@ mod tests {
 
     use super::*;
     use crate::words::normalized_words;
-    use crate::{CleanupOptions, FallbackReason, GenerationOutcome, GuardVerdict, OutputGuard};
+    use crate::{CleanupOptions, CleanupPass, FallbackReason, GenerationOutcome, GuardVerdict, OutputGuard};
 
-    fn review(raw: &str, cleaned: &str, level: CleanupLevel) -> GuardVerdict {
+    fn review(raw: &str, cleaned: &str, pass: CleanupPass) -> GuardVerdict {
         OutputGuard::default().review(
             raw,
             &GenerationOutcome::Completed(cleaned.to_owned()),
-            &CleanupOptions::new(level),
+            &CleanupOptions {
+                pass,
+                ..CleanupOptions::new(CleanupLevel::Standard)
+            },
         )
     }
 
@@ -107,7 +110,7 @@ mod tests {
             ),
         ] {
             assert_eq!(
-                review(raw, cleaned, CleanupLevel::Medium),
+                review(raw, cleaned, CleanupPass::Correcting),
                 GuardVerdict::Rejected(FallbackReason::DroppedWords { count }),
                 "{raw}"
             );
@@ -122,7 +125,7 @@ mod tests {
             ("we never ship on a friday", "We ship on a Friday."),
         ] {
             assert_eq!(
-                review(raw, cleaned, CleanupLevel::Medium),
+                review(raw, cleaned, CleanupPass::Correcting),
                 GuardVerdict::Rejected(FallbackReason::LostNegation),
                 "{raw}"
             );
@@ -142,7 +145,7 @@ mod tests {
             ),
         ] {
             assert_eq!(
-                review(raw, cleaned, CleanupLevel::Medium),
+                review(raw, cleaned, CleanupPass::Correcting),
                 GuardVerdict::Accepted(cleaned.to_owned()),
                 "{raw}"
             );
@@ -154,18 +157,18 @@ mod tests {
         let raw = "the demo of the new release for the sales team was really very good";
         let cleaned = "The demo of the new release for the sales team was good.";
         assert_eq!(
-            review(raw, cleaned, CleanupLevel::Medium),
+            review(raw, cleaned, CleanupPass::Correcting),
             GuardVerdict::Rejected(FallbackReason::DroppedWords { count: 2 })
         );
         assert_eq!(
-            review(raw, cleaned, CleanupLevel::High),
+            review(raw, cleaned, CleanupPass::Rewording),
             GuardVerdict::Accepted(cleaned.to_owned())
         );
         assert_eq!(
             review(
                 "i do not agree with that plan",
                 "I do agree with that plan.",
-                CleanupLevel::High
+                CleanupPass::Rewording
             ),
             GuardVerdict::Rejected(FallbackReason::LostNegation)
         );
@@ -207,7 +210,7 @@ mod tests {
             ),
         ] {
             assert_eq!(
-                review(raw, cleaned, CleanupLevel::Medium),
+                review(raw, cleaned, CleanupPass::Correcting),
                 GuardVerdict::Accepted(cleaned.to_owned()),
                 "{raw}"
             );
@@ -245,7 +248,7 @@ mod tests {
             ),
         ] {
             assert_eq!(
-                review(raw, cleaned, CleanupLevel::Medium),
+                review(raw, cleaned, CleanupPass::Correcting),
                 GuardVerdict::Rejected(reason),
                 "{raw}"
             );

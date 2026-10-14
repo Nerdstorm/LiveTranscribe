@@ -553,7 +553,7 @@ struct SelfRepairTests {
         #expect(
             review("The links are ⟦A1⟧, ⟦A2⟧ and ⟦A3⟧.", "The links are:\n- ⟦A1⟧\n- ⟦A2⟧\n- ⟦A3⟧", multiline: true, placeholders: addresses)
                 == .rejected(.placeholderOnItsOwnLine),
-            "a list of placeholders alone is turned down too, and Medium's sentence shown"
+            "a list of placeholders alone is turned down too, and Standard's sentence shown"
         )
     }
 

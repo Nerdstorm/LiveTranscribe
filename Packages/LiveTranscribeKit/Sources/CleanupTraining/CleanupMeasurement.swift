@@ -93,6 +93,7 @@ public enum CleanupMeasurement {
         _ cases: [EvalCase],
         with cleaner: any Cleaner,
         level: CleanupLevel,
+        pass: CleanupPass? = nil,
         configuration: String,
         recorder: GenerationRecorder?,
         log: @escaping @Sendable (String) -> Void = { _ in }
@@ -100,7 +101,7 @@ public enum CleanupMeasurement {
         var report = MeasurementReport(level: level.rawValue, configuration: configuration)
         for (index, evalCase) in cases.enumerated() {
             let segment = Segment(id: UUID(), sessionID: UUID(), startMs: 0, endMs: 1_000, rawText: evalCase.raw)
-            let options = evalCase.options(level: level)
+            let options = evalCase.options(level: level, pass: pass)
             _ = recorder?.take()
             let cleaned = await cleaner.clean(segment, context: evalCase.context, options: options)
             report.add(evalCase, cleaned: cleaned, level: level, generations: recorder?.take() ?? [])
@@ -114,20 +115,21 @@ public enum CleanupMeasurement {
 
     /// Replays recorded model outputs, one per case, through the app's cleanup policy and output
     /// guard, as if the model had just written them: for scoring another runtime's outputs (the
-    /// Linux and Windows app's) exactly as the Mac scores its own. A second pass, as High and Deep
-    /// may make, has no recorded output and fails, so its first pass's result stands.
+    /// Linux and Windows app's) exactly as the Mac scores its own. A second pass, as Standard and
+    /// Deep may make, has no recorded output and fails, so its first pass's result stands.
     public static func replay(
         _ cases: [EvalCase],
         outputs: [String: String],
         executor: CleanupExecutor,
         level: CleanupLevel,
+        pass: CleanupPass? = nil,
         configuration: String
     ) async -> MeasurementReport {
         var report = MeasurementReport(level: level.rawValue, configuration: configuration)
         for evalCase in cases {
             guard let output = outputs[evalCase.id] else { continue }
             let segment = Segment(id: UUID(), sessionID: UUID(), startMs: 0, endMs: 1_000, rawText: evalCase.raw)
-            let options = evalCase.options(level: level)
+            let options = evalCase.options(level: level, pass: pass)
             let calls = OSAllocatedUnfairLock(initialState: 0)
             let cleaned = await executor.run(segment, context: evalCase.context, options: options) { _ in
                 let call = calls.withLock { count in
@@ -147,12 +149,16 @@ public enum CleanupMeasurement {
     /// runtimes read (see Training/README.md), naming the adapter it runs with when the model has
     /// `adapters` loaded, as ``MLXCleaner`` chooses it.
     public static func requests(
-        _ cases: [EvalCase], executor: CleanupExecutor, level: CleanupLevel, adapters: Set<CleanupRequest.Adapter>
+        _ cases: [EvalCase],
+        executor: CleanupExecutor,
+        level: CleanupLevel,
+        pass: CleanupPass? = nil,
+        adapters: Set<CleanupRequest.Adapter>
     ) async -> [RequestLine] {
         var lines: [RequestLine] = []
         for evalCase in cases {
             let segment = Segment(id: UUID(), sessionID: UUID(), startMs: 0, endMs: 1_000, rawText: evalCase.raw)
-            let options = evalCase.options(level: level)
+            let options = evalCase.options(level: level, pass: pass)
             let captured = OSAllocatedUnfairLock<CleanupRequest?>(initialState: nil)
             _ = await executor.run(segment, context: evalCase.context, options: options) { request in
                 captured.withLock { $0 = $0 ?? request }

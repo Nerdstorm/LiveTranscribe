@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use lt_shared::swift_string::{self as s, CharacterSet};
 use lt_shared::{CleanupLevel, edit_distance, placeholder_token};
 
-use crate::{CleanupOptions, PromptBuilder};
+use crate::{CleanupOptions, CleanupPass, PromptBuilder};
 
 /// Who says a message in the chat the model continues.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -53,7 +53,9 @@ impl Message {
 pub enum Adapter {
     /// The base model.
     Off,
-    /// The self-correction adapter, trained on Medium's prompt ([`adapted`]).
+    /// The self-correction adapter, trained on Standard's correcting prompt ([`adapted`]).
+    /// Standard's passes use it. Named for the Medium level it was first trained for, as are the
+    /// model's files (`adapters/medium`).
     Medium,
     /// Deep's adapter, trained on Deep's prompts.
     Deep,
@@ -162,21 +164,30 @@ pub const MAX_TOKENS_PER_INPUT_WORD: usize = 2;
 pub const MAX_TOKENS_ALLOWANCE: usize = 16;
 pub const MAX_TOKENS_PER_PLACEHOLDER: usize = 6;
 
-/// Strict correction, the Light level's prompt and every level's without the adapter: the model is
-/// told to remove nothing, so spoken self-corrections normally stay as said ("cars, sorry,
-/// buses"). Asking Qwen3-1.7B to resolve them, by instruction or by worked examples, resolved at
-/// most 1 in 7 correctly, usually kept the retracted words instead of the correction, and made it
-/// drop hedges such as "I think" elsewhere. From Medium up, the output guard still accepts a correct
-/// resolution if the model makes one.
+/// Strict correction, Standard's correcting pass without the adapter: the model is told to remove
+/// nothing, so spoken self-corrections normally stay as said ("cars, sorry, buses"). Asking
+/// Qwen3-1.7B to resolve them, by instruction or by worked examples, resolved at most 1 in 7
+/// correctly, usually kept the retracted words instead of the correction, and made it drop hedges
+/// such as "I think" elsewhere. The output guard still accepts a correct resolution if the model
+/// makes one.
 pub fn cleanup() -> PromptTemplate {
-    PromptBuilder::new(false).template(&CleanupOptions::new(CleanupLevel::Light))
+    PromptBuilder::new(false).template(&correcting_options())
 }
 
-/// Used with the bundled fine-tuned adapter, which was trained on exactly this prompt: the Medium
-/// level's. The one removal it allows is a spoken self-correction; the adapter supplies the
-/// ability the base model lacks, and the output guard checks that nothing else was removed.
+/// Used with the bundled fine-tuned adapter, which was trained on exactly this prompt: Standard's
+/// correcting pass, the Medium level's before Light, Medium and High became Standard. The one
+/// removal it allows is a spoken self-correction; the adapter supplies the ability the base model
+/// lacks, and the output guard checks that nothing else was removed.
 pub fn adapted() -> PromptTemplate {
-    PromptBuilder::new(true).template(&CleanupOptions::new(CleanupLevel::Medium))
+    PromptBuilder::new(true).template(&correcting_options())
+}
+
+/// Standard's correcting pass, with nothing else to add.
+fn correcting_options() -> CleanupOptions {
+    CleanupOptions {
+        pass: CleanupPass::Correcting,
+        ..CleanupOptions::new(CleanupLevel::Standard)
+    }
 }
 
 /// The chat template's variables for a request without thinking.

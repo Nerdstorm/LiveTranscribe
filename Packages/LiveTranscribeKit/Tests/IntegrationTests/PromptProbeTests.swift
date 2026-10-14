@@ -85,8 +85,9 @@ struct PromptProbeTests {
         return configured.isEmpty ? [AppSettings.defaults.llmModel] : configured
     }
 
-    /// The app's default level: fillers are removed before the model sees the text.
-    static let options = CleanupOptions(level: .medium)
+    /// The prompt the self-correction adapter is trained on, Standard's correcting pass: fillers
+    /// are removed before the model sees the text.
+    static let options = CleanupOptions(level: .standard, pass: .correcting)
 
     /// Text as dictation sends it, with placeholders for emoji, addresses, line breaks, list
     /// markers and snippets, which the model must copy once each, unchanged.
@@ -112,7 +113,7 @@ struct PromptProbeTests {
 
     /// Accepts any non-empty answer, so the probe sees what the model actually wrote.
     static let permissiveGuard = OutputGuard(policy: .init(
-        wordRatioBounds: Dictionary(uniqueKeysWithValues: CleanupLevel.allCases.map { ($0, 0...Double.greatestFiniteMagnitude) }),
+        wordRatioBounds: Dictionary(uniqueKeysWithValues: CleanupPass.allCases.map { ($0, 0...Double.greatestFiniteMagnitude) }),
         minSimilarity: 0,
         preambles: [],
         correctionCues: [],
@@ -150,7 +151,7 @@ struct PromptProbeTests {
         var damaged = 0
         for raw in Self.placeholderCases {
             let tokens = raw.matches(of: /⟦S[0-9]+⟧/).map { String($0.output) }
-            let options = CleanupOptions(level: .medium, placeholders: tokens)
+            let options = CleanupOptions(level: .standard, pass: .correcting, placeholders: tokens)
             let segment = Segment(id: UUID(), sessionID: UUID(), startMs: 0, endMs: 1_000, rawText: raw)
             let cleaned = await cleaner.clean(segment, context: [], options: options)
             let verdict = productionGuard.review(raw: raw, outcome: .completed(cleaned.cleanedText), options: options)
@@ -182,7 +183,7 @@ struct PromptProbeTests {
                     raw = raw.replacingOccurrences(of: String(match.output.0), with: token)
                     tokens.append(token)
                 }
-                let options = CleanupOptions(level: .medium, placeholders: tokens)
+                let options = CleanupOptions(level: .standard, pass: .correcting, placeholders: tokens)
                 let segment = Segment(id: UUID(), sessionID: UUID(), startMs: 0, endMs: 1_000, rawText: raw)
                 let cleaned = await cleaner.clean(segment, context: [], options: options).cleanedText
                 let intact = tokens.filter { cleaned.components(separatedBy: $0).count == 2 }
@@ -213,7 +214,7 @@ struct PromptProbeTests {
         for raw in Self.emojiCases {
             let emoji = raw.split(separator: " ").map(String.init).filter { $0.unicodeScalars.contains { $0.properties.isEmojiPresentation || $0.value > 0x2000 && $0.properties.isEmoji } }
             let segment = Segment(id: UUID(), sessionID: UUID(), startMs: 0, endMs: 1_000, rawText: raw)
-            let cleaned = await cleaner.clean(segment, context: [], options: CleanupOptions(level: .medium)).cleanedText
+            let cleaned = await cleaner.clean(segment, context: [], options: Self.options).cleanedText
             let intact = emoji.map { $0.trimmingCharacters(in: .punctuationCharacters) }.filter { cleaned.components(separatedBy: $0).count == 2 }
             let punctuated = intact.filter { Self.punctuation(around: $0, in: cleaned) != Self.punctuation(around: $0, in: raw) }
             kept += intact.count
@@ -224,7 +225,7 @@ struct PromptProbeTests {
         print("EMOJI SUMMARY kept \(kept)/\(total), punctuated \(repunctuated)")
     }
 
-    /// Texts that invite High to reword: grammar slips, wordy phrasing, idioms and names.
+    /// Texts that invite Standard to reword: grammar slips, wordy phrasing, idioms and names.
     static let rewordingCases = [
         "me and him went to the store yesterday to get some milk",
         "there is lots of reasons why we should of left earlier",
@@ -248,24 +249,24 @@ struct PromptProbeTests {
         "please make sure that you remember to bring your laptop to the workshop",
     ]
 
-    /// What the content and name checks turn away at High, the level that rewords. Cleans every
-    /// cleanup example in `Training/` and ``rewordingCases`` at High with nothing rejected (texts
+    /// What the content and name checks turn away at Standard, the level that rewords. Cleans every
+    /// cleanup example in `Training/` and ``rewordingCases`` at Standard with nothing rejected (texts
     /// without a correction cue, so each is one pass), then reviews each answer with the
     /// production guard and with the guard as it was before those checks. Prints the answers
     /// only the production guard rejects, to judge whether each one lost meaning.
     @Test(.timeLimit(.minutes(60)))
-    func compareContentChecksAtHigh() async throws {
+    func compareContentChecksAtStandard() async throws {
         let cleaner = try await Self.loadCleaner(template: nil, outputGuard: Self.permissiveGuard)
         let productionGuard = OutputGuard()
         var before = OutputGuard.Policy.default
         before.maxDroppedContent = .max
         before.requiresNamesInPlace = false
         let previousGuard = OutputGuard(policy: before)
-        let options = CleanupOptions(level: .high)
+        let options = CleanupOptions(level: .standard)
 
         var rejectedOnlyNow = 0, rejectedOnlyBefore = 0, rejectedByBoth = 0, total = 0
         for text in try Self.trainingCleanupTexts() + Self.rewordingCases.map({ (context: [String](), raw: $0) }) {
-            let input = CleanupExecutor.deterministicCleanup(of: text.raw, level: .high)
+            let input = CleanupExecutor.deterministicCleanup(of: text.raw, level: .standard)
             guard productionGuard.correctionCueCount(in: input) == 0 else { continue }
             let segment = Segment(id: UUID(), sessionID: UUID(), startMs: 0, endMs: 1_000, rawText: text.raw)
             let answer = await cleaner.clean(segment, context: text.context, options: options).cleanedText

@@ -1,4 +1,4 @@
-//! guard.jsonl: the output guard's verdict at every level, in a field that takes one line, and
+//! guard.jsonl: the output guard's verdict in every pass, in a field that takes one line, and
 //! Deep's in one that takes several too, with the parts it judges by, Deep's repair included, on
 //! each raw text and what the model made of it.
 
@@ -10,7 +10,7 @@ use lt_shared::swift_string::{self as s, CharacterSet};
 use lt_shared::{CleanupLevel, edit_distance};
 use serde::Deserialize;
 
-use super::{Exact, assert_no_differences, exact, level, number, read_lines};
+use super::{Exact, assert_no_differences, exact, number, pass, read_lines};
 use crate::content_words::ContentWords;
 use crate::dropped_words::DroppedWords;
 use crate::output_guard::keeps_placeholders;
@@ -19,19 +19,18 @@ use crate::spoken_names::SpokenNames;
 use crate::word_alignment::WordAlignment;
 use crate::word_fragments::WordFragments;
 use crate::words::{WordSet, normalized_words};
-use crate::{CleanupOptions, FallbackReason, GenerationOutcome, GuardPolicy, GuardVerdict, OutputGuard};
+use crate::{CleanupOptions, CleanupPass, FallbackReason, GenerationOutcome, GuardPolicy, GuardVerdict, OutputGuard};
 use repair::{RepairJson, repair_differences};
 
 /// Every fallback reason the guard gives, as the fixtures name them; the guard's cases must cover
 /// them all. (Unfinished thinking is the executor's, and its fixture covers it.)
-const REASONS: [&str; 19] = [
+const REASONS: [&str; 18] = [
     "emptyOutput",
     "thinkingLeaked",
     "preamble",
     "wordRatio",
     "lowSimilarity",
     "invalidSelfCorrection",
-    "selfCorrectionNotAllowed",
     "placeholderChanged",
     "droppedWords",
     "lostNegation",
@@ -118,7 +117,7 @@ impl PolicyJson {
         if let Some(table) = &self.word_ratio_bounds {
             policy.word_ratio_bounds = table
                 .iter()
-                .map(|(name, [lower, upper])| (level(name), number(lower)..=number(upper)))
+                .map(|(name, [lower, upper])| (pass(name), number(lower)..=number(upper)))
                 .collect();
         }
         let replace = |target: &mut Vec<String>, value: &Option<Vec<String>>| {
@@ -212,7 +211,6 @@ fn judged(verdict: &GuardVerdict) -> Judged {
         FallbackReason::WordRatio(ratio) => ("wordRatio", None, None, Some(Exact(*ratio))),
         FallbackReason::LowSimilarity(similarity) => ("lowSimilarity", None, None, Some(Exact(*similarity))),
         FallbackReason::InvalidSelfCorrection => ("invalidSelfCorrection", None, None, None),
-        FallbackReason::SelfCorrectionNotAllowed => ("selfCorrectionNotAllowed", None, None, None),
         FallbackReason::PlaceholderChanged => ("placeholderChanged", None, None, None),
         FallbackReason::DroppedWords { count } => ("droppedWords", None, Some(*count), None),
         FallbackReason::LostNegation => ("lostNegation", None, None, None),
@@ -409,12 +407,17 @@ fn the_guard_verdicts_match_the_mac_apps() {
             line.placeholders,
             line.policy
         );
-        for level in CleanupLevel::ALL {
+        for pass in CleanupPass::ALL {
             let one_line = line
                 .verdicts
-                .get(level.as_str())
-                .unwrap_or_else(|| panic!("{case}: no verdict at {level:?}"));
-            let multiline = if level.repairs_across_sentences() {
+                .get(pass.as_str())
+                .unwrap_or_else(|| panic!("{case}: no verdict in {pass:?}"));
+            let level = if pass == CleanupPass::Repairing {
+                CleanupLevel::Deep
+            } else {
+                CleanupLevel::Standard
+            };
+            let multiline = if pass == CleanupPass::Repairing {
                 &line.deep_multiline
             } else {
                 one_line
@@ -426,6 +429,7 @@ fn the_guard_verdicts_match_the_mac_apps() {
                 }
                 let options = CleanupOptions {
                     level,
+                    pass,
                     vocabulary: Vec::new(),
                     placeholders: line.placeholders.clone(),
                     multiline: in_multiline_field,
@@ -434,7 +438,7 @@ fn the_guard_verdicts_match_the_mac_apps() {
                 let actual = judged(&output_guard.review(&line.raw, &outcome, &options));
                 if actual != expected {
                     differences.push(format!(
-                        "{case}\n  at {level:?} (multiline: {in_multiline_field}), Mac app: {expected:?}\n  this port: {actual:?}"
+                        "{case}\n  in {pass:?} (multiline: {in_multiline_field}), Mac app: {expected:?}\n  this port: {actual:?}"
                     ));
                 }
             }

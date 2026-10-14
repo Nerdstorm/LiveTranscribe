@@ -6,7 +6,7 @@ extension SelfRepair {
     ///
     /// A correction replaces the words it corrects with its phrase, and the cue goes. Deep reads
     /// two kinds:
-    /// - Medium's: up to ``OutputGuard/Policy/maxRetractedWords`` words just before a run of cues,
+    /// - Standard's: up to ``OutputGuard/Policy/maxRetractedWords`` words just before a run of cues,
     ///   taken out with the cues ("we need three, sorry, four"), in the cue's sentence; or at the
     ///   end of the one before, when the cues open the next: one phrase that doesn't start it ("I
     ///   left my charger in the garage. Actually, the lobby."), or more after a "scratch that"
@@ -36,12 +36,12 @@ extension SelfRepair {
     /// that word too ("The billing service goes live. Sorry, I mean the login service." → "The
     /// login service goes live."). Nor does a fact or a name leave the one of its sort just before
     /// the words it corrects ("three servers, sorry, four" corrects "three", never only "servers").
-    /// Medium's take back no more than the corrected words said again ("the physio team, sorry,
+    /// Standard's take back no more than the corrected words said again ("the physio team, sorry,
     /// not physio, nursing" is never "the nursing"), and no less than a sentence that a phrase
     /// opening the way it did starts again ("Ship it to Prague, scratch that, hold it until
     /// September" is never "Ship it to hold it until September").
     enum Corrections {
-        /// Medium's corrections in the words said, by said index.
+        /// Standard's corrections in the words said, by said index.
         struct Spans {
             /// For each start, the ends of the corrected words and cues that may be taken out from
             /// there.
@@ -57,7 +57,7 @@ extension SelfRepair {
             var keys: [Int] = []
         }
 
-        /// Medium's corrections in `words`.
+        /// Standard's corrections in `words`.
         static func spans(in words: [SaidWord], repair: SelfRepair, placeholders: Set<String>) -> Spans {
             var spans = Spans()
             // Every word each phrase may correct, by where it starts. Which of them a repair took
@@ -210,7 +210,7 @@ extension SelfRepair {
                             for start in sentenceStart..<cueStart {
                                 for count in 1...min(repair.retractionLimit, cueStart - start) {
                                     let corrected = start..<(start + count)
-                                    // Within a sentence, a phrase that stays where it is was Medium's.
+                                    // Within a sentence, a phrase that stays where it is was Standard's.
                                     guard crosses || corrected.upperBound < cueStart,
                                           !words[corrected].contains(where: { $0.opensPhrase > 0 }),
                                           restated.map({ repair.restates(words[$0], words[corrected]) }) ?? true,
@@ -496,7 +496,7 @@ extension SelfRepair {
         Set(corrected.filter { carriesMeaning($0) && !Self.isSaid($0, in: phrase) }.map(\.word))
     }
 
-    /// Of the words a phrase of Medium's corrections may correct (`corrected`, all of them, since
+    /// Of the words a phrase of Standard's corrections may correct (`corrected`, all of them, since
     /// which a repair took back isn't known), the ones the key word `key` words into the phrase
     /// stands in for, which no repair may write again: the one where the phrase puts it, found by a
     /// word the phrase says again after it ("blue" in "the blue room, sorry, the green room") or

@@ -99,7 +99,7 @@ These are cases from the set Deep is tested on
 [Training](Packages/LiveTranscribeKit/Training/README.md)), which it is never trained on; the left
 column is the text as the speech model writes it, and the right column is Deep's own answer,
 unedited. Deep got 216 of the 229 cases in
-that set right, about 0.36 s at p50 on an M4 Pro. At Medium, the default, a list you announce
+that set right, about 0.36 s at p50 on an M4 Pro. At Standard, the default, a list you announce
 ("first… second…", "number one… two…", "bullet point…") and a letter's greeting and sign-off are
 laid out by rules alone.
 
@@ -118,17 +118,17 @@ on a Mac.
 
 ## Features
 
-- **Say it naturally, get what you meant.** At the default **Medium** level, fillers disappear,
-  spoken self-corrections are resolved, spoken lists and letters are laid out and numbers are
-  written in digits ("twenty one chairs" → "21 chairs"); say emoji, punctuation and line breaks at
-  any level. Every edit is checked against what you said, and on
-  the Mac ⌃⌥Z puts your own words back.
+- **Say it naturally, get what you meant.** At the default **Standard** level, fillers disappear,
+  spoken self-corrections are resolved, spoken lists and letters are laid out, numbers are written
+  in digits ("twenty one chairs" → "21 chairs"), and it rewords lightly for grammar and clarity;
+  say emoji, punctuation and line breaks at any level. Every edit is checked against what you
+  said, and on the Mac ⌃⌥Z puts your own words back.
 - **Dictate from any app.** Hold the key, or double-tap it for hands-free. A small circle by the
   mouse pointer shows what is happening, and Esc cancels. On the Mac the key is **fn (🌐)** or a
   shortcut of your own; on Linux and Windows, **Right Ctrl** or one other key.
-- **Choose how much it edits.** **None**, **Light**, **Medium**, **High**, or **Deep**, which
-  also follows a correction back into an earlier sentence ("…is tomorrow. No, sorry, the after
-  tomorrow." → "…is the day after tomorrow."), fixes grammar and lays out emails and lists.
+- **Choose how much it edits.** **None**, **Standard** or **Deep**, which also follows a
+  correction back into an earlier sentence ("…is tomorrow. No, sorry, the after tomorrow." → "…is
+  the day after tomorrow."), fixes grammar and lays out emails and lists.
 - **Make it yours (Mac).** Snippets insert saved text when you say their phrase, and vocabulary
   spells your names and jargon your way.
 - **Dependable, app after app.** On the Mac, text goes in through Accessibility and is read
@@ -171,7 +171,7 @@ Models tab in Settings offers others.
 | Guide | What's in it |
 |---|---|
 | [Using Live Transcribe](docs/using.md) | Installing, first start, dictating and every Settings tab, on the Mac, Linux and Windows, plus the Mac's Dictation History and live transcript |
-| [Cleanup and spoken commands](docs/cleanup.md) | The five cleanup levels, what OutputGuard and Deep's check reject, and the phrases that become emoji, punctuation, line breaks and addresses |
+| [Cleanup and spoken commands](docs/cleanup.md) | The three cleanup levels, what OutputGuard and Deep's check reject, and the phrases that become emoji, punctuation, line breaks and addresses |
 | [Snippets, vocabulary and apps](docs/snippets-vocabulary-apps.md) | Saved text, your names and jargon, and how each app gets its text and line breaks |
 | [Privacy](docs/privacy.md) | What is kept where, what goes over the network, and how to remove it all |
 | [Known limitations](docs/limitations.md) | What doesn't work well yet, and what isn't built |
@@ -284,7 +284,7 @@ is built this way: [Design notes](docs/design-notes.md).
 
 The app downloads its models. They are not part of this repository and not covered by its
 licence. The cleanup adapters, two 10 MB LoRA adapters for Qwen3-1.7B (one that resolves
-self-corrections at Medium and High, and Deep's), are part of this repository.
+self-corrections at Standard, and Deep's), are part of this repository.
 
 | Role | Model used | Original model | Licence |
 |---|---|---|---|

@@ -198,14 +198,14 @@ extension CleanupFixtures.Guard {
 
     // MARK: - Word-count ratios
 
-    /// The levels' bounds, and a policy's own, just inside and just outside, with the similarity
+    /// The passes' bounds, and a policy's own, just inside and just outside, with the similarity
     /// check off; and ratios whose two decimals are a tie, which both apps must round alike.
     private static var ratioCases: [Case] {
         let similarityOff = Policy(minSimilarity: 0)
-        let narrowLight = Policy(wordRatioBounds: [.light: 0.9...1.1], minSimilarity: 0)
+        let narrowCorrecting = Policy(wordRatioBounds: [.correcting: 0.9...1.1], minSimilarity: 0)
         let emptyTable = Policy(wordRatioBounds: [:], minSimilarity: 0)
         return [39, 40, 49, 50, 79, 80, 120, 121, 130, 131].map { completed(words(100), words($0), policy: similarityOff) }
-            + [85, 89, 90, 110, 111].map { completed(words(100), words($0), policy: narrowLight) }
+            + [85, 89, 90, 110, 111].map { completed(words(100), words($0), policy: narrowCorrecting) }
             + [45, 125].map { completed(words(100), words($0), policy: emptyTable) }
             + [
                 completed(words(8), words(1)),
@@ -407,7 +407,7 @@ extension CleanupFixtures.Guard {
             completed("we need milk eggs and bread", "We need bread.", policy: Policy(maxDroppedRun: 5, maxDroppedContent: 1)),
             completed("the cat sat", "A dog stood.", policy: Policy(minSimilarity: 0)),
             completed("the cat sat", "The cat sat.", policy: Policy(minSimilarity: 1.5)),
-            completed("we need a new plan", "We need a plan.", policy: Policy(wordRatioBounds: [CleanupLevel.none: 1...1, .light: 1...1, .medium: 1...1, .high: 1...1])),
+            completed("we need a new plan", "We need a plan.", policy: Policy(wordRatioBounds: [CleanupPass.correcting: 1...1, .rewording: 1...1, .repairing: 1...1])),
             completed("we need a new plan", "We need a plan.", policy: Policy(functionWords: ["NEW", "  a  "])),
             completed("the plan is new", "The plan.", policy: Policy(fillers: ["Is", "new"])),
             completed("cars sorry buses", "Buses.", policy: Policy(fillers: ["sorry"])),

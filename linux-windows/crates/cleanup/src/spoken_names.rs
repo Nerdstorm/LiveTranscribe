@@ -118,15 +118,18 @@ mod tests {
 
     use super::*;
     use crate::words::normalized_words;
-    use crate::{CleanupOptions, FallbackReason, GenerationOutcome, GuardVerdict, OutputGuard};
+    use crate::{CleanupOptions, CleanupPass, FallbackReason, GenerationOutcome, GuardVerdict, OutputGuard};
 
     const LETTER: &str = "Hi John thanks for the update I will review it tomorrow cheers Sam.";
 
-    fn review(raw: &str, cleaned: &str, level: CleanupLevel) -> GuardVerdict {
+    fn review(raw: &str, cleaned: &str, pass: CleanupPass) -> GuardVerdict {
         OutputGuard::default().review(
             raw,
             &GenerationOutcome::Completed(cleaned.to_owned()),
-            &CleanupOptions::new(level),
+            &CleanupOptions {
+                pass,
+                ..CleanupOptions::new(CleanupLevel::Standard)
+            },
         )
     }
 
@@ -137,10 +140,10 @@ mod tests {
     const MOVED: GuardVerdict = GuardVerdict::Rejected(FallbackReason::MovedOrDroppedName);
 
     #[test]
-    fn the_sign_offs_name_moved_into_the_greeting_is_rejected_at_every_level() {
+    fn the_sign_offs_name_moved_into_the_greeting_is_rejected_in_both_of_standards_passes() {
         let cleaned = "Hi Sam, thanks for the update. I will review it tomorrow. Cheers.";
-        for level in [CleanupLevel::Light, CleanupLevel::Medium, CleanupLevel::High] {
-            assert_eq!(review(LETTER, cleaned, level), MOVED, "{level:?}");
+        for pass in [CleanupPass::Correcting, CleanupPass::Rewording] {
+            assert_eq!(review(LETTER, cleaned, pass), MOVED, "{pass:?}");
         }
     }
 
@@ -161,7 +164,7 @@ mod tests {
             ),
             ("Tell Yasmin, or rather, Victor.", "Tell Victor, or rather."),
         ] {
-            assert_eq!(review(raw, cleaned, CleanupLevel::Medium), MOVED, "{cleaned}");
+            assert_eq!(review(raw, cleaned, CleanupPass::Correcting), MOVED, "{cleaned}");
         }
     }
 
@@ -177,7 +180,7 @@ mod tests {
             ("Hi John John thanks for coming", "Hi John, thanks for coming."),
         ] {
             assert_eq!(
-                review(raw, cleaned, CleanupLevel::Medium),
+                review(raw, cleaned, CleanupPass::Correcting),
                 GuardVerdict::Accepted(cleaned.to_owned()),
                 "{raw}"
             );

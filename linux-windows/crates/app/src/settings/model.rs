@@ -44,7 +44,7 @@ pub struct Settings {
     pub stt_device: String,
     /// Cleanup's language model cleans the text at the levels that use it (the Mac's "Clean up
     /// transcripts with the LLM"). Off, each level applies only its rules that need no model:
-    /// fillers removed and lists and letters laid out from Medium up.
+    /// fillers removed and lists and letters laid out at Standard and Deep.
     pub cleanup_enabled: bool,
     /// How long one cleanup may take before the text goes in without it; Deep takes at least 8 s.
     pub cleanup_timeout_seconds: f64,
@@ -60,7 +60,7 @@ impl Default for Settings {
             dictation_enabled: true,
             dictation_hotkey: "KEY_RIGHTCTRL".to_owned(),
             hands_free_enabled: true,
-            cleanup_level: CleanupLevel::Medium,
+            cleanup_level: CleanupLevel::Standard,
             input_device_id: None,
             hotkey_tap_max_ms: 300,
             hotkey_double_tap_window_ms: 300,
@@ -223,7 +223,9 @@ fn canonical_language(text: &str) -> Result<String, String> {
     ))
 }
 
-/// A cleanup level as its name: `none`, `light`, `medium`, `high` or `deep`.
+/// A cleanup level as its name: `none`, `standard` or `deep`. The earlier levels' names, `light`,
+/// `medium` and `high`, read as `standard`, and the next save writes that, as the Mac app's
+/// settings move them to Standard.
 mod cleanup_level {
     use lt_shared::CleanupLevel;
     use serde::{Deserialize, Deserializer, Serializer};
@@ -234,10 +236,8 @@ mod cleanup_level {
 
     pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<CleanupLevel, D::Error> {
         let name = String::deserialize(deserializer)?;
-        CleanupLevel::ALL
-            .into_iter()
-            .find(|level| level.as_str() == name)
-            .ok_or_else(|| serde::de::Error::custom(format!("{name} isn't one of none, light, medium, high or deep")))
+        CleanupLevel::from_stored(&name)
+            .ok_or_else(|| serde::de::Error::custom(format!("{name} isn't one of none, standard or deep")))
     }
 }
 
@@ -267,7 +267,7 @@ mod tests {
                 "dictationEnabled": true,
                 "dictationHotkey": "KEY_RIGHTCTRL",
                 "handsFreeEnabled": true,
-                "cleanupLevel": "medium",
+                "cleanupLevel": "standard",
                 "inputDeviceId": null,
                 "hotkeyTapMaxMs": 300,
                 "hotkeyDoubleTapWindowMs": 300,
@@ -309,8 +309,8 @@ mod tests {
 
     #[test]
     fn a_missing_setting_is_its_default() {
-        let (settings, problems) = Settings::read(r#"{"cleanupLevel": "high"}"#).unwrap();
-        assert_eq!(settings.cleanup_level, CleanupLevel::High);
+        let (settings, problems) = Settings::read(r#"{"cleanupLevel": "deep"}"#).unwrap();
+        assert_eq!(settings.cleanup_level, CleanupLevel::Deep);
         assert_eq!(settings.dictation_hotkey, "KEY_RIGHTCTRL");
         assert!(problems.is_empty());
     }
@@ -323,7 +323,7 @@ mod tests {
         )
         .unwrap();
         assert!(!settings.hands_free_enabled);
-        assert_eq!(settings.cleanup_level, CleanupLevel::Medium);
+        assert_eq!(settings.cleanup_level, CleanupLevel::Standard);
         assert_eq!(settings.dictation_hotkey, "KEY_RIGHTCTRL");
         assert_eq!(settings.stt_device, "auto");
         assert_eq!(settings.hotkey_tap_max_ms, 300);
@@ -334,11 +334,30 @@ mod tests {
 
     #[test]
     fn keys_from_a_later_version_are_kept() {
-        let (settings, _) = Settings::read(r#"{"historyEnabled": false, "cleanupLevel": "light"}"#).unwrap();
+        let (settings, _) = Settings::read(r#"{"historyEnabled": false, "cleanupLevel": "none"}"#).unwrap();
         assert_eq!(settings.unknown.get("historyEnabled"), Some(&json!(false)));
         let written = serde_json::to_value(&settings).unwrap();
         assert_eq!(written["historyEnabled"], json!(false));
-        assert_eq!(written["cleanupLevel"], json!("light"));
+        assert_eq!(written["cleanupLevel"], json!("none"));
+    }
+
+    /// Light, Medium and High became Standard.
+    #[test]
+    fn the_earlier_levels_read_as_standard_and_are_written_so() {
+        for name in ["light", "medium", "high"] {
+            let (settings, problems) = Settings::read(&json!({"cleanupLevel": name}).to_string()).unwrap();
+            assert_eq!(settings.cleanup_level, CleanupLevel::Standard, "{name}");
+            assert!(problems.is_empty(), "{problems:?}");
+            assert_eq!(
+                serde_json::to_value(&settings).unwrap()["cleanupLevel"],
+                json!("standard")
+            );
+        }
+        let (_, problems) = Settings::read(r#"{"cleanupLevel": "Medium"}"#).unwrap();
+        assert!(
+            problems[0].contains("Medium isn't one of none, standard or deep"),
+            "{problems:?}"
+        );
     }
 
     #[test]

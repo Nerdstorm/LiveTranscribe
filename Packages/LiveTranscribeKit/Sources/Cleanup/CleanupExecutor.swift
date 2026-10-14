@@ -8,21 +8,21 @@ import Styles
 /// Model-agnostic: the generation itself is passed in, so the policy (levels, timeout,
 /// cancellation, fallback) is unit-testable without loading a model.
 ///
-/// The text the model sees is the raw transcript with fillers removed from Medium up. When
-/// the guard rejects the output, that text is the result: fillers stay removed, so a fallback
-/// differs from a success only in what the model would have corrected.
+/// The text the model sees is the raw transcript with fillers removed. When the guard rejects
+/// the output, that text is the result: fillers stay removed, so a fallback differs from a
+/// success only in what the model would have corrected.
 ///
-/// High runs in two passes when the text has a correction cue ("sorry", "no", "I mean"): the
-/// Medium prompt resolves the self-correction, as the adapter was trained to, then the High
-/// prompt rewords the result. Both share the one deadline. If the rewording is rejected or there
-/// is no time left for it, the resolved text is used; that is a success at Medium's standard,
-/// not a fallback.
+/// Standard asks once, with its rewording pass, or twice when the text has a correction cue
+/// ("sorry", "no", "I mean"): the correcting pass resolves the self-correction, as the adapter
+/// was trained to, then the rewording pass rewords the result (``CleanupPass``). Both share the
+/// one deadline. If the rewording is rejected or there is no time left for it, the resolved text
+/// is used; that is a success, not a fallback.
 ///
 /// Deep runs as ``DeepCleanup`` says: its own prompt, with or without the adapter, thinking or
-/// not, after Medium's pass or on its own, under a longer deadline. When its repair is turned
-/// down, Medium's result is used, from the pass before it or one run in the time left: a success
-/// at Medium's standard, not a fallback. A result from the pass run in the time left must pass
-/// Deep's check as well.
+/// not, after the correcting pass or on its own, under a longer deadline. When its repair is
+/// turned down, the correcting pass's result is used if it ran first; otherwise Standard's
+/// cleanup runs in the time left, and its result is used if it passes Deep's check as well.
+/// Either is a success, not a fallback.
 public struct CleanupExecutor: Sendable {
     public let contextLimit: Int
     public let timeoutSeconds: Double
@@ -65,14 +65,9 @@ public struct CleanupExecutor: Sendable {
             return CleanedSegment(segment: segment, cleanedText: input, fellBack: false, fallbackReason: nil, latencyMs: 0)
         }
 
-        let verdict: GuardVerdict
-        if options.level.repairsAcrossSentences {
-            verdict = await repairing(input, context: context, options: options, started: started, generate: generate)
-        } else if options.level.allowsRewording, outputGuard.correctionCueCount(in: input) > 0 {
-            verdict = await resolvingThenRewording(input, context: context, options: options, started: started, generate: generate)
-        } else {
-            verdict = await pass(input, context: context, options: options, seconds: timeoutSeconds, generate: generate)
-        }
+        let verdict = options.level.repairsAcrossSentences
+            ? await repairing(input, context: context, options: options, started: started, generate: generate)
+            : await standard(input, context: context, options: options, seconds: timeoutSeconds, generate: generate)
 
         let latencyMs = started.duration(to: .now).wholeMilliseconds
         switch verdict {
@@ -84,7 +79,7 @@ public struct CleanupExecutor: Sendable {
         }
     }
 
-    /// What `level` does without the model: fillers removed from Medium up, otherwise the
+    /// What `level` does without the model: fillers removed at Standard and Deep, otherwise the
     /// text unchanged. It is what the model is given, what a fallback returns, and what
     /// dictation inserts when the cleanup model is turned off, so all three agree.
     public static func deterministicCleanup(of text: String, level: CleanupLevel) -> String {
@@ -93,12 +88,12 @@ public struct CleanupExecutor: Sendable {
 
     // MARK: - Private
 
-    /// Deep: its own pass, under Deep's deadline. With ``DeepCleanup/Passes/afterMedium`` and a
-    /// correction cue in the text, Medium's pass resolves what it can first; if Deep's pass is then
-    /// rejected or out of time, Medium's result is kept, a success at Medium's standard. Otherwise,
-    /// when Deep's answer is turned down, Medium's pass runs in the time left
-    /// (``DeepCleanup/fallsBackToMedium``), and its answer is shown only if Deep's check accepts it
-    /// too: Medium's guard lets through some meaning changes that Deep's turns down, such as a
+    /// Deep: its own pass, under Deep's deadline. With ``DeepCleanup/Passes/afterCorrecting`` and
+    /// a correction cue in the text, Standard's correcting pass resolves what it can first; if
+    /// Deep's pass is then rejected or out of time, that result is kept. Otherwise, when Deep's
+    /// answer is turned down, Standard's cleanup runs in the time left
+    /// (``DeepCleanup/fallsBackToStandard``), and its answer is shown only if Deep's check accepts
+    /// it too: Standard's guard lets through some meaning changes that Deep's turns down, such as a
     /// correction that takes back more than it corrects. Otherwise Deep's reason is reported and
     /// what was said is shown.
     private func repairing(
@@ -111,11 +106,14 @@ public struct CleanupExecutor: Sendable {
         let seconds = deep.deadline(given: timeoutSeconds)
         var text = input
         var resolved: GuardVerdict?
-        var resolving = options
-        resolving.level = .medium
-        let resolvesFirst = deep.passes == .afterMedium && outputGuard.correctionCueCount(in: input) > 0
+        var standard = options
+        standard.level = .standard
+        standard.pass = .rewording
+        var correcting = standard
+        correcting.pass = .correcting
+        let resolvesFirst = deep.passes == .afterCorrecting && outputGuard.correctionCueCount(in: input) > 0
         if resolvesFirst {
-            let first = await pass(input, context: context, options: resolving, seconds: seconds, generate: generate)
+            let first = await pass(input, context: context, options: correcting, seconds: seconds, generate: generate)
             if case .accepted(let resolvedText) = first {
                 text = resolvedText
                 resolved = first
@@ -128,39 +126,44 @@ public struct CleanupExecutor: Sendable {
         let repaired = await pass(text, context: context, options: options, seconds: remaining, generate: generate)
         guard case .rejected(let reason) = repaired else { return repaired }
         if let resolved {
-            Log.cleanup.notice("Deep repair rejected, keeping Medium's result: \(reason.description, privacy: .public)")
+            Log.cleanup.notice("Deep repair rejected, keeping the corrected text: \(reason.description, privacy: .public)")
             return resolved
         }
-        guard deep.fallsBackToMedium, !resolvesFirst, reason.rejectsAnAnswer else { return repaired }
+        guard deep.fallsBackToStandard, !resolvesFirst, reason.rejectsAnAnswer else { return repaired }
         let left = seconds - Double(started.duration(to: .now).wholeMilliseconds) / 1_000
         guard left > 0, !Task.isCancelled else { return repaired }
-        let fallback = await pass(input, context: context, options: resolving, seconds: left, generate: generate)
+        let fallback = await self.standard(input, context: context, options: standard, seconds: left, generate: generate)
         guard case .accepted(let answer) = fallback else { return repaired }
         if case .rejected(let check) = outputGuard.review(raw: input, outcome: .completed(answer), options: options) {
             Log.cleanup.notice(
-                "Deep repair rejected (\(reason.description, privacy: .public)), and Medium's cleanup fails Deep's check: \(check.description, privacy: .public)"
+                "Deep repair rejected (\(reason.description, privacy: .public)), and Standard's cleanup fails Deep's check: \(check.description, privacy: .public)"
             )
             return repaired
         }
-        Log.cleanup.notice("Deep repair rejected, showing Medium's cleanup: \(reason.description, privacy: .public)")
+        Log.cleanup.notice("Deep repair rejected, showing Standard's cleanup: \(reason.description, privacy: .public)")
         return fallback
     }
 
-    /// High with a self-correction: Medium resolves it, then High rewords what is left in the
-    /// time remaining. A rejected rewording keeps the resolved text.
-    private func resolvingThenRewording(
+    /// Standard, within `seconds`: one rewording pass, or, with a correction cue in the text, the
+    /// correcting pass resolves it, then the rewording pass rewords what is left in the time
+    /// remaining. A rejected rewording keeps the resolved text.
+    private func standard(
         _ input: String,
         context: [String],
         options: CleanupOptions,
-        started: ContinuousClock.Instant,
+        seconds: Double,
         generate: @escaping @Sendable (CleanupRequest) async throws -> String
     ) async -> GuardVerdict {
-        var resolving = options
-        resolving.level = .medium
-        let first = await pass(input, context: context, options: resolving, seconds: timeoutSeconds, generate: generate)
+        guard options.pass == .rewording, outputGuard.correctionCueCount(in: input) > 0 else {
+            return await pass(input, context: context, options: options, seconds: seconds, generate: generate)
+        }
+        let started = ContinuousClock.now
+        var correcting = options
+        correcting.pass = .correcting
+        let first = await pass(input, context: context, options: correcting, seconds: seconds, generate: generate)
         guard case .accepted(let resolved) = first else { return first }
 
-        let remaining = timeoutSeconds - Double(started.duration(to: .now).wholeMilliseconds) / 1_000
+        let remaining = seconds - Double(started.duration(to: .now).wholeMilliseconds) / 1_000
         guard remaining > 0, !Task.isCancelled else {
             Log.cleanup.notice("No time left to reword; keeping the resolved self-correction")
             return first
@@ -232,11 +235,11 @@ public struct CleanupExecutor: Sendable {
         return (request(for: aliases.aliased(input), context: context, options: modelOptions), aliases.aliased(target))
     }
 
-    /// What the model is asked for `text` under `options`. The adapter is on where the level
-    /// resolves self-corrections, as it was trained to, and at Deep as ``deep`` says; only Deep
-    /// thinks. Training builds its prompts here too, so they are the app's.
+    /// What the model is asked for `text` under `options`. The self-correction adapter is on for
+    /// Standard's passes, as it was trained to, and Deep's pass has the adapter ``deep`` says;
+    /// only Deep thinks. Training builds its prompts here too, so they are the app's.
     public func request(for text: String, context: [String], options: CleanupOptions) -> CleanupRequest {
-        let repairs = options.level.repairsAcrossSentences
+        let repairs = options.pass == .repairing
         return Prompt.request(
             for: text,
             context: context,

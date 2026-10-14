@@ -5,7 +5,7 @@ Live Transcribe runs on the Mac, on Linux and on Windows. This guide covers the 
 
 | | Mac | Linux and Windows |
 |---|---|---|
-| Dictation, the five cleanup levels, spoken commands | yes | yes |
+| Dictation, the three cleanup levels, spoken commands | yes | yes |
 | Dictation shortcut | **fn (🌐)**, a modifier held on its own, or a combination | **Right Ctrl**, or one other key |
 | Speech models to choose from | 7 | 4 |
 | Live transcript window, dictation history, Undo AI Edit | yes | not yet |
@@ -91,7 +91,7 @@ needs attention does a short message appear in a bubble beside it.
 - Long dictations have not been measured. Cleanup runs on the whole dictation in one call,
   within the cleanup timeout (3 s by default, and at least 8 s at Deep). By extrapolation from
   the eval, a dictation longer than a minute or two will likely exceed it and be inserted
-  uncleaned (fillers still removed from Medium up), and without a message.
+  uncleaned (fillers still removed), and without a message.
 - If the microphone stops for good partway (a Bluetooth headset disconnects on a Mac with no
   other microphone, for example), what was heard is inserted and the panel says so.
 - One dictation runs at a time. Pressing the shortcut while the last dictation is still being
@@ -182,7 +182,7 @@ of the open-source packages the app is built with.
 | **History** | dictation history on or off, retention, clearing |
 | **Permissions** | microphone and Accessibility status, with buttons that open the right System Settings pane, and **Reopen Live Transcribe** when macOS won't let it paste until it reopens |
 | **Models** | the speech-to-text model: models to download, switch to and remove, each with its languages, size and licence, and **Another model**, for any Hugging Face repository or a model folder on your Mac |
-| **Advanced** | for dictation and the live transcript: the cleanup model, **Clean up transcripts with the LLM**, **Resolve spoken self-corrections** (both adapters: Medium and High's, and Deep's), the cleanup **Timeout**, the GPU cache and capture restarts; for the live transcript only: the voice-activity model, silence, speech threshold, pre-roll and minimum speech, maximum segment length, live partials, context segments and queue capacity |
+| **Advanced** | for dictation and the live transcript: the cleanup model, **Clean up transcripts with the LLM**, **Resolve spoken self-corrections** (both adapters: Standard's and Deep's), the cleanup **Timeout**, the GPU cache and capture restarts; for the live transcript only: the voice-activity model, silence, speech threshold, pre-roll and minimum speech, maximum segment length, live partials, context segments and queue capacity |
 
 Settings on every tab but **Advanced** apply immediately, to the next dictation. A speech model
 chosen in **Models** loads straight away; dictation waits the few seconds it takes, and a live
@@ -199,7 +199,7 @@ Both systems run the same app, and dictate as the Mac does: hold a key, speak, l
 cleaned text is typed where you are working. It has a tray icon and a Settings window, and nothing
 else: no live transcript, dictation history, Undo AI Edit, snippets, vocabulary or per-app
 settings yet ([Known limitations](limitations.md)). Spoken commands, fillers, lists and letters,
-numbers in digits, and all five cleanup levels work as on the Mac ([Cleanup](cleanup.md)).
+numbers in digits, and all three cleanup levels work as on the Mac ([Cleanup](cleanup.md)).
 
 ### Installing and first start
 
@@ -224,12 +224,12 @@ There is no account or sign-in. The app starts in the tray. The first start down
 model (1.1 GB) and the cleanup model (0.9 GB) from Hugging Face. The tray's status line shows how
 far the speech model got ("Downloading speech models… 42%", then "Loading speech models…") until it
 reads "Hold Right Ctrl to dictate"; **Settings › Advanced** shows the cleanup model's progress, and
-until it has loaded, dictation works without its cleanup (fillers are still removed from Medium up).
-With an Intel Core Ultra's NPU (its driver comes from your distribution, or on Windows from Windows
-Update or the PC's maker) the default speech model runs on the NPU; otherwise on the CPU. Cleanup
-always runs on the CPU, and takes about four times as long as on a Mac. If dictation can't start (on
-Linux the desktop can't type or the keyboards can't be read; on Windows the hotkey can't be
-watched), Settings opens at once and says why, and closing it quits the app, since some desktops
+until it has loaded, dictation works without its cleanup (fillers are still removed at Standard and
+Deep). With an Intel Core Ultra's NPU (its driver comes from your distribution, or on Windows from
+Windows Update or the PC's maker) the default speech model runs on the NPU; otherwise on the CPU.
+Cleanup always runs on the CPU, and takes about four times as long as on a Mac. If dictation can't
+start (on Linux the desktop can't type or the keyboards can't be read; on Windows the hotkey can't
+be watched), Settings opens at once and says why, and closing it quits the app, since some desktops
 show no tray icon. A second copy is refused.
 
 ### Dictating
@@ -260,7 +260,7 @@ show no tray icon. A second copy is refused.
   terminal)".
 - Recordings under 300 ms are ignored, and only the first 5 minutes of one are kept (**Longest
   recording**, from 10 seconds to 30 minutes). A cleanup that times out or is rejected is silent:
-  the text goes in as spoken, with fillers still removed from Medium up.
+  the text goes in as spoken, with fillers still removed.
 - A space is added before the text only on Linux, in fields that take the input method and report
   what comes before the cursor. On Windows, and in pasted Linux text, none is added, so a second
   dictation runs straight into the first.
@@ -281,7 +281,7 @@ hotkey isn't seen while an app running as administrator has the keyboard.
 Left-click the tray icon. The menu shows the status ("Hold Right Ctrl to dictate", "Listening…",
 "Transcribing…", "Downloading speech models… 42%", or what stops it), then **Start Dictation** (it
 reads **Stop Dictation** while recording), **Cancel Dictation**, **Copy Last Dictation**,
-**Cleanup** (None, Light, Medium, High and Deep; the choice is saved), **Settings…** and **Quit
+**Cleanup** (None, Standard and Deep; the choice is saved), **Settings…** and **Quit
 Live Transcribe**. The icon shows the state: a waveform when ready, a microphone when recording,
 a warning triangle when something needs attention.
 

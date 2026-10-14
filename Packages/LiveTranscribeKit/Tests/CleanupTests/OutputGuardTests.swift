@@ -6,8 +6,10 @@ import Testing
 struct OutputGuardTests {
     private let outputGuard = OutputGuard()
 
-    private func review(raw: String, outcome: GenerationOutcome, level: CleanupLevel = .medium, placeholders: [String] = []) -> GuardVerdict {
-        outputGuard.review(raw: raw, outcome: outcome, options: CleanupOptions(level: level, placeholders: placeholders))
+    /// Standard's correcting pass by default: the one that keeps every spoken word but a
+    /// correction's.
+    private func review(raw: String, outcome: GenerationOutcome, pass: CleanupPass = .correcting, placeholders: [String] = []) -> GuardVerdict {
+        outputGuard.review(raw: raw, outcome: outcome, options: CleanupOptions(level: .standard, pass: pass, placeholders: placeholders))
     }
 
     private func words(_ count: Int) -> String {
@@ -73,32 +75,34 @@ struct OutputGuardTests {
         return OutputGuard(policy: policy)
     }()
 
-    @Test("Each level accepts output at its word-ratio bounds and rejects it just outside",
-          arguments: [CleanupLevel.light, .medium, .high])
-    func wordRatioBoundsFollowTheLevel(level: CleanupLevel) {
-        let options = CleanupOptions(level: level)
-        let low = Int((level.wordRatioBounds.lowerBound * 100).rounded())
-        let high = Int((level.wordRatioBounds.upperBound * 100).rounded())
+    @Test("Each of Standard's passes accepts output at its word-ratio bounds and rejects it just outside",
+          arguments: [CleanupPass.correcting, .rewording])
+    func wordRatioBoundsFollowThePass(pass: CleanupPass) {
+        let options = CleanupOptions(level: .standard, pass: pass)
+        let low = Int((pass.wordRatioBounds.lowerBound * 100).rounded())
+        let high = Int((pass.wordRatioBounds.upperBound * 100).rounded())
         for accepted in [low, high] {
             #expect(ratioOnlyGuard.review(raw: words(100), outcome: .completed(words(accepted)), options: options) == .accepted(words(accepted)))
         }
         for rejected in [low - 1, high + 1] {
             let verdict = ratioOnlyGuard.review(raw: words(100), outcome: .completed(words(rejected)), options: options)
             guard case .rejected(.wordRatio(let ratio)) = verdict else {
-                Issue.record("expected a word-ratio rejection at \(rejected) words for \(level), got \(verdict)")
+                Issue.record("expected a word-ratio rejection at \(rejected) words for \(pass), got \(verdict)")
                 continue
             }
             #expect(abs(ratio - Double(rejected) / 100) < 1e-9)
         }
     }
 
-    @Test func aPolicyCanOverrideALevelsBounds() {
+    @Test func aPolicyCanOverrideAPassesBounds() {
         var policy = OutputGuard.Policy.default
         policy.minSimilarity = 0
-        policy.wordRatioBounds[.light] = 0.9...1.1
-        let verdict = OutputGuard(policy: policy).review(raw: words(100), outcome: .completed(words(85)), options: CleanupOptions(level: .light))
+        policy.wordRatioBounds[.rewording] = 0.9...1.1
+        let verdict = OutputGuard(policy: policy).review(raw: words(100), outcome: .completed(words(85)), options: CleanupOptions(level: .standard))
         #expect(verdict == .rejected(.wordRatio(0.85)))
-        #expect(policy.wordRatioBounds(for: .medium) == CleanupLevel.medium.wordRatioBounds)
+        #expect(policy.wordRatioBounds(for: .correcting) == CleanupPass.correcting.wordRatioBounds)
+        policy.wordRatioBounds.removeAll()
+        #expect(policy.wordRatioBounds(for: .rewording) == 0.4...1.3)
     }
 
     @Test func lowSimilarityFallsBack() {
@@ -128,23 +132,21 @@ struct OutputGuardTests {
     @Test func fallbackReasonsAreReadable() {
         #expect(FallbackReason.timedOut(seconds: 3).description == "timed out after 3.0s")
         #expect(FallbackReason.wordRatio(1.31).description == "word-count ratio 1.31 outside allowed range")
-        #expect(FallbackReason.selfCorrectionNotAllowed.description == "resolved a self-correction at a level that keeps every word")
         #expect(FallbackReason.placeholderChanged.description == "changed a placeholder")
     }
 
-    // MARK: - Levels
+    // MARK: - Passes
 
-    @Test func lightRejectsAResolvedSelfCorrectionThatMediumAccepts() {
+    @Test func bothOfStandardsPassesAcceptAResolvedSelfCorrection() {
         let raw = "we should meet on tuesday sorry wednesday"
         let cleaned = "We should meet on Wednesday."
-        #expect(review(raw: raw, outcome: .completed(cleaned), level: .light) == .rejected(.selfCorrectionNotAllowed))
-        #expect(review(raw: raw, outcome: .completed(cleaned), level: .medium) == .accepted(cleaned))
-        #expect(review(raw: raw, outcome: .completed(cleaned), level: .high) == .accepted(cleaned))
+        #expect(review(raw: raw, outcome: .completed(cleaned), pass: .correcting) == .accepted(cleaned))
+        #expect(review(raw: raw, outcome: .completed(cleaned), pass: .rewording) == .accepted(cleaned))
     }
 
-    @Test func lightAcceptsASelfCorrectionKeptAsSpoken() {
+    @Test func aSelfCorrectionKeptAsSpokenIsAccepted() {
         let cleaned = "We should meet on Tuesday, sorry, Wednesday."
-        #expect(review(raw: "we should meet on tuesday sorry wednesday", outcome: .completed(cleaned), level: .light) == .accepted(cleaned))
+        #expect(review(raw: "we should meet on tuesday sorry wednesday", outcome: .completed(cleaned)) == .accepted(cleaned))
     }
 
     // MARK: - Placeholders

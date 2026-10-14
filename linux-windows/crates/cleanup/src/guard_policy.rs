@@ -1,17 +1,17 @@
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
 
-use lt_shared::CleanupLevel;
 use lt_styles::STANDARD_FILLERS;
 
+use crate::CleanupPass;
 use crate::content_words::STANDARD_FUNCTION_WORDS;
 
 /// What the output guard allows: its limits, and the words its checks look for.
 #[derive(Clone, Debug, PartialEq)]
 pub struct GuardPolicy {
-    /// Allowed ratio of the output's word count to the input's, per level. A level missing from
-    /// the table uses [`CleanupLevel::word_ratio_bounds`].
-    pub word_ratio_bounds: HashMap<CleanupLevel, RangeInclusive<f64>>,
+    /// Allowed ratio of the output's word count to the input's, per pass. A pass missing from
+    /// the table uses [`CleanupPass::word_ratio_bounds`].
+    pub word_ratio_bounds: HashMap<CleanupPass, RangeInclusive<f64>>,
     /// Minimum [`lt_shared::edit_distance::normalized_similarity`] between raw and cleaned text.
     pub min_similarity: f64,
     /// Lowercased openings that signal the model is talking about the text, not returning it.
@@ -43,12 +43,12 @@ pub struct GuardPolicy {
 }
 
 impl GuardPolicy {
-    /// The bounds for `level`.
-    pub fn word_ratio_bounds_for(&self, level: CleanupLevel) -> RangeInclusive<f64> {
+    /// The bounds for `pass`.
+    pub fn word_ratio_bounds_for(&self, pass: CleanupPass) -> RangeInclusive<f64> {
         self.word_ratio_bounds
-            .get(&level)
+            .get(&pass)
             .cloned()
-            .unwrap_or_else(|| level.word_ratio_bounds())
+            .unwrap_or_else(|| pass.word_ratio_bounds())
     }
 }
 
@@ -56,9 +56,9 @@ impl Default for GuardPolicy {
     fn default() -> Self {
         let strings = |values: &[&str]| values.iter().map(|&value| value.to_owned()).collect();
         Self {
-            word_ratio_bounds: CleanupLevel::ALL
+            word_ratio_bounds: CleanupPass::ALL
                 .into_iter()
-                .map(|level| (level, level.word_ratio_bounds()))
+                .map(|pass| (pass, pass.word_ratio_bounds()))
                 .collect(),
             min_similarity: 0.6,
             preambles: strings(&[

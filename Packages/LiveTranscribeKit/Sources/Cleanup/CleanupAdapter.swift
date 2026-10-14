@@ -3,7 +3,7 @@ import MLXLMCommon
 import Shared
 
 /// A fine-tuned LoRA adapter for the cleanup model, and the exact base model it was trained on:
-/// the self-correction adapter, which Medium and High use, or Deep's.
+/// the self-correction adapter, which Standard uses, or Deep's.
 ///
 /// Both ship in this slice's resources (`Adapter/` and `DeepAdapter/`) as mlx's
 /// `adapters.safetensors` and `adapter_config.json`, which also records the base model and

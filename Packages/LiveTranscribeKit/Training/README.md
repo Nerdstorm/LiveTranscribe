@@ -5,15 +5,16 @@ asked to turn "fuel efficiency in cars, sorry, buses" into "fuel efficiency in b
 most 1 in 7 right. This folder holds the data that teaches it with LoRA adapters, and the
 `Train` tool builds the data, trains the adapters, and measures them. Everything runs on the
 Mac, in Swift, with mlx-swift-lm. There are two adapters: the self-correction adapter, which
-Medium and High use (most of this page), and Deep's ([Deep's adapter](#deeps-adapter)).
+Standard uses (most of this page), and Deep's ([Deep's adapter](#deeps-adapter)).
 
-The adapter is trained on Medium's prompt with the adapter on (`Prompt.adapted`, that is
-`PromptBuilder(adapted: true)` at Medium), so at Medium training and inference see the same
-instructions; High adds its rewording line, and any level adds the request's vocabulary and
-placeholder rules. Only the answer tokens are trained on. The app loads the base model at the exact
-commit the adapter was trained on and applies the adapter; if that fails, it uses the base model
-with the strict prompt (`adapted: false`), which tells Light and Medium to remove nothing and High
-to reword without removing, and Deep too runs on the base model, with its own prompt.
+The adapter is trained on the prompt of Standard's correcting pass with the adapter on
+(`Prompt.adapted`, that is `PromptBuilder(adapted: true)` for that pass), so in the correcting
+pass training and inference see the same instructions; the rewording pass adds its rewording
+line, and any pass adds the request's vocabulary and placeholder rules. Only the answer tokens are
+trained on. The app loads the base model at the exact commit the adapter was trained on and
+applies the adapter; if that fails, it uses the base model with the strict prompt
+(`adapted: false`), which tells the correcting pass to remove nothing and the rewording pass to
+reword without removing, and Deep too runs on the base model, with its own prompt.
 
 ## Data
 
@@ -144,8 +145,8 @@ One more category, `composite`, isn't generated: the measured preparation joins 
 others into dictations of several sentences (below).
 
 Validation and test get a tenth and an eighth of these. Training and validation also get 1,260 and
-126 of Medium's own examples (`ExampleGenerator`), a third of them in a field that takes several
-lines, so Deep keeps what Medium does. Examples the validator rejects are left out. Some raw texts
+126 of the self-correction adapter's own examples (`ExampleGenerator`), a third of them in a field
+that takes several lines, so Deep keeps what Standard's correcting pass does. Examples the validator rejects are left out. Some raw texts
 are historical lowercase/punctuation stress cases; these are not a description of current
 speech-to-text output. The measured preparation workflow below replaces that input assumption.
 `generated/deep-*.jsonl` is not committed; `Train generate --deep` recreates it.
@@ -192,15 +193,18 @@ cd Packages/LiveTranscribeKit
   hours on an M4 Pro; the best validation loss, at iteration 1,400, is the adapter kept). The
   prompt it is trained on includes the email-body line (`letterBody`), so the adapter and the
   app's prompt go together.
-- `measure --level <level>` cleans every case through `MLXCleaner` and `CleanupExecutor`, as the app
-  does at that level, and reports per category how often the shown text matches the target, fell
-  back, came out unchanged, changed the meaning (lost a word the case keeps, or has one it rules
-  out), or differed, with latency. `--data` picks the cases (by default Medium's 515 test examples),
-  `--deep-adapter-dir` another Deep adapter, `--deep-adapter none|medium|deep`, `--deep-passes
-  one|after-medium`, `--thinking` and `--thinking-tokens` other ways of running Deep, and
-  `--no-medium-fallback` Deep's pass alone.
+- `measure --level <none|standard|deep>` cleans every case through `MLXCleaner` and
+  `CleanupExecutor`, as the app does at that level (`standard` by default), and reports per
+  category how often the shown text matches the target, fell back, came out unchanged, changed
+  the meaning (lost a word the case keeps, or has one it rules out), or differed, with latency.
+  `--pass correcting` or `--pass rewording` runs one of Standard's passes alone; the correcting
+  pass is the prompt the self-correction adapter is trained on. `--data` picks the cases (by
+  default the self-correction adapter's 515 test examples), `--deep-adapter-dir` another Deep
+  adapter, `--deep-adapter none|medium|deep`, `--deep-passes one|after-correcting`, `--thinking`
+  and `--thinking-tokens` other ways of running Deep, and `--no-standard-fallback` Deep's pass
+  alone.
 - `requests` writes the requests the app would make, and `replay` scores another runtime's
-  answers to them, which is how the Linux and Windows runtime is checked against the Mac.
+  answers to them (both take `--level` and `--pass` as `measure` does), which is how the Linux and Windows runtime is checked against the Mac.
 
 To ship a new Deep adapter, copy `adapters.safetensors` and `adapter_config.json` from the run
 folder into `Sources/Cleanup/DeepAdapter/`. The Linux and Windows app compiles the same files in.
@@ -210,9 +214,9 @@ Deep's measured results, and how the design was chosen, are in
 
 ## Preparing speech-to-text training data
 
-The next recipe preserves the speech model's punctuation and capitals. The proposed choices
-are None, Standard and Deep; until that rename lands, the CLI calls Standard `high` and its
-self-correction adapter `medium`. `--kind medium` prepares that adapter's data.
+The next recipe preserves the speech model's punctuation and capitals. The levels are None,
+Standard and Deep. Standard's self-correction adapter keeps the name `medium`, the level it was
+first trained for, so `--kind medium` prepares that adapter's data.
 
 ### Seeds and the candidate mix
 
@@ -485,8 +489,8 @@ python3 scripts/prepare-cleanup-data.py score \
 Any other `Train measure` report, such as the evaluation or Standard set, is scored with
 `python3 scripts/cleanup_scoring.py <report.json>... --by-category`.
 
-That scoring command runs from the repository root. Measure Standard with the current
-`--level high` flag and score it too. Keep the merged test file/hash fixed for baseline and
+That scoring command runs from the repository root. Measure Standard with `--level standard`,
+and the self-correction adapter's own prompt with `--pass correcting`, and score them too. Keep the merged test file/hash fixed for baseline and
 candidate, include the existing Deep/layout and self-correction regression sets, and require
 no regression in names, negation, values, token preservation or questions. TTS gives repeatable
 inputs; held-out real speech and private evaluation are still needed before shipping.
