@@ -91,6 +91,22 @@ impl Languages {
         }
     }
 
+    /// The reply of a model told to write `told` ([`Self::spelled`]): all of it is the transcript,
+    /// in that language, as mlx-audio-swift's `parseGeneratedChunk` reads it with a forced
+    /// language.
+    pub fn read_told(&self, decoded: &str, told: &str) -> Reply {
+        Reply {
+            language: self.normalized(told),
+            text: s::trimming(decoded, CharacterSet::WhitespacesAndNewlines).to_owned(),
+        }
+    }
+
+    /// `name` as the model's supported languages spell it, as its prompt takes it; a name it
+    /// doesn't know stays as written.
+    pub fn spelled(&self, name: &str) -> String {
+        self.normalized(name).unwrap_or_else(|| name.to_owned())
+    }
+
     /// `name` as the model's supported languages spell it, through the aliases; a name it doesn't
     /// know stays as written.
     fn normalized(&self, name: &str) -> Option<String> {

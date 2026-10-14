@@ -1,14 +1,17 @@
 use super::tokenizer::{Tokenizer, TokenizerError};
 
-/// The prompt the Mac app gives Qwen3-ASR: no context and no language, so the model names the
-/// language itself before the transcript ("language English<asr_text>…"), as mlx-audio-swift's
-/// `buildPromptText` writes it when no language is given:
+/// The prompt the Mac app gives Qwen3-ASR, as mlx-audio-swift's `buildPromptText` writes it:
+/// no context, and with no language the model names the language itself before the transcript
+/// ("language English<asr_text>…"):
 ///
 /// ```text
 /// <|im_start|>system\n<|im_end|>\n<|im_start|>user\n<|audio_start|>
 /// <|audio_pad|> × the clip's placeholders
 /// <|audio_end|><|im_end|>\n<|im_start|>assistant\n
 /// ```
+///
+/// Told a language, the prompt goes on with the start of the reply, "language English<asr_text>"
+/// ([`told_language`]), and the model writes the transcript after it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PromptFormat {
     prefix: Vec<u32>,
@@ -61,6 +64,12 @@ impl PromptFormat {
     pub fn audio_start(&self) -> usize {
         self.prefix.len()
     }
+}
+
+/// The ids that start the reply of a model told to write `language`, as its supported languages
+/// spell it: "language English<asr_text>". The tokenizer must have its merges to encode them.
+pub fn told_language(tokenizer: &Tokenizer, language: &str) -> Result<Vec<u32>, TokenizerError> {
+    tokenizer.encode(&format!("language {language}<asr_text>"))
 }
 
 #[cfg(test)]

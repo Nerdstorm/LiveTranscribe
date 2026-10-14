@@ -33,8 +33,8 @@ struct BenchOptions {
     var verbose = false
     /// A speech-to-text model to measure instead of the default, to compare models on the same clips.
     var sttModel: String?
-    /// The Language setting, for a model that is told the language to write (Cohere Transcribe): a
-    /// code, such as `de`.
+    /// The Language setting, for a model that can be told the language to write (Qwen3-ASR,
+    /// Whisper, Cohere Transcribe): a code, such as `de`. Absent is Automatic.
     var sttLanguage: String?
     /// Export untouched ASR inputs for synthetic cleanup-data preparation, without cleanup.
     var asrOutput: URL?

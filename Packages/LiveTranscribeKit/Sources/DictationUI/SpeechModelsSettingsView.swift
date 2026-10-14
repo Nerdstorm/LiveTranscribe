@@ -30,6 +30,7 @@ struct SpeechModelsSettingsView: View {
                         status: status(of: model.mac.repository.rawValue, download: library.state(of: model)),
                         canRemove: canRemove(model),
                         language: languageChoice(for: model),
+                        languages: SpeechLanguageMenu(model: model),
                         actions: actions(for: model)
                     )
                 }
@@ -115,15 +116,17 @@ struct SpeechModelsSettingsView: View {
         )
     }
 
-    /// The language a model that is told one writes: the Language setting's, if the model has
-    /// it, and otherwise its first. `nil` for a model that finds the language itself.
+    /// The Language setting, for a model that can be told a language: its tag in the model's
+    /// menu (``SpeechLanguageMenu``). `nil` for a model that can't be told one.
     private func languageChoice(for model: SpeechModelCatalog.Model) -> Binding<String>? {
-        guard let first = model.languageChoices.first else { return nil }
+        let menu = SpeechLanguageMenu(model: model)
+        guard menu.canChoose else { return nil }
         return Binding(
-            get: { model.language(forSetting: language)?.code ?? first.code },
-            set: { code in
+            get: { menu.tag(forSetting: language) },
+            set: { tag in
+                let code = SpeechLanguageMenu.setting(forTag: tag)
                 context.settingsStore.setSpeechLanguage(code)
-                Log.ui.info("Speech language chosen in Settings: \(code, privacy: .public)")
+                Log.ui.info("Speech language chosen in Settings: \(code ?? "automatic", privacy: .public)")
             }
         )
     }
@@ -145,15 +148,16 @@ struct SpeechModelsSettingsView: View {
     }
 }
 
-/// One catalog model: what it is for, the language it writes if it's told one, and its status or
-/// what can be done with it.
+/// One catalog model: what it is for, the language it writes if it can be told one, and its
+/// status or what can be done with it.
 private struct SpeechModelRow: View {
     let model: SpeechModelCatalog.Model
     let isDefault: Bool
     let status: SpeechModelRowStatus
     let canRemove: Bool
-    /// The Language setting, for a model that is told one.
+    /// The Language setting, for a model that can be told one.
     let language: Binding<String>?
+    let languages: SpeechLanguageMenu
     let actions: SpeechModelStatusView.Actions
 
     var body: some View {
@@ -183,7 +187,9 @@ private struct SpeechModelRow: View {
                 .accessibilityElement(children: .combine)
                 if let language {
                     Picker("Language", selection: language) {
-                        ForEach(model.languageChoices) { choice in
+                        Text(languages.automaticTitle).tag(SpeechLanguageMenu.automatic)
+                        Divider()
+                        ForEach(languages.choices) { choice in
                             Text(choice.name).tag(choice.code)
                         }
                     }

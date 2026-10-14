@@ -341,6 +341,7 @@ pub(crate) mod tests {
                 code: "en".to_owned(),
                 name: "English".to_owned(),
             }],
+            automatic_language: Some("en".to_owned()),
             engine: Engine::SherpaOnnx {
                 family: Family::CohereTranscribe,
                 archive: Archive {

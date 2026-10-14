@@ -51,8 +51,8 @@ pub struct Options {
     /// can't run), or only on one OpenVINO device: CPU, GPU or NPU [default: Settings']
     #[arg(long, value_name = "DEVICE")]
     device: Option<String>,
-    /// The language Cohere Transcribe writes, by its code or name, such as de or German; the
-    /// other models find the language themselves [default: Settings', at first English]
+    /// The language the speech model writes, by its code or name, such as en or English, or
+    /// automatic, for Qwen3-ASR and Cohere Transcribe [default: Settings', at first automatic]
     #[arg(long, value_name = "LANGUAGE")]
     language: Option<String>,
     /// The key to hold, as linux/input-event-codes.h names it (`livetranscribe keys` shows the
@@ -79,7 +79,12 @@ impl Options {
             overrides.insert("sttDevice".to_owned(), Value::from(device.as_str()));
         }
         if let Some(language) = &self.language {
-            overrides.insert("sttLanguage".to_owned(), Value::from(language.as_str()));
+            let language = if language.trim().eq_ignore_ascii_case("automatic") {
+                Value::Null
+            } else {
+                Value::from(language.as_str())
+            };
+            overrides.insert("sttLanguage".to_owned(), language);
         }
         if let Some(key) = &self.key {
             overrides.insert("dictationHotkey".to_owned(), Value::from(key.as_str()));
@@ -221,6 +226,7 @@ fn blocked_status(settings: &Settings, blocker: &Blocker) -> DictationStatus {
         hotkey: settings.dictation_enabled.then_some(hotkey),
         has_last_dictation: false,
         cleanup: settings.cleanup_level,
+        language: settings.stt_language.clone(),
         cleanup_model: None,
         blocker: Some(blocker.clone()),
     }
@@ -297,6 +303,11 @@ mod tests {
         assert_eq!(given["sttModel"], FOLDER);
         // The settings keep it by its code (Settings::changed).
         assert_eq!(given["sttLanguage"], "German");
+        assert_eq!(
+            overrides(&["--language", "Automatic"])["sttLanguage"],
+            Value::Null,
+            "a saved language is set aside for the run"
+        );
     }
 
     #[test]

@@ -12,9 +12,11 @@ import Shared
 ///
 /// The model is loaded once and warmed up, and replaced when ``switchModel(to:progress:)`` names
 /// another. It never leaves this actor, which runs on its own serial queue so the blocking MLX
-/// inference does not occupy the cooperative thread pool. A catalog model that is told which
-/// language to write (Cohere Transcribe) is told the Language setting's at each transcription, so
-/// a change applies to the next without loading the model again.
+/// inference does not occupy the cooperative thread pool. A catalog model that can be told which
+/// language to write (Qwen3-ASR, Whisper, Cohere Transcribe) is told the Language setting's at
+/// each transcription, so a change applies to the next without loading the model again.
+/// Automatic tells it nothing, and it finds the language, except Cohere Transcribe, which can't
+/// and is told English.
 public actor MLXTranscriber: Transcriber {
     /// Shorter clips are returned as empty text rather than sent to the model: they hold no word,
     /// and some models' subsampling (Parakeet's conformer, say) needs a minimum number of frames.
@@ -32,7 +34,7 @@ public actor MLXTranscriber: Transcriber {
 
     private let catalog: SpeechModelCatalog
     private let downloads: SpeechModelDownloads
-    /// The Language setting, a code, read at each transcription; `nil` for each model's first.
+    /// The Language setting, a code, read at each transcription; `nil` for Automatic.
     private let language: @Sendable () -> String?
 
     private let queue = DispatchSerialQueue(label: "LiveTranscribe.MLXTranscriber", qos: .userInitiated)
@@ -120,16 +122,17 @@ public actor MLXTranscriber: Transcriber {
         return output.text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// `parameters`, with the language to write for a catalog model that is told one: the
-    /// Language setting's if the model has it, and otherwise its first
-    /// (``SpeechModelCatalog/Model/language(forSetting:)``). Any other model keeps its own.
+    /// `parameters`, with the language to write for a catalog model that can be told one: the
+    /// Language setting's if the model has it, and otherwise Automatic's
+    /// (``SpeechModelCatalog/Model/language(forSetting:)``). A model that finds the language
+    /// itself, and any model outside the catalog, keeps its own parameters, which tell it none.
     static func parameters(
         _ parameters: STTGenerateParameters,
         for model: SpeechModelCatalog.Model?,
         language setting: String?
     ) -> STTGenerateParameters {
-        guard let told = model?.language(forSetting: setting) else { return parameters }
-        return parameters.replacing(language: told.code)
+        guard let model, let choice = model.language(forSetting: setting) else { return parameters }
+        return parameters.replacing(language: model.told(choice))
     }
 
     /// The model's folder, downloaded first when it's a repository.

@@ -153,6 +153,19 @@ switches back when it reconnects.
 between dictations, so dictation starts faster and keeps the 300 ms before you pressed the key.
 macOS's microphone indicator then stays on while the app runs.
 
+### Speech language
+
+Choose the language the speech model writes from the menu bar's **Language** menu, or from the
+**Language** menu on the model's row in **Settings › Models**. Both list only the languages the
+chosen model can be told, after **Automatic**, the default. Automatic lets the model work out the
+language from each recording; a short or noisy one can come out in another language. Choosing
+English keeps every dictation and the live transcript in English, and something said in another
+language then comes out as made-up English. The choice is one for every model: one that doesn't
+have the language uses Automatic, and the choice comes back with a model that has it. Qwen3-ASR
+(30 languages, and Sinhala in the default model) and Whisper (100) can be told a language.
+Cohere Transcribe can't work out the language, so its Automatic is English. Parakeet can't be told
+one, and its **Language** menu is greyed out.
+
 ### Updates
 
 A release downloaded from GitHub updates itself with [Sparkle](https://sparkle-project.org). On
@@ -181,7 +194,7 @@ of the open-source packages the app is built with.
 | **Apps** | per app, how text goes in (Accessibility or paste) and whether it takes line breaks |
 | **History** | dictation history on or off, retention, clearing |
 | **Permissions** | microphone and Accessibility status, with buttons that open the right System Settings pane, and **Reopen Live Transcribe** when macOS won't let it paste until it reopens |
-| **Models** | the speech-to-text model: models to download, switch to and remove, each with its languages, size and licence, and **Another model**, for any Hugging Face repository or a model folder on your Mac |
+| **Models** | the speech-to-text model: models to download, switch to and remove, each with its languages, size and licence, a **Language** menu on each model that can be told one ([Speech language](#speech-language)), and **Another model**, for any Hugging Face repository or a model folder on your Mac |
 | **Advanced** | for dictation and the live transcript: the cleanup model, **Clean up transcripts with the LLM**, **Resolve spoken self-corrections** (both adapters: Standard's and Deep's), the cleanup **Timeout**, the GPU cache and capture restarts; for the live transcript only: the voice-activity model, silence, speech threshold, pre-roll and minimum speech, maximum segment length, live partials, context segments and queue capacity |
 
 Settings on every tab but **Advanced** apply immediately, to the next dictation. A speech model
@@ -281,8 +294,9 @@ hotkey isn't seen while an app running as administrator has the keyboard.
 Left-click the tray icon. The menu shows the status ("Hold Right Ctrl to dictate", "Listening…",
 "Transcribing…", "Downloading speech models… 42%", or what stops it), then **Start Dictation** (it
 reads **Stop Dictation** while recording), **Cancel Dictation**, **Copy Last Dictation**,
-**Cleanup** (None, Standard and Deep; the choice is saved), **Settings…** and **Quit
-Live Transcribe**. The icon shows the state: a waveform when ready, a microphone when recording,
+**Cleanup** (None, Standard and Deep; the choice is saved), **Language** (Automatic, then the
+languages the speech model can be told, as on the Mac: [Speech language](#speech-language)),
+**Settings…** and **Quit Live Transcribe**. The icon shows the state: a waveform when ready, a microphone when recording,
 a warning triangle when something needs attention.
 
 ### Settings
@@ -293,7 +307,7 @@ dictation.
 | Tab | What it holds |
 |---|---|
 | **General** | **Dictate with the hotkey** (off, and the tray's **Start Dictation** still works), the hotkey, **Double-tap for hands-free**, the cleanup level, the microphone to **Record from** (System default, or one listed), and **Timing**: longest tap 300 ms, double-tap window 300 ms, shortest recording 300 ms, longest recording 300 s, message duration 2.5 s and the clipboard restore delay 250 ms (which does nothing on Windows) |
-| **Models** | the speech models, each with its languages, size and licence: **Download**, **Use** and **Remove** them, and **Another model** for a converted model in the models folder. Cohere Transcribe has a **Language** menu (14 languages) |
+| **Models** | the speech models, each with its languages, size and licence: **Download**, **Use** and **Remove** them, and **Another model** for a converted model in the models folder. Qwen3-ASR (31 languages) and Cohere Transcribe (14) each have a **Language** menu, the same choice as the tray's |
 | **Advanced** | **Runs on**: Auto (the NPU if there is one, else the CPU), NPU only or CPU only, for Qwen3-ASR only; GPU only is offered but the packages can't run it; **Clean up transcripts with the LLM**; the cleanup **Timeout** (3 s; at least 8 s at Deep); and the state of both models with **Try Again**. **Restore Defaults** resets these three |
 
 The speech models are Qwen3-ASR 0.6B fine-tuned for Sinhala (the default), Parakeet TDT 0.6B v2

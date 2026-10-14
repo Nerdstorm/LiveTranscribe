@@ -39,35 +39,89 @@ struct SpeechModelCatalogTests {
     }
 
     /// mlx-audio-swift's Cohere tokenizer knows these codes, and writes English for any other.
+    /// It can't find the language itself, so Automatic tells it English.
     @Test func cohereIsToldOneOfTheLanguagesItKnows() throws {
         let cohere = try #require(catalog.models.first { $0.id == "cohere-transcribe" })
-        #expect(cohere.languageChoices.first?.code == "en", "English is the default")
         #expect(cohere.languageChoices.map(\.code).sorted() == ["ar", "de", "el", "en", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "vi", "zh"])
-        #expect(cohere.languageChoices.allSatisfy { !$0.name.isEmpty })
-        for model in catalog.models where model.id != "cohere-transcribe" {
-            #expect(model.languageChoices.isEmpty, "\(model.id) finds the language itself")
+        #expect(cohere.automaticChoice?.name == "English")
+    }
+
+    /// Qwen3-ASR's prompt takes a language by the name its config.json lists
+    /// (`support_languages`, at the pinned revisions), and only Sinhala's fine-tune knows Sinhala.
+    @Test func qwenIsToldTheLanguagesItsConfigLists() throws {
+        let qwen = ["Chinese", "English", "Cantonese", "Arabic", "German", "French", "Spanish", "Portuguese", "Indonesian",
+                    "Italian", "Korean", "Russian", "Thai", "Vietnamese", "Japanese", "Turkish", "Hindi", "Malay", "Dutch",
+                    "Swedish", "Danish", "Finnish", "Polish", "Czech", "Filipino", "Persian", "Greek", "Romanian",
+                    "Hungarian", "Macedonian"]
+        for model in catalog.models where model.mac.kind == "qwen3_asr" {
+            let expected = model.id.hasSuffix("sinhala") ? qwen + ["Sinhala"] : qwen
+            #expect(Set(model.languageChoices.map(\.name)) == Set(expected), "\(model.id)")
+            #expect(model.automaticLanguage == nil, "\(model.id) finds the language itself")
         }
     }
 
-    @Test func theLanguageToldIsTheSettingsIfTheModelHasItAndElseItsFirst() throws {
+    /// Whisper large-v3's tokenizer has a token for each of these, by its code.
+    @Test func whisperIsToldItsHundredLanguages() throws {
+        let whisper = try #require(catalog.models.first { $0.mac.kind == "whisper" })
+        #expect(whisper.languageChoices.count == 100)
+        #expect(whisper.languageChoices.contains { $0.code == "yue" && $0.name == "Cantonese" })
+        #expect(whisper.automaticLanguage == nil)
+    }
+
+    /// One setting holds the language for every model, so a language is the same code and name
+    /// in each, and Settings lists English first, then the rest by name.
+    @Test func everyModelsLanguagesAreListedAlike() throws {
+        var names: [String: String] = [:]
+        for model in catalog.models where !model.languageChoices.isEmpty {
+            let codes = model.languageChoices.map(\.code)
+            #expect(Set(codes).count == codes.count, "\(model.id) lists a language twice")
+            #expect(codes.allSatisfy { (2...3).contains($0.count) && $0.allSatisfy { $0.isLowercase && $0.isASCII } }, "\(model.id)")
+            #expect(codes.first == "en", "\(model.id)")
+            let rest = model.languageChoices.dropFirst().map(\.name)
+            #expect(rest == rest.sorted(), "\(model.id)")
+            for choice in model.languageChoices {
+                #expect(names[choice.code, default: choice.name] == choice.name, "\(choice.code) in \(model.id)")
+                names[choice.code] = choice.name
+            }
+            if let automatic = model.automaticLanguage {
+                #expect(codes.contains(automatic), "\(model.id)")
+            }
+        }
+        for model in catalog.models where model.mac.kind == "parakeet" {
+            #expect(model.languageChoices.isEmpty, "\(model.id) can't be told a language")
+        }
+    }
+
+    @Test func theLanguageToldIsTheSettingsIfTheModelHasItAndElseAutomatics() throws {
         let cohere = try #require(catalog.models.first { $0.id == "cohere-transcribe" })
         #expect(cohere.language(forSetting: "de")?.name == "German")
-        #expect(cohere.language(forSetting: nil)?.code == "en")
+        #expect(cohere.language(forSetting: nil)?.code == "en", "it can't find the language")
         #expect(cohere.language(forSetting: "si")?.code == "en", "Sinhala isn't one of its languages")
+        let qwen = try #require(catalog.models.first { $0.id == "qwen3-asr-0.6b-sinhala" })
+        #expect(qwen.language(forSetting: "en")?.name == "English")
+        #expect(qwen.language(forSetting: nil) == nil, "it finds the language")
+        #expect(qwen.language(forSetting: "ca") == nil, "Catalan isn't one of its languages")
         let parakeet = try #require(catalog.models.first { $0.id == "parakeet-tdt-0.6b-v3" })
         #expect(parakeet.language(forSetting: "de") == nil)
     }
 
-    /// The transcriber tells Cohere the language at each transcription, and leaves the others'
-    /// parameters as they are.
-    @Test func onlyAModelThatIsToldALanguageGetsTheSettings() throws {
+    /// The transcriber tells a model the setting's language at each transcription: Qwen3-ASR by
+    /// name, the others by code. Automatic leaves a model that finds the language as it is.
+    @Test func aModelIsToldTheSettingsLanguageAsItTakesIt() throws {
         let cohere = try #require(catalog.models.first { $0.id == "cohere-transcribe" })
+        let qwen = try #require(catalog.models.first { $0.id == "qwen3-asr-0.6b-sinhala" })
+        let whisper = try #require(catalog.models.first { $0.mac.kind == "whisper" })
         let parakeet = try #require(catalog.models.first { $0.id == "parakeet-tdt-0.6b-v3" })
         let english = STTGenerateParameters(maxTokens: 512, temperature: 0.2, language: "en")
         let told = MLXTranscriber.parameters(english, for: cohere, language: "de")
         #expect(told.language == "de")
         #expect(told.maxTokens == 512 && told.temperature == 0.2, "the rest are kept")
         #expect(MLXTranscriber.parameters(english, for: cohere, language: "si").language == "en")
+        #expect(MLXTranscriber.parameters(STTGenerateParameters(), for: qwen, language: "en").language == "English")
+        #expect(MLXTranscriber.parameters(STTGenerateParameters(), for: qwen, language: "si").language == "Sinhala")
+        #expect(MLXTranscriber.parameters(STTGenerateParameters(), for: qwen, language: nil).language == nil)
+        #expect(MLXTranscriber.parameters(STTGenerateParameters(), for: whisper, language: "en").language == "en")
+        #expect(MLXTranscriber.parameters(STTGenerateParameters(), for: whisper, language: "fil").language == nil, "Whisper calls it Tagalog")
         #expect(MLXTranscriber.parameters(STTGenerateParameters(), for: parakeet, language: "de").language == nil)
         #expect(MLXTranscriber.parameters(english, for: nil, language: "de").language == "en", "a model outside the catalog")
     }
@@ -94,9 +148,12 @@ struct SpeechModelCatalogTests {
     @Test func aModelsLanguageChoicesAreReadAndOptional() throws {
         var told = Self.entry(id: "told", mac: true)
         told["language_choices"] = [["code": "en", "name": "English"], ["code": "de", "name": "German"]]
+        told["automatic_language"] = "de"
         let catalog = try SpeechModelCatalog(json: Self.json(models: [told, Self.entry(id: "finds", mac: true)]))
         #expect(catalog.models[0].languageChoices.map(\.code) == ["en", "de"])
+        #expect(catalog.models[0].automaticChoice?.name == "German")
         #expect(catalog.models[1].languageChoices.isEmpty)
+        #expect(catalog.models[1].automaticLanguage == nil)
     }
 
     @Test func anotherFormatIsRefused() {
@@ -182,7 +239,7 @@ struct SpeechModelCatalogTests {
     private static func model(repository: Repo.ID = "owner/a-model") -> SpeechModelCatalog.Model {
         SpeechModelCatalog.Model(
             id: "a-model", name: "A Model", summary: "For tests.", languages: "English", licence: "MIT", credit: "Nobody",
-            languageChoices: [],
+            languageChoices: [], automaticLanguage: nil,
             mac: .init(repository: repository, revision: String(repeating: "a", count: 40), bytes: 1, kind: "qwen3_asr")
         )
     }

@@ -202,7 +202,14 @@ pub fn open_transcriber(
     cache: Option<&Path>,
 ) -> Result<Transcriber<OpenVinoModel>, OpenError> {
     let (model, manifest) = OpenVinoModel::load(folder, device, cache).map_err(OpenError::Model)?;
-    let tokenizer = Tokenizer::load(folder).map_err(OpenError::Tokenizer)?;
+    // The merges encode the language a clip is told; a converted model outside the catalog may
+    // lack them, and is never told one.
+    let tokenizer = if folder.join("merges.txt").exists() {
+        Tokenizer::load_with_merges(folder)
+    } else {
+        Tokenizer::load(folder)
+    }
+    .map_err(OpenError::Tokenizer)?;
     let pad = tokenizer.id("<|audio_pad|>").map_err(OpenError::Tokenizer)?;
     if pad != manifest.text.audio_token_id {
         return Err(OpenError::Model(OpenVinoError::Folder {

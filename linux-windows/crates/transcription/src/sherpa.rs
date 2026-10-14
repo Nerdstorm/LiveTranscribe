@@ -42,10 +42,16 @@ impl Family {
         }
     }
 
-    /// Whether its models are told which language to write: Cohere Transcribe can't find it, and
-    /// writes nothing at all without one. NeMo transducers find it themselves.
+    /// Whether its models can be told which language to write: Cohere Transcribe must be. NeMo
+    /// transducers can't be, and find it themselves.
     pub fn takes_language(self) -> bool {
         matches!(self, Self::CohereTranscribe)
+    }
+
+    /// Whether its models find the language themselves: Cohere Transcribe can't, and writes
+    /// nothing at all without one.
+    pub fn finds_language(self) -> bool {
+        !matches!(self, Self::CohereTranscribe)
     }
 
     /// Points `config` at the files, whose paths `path` gives by role. `language` is the one a
@@ -146,20 +152,23 @@ pub struct SherpaTranscriber {
     recognizer: OfflineRecognizer,
     family: Family,
     threads: usize,
-    /// The languages the model can be told, its default first; empty for a model that finds it.
+    /// The languages the model can be told; empty for a model that can't be told one.
     languages: Vec<LanguageChoice>,
+    /// The code of the language Automatic tells it, for a model that can't find the language.
+    automatic: Option<String>,
 }
 
 impl SherpaTranscriber {
     /// Opens the model of `family` whose `files` are in `folder`, to run on `threads` of the CPU's
     /// threads. Each file must have been checked first (see the module's documentation). A family
-    /// that takes a language is told one of `languages` for each clip, the first unless the clip
-    /// asks for another; the catalog gives it at least one.
+    /// that takes a language is told one of `languages` for each clip: the one the clip asks for,
+    /// or Automatic's, `automatic`, which the catalog gives a model that can't find it.
     pub(crate) fn open(
         folder: &Path,
         family: Family,
         files: &[ModelFile],
         languages: &[LanguageChoice],
+        automatic: Option<&str>,
         threads: usize,
     ) -> Result<Self, OpenError> {
         let mut paths = Vec::with_capacity(family.roles().len());
@@ -181,13 +190,14 @@ impl SherpaTranscriber {
         };
 
         // Only a family that takes a language keeps them.
-        let languages = if family.takes_language() {
-            languages.to_vec()
+        let (languages, automatic) = if family.takes_language() {
+            (languages.to_vec(), automatic.map(str::to_owned))
         } else {
-            Vec::new()
+            (Vec::new(), None)
         };
         let mut config = OfflineRecognizerConfig::default();
-        let default_language = languages.first().map(|choice| choice.code.as_str());
+        let default_language =
+            chosen_language(&languages, automatic.as_deref(), None).map(|choice| choice.code.as_str());
         family.configure(&mut config.model_config, path, default_language);
         let threads = threads.max(1);
         config.model_config.num_threads = i32::try_from(threads).unwrap_or(i32::MAX);
@@ -207,6 +217,7 @@ impl SherpaTranscriber {
             family,
             threads,
             languages,
+            automatic,
         })
     }
 
@@ -220,9 +231,9 @@ impl SherpaTranscriber {
         self.threads
     }
 
-    /// The transcript of `samples`, 16 kHz mono. A model told which language to write writes
-    /// `language` (the Language setting, a code) if it's one of its languages, and otherwise its
-    /// first ([`chosen_language`]).
+    /// The transcript of `samples`, 16 kHz mono. A model that can be told which language to write
+    /// writes `language` (the Language setting, a code) if it's one of its languages, and otherwise
+    /// Automatic's ([`chosen_language`]).
     pub fn transcribe(&self, samples: &[f32], language: Option<&str>) -> Result<SherpaTranscript, TranscribeError> {
         if samples.len() < MINIMUM_SAMPLES {
             return Ok(SherpaTranscript {
@@ -238,7 +249,7 @@ impl SherpaTranscriber {
         let stream = self.recognizer.create_stream();
         // Read for each clip, over the one the model was opened with: a change of language
         // doesn't load the model again.
-        let told = chosen_language(&self.languages, language);
+        let told = chosen_language(&self.languages, self.automatic.as_deref(), language);
         if let Some(choice) = told {
             stream.set_option("language", &choice.code);
         }

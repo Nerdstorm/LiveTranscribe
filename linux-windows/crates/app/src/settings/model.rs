@@ -37,8 +37,9 @@ pub struct Settings {
     /// The speech model: a catalog model's id, or a folder the setup kit converted a model into,
     /// in the app's models folder or a path; `None` for the default model.
     pub stt_model: Option<String>,
-    /// The language a speech model that is told one (Cohere Transcribe) writes, by its code;
-    /// `None` for the model's first, English. The other models find the language themselves.
+    /// The language a speech model that can be told one (Qwen3-ASR, Cohere Transcribe) writes,
+    /// by its code; `None` for Automatic: the model finds the language, or, for one that can't
+    /// (Cohere Transcribe), writes English. Parakeet always finds it.
     pub stt_language: Option<String>,
     /// Where a Qwen3-ASR model runs: one of [`DEVICES`]. The catalog's other models run on the CPU.
     pub stt_device: String,
@@ -290,6 +291,7 @@ mod tests {
             ("German", Some("de")),
             ("DE", Some("de")),
             (" ja ", Some("ja")),
+            ("Sinhala", Some("si")),
             (" ", None),
         ] {
             let (settings, problems) = Settings::read(&json!({"sttLanguage": given}).to_string()).unwrap();
@@ -297,10 +299,11 @@ mod tests {
             assert!(problems.is_empty(), "{problems:?}");
         }
 
-        let (settings, problems) = Settings::read(r#"{"sttLanguage": "si"}"#).unwrap();
+        // Catalan is only Whisper's, which runs on the Mac.
+        let (settings, problems) = Settings::read(r#"{"sttLanguage": "ca"}"#).unwrap();
         assert_eq!(settings.stt_language, None);
         assert_eq!(problems.len(), 1);
-        assert!(problems[0].contains("si isn't a language"), "{problems:?}");
+        assert!(problems[0].contains("ca isn't a language"), "{problems:?}");
         assert!(problems[0].contains("de, el, en"), "{problems:?}");
 
         let refused = Settings::default().changed(&changes(json!({"sttLanguage": "Klingon"})));
