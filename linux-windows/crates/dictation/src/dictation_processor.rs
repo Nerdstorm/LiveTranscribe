@@ -1,4 +1,4 @@
-use lt_cleanup::{CleanedText, CleanupOptions, deterministic_cleanup};
+use lt_cleanup::{CleanedText, CleanupOptions, CleanupPass, deterministic_cleanup};
 use lt_shared::CleanupLevel;
 use lt_shared::swift_string::{self as s, CharacterSet};
 use lt_snippets::Snippet;
@@ -96,9 +96,9 @@ impl Pending {
         &self.options
     }
 
-    /// The text with the level's rules that need no model, filler removal, layout and numbers from
-    /// Medium up, and nothing reworded: cleanup's model is turned off. That was chosen, so it is not
-    /// reported as a fallback.
+    /// The text with the level's rules that need no model, filler removal, layout and numbers at
+    /// Standard and Deep, and nothing reworded: cleanup's model is turned off. That was chosen, so
+    /// it is not reported as a fallback.
     pub fn without_the_model(self) -> Output {
         // Placeholders are single words that are never fillers, so they come through intact.
         let cleaned = deterministic_cleanup(&self.body, self.options.level);
@@ -141,8 +141,8 @@ impl Pending {
 
 /// Everything after speech-to-text up to cleanup's model: snippets, spoken commands and vocabulary
 /// at every level, then, when the level uses the model, what it is to clean. A letter's greeting
-/// and sign-off are laid out already, from Medium up in fields that take several lines, and only
-/// its body is cleaned.
+/// and sign-off are laid out already, at Standard and Deep in fields that take several lines, and
+/// only its body is cleaned.
 ///
 /// Snippet triggers, emoji, addresses and spoken line breaks become opaque placeholders first (see
 /// `PreparedDictation`), so the model can neither see nor change them.
@@ -164,6 +164,7 @@ pub fn prepare(transcript: &str, configuration: &Configuration) -> Prepared {
         .map_or_else(|| prepared.text().to_owned(), |frame| frame.body.clone());
     let options = CleanupOptions {
         level: configuration.level,
+        pass: CleanupPass::for_level(configuration.level),
         vocabulary: VocabularySelector::new(&configuration.vocabulary, configuration.vocabulary_similarity_threshold)
             .relevant_terms(&body, configuration.vocabulary_prompt_limit),
         placeholders: prepared
@@ -188,8 +189,8 @@ pub fn prepare(transcript: &str, configuration: &Configuration) -> Prepared {
 
 /// Everything after speech-to-text, with cleanup's language model turned off: snippets, spoken
 /// commands and vocabulary at every level, then the level's rules that need no model, filler
-/// removal, layout and numbers from Medium up. Nothing is reworded, and that was chosen, so it is
-/// not reported as a fallback.
+/// removal, layout and numbers at Standard and Deep. Nothing is reworded, and that was chosen, so
+/// it is not reported as a fallback.
 pub fn finish(transcript: &str, configuration: &Configuration) -> Output {
     match prepare(transcript, configuration) {
         Prepared::Done(output) => output,

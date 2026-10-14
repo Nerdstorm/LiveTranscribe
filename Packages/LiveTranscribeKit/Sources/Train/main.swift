@@ -8,12 +8,12 @@
 //               [--learning-rate <x>] [--rank <n>] [--scale <x>] [--layers <n>]
 //               [--curated-repeats <n>] [--seed <n>]
 //   Train evaluate [--adapter <dir> | --no-adapter] [--data <file.jsonl>]... [--report <file>]
-//   Train measure --level <level> [--data <file.jsonl>]... [--adapter <dir> | --no-adapter] [--timeout <s>]
-//                 [--thinking | --no-thinking] [--thinking-tokens <n>] [--deep-passes one|after-medium]
-//                 [--deep-adapter none|medium|deep] [--deep-adapter-dir <dir>] [--no-medium-fallback]
+//   Train measure --level <level> [--pass correcting|rewording] [--data <file.jsonl>]... [--adapter <dir> | --no-adapter] [--timeout <s>]
+//                 [--thinking | --no-thinking] [--thinking-tokens <n>] [--deep-passes one|after-correcting]
+//                 [--deep-adapter none|medium|deep] [--deep-adapter-dir <dir>] [--no-standard-fallback]
 //                 [--label <text>] [--report <file>]
-//   Train requests --level <level> [--data <file.jsonl>]... [--no-adapter] [--thinking] --out <file>
-//   Train replay --level <level> [--data <file.jsonl>]... [--no-adapter] --outputs <file> [--report <file>]
+//   Train requests --level <level> [--pass correcting|rewording] [--data <file.jsonl>]... [--no-adapter] [--thinking] --out <file>
+//   Train replay --level <level> [--pass correcting|rewording] [--data <file.jsonl>]... [--no-adapter] --outputs <file> [--report <file>]
 
 import Cleanup
 import CleanupTraining
@@ -395,12 +395,12 @@ enum TrainError: LocalizedError {
                                [--learning-rate <x>] [--rank <n>] [--scale <x>] [--layers <n>]
                                [--curated-repeats <n>] [--seed <n>] [--data-dir <prepared-dir>]
                    Train evaluate [--adapter <dir> | --no-adapter] [--data <file.jsonl>]... [--report <file>]
-                   Train measure --level <level> [--data <file.jsonl>]... [--adapter <dir> | --no-adapter] [--timeout <s>]
-                                 [--thinking | --no-thinking] [--thinking-tokens <n>] [--deep-passes one|after-medium]
-                                 [--deep-adapter none|medium|deep] [--deep-adapter-dir <dir>] [--no-medium-fallback]
+                   Train measure --level <level> [--pass correcting|rewording] [--data <file.jsonl>]... [--adapter <dir> | --no-adapter] [--timeout <s>]
+                                 [--thinking | --no-thinking] [--thinking-tokens <n>] [--deep-passes one|after-correcting]
+                                 [--deep-adapter none|medium|deep] [--deep-adapter-dir <dir>] [--no-standard-fallback]
                                  [--label <text>] [--report <file>]
-                   Train requests --level <level> [--data <file.jsonl>]... [--no-adapter] [--thinking] --out <file>
-                   Train replay --level <level> [--data <file.jsonl>]... [--no-adapter] --outputs <file> [--report <file>]
+                   Train requests --level <level> [--pass correcting|rewording] [--data <file.jsonl>]... [--no-adapter] [--thinking] --out <file>
+                   Train replay --level <level> [--pass correcting|rewording] [--data <file.jsonl>]... [--no-adapter] --outputs <file> [--report <file>]
             """
         case .noRevision(let model):
             "\(model) is not in the Hugging Face cache. Pass --revision <commit>, or run the model tests once to download it."

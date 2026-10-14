@@ -727,7 +727,7 @@ fn rejects_a_placeholder_on_a_line_of_its_own() {
             &["⟦A1⟧", "⟦A2⟧", "⟦A3⟧"]
         ),
         GuardVerdict::Rejected(FallbackReason::PlaceholderOnItsOwnLine),
-        "a list of placeholders alone is turned down too, and Medium's sentence shown"
+        "a list of placeholders alone is turned down too, and Standard's sentence shown"
     );
 }
 

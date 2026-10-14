@@ -6,7 +6,7 @@ use std::fmt;
 
 use lt_shared::CleanupLevel;
 
-use crate::{Adapter, CleanupOptions, CleanupRequest, Deadline, PromptBuilder, prompt};
+use crate::{Adapter, CleanupOptions, CleanupPass, CleanupRequest, Deadline, PromptBuilder, prompt};
 
 /// The cleanup model: one request in, the model's reply out. Everything around it (the level's
 /// rules, the prompt, the adapter each request asks for, the deadline, the output guard and the
@@ -23,9 +23,7 @@ pub trait CleanupModel {
     ///
     /// As the Mac app's `MLXCleaner` does, a model without the adapter a request names runs it with
     /// the one [`Adapter::resolved`] gives: Deep's requests with the self-correction adapter when
-    /// it has that one, and any other on the base model. Trained to resolve self-corrections
-    /// whatever the prompt says, an adapter would otherwise do so at Light too, where every word
-    /// must stay, and the output guard would reject the result.
+    /// it has that one, and any other on the base model.
     ///
     /// Generation must stop soon after `deadline.should_stop()` turns true, which the model checks
     /// between tokens: the time is up, or the cleanup was cancelled. What it returns then is
@@ -36,10 +34,14 @@ pub trait CleanupModel {
 /// The first generation compiles kernels and can be slow; it gets a generous deadline.
 pub const WARM_UP_TIMEOUT_SECONDS: f64 = 60.0;
 
-/// The request that warms the model up once it has loaded: Medium's prompt, with the
+/// The request that warms the model up once it has loaded: Standard's correcting prompt, with the
 /// self-correction adapter on when the model has it (`prompts.adapted`), and otherwise Deep's.
 pub fn warm_up_request(prompts: &PromptBuilder) -> CleanupRequest {
-    let template = prompts.template(&CleanupOptions::new(CleanupLevel::Medium));
+    let correcting = CleanupOptions {
+        pass: CleanupPass::Correcting,
+        ..CleanupOptions::new(CleanupLevel::Standard)
+    };
+    let template = prompts.template(&correcting);
     let adapter = if prompts.adapted {
         Adapter::Medium
     } else {
@@ -99,7 +101,8 @@ mod tests {
         assert_eq!(request.adapter, Adapter::Deep);
         assert_eq!(
             request.messages[0].content,
-            prompts.template(&CleanupOptions::new(CleanupLevel::Medium)).system
+            prompt::cleanup().system,
+            "the correcting pass's prompt without the adapter"
         );
     }
 }

@@ -9,7 +9,7 @@ import SwiftUI
 /// before the language model; None's line says so too, and the live transcript applies none of
 /// them), and
 /// self-corrections are resolved only with the fine-tuned adapter
-/// (`PromptBuilder.levelRules(for:adapted:)`), which Advanced can turn off.
+/// (`PromptBuilder.passRules(for:adapted:)`), which Advanced can turn off.
 ///
 /// The cleanup model and its adapter are loaded at launch, so the notes describe the switches
 /// in effect since then (``DictationUIContext/settingsAtLaunch``) and say when Advanced holds a
@@ -49,7 +49,7 @@ enum GeneralSettingsCleanupNotes {
     /// What the levels do without the cleanup model. Filler removal and layout need no model
     /// (`CleanupExecutor.deterministicCleanup`, `Layout`); the live transcript runs no cleanup at
     /// all without it.
-    static let withoutModel = "nothing is reworded: dictation still removes filler words and lays out spoken lists and letters from Medium up, and the live transcript shows what was heard."
+    static let withoutModel = "nothing is reworded: dictation still removes filler words and lays out spoken lists and letters at Standard and Deep, and the live transcript shows what was heard."
 
     /// The cleanup model when it is off or is about to change; `nil` while it is on and stays on.
     private static func modelNote(inEffect: ModelSwitches, stored: ModelSwitches) -> String? {

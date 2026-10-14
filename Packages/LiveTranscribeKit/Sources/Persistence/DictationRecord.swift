@@ -5,7 +5,7 @@ import Foundation
 /// Both texts are kept so the history window can show what cleanup changed and so the user can
 /// recover the raw transcript later. Plain strings stand in for the cleanup level and the delivery
 /// route, so Persistence stays independent of the Styles and Insertion slices; the integrator
-/// stores their raw values (for example `CleanupLevel.medium.rawValue`).
+/// stores their raw values (for example `CleanupLevel.standard.rawValue`).
 public struct DictationRecord: Codable, Sendable, Equatable, Identifiable {
     public let id: UUID
     /// When the dictation was delivered, to the nearest millisecond.
@@ -22,7 +22,8 @@ public struct DictationRecord: Codable, Sendable, Equatable, Identifiable {
     public let rawText: String
     /// The text that was delivered: cleaned, or the raw text when cleanup was off or fell back.
     public let cleanedText: String
-    /// Raw value of the cleanup level in effect, such as "medium".
+    /// Raw value of the cleanup level in effect, such as "standard". Records from before cleanup
+    /// had three levels can name Light, Medium or High.
     public let cleanupLevel: String
     /// Whether cleanup was rejected or failed and the pre-cleanup text was delivered instead.
     public let fellBack: Bool

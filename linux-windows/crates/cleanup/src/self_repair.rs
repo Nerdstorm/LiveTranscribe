@@ -41,7 +41,7 @@ pub(crate) const MIN_BULLETED_ITEMS: usize = 3;
 /// - a filler, a repeated word, or a word that only holds the grammar together dropped or added
 ///   ("I going" → "I am going"); the start of a word broken off and said again in full dropped
 ///   ("con consider" → "consider", `WordFragments`);
-/// - a self-correction resolved ([`corrections`]): as at Medium, up to
+/// - a self-correction resolved ([`corrections`]): as at Standard, up to
 ///   [`GuardPolicy::max_retracted_words`] words and the cue after them taken out, with "not" and
 ///   the words taken back when the speaker says them again ("four, no, not four, five"); from a
 ///   later sentence, a short correction phrase about the same thing (a word they share, or both a

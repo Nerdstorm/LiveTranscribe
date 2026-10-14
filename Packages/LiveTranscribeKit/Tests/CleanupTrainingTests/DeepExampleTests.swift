@@ -26,7 +26,7 @@ struct DeepExampleGeneratorTests {
     }
 
     /// The validator drops the rest: a correction of something no check can tell the phrase is
-    /// about ("the auth service. Sorry, the cache.") is left for Medium's pass.
+    /// about ("the auth service. Sorry, the cache.") is left for Standard's pass.
     @Test("Nearly every generated example passes the validator", arguments: DataSplit.allCases)
     func nearlyEveryExampleIsValid(split: DataSplit) {
         let validator = DeepExampleValidator()
@@ -158,9 +158,9 @@ struct CleanupMeasurementTests {
     @Test func requestsNameTheAdapterTheyRunWith() async {
         let executor = CleanupExecutor(contextLimit: 3, timeoutSeconds: 30, prompts: PromptBuilder(adapted: false), deep: .shipped)
         let correction = EvalCase(id: "jane", category: "correction", raw: "send it to john i mean jane", target: "Send it to Jane.")
-        let strict = await CleanupMeasurement.requests([correction], executor: executor, level: .medium, adapters: [])
+        let strict = await CleanupMeasurement.requests([correction], executor: executor, level: .standard, adapters: [])
         #expect(strict.map(\.adapter) == [.off])
-        let adapted = await CleanupMeasurement.requests([correction], executor: executor, level: .medium, adapters: [.medium, .deep])
+        let adapted = await CleanupMeasurement.requests([correction], executor: executor, level: .standard, adapters: [.medium, .deep])
         #expect(adapted.map(\.adapter) == [.medium])
         let deepWithoutItsOwn = await CleanupMeasurement.requests([deepCase], executor: executor, level: .deep, adapters: [.medium])
         #expect(deepWithoutItsOwn.map(\.adapter) == [.medium])
@@ -177,7 +177,7 @@ struct CleanupMeasurementTests {
         )
         #expect(report.results.map(\.verdict) == [.right])
 
-        // Medium's pass after a rejected repair has no recorded output, so the case falls back.
+        // Standard's cleanup after a rejected repair has no recorded output, so the case falls back.
         let rejected = await CleanupMeasurement.replay(
             [deepCase],
             outputs: ["kirk": "I don't think he answered whether the release is the day after tomorrow."],

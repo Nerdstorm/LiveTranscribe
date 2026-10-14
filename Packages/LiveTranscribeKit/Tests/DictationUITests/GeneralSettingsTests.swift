@@ -92,14 +92,14 @@ struct GeneralSettingsTests {
         }
     }
 
-    /// Without the model, the levels from Medium up still remove fillers and format lists, so they
-    /// do not work like None; the note says what does happen.
+    /// Without the model, Standard and Deep still remove fillers and format lists, so they do not
+    /// work like None; the note says what does happen.
     @Test func cleanupNotesSayWhatTheLevelsStillDoWithTheModelOff() {
         let off = Switches(cleanupEnabled: false, adapterEnabled: true)
         for level in CleanupLevel.allCases {
             let text = notes(level, inEffect: off)
             #expect(text.contains("The cleanup model is off in Advanced, so nothing is reworded"), "\(level)")
-            #expect(text.contains("still removes filler words and lays out spoken lists and letters from Medium up"), "\(level)")
+            #expect(text.contains("still removes filler words and lays out spoken lists and letters at Standard and Deep"), "\(level)")
             #expect(!text.contains("works like None"), "\(level)")
             #expect(!text.contains("Self-corrections"), "the model being off says it all (\(level))")
         }
@@ -108,8 +108,9 @@ struct GeneralSettingsTests {
     /// Self-corrections are resolved only by the adapter, and only at levels that ask for it.
     @Test func cleanupNotesExplainTheAdapterBeingOff() {
         let adapterOff = Switches(cleanupEnabled: true, adapterEnabled: false)
-        #expect(notes(.medium, inEffect: adapterOff).contains("Self-corrections are kept as spoken, because Resolve spoken self-corrections is off in Advanced."))
-        #expect(!notes(.light, inEffect: adapterOff).contains("Self-corrections"))
+        #expect(notes(.standard, inEffect: adapterOff).contains("Self-corrections are kept as spoken, because Resolve spoken self-corrections is off in Advanced."))
+        #expect(notes(.deep, inEffect: adapterOff).contains("Self-corrections are kept as spoken"))
+        #expect(!notes(.none, inEffect: adapterOff).contains("Self-corrections"))
     }
 
     /// Advanced's switches apply at the next launch, so General describes the ones in effect and
@@ -118,17 +119,17 @@ struct GeneralSettingsTests {
         let modelOff = Switches(cleanupEnabled: false, adapterEnabled: true)
         let adapterOff = Switches(cleanupEnabled: true, adapterEnabled: false)
 
-        let turningOff = notes(.medium, inEffect: Self.allOn, stored: modelOff)
+        let turningOff = notes(.standard, inEffect: Self.allOn, stored: modelOff)
         #expect(turningOff.contains("The cleanup model turns off the next time Live Transcribe starts."))
         #expect(!turningOff.contains("nothing is reworded"), "the model still cleans up until then")
 
-        let turningOn = notes(.medium, inEffect: modelOff, stored: Self.allOn)
+        let turningOn = notes(.standard, inEffect: modelOff, stored: Self.allOn)
         #expect(turningOn.contains("The cleanup model is off until Live Transcribe restarts, so nothing is reworded"))
         #expect(!turningOn.contains("off in Advanced"), "Advanced already shows it on")
 
-        #expect(notes(.high, inEffect: Self.allOn, stored: adapterOff)
+        #expect(notes(.deep, inEffect: Self.allOn, stored: adapterOff)
             .contains("Resolve spoken self-corrections turns off the next time Live Transcribe starts."))
-        let adapterTurningOn = notes(.medium, inEffect: adapterOff, stored: Self.allOn)
+        let adapterTurningOn = notes(.standard, inEffect: adapterOff, stored: Self.allOn)
         #expect(adapterTurningOn.contains("Self-corrections are kept as spoken until Live Transcribe restarts"))
         #expect(!adapterTurningOn.contains("off in Advanced"))
     }

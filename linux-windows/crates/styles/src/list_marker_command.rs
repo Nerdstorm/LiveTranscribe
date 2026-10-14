@@ -69,7 +69,7 @@ const ORDINALS: [&str; 11] = [
 /// release"), but not after a comma ("number one, is it ready?") or in a question ("number one is
 /// it ready?").
 ///
-/// Used only where lists are laid out: from Medium up, in fields that take several lines.
+/// Used only where lists are laid out: at Standard and Deep, in fields that take several lines.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ListMarkerCommand;
 

@@ -6,6 +6,9 @@ import Shared
 /// the next dictation or Start without reloading anything.
 public struct CleanupOptions: Sendable, Equatable {
     public var level: CleanupLevel
+    /// Which of the level's requests this is (``CleanupPass``): the level's own unless the
+    /// executor asks for Standard's correcting pass.
+    public var pass: CleanupPass
     /// Canonical spellings the model should use (the user's vocabulary), most relevant first.
     /// The caller caps the list: every term costs prompt tokens and latency.
     public var vocabulary: [String]
@@ -23,12 +26,14 @@ public struct CleanupOptions: Sendable, Equatable {
 
     public init(
         level: CleanupLevel,
+        pass: CleanupPass? = nil,
         vocabulary: [String] = [],
         placeholders: [String] = [],
         multiline: Bool = false,
         letterBody: Bool = false
     ) {
         self.level = level
+        self.pass = pass ?? CleanupPass(level)
         self.vocabulary = vocabulary
         self.placeholders = placeholders
         self.multiline = multiline

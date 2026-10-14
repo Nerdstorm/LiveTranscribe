@@ -12,7 +12,7 @@ public struct DeepExample: Codable, Sendable, Equatable {
         case crossSentence = "cross-sentence"
         /// A correction whose phrase came out garbled ("the after tomorrow"), read as meant.
         case malformed
-        /// A correction within one sentence, as Medium resolves it.
+        /// A correction within one sentence, as Standard resolves it.
         case sameSentence = "same-sentence"
         /// A cue word in its ordinary meaning, which stays: an answer, an apology, a new point.
         case control

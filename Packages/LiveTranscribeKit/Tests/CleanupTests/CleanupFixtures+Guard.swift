@@ -4,7 +4,7 @@ import Shared
 import Testing
 
 extension CleanupFixtures {
-    /// guard.jsonl: the output guard's verdict on each case at every level, in a field that takes
+    /// guard.jsonl: the output guard's verdict on each case in every pass, in a field that takes
     /// one line, and Deep's in one that takes several too; and the parts it judges by (the words,
     /// cues, alignment, names and content it counts, and Deep's repair), so a difference shows
     /// where it starts. guard-policy.json: the default policy, word lists included.
@@ -19,9 +19,9 @@ extension CleanupFixtures {
         }
 
         /// Changes to the default policy, for the cases that test its settings. A word-ratio
-        /// table replaces the default one; levels missing from it use their own bounds.
+        /// table replaces the default one; passes missing from it use their own bounds.
         struct Policy: Encodable {
-            var wordRatioBounds: [CleanupLevel: ClosedRange<Double>]?
+            var wordRatioBounds: [CleanupPass: ClosedRange<Double>]?
             var minSimilarity: Double?
             var preambles: [String]?
             var correctionCues: [String]?
@@ -79,8 +79,8 @@ extension CleanupFixtures {
 
         struct DefaultPolicy: Encodable {
             let wordRatioBounds: [String: [String]]
-            /// Each level's own bounds, which a policy uses for a level missing from its table.
-            let levelWordRatioBounds: [String: [String]]
+            /// Each pass's own bounds, which a policy uses for a pass missing from its table.
+            let passWordRatioBounds: [String: [String]]
             let minSimilarity: String
             let preambles: [String]
             let correctionCues: [String]
@@ -100,7 +100,7 @@ extension CleanupFixtures {
             let outcome: Outcome
             let placeholders: [String]
             let policy: Policy?
-            /// By level, in a field that takes one line.
+            /// By pass, in a field that takes one line.
             let verdicts: [String: Verdict]
             /// Deep's verdict in a field that takes several lines, which only Deep reads.
             let deepMultiline: Verdict
@@ -211,7 +211,7 @@ extension CleanupFixtures {
             let policy = OutputGuard.Policy.default
             return try CleanupFixtures.line(DefaultPolicy(
                 wordRatioBounds: bounds(policy.wordRatioBounds),
-                levelWordRatioBounds: bounds(Dictionary(uniqueKeysWithValues: CleanupLevel.allCases.map { ($0, $0.wordRatioBounds) })),
+                passWordRatioBounds: bounds(Dictionary(uniqueKeysWithValues: CleanupPass.allCases.map { ($0, $0.wordRatioBounds) })),
                 minSimilarity: number(policy.minSimilarity),
                 preambles: policy.preambles,
                 correctionCues: policy.correctionCues,
@@ -231,24 +231,25 @@ extension CleanupFixtures {
             try cases.map { try CleanupFixtures.line(line(for: $0)) }
         }
 
-        static func bounds(_ table: [CleanupLevel: ClosedRange<Double>]) -> [String: [String]] {
-            Dictionary(uniqueKeysWithValues: table.map { level, range in
-                (level.rawValue, [number(range.lowerBound), number(range.upperBound)])
+        static func bounds(_ table: [CleanupPass: ClosedRange<Double>]) -> [String: [String]] {
+            Dictionary(uniqueKeysWithValues: table.map { pass, range in
+                (pass.rawValue, [number(range.lowerBound), number(range.upperBound)])
             })
         }
 
         private static func line(for testCase: Case) -> Line {
             let policy = testCase.policy?.applied ?? .default
             let outputGuard = OutputGuard(policy: policy)
-            func verdict(at level: CleanupLevel, multiline: Bool) -> Verdict {
-                let options = CleanupOptions(level: level, placeholders: testCase.placeholders, multiline: multiline)
+            func verdict(in pass: CleanupPass, multiline: Bool) -> Verdict {
+                let level: CleanupLevel = pass == .repairing ? .deep : .standard
+                let options = CleanupOptions(level: level, pass: pass, placeholders: testCase.placeholders, multiline: multiline)
                 return Verdict(outputGuard.review(raw: testCase.raw, outcome: testCase.outcome, options: options))
             }
             var verdicts: [String: Verdict] = [:]
-            for level in CleanupLevel.allCases {
-                verdicts[level.rawValue] = verdict(at: level, multiline: false)
+            for pass in CleanupPass.allCases {
+                verdicts[pass.rawValue] = verdict(in: pass, multiline: false)
             }
-            let deepMultiline = verdict(at: .deep, multiline: true)
+            let deepMultiline = verdict(in: .repairing, multiline: true)
             var outcome = Outcome()
             var parts: Parts?
             var repair: Repair?

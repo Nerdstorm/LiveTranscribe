@@ -34,7 +34,7 @@ struct DictationControllerTests {
         #expect(saved.first?.cleanedText == "Ship it on friday.")
         #expect(saved.first?.delivery == "accessibility")
         #expect(saved.first?.appName == "Notes")
-        #expect(saved.first?.cleanupLevel == "medium")
+        #expect(saved.first?.cleanupLevel == "standard")
     }
 
     /// Whether the text may break across lines is the delivery's answer for the field dictated

@@ -4,32 +4,32 @@
 
 - **Cleanup is written for English.** Text with Sinhala in it skips the cleanup model, which drops
   Sinhala's vowel signs when it copies them. It gets only the steps that need no model, as when
-  cleanup is turned off: spoken commands (and on the Mac snippets and vocabulary), and from Medium
-  up filler removal and layout, all of which listen for English words. The other languages go
+  cleanup is turned off: spoken commands (and on the Mac snippets and vocabulary), and at Standard
+  and Deep filler removal and layout, all of which listen for English words. The other languages go
   through the English cleanup, which hasn't been tested with them.
 - The speech model learnt Sinhala from read sentences (OpenSLR 52). Conversation, strong accents
   and noise are untested, and Sinhala sentences that mix in a lot of English may not always come
   out in English letters.
 - **Long dictations are untested.** The eval's longest clip is about 40 words. Cleanup runs on
   the whole dictation under a timeout (3 s, and 8 s at Deep), so a dictation longer than a minute
-  or two will likely be inserted uncleaned (fillers still removed from Medium up), without a
-  message. Cleanup takes about four times as long on Linux and Windows, so it happens sooner
-  there; raise **Timeout** in **Settings › Advanced**. Past the recording limit (5 minutes by
-  default) speech is dropped, and the panel says so only when you finish.
+  or two will likely be inserted uncleaned (fillers still removed), without a message. Cleanup
+  takes about four times as long on Linux and Windows, so it happens sooner there; raise
+  **Timeout** in **Settings › Advanced**. Past the recording limit (5 minutes by default) speech
+  is dropped, and the panel says so only when you finish.
 - Spoken self-corrections ("fuel efficiency in cars, sorry, buses" → "fuel efficiency in buses")
   are resolved by a small fine-tuned adapter trained on synthetic data, so expect lower accuracy
   on real speech than the 97% it scored on synthetic held-out examples. The check turns down any
   answer that drops a correction cue without a genuine correction ([Cleanup](cleanup.md)).
 - The adapter occasionally rewrites a plain sentence (1 of 65 eval clips); the check catches it
-  and the dictation is inserted without the model (fillers removed from Medium up, lists and
-  letters still laid out). In dictation such a fallback is silent; on the Mac, only **Dictation
-  History** shows it, if history is on.
-- A 1.7B model can't be relied on to fix words that sound alike, so **High** behaves close to
-  Medium; on the Mac, a vocabulary entry fixes a specific one. Below Deep, the check catches a
-  word left out and a name moved, but not a word replaced by a different one ("milk" → "cream",
-  "three" → "4") unless it is a name. Words that only hold a sentence together ("the", "of",
-  "really") may still be dropped. Names are recognised by the capital letter speech-to-text gives
-  them.
+  and the dictation is inserted without the model (fillers removed, lists and letters still laid
+  out). In dictation such a fallback is silent; on the Mac, only **Dictation History** shows it,
+  if history is on.
+- A 1.7B model can't be relied on to fix words that sound alike, so **Standard**'s rewording
+  changes little; on the Mac, a vocabulary entry fixes a specific one. At Standard, the check
+  catches a word left out and a name moved, but not a word replaced by a different one ("milk" →
+  "cream", "three" → "4") unless it is a name. Words that only hold a sentence together ("the",
+  "of", "really") may still be dropped. Names are recognised by the capital letter speech-to-text
+  gives them.
 - **Deep's repairs are learnt from synthetic data**, and were checked on 114 hand-written cases and
   on dictations of the owner's own; expect less on real speech. The model doesn't always fix what it
   could, and the check lets through any other form of a word that was said, so a wrong tense or
@@ -39,11 +39,12 @@
   "Joan"). A misheard word that doesn't look like the right one ("Max" for "Macs", "Russell" for
   "Rust") stays as speech-to-text wrote it. The check turns down repairs that reorder words ("Friday
   night. Sorry, the night Saturday." → "Saturday night"), or that replace a word across a sentence
-  end with one that has nothing in common with it, and then Medium's cleanup is shown. A correction
-  inside a mention ("words like Docker, sorry, not Docker, Kubernetes") the model may leave as said,
-  or read the wrong way round, which the check turns down. Deep is slower than Medium (379 ms
-  against 288 ms at p50, speech-to-text plus cleanup, on an M4 Pro;
-  [Development](development.md#bench-and-eval)), and a rejected answer adds Medium's pass.
+  end with one that has nothing in common with it, and then Standard's cleanup is shown if Deep's
+  check accepts it. A correction inside a mention ("words like Docker, sorry, not Docker,
+  Kubernetes") the model may leave as said, or read the wrong way round, which the check turns
+  down. Deep is slower than Medium (379 ms against 288 ms at p50, speech-to-text plus cleanup, on
+  an M4 Pro; [Development](development.md#bench-and-eval)), and a rejected answer adds Standard's
+  cleanup.
 - Spoken lists are laid out only when you say their markers ("first…", "one is…", "number one…", or
   a mix of them in order, "bullet point…"), and lists and letters only where line breaks are
   allowed. A number said alone is a marker only with "is", a comma, a colon or a full stop after it:
@@ -102,7 +103,7 @@
 - Reserved system shortcuts (⌘Space, ⌘Tab, …) are recognised by key position on a US layout, so
   on other layouts Settings may accept a shortcut that macOS already uses. ⌃⌥Space is allowed as
   a shortcut but can clash with input-source switching on some Macs.
-- With a cleanup model other than Qwen3-1.7B-4bit (**Settings › Advanced**), Medium and High stop
+- With a cleanup model other than Qwen3-1.7B-4bit (**Settings › Advanced**), Standard stops
   resolving corrections and Deep runs on its prompt alone, since the adapters fit only that model.
 - The speech models in the catalog download at the commit pinned in `speech-models.json`, and
   the cleanup model at its adapters' commit. Silero VAD, a cleanup model without adapters and a

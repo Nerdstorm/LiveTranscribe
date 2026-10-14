@@ -35,30 +35,27 @@ struct PromptBuilderTests {
             """)
     }
 
-    @Test func mediumWithTheAdapterIsTheTrainedPrompt() {
-        #expect(adapted.template(for: CleanupOptions(level: .medium)) == Prompt.adapted)
+    @Test func theCorrectingPassWithTheAdapterIsTheTrainedPrompt() {
+        #expect(adapted.template(for: CleanupOptions(level: .standard, pass: .correcting)) == Prompt.adapted)
     }
 
-    @Test("Without the adapter every level keeps every word", arguments: [CleanupLevel.none, .light, .medium])
-    func withoutTheAdapterLevelsKeepEveryWord(level: CleanupLevel) {
-        #expect(base.template(for: CleanupOptions(level: level)) == Prompt.cleanup)
+    @Test func withoutTheAdapterTheCorrectingPassKeepsEveryWord() {
+        #expect(base.template(for: CleanupOptions(level: .standard, pass: .correcting)) == Prompt.cleanup)
     }
 
-    @Test func lightKeepsEveryWordEvenWithTheAdapter() {
-        #expect(adapted.template(for: CleanupOptions(level: .light)) == Prompt.cleanup)
-    }
-
-    @Test func highAllowsRewording() {
-        let withAdapter = lines(adapted.template(for: CleanupOptions(level: .high)))
+    @Test func standardRewordsUnlessAskedForItsCorrectingPass() {
+        #expect(CleanupOptions(level: .standard).pass == .rewording)
+        #expect(CleanupOptions(level: .deep).pass == .repairing)
+        let withAdapter = lines(adapted.template(for: CleanupOptions(level: .standard)))
         #expect(withAdapter.contains("You may reword lightly for grammar and clarity. Do not add or summarise content."))
         #expect(withAdapter.contains("When the speaker corrects themselves, keep only the correction."))
-        let withoutAdapter = lines(base.template(for: CleanupOptions(level: .high)))
+        let withoutAdapter = lines(base.template(for: CleanupOptions(level: .standard)))
         #expect(withoutAdapter.contains("You may reword lightly for grammar and clarity. Do not add, remove or summarise content."))
         #expect(!withoutAdapter.contains("When the speaker corrects themselves, keep only the correction."))
     }
 
     @Test func vocabularyAndPlaceholdersComeBeforeTheOutputRule() {
-        let options = CleanupOptions(level: .medium, vocabulary: ["Nerdstorm", "GitHub"], placeholders: ["⟦S1⟧"])
+        let options = CleanupOptions(level: .standard, pass: .correcting, vocabulary: ["Nerdstorm", "GitHub"], placeholders: ["⟦S1⟧"])
         let rules = lines(adapted.template(for: options))
         #expect(Array(rules.suffix(3)) == [
             "Spell these names and terms exactly as written: Nerdstorm, GitHub.",
@@ -92,8 +89,8 @@ struct PromptBuilderTests {
 
         let oneLine = adapted.template(for: CleanupOptions(level: .deep, letterBody: true))
         #expect(oneLine == adapted.template(for: CleanupOptions(level: .deep)), "where lines are not allowed the flag changes nothing")
-        #expect(adapted.template(for: CleanupOptions(level: .medium, multiline: true, letterBody: true))
-            == adapted.template(for: CleanupOptions(level: .medium, multiline: true)), "and so does it below Deep")
+        #expect(adapted.template(for: CleanupOptions(level: .standard, multiline: true, letterBody: true))
+            == adapted.template(for: CleanupOptions(level: .standard, multiline: true)), "and so does it at Standard")
     }
 
     @Test func anOverrideIsUsedForEveryLevel() {

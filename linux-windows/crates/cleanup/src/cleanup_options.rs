@@ -1,5 +1,7 @@
 use lt_shared::CleanupLevel;
 
+use crate::CleanupPass;
+
 /// What one cleanup request may do, beyond the model's fixed instructions.
 ///
 /// Chosen per request rather than per model load, so the level, vocabulary and snippets apply to
@@ -7,6 +9,9 @@ use lt_shared::CleanupLevel;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CleanupOptions {
     pub level: CleanupLevel,
+    /// Which of the level's requests this is ([`CleanupPass`]): the level's own unless the
+    /// executor asks for Standard's correcting pass.
+    pub pass: CleanupPass,
     /// Canonical spellings the model should use (the user's vocabulary), most relevant first.
     /// The caller caps the list: every term costs prompt tokens and latency.
     pub vocabulary: Vec<String>,
@@ -24,11 +29,12 @@ pub struct CleanupOptions {
 }
 
 impl CleanupOptions {
-    /// The options for `level`, with no vocabulary and no placeholders, in a field that takes one
-    /// line.
+    /// The options for `level`, with its own pass, no vocabulary and no placeholders, in a field
+    /// that takes one line.
     pub fn new(level: CleanupLevel) -> Self {
         Self {
             level,
+            pass: CleanupPass::for_level(level),
             vocabulary: Vec::new(),
             placeholders: Vec::new(),
             multiline: false,

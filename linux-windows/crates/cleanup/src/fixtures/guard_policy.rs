@@ -1,14 +1,13 @@
-//! guard-policy.json: the output guard's default policy, word lists included, and each level's
+//! guard-policy.json: the output guard's default policy, word lists included, and each pass's
 //! own word-ratio bounds.
 
 use std::collections::BTreeMap;
 use std::ops::RangeInclusive;
 
-use lt_shared::CleanupLevel;
 use serde::Deserialize;
 
 use super::{Exact, exact, read_lines};
-use crate::GuardPolicy;
+use crate::{CleanupPass, GuardPolicy};
 
 fn exact_bounds(bounds: &[String; 2]) -> (Exact, Exact) {
     (exact(&bounds[0]), exact(&bounds[1]))
@@ -22,7 +21,7 @@ fn bounds_of(range: &RangeInclusive<f64>) -> (Exact, Exact) {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct DefaultPolicyJson {
     word_ratio_bounds: BTreeMap<String, [String; 2]>,
-    level_word_ratio_bounds: BTreeMap<String, [String; 2]>,
+    pass_word_ratio_bounds: BTreeMap<String, [String; 2]>,
     min_similarity: String,
     preambles: Vec<String>,
     correction_cues: Vec<String>,
@@ -47,23 +46,23 @@ fn the_default_policy_matches_the_mac_apps() {
     let table: BTreeMap<&str, (Exact, Exact)> = policy
         .word_ratio_bounds
         .iter()
-        .map(|(level, range)| (level.as_str(), bounds_of(range)))
+        .map(|(pass, range)| (pass.as_str(), bounds_of(range)))
         .collect();
     let recorded_table: BTreeMap<&str, (Exact, Exact)> = recorded
         .word_ratio_bounds
         .iter()
-        .map(|(level, bounds)| (level.as_str(), exact_bounds(bounds)))
+        .map(|(pass, bounds)| (pass.as_str(), exact_bounds(bounds)))
         .collect();
     assert_eq!(table, recorded_table, "word-ratio bounds");
-    for level in CleanupLevel::ALL {
+    for pass in CleanupPass::ALL {
         let bounds = recorded
-            .level_word_ratio_bounds
-            .get(level.as_str())
-            .unwrap_or_else(|| panic!("no bounds recorded for {level:?}"));
+            .pass_word_ratio_bounds
+            .get(pass.as_str())
+            .unwrap_or_else(|| panic!("no bounds recorded for {pass:?}"));
         assert_eq!(
-            bounds_of(&level.word_ratio_bounds()),
+            bounds_of(&pass.word_ratio_bounds()),
             exact_bounds(bounds),
-            "{level:?}'s own bounds"
+            "{pass:?}'s own bounds"
         );
     }
     assert_eq!(

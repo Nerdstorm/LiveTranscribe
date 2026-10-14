@@ -1,5 +1,5 @@
-//! prompts.jsonl: the request the model gets for each level, adapter, vocabulary, placeholder
-//! list, text and context, and for Deep in each kind of field, run each way it can be.
+//! prompts.jsonl: the request the model gets for each level and pass, adapter, vocabulary,
+//! placeholder list, text and context, and for Deep in each kind of field, run each way it can be.
 
 use serde::Deserialize;
 
@@ -24,7 +24,7 @@ struct PromptLine {
 #[test]
 fn the_prompts_match_the_mac_apps() {
     let lines: Vec<PromptLine> = read_lines("prompts.jsonl");
-    assert!(lines.len() > 300, "prompts.jsonl was read");
+    assert!(lines.len() > 250, "prompts.jsonl was read");
 
     let mut differences = Vec::new();
     let mut shipped_deep_checked = false;
@@ -40,7 +40,7 @@ fn the_prompts_match_the_mac_apps() {
                 assert_eq!(
                     builder.template(&options),
                     prompt::cleanup(),
-                    "the cleanup prompt is Light's without the adapter"
+                    "the cleanup prompt is the correcting pass's without the adapter"
                 );
                 executor.request(&line.text, &line.context, &options)
             }
@@ -48,7 +48,7 @@ fn the_prompts_match_the_mac_apps() {
                 assert_eq!(
                     builder.template(&options),
                     prompt::adapted(),
-                    "the adapted prompt is Medium's with the adapter"
+                    "the adapted prompt is the correcting pass's with the adapter"
                 );
                 executor.request(&line.text, &line.context, &options)
             }

@@ -6,20 +6,20 @@ import Testing
 struct ContentWordsTests {
     private let outputGuard = OutputGuard()
 
-    private func review(_ raw: String, _ cleaned: String, level: CleanupLevel, placeholders: [String] = []) -> GuardVerdict {
-        outputGuard.review(raw: raw, outcome: .completed(cleaned), options: CleanupOptions(level: level, placeholders: placeholders))
+    private func review(_ raw: String, _ cleaned: String, pass: CleanupPass, placeholders: [String] = []) -> GuardVerdict {
+        outputGuard.review(raw: raw, outcome: .completed(cleaned), options: CleanupOptions(level: .standard, pass: pass, placeholders: placeholders))
     }
 
     private func words(_ text: String) -> [String] {
         EditDistance.words(in: EditDistance.normalize(text))
     }
 
-    @Test("A content word deleted outright is rejected at every level", arguments: [CleanupLevel.light, .medium, .high])
-    func rejectsAContentWordDeletedOutright(level: CleanupLevel) {
-        #expect(review("we need milk, eggs, and bread.", "We need eggs and bread.", level: level) == .rejected(.droppedContent(count: 1)))
+    @Test("A content word deleted outright is rejected in both of Standard's passes", arguments: [CleanupPass.correcting, .rewording])
+    func rejectsAContentWordDeletedOutright(pass: CleanupPass) {
+        #expect(review("we need milk, eggs, and bread.", "We need eggs and bread.", pass: pass) == .rejected(.droppedContent(count: 1)))
     }
 
-    @Test("Rewording at High may not leave content out", arguments: [
+    @Test("Rewording may not leave content out", arguments: [
         ("we could meet at the cafe on the corner or at the office", "We could meet at the cafe or the office.", 1),
         ("i need to cancel the order before friday", "I need the order before Friday.", 1),
         ("Shopping list bullet point milk bullet point eggs bullet point bread.", "Shopping list bullet point: milk, eggs, bread.", 4),
@@ -27,7 +27,7 @@ struct ContentWordsTests {
     ])
     func highRejectsContentLeftOut(raw: String, cleaned: String, count: Int) {
         let placeholders = raw.contains("⟦S1⟧") ? ["⟦S1⟧"] : []
-        #expect(review(raw, cleaned, level: .high, placeholders: placeholders) == .rejected(.droppedContent(count: count)))
+        #expect(review(raw, cleaned, pass: .rewording, placeholders: placeholders) == .rejected(.droppedContent(count: count)))
     }
 
     @Test("Rewording may replace, reorder, respell, merge and rewrite numbers", arguments: [
@@ -48,17 +48,17 @@ struct ContentWordsTests {
     @Test func highAcceptsRewordingThatKeepsTheContent() {
         let raw = "please send the final slides to the whole team tomorrow and i got the room booked for friday"
         let cleaned = "Tomorrow, please send the final slides to the whole team. I have the room booked for Friday."
-        #expect(review(raw, cleaned, level: .high) == .accepted(cleaned))
+        #expect(review(raw, cleaned, pass: .rewording) == .accepted(cleaned))
         let placeholders = ["⟦S1⟧"]
-        #expect(review("send ⟦S1⟧ to the team", "Send ⟦S1⟧ to the team.", level: .high, placeholders: placeholders) == .accepted("Send ⟦S1⟧ to the team."))
+        #expect(review("send ⟦S1⟧ to the team", "Send ⟦S1⟧ to the team.", pass: .rewording, placeholders: placeholders) == .accepted("Send ⟦S1⟧ to the team."))
     }
 
     @Test func aWordMovedOverACueIsNotACorrection() {
-        #expect(review("tell yasmin or rather victor", "Tell Victor, or rather.", level: .medium) == .rejected(.droppedContent(count: 1)))
+        #expect(review("tell yasmin or rather victor", "Tell Victor, or rather.", pass: .correcting) == .rejected(.droppedContent(count: 1)))
     }
 
     @Test func aWordSaidTwiceInARowMayBeSaidOnce() {
-        #expect(review("we need milk milk and bread", "We need milk and bread.", level: .medium) == .accepted("We need milk and bread."))
+        #expect(review("we need milk milk and bread", "We need milk and bread.", pass: .correcting) == .accepted("We need milk and bread."))
     }
 
     @Test func aWordMovedIntoAnotherWordsPlaceDoesNotReplaceIt() {

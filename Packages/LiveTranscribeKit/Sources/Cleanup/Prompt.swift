@@ -23,7 +23,9 @@ public struct CleanupRequest: Sendable, Equatable {
     public enum Adapter: String, Sendable, Equatable, CaseIterable, Codable {
         /// The base model.
         case off = "none"
-        /// The self-correction adapter, trained on Medium's prompt (``Prompt/adapted``).
+        /// The self-correction adapter, trained on Standard's correcting prompt (``Prompt/adapted``).
+        /// Standard's passes use it. Named for the Medium level it was first trained for, as are
+        /// the files of the Linux and Windows model.
         case medium
         /// Deep's adapter, trained on Deep's prompts.
         case deep
@@ -116,20 +118,20 @@ public struct PromptTemplate: Sendable, Equatable {
 /// to correct "CONTEXT + TEXT" in one message tends to return both, which the output guard then
 /// has to reject.
 public enum Prompt {
-    /// Strict correction, the Light level's prompt and every level's without the adapter: the
-    /// model is told to remove nothing, so spoken self-corrections normally stay as said
-    /// ("cars, sorry, buses"). Asking Qwen3-1.7B to resolve them, by
-    /// instruction or by worked examples, resolved at most 1 in 7 correctly, usually kept the
-    /// retracted words instead of the correction, and made it drop hedges such as "I think"
-    /// elsewhere. At Medium and High, ``OutputGuard`` still accepts a correct resolution if the
-    /// model makes one.
-    public static let cleanup = PromptBuilder(adapted: false).template(for: CleanupOptions(level: .light))
+    /// Strict correction, Standard's correcting pass without the adapter: the model is told to
+    /// remove nothing, so spoken self-corrections normally stay as said ("cars, sorry, buses").
+    /// Asking Qwen3-1.7B to resolve them, by instruction or by worked examples, resolved at most 1
+    /// in 7 correctly, usually kept the retracted words instead of the correction, and made it
+    /// drop hedges such as "I think" elsewhere. ``OutputGuard`` still accepts a correct resolution
+    /// if the model makes one.
+    public static let cleanup = PromptBuilder(adapted: false).template(for: CleanupOptions(level: .standard, pass: .correcting))
 
     /// Used with the bundled fine-tuned adapter (``CleanupAdapter``), which was trained on
-    /// exactly this prompt: the Medium level's. The one removal it allows is a spoken
-    /// self-correction; the adapter supplies the ability the base model lacks, and
-    /// ``OutputGuard`` checks that nothing else was removed.
-    public static let adapted = PromptBuilder(adapted: true).template(for: CleanupOptions(level: .medium))
+    /// exactly this prompt: Standard's correcting pass, the Medium level's before Light, Medium
+    /// and High became Standard. The one removal it allows is a spoken self-correction; the
+    /// adapter supplies the ability the base model lacks, and ``OutputGuard`` checks that nothing
+    /// else was removed.
+    public static let adapted = PromptBuilder(adapted: true).template(for: CleanupOptions(level: .standard, pass: .correcting))
 
     /// Qwen3's chat template reads `enable_thinking`. Thinking is off at every level but Deep's
     /// thinking mode: with it on, latency grows by seconds and the `<think>` block has to be removed

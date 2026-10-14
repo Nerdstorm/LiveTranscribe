@@ -49,7 +49,7 @@ struct DictationProcessorTests {
 
     @Test func mediumHidesSnippetsFromTheModelAndExpandsThemAfter() async {
         let cleaner = ScriptedCleaner(reply: Self.tidy)
-        let output = await finish("um send my calendar link to nerd storm", configuration(.medium), cleaner: cleaner)
+        let output = await finish("um send my calendar link to nerd storm", configuration(.standard), cleaner: cleaner)
 
         let request = await cleaner.requests.first
         #expect(request?.text == "send S1 to Nerdstorm", "fillers, snippets and vocabulary are handled before the model")
@@ -75,7 +75,7 @@ struct DictationProcessorTests {
 
     @Test func aDamagedPlaceholderFallsBackWithSnippetsStillExpanded() async {
         let cleaner = ScriptedCleaner { text in Self.tidy(text.replacingOccurrences(of: "S1", with: "S 1")) }
-        let output = await finish("um send my calendar link to nerd storm", configuration(.medium), cleaner: cleaner)
+        let output = await finish("um send my calendar link to nerd storm", configuration(.standard), cleaner: cleaner)
         #expect(output.fellBack)
         #expect(output.fallbackReason == "changed a placeholder")
         #expect(output.text == "send https://cal.example.com/me to Nerdstorm")
@@ -84,19 +84,19 @@ struct DictationProcessorTests {
     @Test func spokenListsBecomeNumberedLinesOnlyInMultilineFields() async {
         let transcript = "we need three things: first, milk; second, eggs; and third, bread."
         let cleaner = ScriptedCleaner { $0.prefix(1).uppercased() + $0.dropFirst() }
-        let multiline = await finish(transcript, configuration(.medium, multiline: true), cleaner: cleaner)
+        let multiline = await finish(transcript, configuration(.standard, multiline: true), cleaner: cleaner)
         #expect(multiline.text == "We need three things:\n1. Milk\n2. Eggs\n3. Bread")
-        let singleLine = await finish(transcript, configuration(.medium, multiline: false), cleaner: cleaner)
+        let singleLine = await finish(transcript, configuration(.standard, multiline: false), cleaner: cleaner)
         #expect(singleLine.text == "We need three things: first, milk; second, eggs; and third, bread.")
-        let light = await finish(transcript, configuration(.light, multiline: true), cleaner: cleaner)
-        #expect(!light.text.contains("\n"), "Light keeps the words as spoken")
+        let none = await finish(transcript, configuration(.none, multiline: true), cleaner: cleaner)
+        #expect(!none.text.contains("\n"), "None keeps the words as spoken")
     }
 
     // MARK: - Spoken commands and layout
 
     @Test func emojiIsHiddenFromTheModelAndWrittenAfter() async {
         let cleaner = ScriptedCleaner(reply: Self.tidy)
-        let output = await finish("hi emoji fireworks", configuration(.medium), cleaner: cleaner)
+        let output = await finish("hi emoji fireworks", configuration(.standard), cleaner: cleaner)
         let request = await cleaner.requests.first
         #expect(request?.text == "hi S1", "the model sees a word for the placeholder")
         #expect(request?.options.placeholders == ["⟦S1⟧"])
@@ -108,7 +108,7 @@ struct DictationProcessorTests {
     /// speaker did not say.
     @Test func commasTheModelPutsAroundAnEmojiGo() async {
         let cleaner = ScriptedCleaner { _ in "Great job, S1, see you tomorrow." }
-        let output = await finish("great job emoji party popper see you tomorrow", configuration(.medium), cleaner: cleaner)
+        let output = await finish("great job emoji party popper see you tomorrow", configuration(.standard), cleaner: cleaner)
         #expect(output.text == "Great job \u{1F389} see you tomorrow.")
     }
 
@@ -120,10 +120,10 @@ struct DictationProcessorTests {
         let none = await finish(transcript, configuration(.none), cleaner: nil)
         #expect(none.text == expected)
         let cleaner = ScriptedCleaner { $0 }
-        let medium = await finish(transcript, configuration(.medium), cleaner: cleaner)
+        let standard = await finish(transcript, configuration(.standard), cleaner: cleaner)
         #expect(await cleaner.requests.first?.text == "Great job! S1. See you soon. S2.", "the model sees the transcript's punctuation")
-        #expect(medium.text == expected)
-        #expect(medium.uncleanedText == expected)
+        #expect(standard.text == expected)
+        #expect(standard.uncleanedText == expected)
     }
 
     @Test func aFullStopAfterAnEmojiInASentenceStays() async {
@@ -133,14 +133,14 @@ struct DictationProcessorTests {
 
     @Test func aDictatedCommaNextToAnEmojiStays() async {
         let cleaner = ScriptedCleaner { _ in "Great job, S1." }
-        let output = await finish("great job comma emoji party popper", configuration(.medium), cleaner: cleaner)
+        let output = await finish("great job comma emoji party popper", configuration(.standard), cleaner: cleaner)
         #expect(output.text == "Great job, \u{1F389}.")
     }
 
     @Test func commasAroundOtherPlaceholdersStay() async {
         let name = Snippet(trigger: "my name", expansion: "Jordan Lee")
         let cleaner = ScriptedCleaner { _ in "Thanks, S1." }
-        let output = await finish("thanks my name", configuration(.medium, snippets: [name]), cleaner: cleaner)
+        let output = await finish("thanks my name", configuration(.standard, snippets: [name]), cleaner: cleaner)
         #expect(output.text == "Thanks, Jordan Lee.")
     }
 
@@ -155,9 +155,9 @@ struct DictationProcessorTests {
 
     @Test func aSpokenLineBreakIsANewlineOnlyWhereTheFieldTakesLines() async {
         let cleaner = ScriptedCleaner(reply: Self.tidy)
-        let multiline = await finish("thanks new paragraph see you soon", configuration(.light, multiline: true), cleaner: cleaner)
+        let multiline = await finish("thanks new paragraph see you soon", configuration(.standard, multiline: true), cleaner: cleaner)
         #expect(multiline.text == "Thanks\n\nSee you soon.")
-        let singleLine = await finish("thanks new paragraph see you soon", configuration(.light), cleaner: cleaner)
+        let singleLine = await finish("thanks new paragraph see you soon", configuration(.standard), cleaner: cleaner)
         #expect(singleLine.text == "Thanks see you soon.")
     }
 
@@ -172,7 +172,7 @@ struct DictationProcessorTests {
         let transcript = "List of to-do tasks for Acme. Number 1, we have to work on the launch. "
             + "Number two, need to fix the Android build."
         let cleaner = ScriptedCleaner { $0 }
-        let output = await finish(transcript, configuration(.medium, multiline: true), cleaner: cleaner)
+        let output = await finish(transcript, configuration(.standard, multiline: true), cleaner: cleaner)
         #expect(await cleaner.requests.first?.text
             == "List of to-do tasks for Acme. S1 we have to work on the launch. S2 need to fix the Android build.")
         #expect(output.text
@@ -186,13 +186,13 @@ struct DictationProcessorTests {
         let cleaner = ScriptedCleaner { $0 }
         let ordinals = await finish(
             "I have a few to-do items. First is work on getting the weed killer. Second is go to the hardware store and buy the weed killer.",
-            configuration(.medium, multiline: true),
+            configuration(.standard, multiline: true),
             cleaner: cleaner
         )
         #expect(ordinals.text
             == "I have a few to-do items:\n1. Work on getting the weed killer.\n2. Go to the hardware store and buy the weed killer.")
         let transcript = "Number one is ship the release. Number two is fix the build."
-        let numbered = await finish(transcript, configuration(.medium, multiline: true), cleaner: cleaner)
+        let numbered = await finish(transcript, configuration(.standard, multiline: true), cleaner: cleaner)
         #expect(numbered.text == "1. Ship the release\n2. Fix the build")
         #expect(numbered.uncleanedText == transcript)
     }
@@ -200,10 +200,10 @@ struct DictationProcessorTests {
     @Test func listMarkersStayWordsWhereNothingIsLaidOut() async {
         let transcript = "Number 1, milk. Number two, eggs."
         let cleaner = ScriptedCleaner { $0 }
-        let singleLine = await finish(transcript, configuration(.medium), cleaner: cleaner)
+        let singleLine = await finish(transcript, configuration(.standard), cleaner: cleaner)
         #expect(singleLine.text == transcript)
-        let light = await finish(transcript, configuration(.light, multiline: true), cleaner: cleaner)
-        #expect(light.text == transcript)
+        let none = await finish(transcript, configuration(.none, multiline: true), cleaner: cleaner)
+        #expect(none.text == transcript)
     }
 
     /// The model sees only the body, so it cannot move names between the greeting and the
@@ -211,7 +211,7 @@ struct DictationProcessorTests {
     @Test func aLetterIsFramedAndOnlyItsBodyIsCleaned() async {
         let transcript = "Dear sir oh madam, I'm writing about my passport renewal. Kind regards Jordan Lee."
         let cleaner = ScriptedCleaner { $0.replacingOccurrences(of: "I'm", with: "I am") }
-        let output = await finish(transcript, configuration(.medium, multiline: true), cleaner: cleaner)
+        let output = await finish(transcript, configuration(.standard, multiline: true), cleaner: cleaner)
         #expect(await cleaner.requests.first?.text == "I'm writing about my passport renewal.")
         #expect(output.text == "Dear Sir or Madam,\n\nI am writing about my passport renewal.\n\nKind regards,\nJordan Lee")
         #expect(output.uncleanedText == transcript)
@@ -224,7 +224,7 @@ struct DictationProcessorTests {
         let transcript = "Hi team, there are a few things I need to talk with you about. One is the launch of the "
             + "application and how to go through the QA process. Two, the marketing part of it. Talk back to me "
             + "when you get five minutes. Thanks."
-        let output = await finish(transcript, configuration(.high, multiline: true), cleaner: ScriptedCleaner { $0 })
+        let output = await finish(transcript, configuration(.standard, multiline: true), cleaner: ScriptedCleaner { $0 })
         #expect(output.text == "Hi team,\n\nThere are a few things I need to talk with you about:\n"
             + "1. The launch of the application and how to go through the QA process.\n2. The marketing part of it.\n\n"
             + "Talk back to me when you get five minutes.\n\nThanks,")
@@ -235,7 +235,7 @@ struct DictationProcessorTests {
     @Test func anEmailWithListMarkersIsLaidOut() async {
         let output = await finish(
             "Hi team, number one the launch, number two the marketing. Thanks",
-            configuration(.medium, multiline: true),
+            configuration(.standard, multiline: true),
             cleaner: ScriptedCleaner { $0 }
         )
         #expect(output.text == "Hi team,\n\n1. The launch\n2. The marketing\n\nThanks,")
@@ -244,7 +244,7 @@ struct DictationProcessorTests {
     @Test func anUnpunctuatedNoteIsFramed() async {
         let output = await finish(
             "Hi John thanks for the update I will review it tomorrow cheers Sam.",
-            configuration(.medium, multiline: true),
+            configuration(.standard, multiline: true),
             cleaner: ScriptedCleaner(reply: Self.tidy)
         )
         #expect(output.text == "Hi John,\n\nThanks for the update I will review it tomorrow.\n\nCheers,\nSam")
@@ -253,7 +253,7 @@ struct DictationProcessorTests {
     @Test func aLetterIsStillFramedWhenCleanupFallsBack() async {
         let output = await finish(
             "Hi John thanks for the update cheers Sam.",
-            configuration(.medium, multiline: true),
+            configuration(.standard, multiline: true),
             cleaner: ScriptedCleaner { _ in "" }
         )
         #expect(output.fellBack)
@@ -262,7 +262,7 @@ struct DictationProcessorTests {
 
     @Test func aLetterIsNotFramedInASingleLineField() async {
         let transcript = "Hi John thanks for the update cheers Sam."
-        let output = await finish(transcript, configuration(.medium), cleaner: ScriptedCleaner { $0 })
+        let output = await finish(transcript, configuration(.standard), cleaner: ScriptedCleaner { $0 })
         #expect(output.text == transcript)
     }
 
@@ -271,7 +271,7 @@ struct DictationProcessorTests {
         let cleaner = ScriptedCleaner(reply: Self.tidy)
         let output = await finish(
             "Hi John, send my calendar link please. Cheers my name",
-            configuration(.medium, multiline: true, snippets: [calendar, name]),
+            configuration(.standard, multiline: true, snippets: [calendar, name]),
             cleaner: cleaner
         )
         let request = await cleaner.requests.first
@@ -299,7 +299,7 @@ struct DictationProcessorTests {
     @Test func aParagraphBreakAfterTheGreetingAddsNoBlankLines() async {
         let output = await finish(
             "Hi John new paragraph thanks for the update cheers Sam",
-            configuration(.medium, multiline: true),
+            configuration(.standard, multiline: true),
             cleaner: ScriptedCleaner { $0 }
         )
         #expect(output.text == "Hi John,\n\nThanks for the update\n\nCheers,\nSam")
@@ -312,7 +312,7 @@ struct DictationProcessorTests {
     @Test func numbersAreWrittenAfterTheModelResolvesACorrection() async {
         let transcript = "the budget is fifty thousand, I mean sixty thousand"
         let cleaner = ScriptedCleaner { _ in "The budget is sixty thousand." }
-        let output = await finish(transcript, configuration(.medium), cleaner: cleaner)
+        let output = await finish(transcript, configuration(.standard), cleaner: cleaner)
         let request = await cleaner.requests.first
         #expect(request?.text == transcript, "no placeholder hides a number from the model")
         #expect(output.text == "The budget is 60,000.")
@@ -320,7 +320,7 @@ struct DictationProcessorTests {
         #expect(!output.fellBack)
     }
 
-    @Test func numbersAreWrittenFromMediumUpInEveryField() async {
+    @Test func numbersAreWrittenAtStandardAndDeepInEveryField() async {
         let transcript = "version two point four point one is out"
         for level in CleanupLevel.allCases {
             for multiline in [false, true] {
@@ -332,13 +332,13 @@ struct DictationProcessorTests {
     }
 
     @Test func numbersAreWrittenWhenCleanupFallsBack() async {
-        let output = await finish("we need twenty one chairs", configuration(.medium), cleaner: ScriptedCleaner { _ in "" })
+        let output = await finish("we need twenty one chairs", configuration(.standard), cleaner: ScriptedCleaner { _ in "" })
         #expect(output.fellBack)
         #expect(output.text == "we need 21 chairs")
     }
 
     @Test func numbersAreWrittenWithTheCleanupModelOff() async {
-        let output = await finish("um we need twenty one chairs", configuration(.medium), cleaner: nil)
+        let output = await finish("um we need twenty one chairs", configuration(.standard), cleaner: nil)
         #expect(output.text == "we need 21 chairs")
         #expect(!output.fellBack)
     }
@@ -347,13 +347,13 @@ struct DictationProcessorTests {
     @Test func spokenListMarkersStillMakeAList() async {
         let cleaner = ScriptedCleaner { _ in "One, go to shops. Two, talk to mechanic." }
         let transcript = "one, go to shops, two talk to mechanic"
-        let multiline = await finish(transcript, configuration(.medium, multiline: true), cleaner: cleaner)
+        let multiline = await finish(transcript, configuration(.standard, multiline: true), cleaner: cleaner)
         #expect(multiline.text == "1. Go to shops\n2. Talk to mechanic")
-        let singleLine = await finish(transcript, configuration(.medium), cleaner: cleaner)
+        let singleLine = await finish(transcript, configuration(.standard), cleaner: cleaner)
         #expect(singleLine.text == "One, go to shops. Two, talk to mechanic.", "markers below ten stay words")
         let withoutTheModel = await finish(
             "one, go to shops, two, talk to mechanic, three, buy twelve eggs",
-            configuration(.medium, multiline: true),
+            configuration(.standard, multiline: true),
             cleaner: nil
         )
         #expect(withoutTheModel.text == "1. Go to shops\n2. Talk to mechanic\n3. Buy 12 eggs")
@@ -363,14 +363,14 @@ struct DictationProcessorTests {
     /// written in digits; in a single-line field the markers below ten stay as said.
     @Test func numberedMarkersStillMakeAList() async {
         let transcript = "number one go to shops number two buy fifteen eggs at nine thirty"
-        let multiline = await finish(transcript, configuration(.medium, multiline: true), cleaner: nil)
+        let multiline = await finish(transcript, configuration(.standard, multiline: true), cleaner: nil)
         #expect(multiline.text == "1. Go to shops\n2. Buy 15 eggs at 9:30")
-        let singleLine = await finish(transcript, configuration(.medium), cleaner: nil)
+        let singleLine = await finish(transcript, configuration(.standard), cleaner: nil)
         #expect(singleLine.text == "number one go to shops number two buy 15 eggs at 9:30")
 
         let markers = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven"]
         let long = markers.map { "number \($0) check the form" }.joined(separator: " ")
-        let laidOut = await finish(long, configuration(.medium, multiline: true), cleaner: nil)
+        let laidOut = await finish(long, configuration(.standard, multiline: true), cleaner: nil)
         #expect(laidOut.text == (1...11).map { "\($0). Check the form" }.joined(separator: "\n"))
     }
 
@@ -378,7 +378,7 @@ struct DictationProcessorTests {
         let office = Snippet(trigger: "my office", expansion: "Suite twenty, Level five")
         let studio = VocabularyEntry(term: "Studio Fifty-Four", spokenVariants: ["studio fifty for"])
         let configuration = DictationProcessor.Configuration(
-            level: .medium,
+            level: .standard,
             snippets: [office],
             vocabulary: [studio],
             vocabularyPromptLimit: 50,
@@ -395,10 +395,10 @@ struct DictationProcessorTests {
 
     // MARK: - Cleanup model turned off
 
-    /// Turning the model off in Advanced is a choice, not a failure: Medium still removes
+    /// Turning the model off in Advanced is a choice, not a failure: Standard still removes
     /// fillers and applies snippets and vocabulary, nothing is reworded, and nothing is flagged.
-    @Test func withTheCleanupModelOffMediumRemovesFillersWithoutFallingBack() async {
-        let output = await finish("um send my calendar link to nerd storm", configuration(.medium), cleaner: nil)
+    @Test func withTheCleanupModelOffStandardRemovesFillersWithoutFallingBack() async {
+        let output = await finish("um send my calendar link to nerd storm", configuration(.standard), cleaner: nil)
         #expect(output.text == "send https://cal.example.com/me to Nerdstorm")
         #expect(output.uncleanedText == "um send https://cal.example.com/me to Nerdstorm")
         #expect(!output.fellBack)
@@ -406,21 +406,21 @@ struct DictationProcessorTests {
         #expect(output.cleanupMs == 0)
     }
 
-    @Test func withTheCleanupModelOffListsAreStillFormattedAndLightKeepsEveryWord() async {
+    @Test func withTheCleanupModelOffListsAreStillFormattedAndNoneKeepsEveryWord() async {
         let transcript = "um we need three things: first, milk; second, eggs; and third, bread."
-        let medium = await finish(transcript, configuration(.medium, multiline: true), cleaner: nil)
-        #expect(medium.text == "we need three things:\n1. Milk\n2. Eggs\n3. Bread")
-        #expect(!medium.fellBack)
+        let standard = await finish(transcript, configuration(.standard, multiline: true), cleaner: nil)
+        #expect(standard.text == "we need three things:\n1. Milk\n2. Eggs\n3. Bread")
+        #expect(!standard.fellBack)
 
-        let light = await finish(transcript, configuration(.light, multiline: true), cleaner: nil)
-        #expect(light.text == transcript, "Light removes nothing and formats nothing without the model")
-        #expect(!light.fellBack)
+        let none = await finish(transcript, configuration(.none, multiline: true), cleaner: nil)
+        #expect(none.text == transcript, "None removes nothing and formats nothing")
+        #expect(!none.fellBack)
     }
 
     @Test func withTheCleanupModelOffALetterIsStillFramed() async {
         let output = await finish(
             "um dear team the build is green. Regards Sam",
-            configuration(.medium, multiline: true),
+            configuration(.standard, multiline: true),
             cleaner: nil
         )
         #expect(output.text == "Dear team,\n\nThe build is green.\n\nRegards,\nSam")
@@ -429,7 +429,7 @@ struct DictationProcessorTests {
 
     @Test func processWithoutACleanerStillTranscribes() async throws {
         let processor = DictationProcessor(transcriber: FakeTranscriber(transcript: " um ship it on friday "), cleaner: nil)
-        let output = try await processor.process([0.1, 0.2], configuration: configuration(.high))
+        let output = try await processor.process([0.1, 0.2], configuration: configuration(.standard))
         #expect(output.text == "ship it on friday")
         #expect(output.rawTranscript == "um ship it on friday")
         #expect(!output.fellBack)
@@ -440,7 +440,7 @@ struct DictationProcessorTests {
             Issue.record("the model should not run")
             return ""
         }
-        let output = await finish("   ", configuration(.medium), cleaner: cleaner)
+        let output = await finish("   ", configuration(.standard), cleaner: cleaner)
         #expect(output.isEmpty)
         #expect(output.rawTranscript.isEmpty)
     }
@@ -451,7 +451,7 @@ struct DictationProcessorTests {
             cleaner: ScriptedCleaner { $0 }
         )
         await #expect(throws: DictationError.transcriptionFailed("model not loaded")) {
-            try await processor.process([0.1], configuration: configuration(.medium))
+            try await processor.process([0.1], configuration: configuration(.standard))
         }
     }
 
@@ -460,7 +460,7 @@ struct DictationProcessorTests {
             transcriber: FakeTranscriber(transcript: " ship it on friday "),
             cleaner: ScriptedCleaner(reply: Self.tidy)
         )
-        let output = try await processor.process([0.1, 0.2], configuration: configuration(.high))
+        let output = try await processor.process([0.1, 0.2], configuration: configuration(.standard))
         #expect(output.text == "Ship it on friday.")
         #expect(output.transcriptionMs >= 0)
     }

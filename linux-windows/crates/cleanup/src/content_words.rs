@@ -21,9 +21,9 @@ static NUMBER_WORD_SET: LazyLock<WordSet> = LazyLock::new(|| WordSet::new(NUMBER
 /// "basically").
 ///
 /// The dropped-words check catches a run of deleted words, but lets one word go at a time and is
-/// off at High, where rewording needs room. This check applies at every level and catches a
-/// single word: "We need milk, eggs, and bread." cleaned to "We need eggs and bread." loses the
-/// milk.
+/// off in Standard's rewording pass, where rewording needs room. This check applies in every pass
+/// and catches a single word: "We need milk, eggs, and bread." cleaned to "We need eggs and
+/// bread." loses the milk.
 ///
 /// Rewording may replace, reorder, respell and merge words, so a deleted content word still counts
 /// as kept when:
@@ -180,12 +180,13 @@ mod tests {
 
     use super::*;
     use crate::words::normalized_words;
-    use crate::{CleanupOptions, FallbackReason, GenerationOutcome, GuardVerdict, OutputGuard};
+    use crate::{CleanupOptions, CleanupPass, FallbackReason, GenerationOutcome, GuardVerdict, OutputGuard};
 
-    fn review(raw: &str, cleaned: &str, level: CleanupLevel, placeholders: &[&str]) -> GuardVerdict {
+    fn review(raw: &str, cleaned: &str, pass: CleanupPass, placeholders: &[&str]) -> GuardVerdict {
         let options = CleanupOptions {
+            pass,
             placeholders: placeholders.iter().map(|&token| token.to_owned()).collect(),
-            ..CleanupOptions::new(level)
+            ..CleanupOptions::new(CleanupLevel::Standard)
         };
         OutputGuard::default().review(raw, &GenerationOutcome::Completed(cleaned.to_owned()), &options)
     }
@@ -199,12 +200,12 @@ mod tests {
     }
 
     #[test]
-    fn a_content_word_deleted_outright_is_rejected_at_every_level() {
-        for level in [CleanupLevel::Light, CleanupLevel::Medium, CleanupLevel::High] {
+    fn a_content_word_deleted_outright_is_rejected_in_both_of_standards_passes() {
+        for pass in [CleanupPass::Correcting, CleanupPass::Rewording] {
             assert_eq!(
-                review("we need milk, eggs, and bread.", "We need eggs and bread.", level, &[]),
+                review("we need milk, eggs, and bread.", "We need eggs and bread.", pass, &[]),
                 GuardVerdict::Rejected(FallbackReason::DroppedContent { count: 1 }),
-                "{level:?}"
+                "{pass:?}"
             );
         }
     }
@@ -231,7 +232,7 @@ mod tests {
         ] {
             let placeholders: &[&str] = if raw.contains("⟦S1⟧") { &["⟦S1⟧"] } else { &[] };
             assert_eq!(
-                review(raw, cleaned, CleanupLevel::High, placeholders),
+                review(raw, cleaned, CleanupPass::Rewording, placeholders),
                 GuardVerdict::Rejected(FallbackReason::DroppedContent { count }),
                 "{raw}"
             );
@@ -262,14 +263,14 @@ mod tests {
         let raw = "please send the final slides to the whole team tomorrow and i got the room booked for friday";
         let cleaned = "Tomorrow, please send the final slides to the whole team. I have the room booked for Friday.";
         assert_eq!(
-            review(raw, cleaned, CleanupLevel::High, &[]),
+            review(raw, cleaned, CleanupPass::Rewording, &[]),
             GuardVerdict::Accepted(cleaned.to_owned())
         );
         assert_eq!(
             review(
                 "send ⟦S1⟧ to the team",
                 "Send ⟦S1⟧ to the team.",
-                CleanupLevel::High,
+                CleanupPass::Rewording,
                 &["⟦S1⟧"]
             ),
             GuardVerdict::Accepted("Send ⟦S1⟧ to the team.".to_owned())
@@ -282,7 +283,7 @@ mod tests {
             review(
                 "tell yasmin or rather victor",
                 "Tell Victor, or rather.",
-                CleanupLevel::Medium,
+                CleanupPass::Correcting,
                 &[]
             ),
             GuardVerdict::Rejected(FallbackReason::DroppedContent { count: 1 })
@@ -295,7 +296,7 @@ mod tests {
             review(
                 "we need milk milk and bread",
                 "We need milk and bread.",
-                CleanupLevel::Medium,
+                CleanupPass::Correcting,
                 &[]
             ),
             GuardVerdict::Accepted("We need milk and bread.".to_owned())

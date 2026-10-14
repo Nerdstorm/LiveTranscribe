@@ -4,7 +4,7 @@ import Shared
 import Testing
 
 extension CleanupFixtures {
-    /// prompts.jsonl: the request for every level with and without the adapter, with each kind of
+    /// prompts.jsonl: the request for every pass with and without the adapter, with each kind of
     /// vocabulary and placeholder list, on texts and contexts that exercise the context window,
     /// the token budget and the one-line rules; then Deep in both kinds of field, with each
     /// adapter, thinking or not; then a prompt override, the warm-up request, the two named
@@ -70,22 +70,30 @@ extension CleanupFixtures {
         /// Deep as tools vary it: each adapter, thinking or not, with a budget for the reasoning
         /// that only thinking uses, and the passes, which don't change the request.
         static let deeps: [DeepCleanup] = [
-            DeepCleanup(passes: .one, adapter: .off, thinking: false, thinkingTokens: 768, fallsBackToMedium: true, minimumTimeoutSeconds: 8),
-            DeepCleanup(passes: .one, adapter: .medium, thinking: false, thinkingTokens: 768, fallsBackToMedium: false, minimumTimeoutSeconds: 8),
-            DeepCleanup(passes: .one, adapter: .deep, thinking: true, thinkingTokens: 768, fallsBackToMedium: true, minimumTimeoutSeconds: 8),
-            DeepCleanup(passes: .one, adapter: .off, thinking: true, thinkingTokens: 32, fallsBackToMedium: true, minimumTimeoutSeconds: 0.5),
-            DeepCleanup(passes: .one, adapter: .medium, thinking: true, thinkingTokens: 1_000, fallsBackToMedium: false, minimumTimeoutSeconds: 12),
-            DeepCleanup(passes: .afterMedium, adapter: .deep, thinking: false, thinkingTokens: 768, fallsBackToMedium: true, minimumTimeoutSeconds: 8),
+            DeepCleanup(passes: .one, adapter: .off, thinking: false, thinkingTokens: 768, fallsBackToStandard: true, minimumTimeoutSeconds: 8),
+            DeepCleanup(passes: .one, adapter: .medium, thinking: false, thinkingTokens: 768, fallsBackToStandard: false, minimumTimeoutSeconds: 8),
+            DeepCleanup(passes: .one, adapter: .deep, thinking: true, thinkingTokens: 768, fallsBackToStandard: true, minimumTimeoutSeconds: 8),
+            DeepCleanup(passes: .one, adapter: .off, thinking: true, thinkingTokens: 32, fallsBackToStandard: true, minimumTimeoutSeconds: 0.5),
+            DeepCleanup(passes: .one, adapter: .medium, thinking: true, thinkingTokens: 1_000, fallsBackToStandard: false, minimumTimeoutSeconds: 12),
+            DeepCleanup(passes: .afterCorrecting, adapter: .deep, thinking: false, thinkingTokens: 768, fallsBackToStandard: true, minimumTimeoutSeconds: 8),
         ]
+
+        /// Every kind of request: None's (which never reaches the model), Standard's two passes
+        /// and Deep's.
+        static let kinds: [(level: CleanupLevel, pass: CleanupPass)] = [
+            (.none, .rewording), (.standard, .correcting), (.standard, .rewording), (.deep, .repairing),
+        ]
+
+        static let correcting = CleanupOptions(level: .standard, pass: .correcting)
 
         static func lines() throws -> [String] {
             var lines: [String] = []
             var combination = 0
             for adapted in [false, true] {
-                for level in CleanupLevel.allCases {
+                for kind in kinds {
                     for vocabulary in vocabularies {
                         for placeholders in placeholderLists {
-                            let options = CleanupOptions(level: level, vocabulary: vocabulary, placeholders: placeholders)
+                            let options = CleanupOptions(level: kind.level, pass: kind.pass, vocabulary: vocabulary, placeholders: placeholders)
                             for offset in [0, 4] {
                                 let input = inputs[(combination + offset) % inputs.count]
                                 lines.append(try line(builder: PromptBuilder(adapted: adapted), options: options, input: input))
@@ -118,15 +126,17 @@ extension CleanupFixtures {
                 let options = CleanupOptions(level: .deep, placeholders: placeholders, multiline: multiline, letterBody: true)
                 lines.append(try line(builder: PromptBuilder(adapted: true), deep: deeps[0], options: options, input: inputs[0]))
             }
-            // The other levels' requests depend on neither.
-            for level in CleanupLevel.allCases where !level.repairsAcrossSentences {
-                let options = CleanupOptions(level: level, vocabulary: ["Nerdstorm"], placeholders: ["⟦S1⟧"], multiline: true)
+            // The other requests depend on neither.
+            for kind in kinds where kind.pass != .repairing {
+                let options = CleanupOptions(level: kind.level, pass: kind.pass, vocabulary: ["Nerdstorm"], placeholders: ["⟦S1⟧"], multiline: true)
                 lines.append(try line(builder: PromptBuilder(adapted: true), deep: deeps[2], options: options, input: inputs[1]))
             }
 
             for (index, input) in inputs.enumerated() {
+                let kind = kinds[index % kinds.count]
                 let options = CleanupOptions(
-                    level: CleanupLevel.allCases[index % CleanupLevel.allCases.count],
+                    level: kind.level,
+                    pass: kind.pass,
                     vocabulary: ["X"],
                     placeholders: ["⟦S1⟧"]
                 )
@@ -134,8 +144,8 @@ extension CleanupFixtures {
                 lines.append(try line(builder: builder, options: options, input: input))
             }
 
-            // What MLXCleaner warms the model up with: Medium's prompt, no context, and the
-            // self-correction adapter when it loaded, otherwise Deep's.
+            // What MLXCleaner warms the model up with: the correcting pass's prompt, no context,
+            // and the self-correction adapter when it loaded, otherwise Deep's.
             let warmUp = Input(text: "this is a warm up sentence", context: [], contextLimit: 0)
             for adapted in [false, true] {
                 let builder = PromptBuilder(adapted: adapted)
@@ -143,19 +153,19 @@ extension CleanupFixtures {
                     for: warmUp.text,
                     context: warmUp.context,
                     contextLimit: warmUp.contextLimit,
-                    template: builder.template(for: CleanupOptions(level: .medium)),
+                    template: builder.template(for: Self.correcting),
                     adapter: adapted ? .medium : .deep
                 )
-                lines.append(try line(name: "warm-up", builder: builder, options: CleanupOptions(level: .medium), input: warmUp, request: request))
+                lines.append(try line(name: "warm-up", builder: builder, options: Self.correcting, input: warmUp, request: request))
             }
 
-            // The named prompts: every level's without the adapter is Light's, and the adapter
-            // was trained on Medium's.
+            // The named prompts: the correcting pass's without the adapter, and with it, which the
+            // adapter was trained on.
             let hello = inputs[0]
-            #expect(PromptBuilder(adapted: false).template(for: CleanupOptions(level: .light)) == Prompt.cleanup)
-            #expect(PromptBuilder(adapted: true).template(for: CleanupOptions(level: .medium)) == Prompt.adapted)
-            lines.append(try line(name: "cleanup", builder: PromptBuilder(adapted: false), options: CleanupOptions(level: .light), input: hello))
-            lines.append(try line(name: "adapted", builder: PromptBuilder(adapted: true), options: CleanupOptions(level: .medium), input: hello))
+            #expect(PromptBuilder(adapted: false).template(for: Self.correcting) == Prompt.cleanup)
+            #expect(PromptBuilder(adapted: true).template(for: Self.correcting) == Prompt.adapted)
+            lines.append(try line(name: "cleanup", builder: PromptBuilder(adapted: false), options: Self.correcting, input: hello))
+            lines.append(try line(name: "adapted", builder: PromptBuilder(adapted: true), options: Self.correcting, input: hello))
             // How the app runs Deep, recorded in full.
             lines.append(try line(
                 name: "deep-shipped",

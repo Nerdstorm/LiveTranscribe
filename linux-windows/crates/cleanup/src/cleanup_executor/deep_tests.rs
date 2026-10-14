@@ -8,7 +8,7 @@ use lt_shared::CleanupLevel;
 use super::*;
 use crate::prompt::{ENABLE_THINKING, max_tokens};
 use crate::test_support::{FakeClock, ScriptedFailure, ScriptedModel, replying};
-use crate::{CleanupRequest, Sampling};
+use crate::{CleanupPass, CleanupRequest, Sampling};
 
 const KIRK: &str = "I tried to speak with Kirk, but he didn't. I don't think he actually check whether the release is tomorrow. No, sorry, the after tomorrow.";
 const REPAIRED: &str = "I tried to speak with Kirk, but he didn't. I don't think he actually checked whether the release is the day after tomorrow.";
@@ -22,7 +22,7 @@ fn deep() -> DeepCleanup {
         adapter: Adapter::Off,
         thinking: false,
         thinking_tokens: 64,
-        falls_back_to_medium: false,
+        falls_back_to_standard: false,
         minimum_timeout_seconds: 0.0,
     }
 }
@@ -80,16 +80,22 @@ fn deep_runs_with_the_adapter_it_says() {
     }
 }
 
+fn last_message(request: &CleanupRequest) -> Option<&str> {
+    request.messages.last().map(|message| message.content.as_str())
+}
+
+/// With a correction cue, Standard's cleanup is its two passes: the correcting pass on what was
+/// said, then the rewording pass on what that resolved.
 #[test]
-fn a_rejected_repair_gets_mediums_cleanup() {
+fn a_rejected_repair_gets_standards_cleanup() {
     let resolved = "The lease ends in May.";
     let deep = DeepCleanup {
         adapter: Adapter::Deep,
-        falls_back_to_medium: true,
+        falls_back_to_standard: true,
         ..deep()
     };
     let (executor, _) = executor(deep, 30.0);
-    // Deep's answer keeps the month taken back; Medium's resolves it.
+    // Deep's answer keeps the month taken back; Standard's resolves it.
     let mut model = ScriptedModel::new(|_, request: &CleanupRequest, _| {
         Ok::<_, ScriptedFailure>(if request.adapter == Adapter::Deep {
             "The lease ends in April.".to_owned()
@@ -98,30 +104,105 @@ fn a_rejected_repair_gets_mediums_cleanup() {
         })
     });
     let cleaned = run(&executor, LEASE, &mut model);
-    assert!(
-        !cleaned.fell_back(),
-        "Medium's cleanup is a success at Medium's standard"
-    );
+    assert!(!cleaned.fell_back(), "Standard's cleanup is a success");
     assert_eq!(cleaned.text, resolved);
-    assert_eq!(adapters(&model), [Adapter::Deep, Adapter::Medium]);
-    let medium = &model.requests[1];
+    assert_eq!(adapters(&model), [Adapter::Deep, Adapter::Medium, Adapter::Medium]);
     assert_eq!(
-        medium.messages[0].content,
+        model.requests[1].messages[0].content,
         prompt::adapted().system,
-        "Medium's pass gets the prompt its adapter was trained on"
+        "the correcting pass gets the prompt its adapter was trained on"
     );
     assert_eq!(
-        medium.messages.last().map(|message| message.content.as_str()),
+        last_message(&model.requests[1]),
         Some(format!("TEXT:\n{LEASE}").as_str()),
-        "Medium cleans what was said, not Deep's answer"
+        "Standard cleans what was said, not Deep's answer"
+    );
+    assert_eq!(
+        model.requests[2].messages[0].content,
+        PromptBuilder::new(true)
+            .template(&CleanupOptions::new(CleanupLevel::Standard))
+            .system
+    );
+    assert_eq!(
+        last_message(&model.requests[2]),
+        Some(format!("TEXT:\n{resolved}").as_str()),
+        "then rewords what it resolved"
     );
 }
 
 #[test]
-fn when_mediums_cleanup_is_rejected_too_what_was_said_is_shown() {
+fn without_a_cue_standards_cleanup_is_one_rewording_pass() {
+    let raw = "i think the build is broken on main";
+    let answer = "I think the build is broken on main.";
+    let deep = DeepCleanup {
+        adapter: Adapter::Deep,
+        falls_back_to_standard: true,
+        ..deep()
+    };
+    let (executor, _) = executor(deep, 30.0);
+    let mut model = ScriptedModel::new(|_, request: &CleanupRequest, _| {
+        Ok::<_, ScriptedFailure>(if request.adapter == Adapter::Deep {
+            format!("Here is the text: {answer}")
+        } else {
+            answer.to_owned()
+        })
+    });
+    let cleaned = run(&executor, raw, &mut model);
+    assert!(!cleaned.fell_back());
+    assert_eq!(cleaned.text, answer);
+    assert_eq!(adapters(&model), [Adapter::Deep, Adapter::Medium]);
+    assert_eq!(
+        model.requests[1].messages[0].content,
+        PromptBuilder::new(true)
+            .template(&CleanupOptions::new(CleanupLevel::Standard))
+            .system
+    );
+}
+
+/// Standard may reword; Deep may not, so a reworded answer of Standard's is not shown at Deep.
+#[test]
+fn a_rewording_of_standards_must_pass_deeps_check_too() {
+    let raw = "i think the build is broken on main";
+    let reworded = "I believe the build is broken on main.";
+    let review = |level| {
+        OutputGuard::default().review(
+            raw,
+            &GenerationOutcome::Completed(reworded.to_owned()),
+            &CleanupOptions::new(level),
+        )
+    };
+    assert_eq!(
+        review(CleanupLevel::Standard),
+        GuardVerdict::Accepted(reworded.to_owned())
+    );
+    assert_eq!(
+        review(CleanupLevel::Deep),
+        GuardVerdict::Rejected(FallbackReason::InvalidRepair)
+    );
+
+    let deep = DeepCleanup {
+        adapter: Adapter::Deep,
+        falls_back_to_standard: true,
+        ..deep()
+    };
+    let (executor, _) = executor(deep, 30.0);
+    let mut model = ScriptedModel::new(|_, request: &CleanupRequest, _| {
+        Ok::<_, ScriptedFailure>(if request.adapter == Adapter::Deep {
+            "Here is the text: I think the build on main is broken.".to_owned()
+        } else {
+            reworded.to_owned()
+        })
+    });
+    let cleaned = run(&executor, raw, &mut model);
+    assert!(cleaned.fell_back());
+    assert_eq!(cleaned.text, raw);
+}
+
+#[test]
+fn when_standards_cleanup_is_rejected_too_what_was_said_is_shown() {
     let (executor, _) = executor(
         DeepCleanup {
-            falls_back_to_medium: true,
+            falls_back_to_standard: true,
             ..deep()
         },
         30.0,
@@ -136,28 +217,28 @@ fn when_mediums_cleanup_is_rejected_too_what_was_said_is_shown() {
     assert_eq!(cleaned.text, LEASE);
 }
 
-/// Medium's guard accepts a correction that takes back the name with the word it corrects; Deep's
-/// check doesn't, so Deep shows what was said, not Medium's answer.
+/// Standard's guard accepts a correction that takes back the name with the word it corrects;
+/// Deep's check doesn't, so Deep shows what was said, not Standard's answer.
 #[test]
-fn mediums_cleanup_must_pass_deeps_check_too() {
+fn standards_cleanup_must_pass_deeps_check_too() {
     let raw = "Kofi's brother, no wait, not brother, cousin, is hosting the barbecue.";
-    let medium = "Cousin is hosting the barbecue.";
-    let review = |level| {
-        OutputGuard::default().review(
-            raw,
-            &GenerationOutcome::Completed(medium.to_owned()),
-            &CleanupOptions::new(level),
-        )
+    let standard = "Cousin is hosting the barbecue.";
+    let review = |options: CleanupOptions| {
+        OutputGuard::default().review(raw, &GenerationOutcome::Completed(standard.to_owned()), &options)
     };
-    assert_eq!(review(CleanupLevel::Medium), GuardVerdict::Accepted(medium.to_owned()));
+    let correcting = CleanupOptions {
+        pass: CleanupPass::Correcting,
+        ..CleanupOptions::new(CleanupLevel::Standard)
+    };
+    assert_eq!(review(correcting), GuardVerdict::Accepted(standard.to_owned()));
     assert_eq!(
-        review(CleanupLevel::Deep),
+        review(CleanupOptions::new(CleanupLevel::Deep)),
         GuardVerdict::Rejected(FallbackReason::InvalidRepair)
     );
 
     let deep = DeepCleanup {
         adapter: Adapter::Deep,
-        falls_back_to_medium: true,
+        falls_back_to_standard: true,
         ..deep()
     };
     let (executor, _) = executor(deep, 30.0);
@@ -165,11 +246,11 @@ fn mediums_cleanup_must_pass_deeps_check_too() {
         Ok::<_, ScriptedFailure>(if request.adapter == Adapter::Deep {
             "Here is the text: Kofi's cousin is hosting the barbecue.".to_owned()
         } else {
-            medium.to_owned()
+            standard.to_owned()
         })
     });
     let cleaned = run(&executor, raw, &mut model);
-    assert_eq!(adapters(&model), [Adapter::Deep, Adapter::Medium]);
+    assert_eq!(adapters(&model), [Adapter::Deep, Adapter::Medium, Adapter::Medium]);
     assert!(cleaned.fell_back());
     assert_eq!(
         cleaned.fallback_reason.as_ref().map(ToString::to_string).as_deref(),
@@ -182,7 +263,7 @@ fn mediums_cleanup_must_pass_deeps_check_too() {
 #[test]
 fn no_answer_in_time_is_not_retried() {
     let deep = DeepCleanup {
-        falls_back_to_medium: true,
+        falls_back_to_standard: true,
         minimum_timeout_seconds: 0.1,
         ..deep()
     };
@@ -209,12 +290,12 @@ fn without_the_fallback_a_rejected_repair_shows_what_was_said() {
 }
 
 #[test]
-fn after_medium_resolves_first_then_repairs() {
+fn after_correcting_resolves_first_then_repairs() {
     let raw = "The meeting is on Tuesday. Sorry, Wednesday. We will review the the budget.";
     let resolved = "The meeting is on Wednesday. We will review the budget.";
     let (executor, _) = executor(
         DeepCleanup {
-            passes: DeepPasses::AfterMedium,
+            passes: DeepPasses::AfterCorrecting,
             ..deep()
         },
         30.0,
@@ -225,7 +306,7 @@ fn after_medium_resolves_first_then_repairs() {
     assert_eq!(
         adapters(&model),
         [Adapter::Medium, Adapter::Off],
-        "Medium's pass runs with the adapter it was trained with"
+        "the correcting pass runs with the adapter it was trained with"
     );
     assert_eq!(model.requests[0].messages[0].content, prompt::adapted().system);
     assert_eq!(
@@ -234,16 +315,16 @@ fn after_medium_resolves_first_then_repairs() {
             .last()
             .map(|message| message.content.as_str()),
         Some(format!("TEXT:\n{resolved}").as_str()),
-        "Deep repairs what Medium resolved"
+        "Deep repairs what the correcting pass resolved"
     );
 }
 
 #[test]
-fn after_medium_keeps_mediums_result_when_the_repair_is_rejected() {
+fn after_correcting_keeps_its_result_when_the_repair_is_rejected() {
     let resolved = "The meeting is on Wednesday.";
     let (executor, _) = executor(
         DeepCleanup {
-            passes: DeepPasses::AfterMedium,
+            passes: DeepPasses::AfterCorrecting,
             ..deep()
         },
         30.0,
@@ -261,10 +342,10 @@ fn after_medium_keeps_mediums_result_when_the_repair_is_rejected() {
 }
 
 #[test]
-fn after_medium_runs_one_pass_without_a_cue() {
+fn after_correcting_runs_one_pass_without_a_cue() {
     let (executor, _) = executor(
         DeepCleanup {
-            passes: DeepPasses::AfterMedium,
+            passes: DeepPasses::AfterCorrecting,
             ..deep()
         },
         30.0,
@@ -350,22 +431,30 @@ fn deep_gets_its_longer_deadline() {
     );
 }
 
-/// Only Deep asks for its adapter or thinks; the other levels ignore how Deep runs.
+/// Only Deep asks for its adapter or thinks; Standard's passes ignore how Deep runs.
 #[test]
-fn each_level_asks_for_its_adapter() {
+fn each_pass_asks_for_its_adapter() {
     let thinking = DeepCleanup {
         adapter: Adapter::Deep,
         thinking: true,
         ..deep()
     };
     let (executor, _) = executor(thinking, 30.0);
-    for (level, adapter, thinks) in [
-        (CleanupLevel::Light, Adapter::Off, false),
-        (CleanupLevel::Medium, Adapter::Medium, false),
-        (CleanupLevel::High, Adapter::Medium, false),
-        (CleanupLevel::Deep, Adapter::Deep, true),
+    let correcting = CleanupOptions {
+        pass: CleanupPass::Correcting,
+        ..CleanupOptions::new(CleanupLevel::Standard)
+    };
+    for (options, adapter, thinks) in [
+        (correcting, Adapter::Medium, false),
+        (CleanupOptions::new(CleanupLevel::Standard), Adapter::Medium, false),
+        (CleanupOptions::new(CleanupLevel::Deep), Adapter::Deep, true),
     ] {
-        let request = executor.request("hello there", &[], &CleanupOptions::new(level));
-        assert_eq!((request.adapter, request.thinks()), (adapter, thinks), "{level:?}");
+        let request = executor.request("hello there", &[], &options);
+        assert_eq!(
+            (request.adapter, request.thinks()),
+            (adapter, thinks),
+            "{:?}",
+            options.pass
+        );
     }
 }

@@ -9,8 +9,9 @@ import Shared
 /// way it describes.
 public struct ExampleValidator: Sendable {
     public static let maxWords = 60
-    /// The adapter is trained on the Medium level's prompt, so its targets must pass Medium's guard.
-    public static let options = CleanupOptions(level: .medium)
+    /// The adapter is trained on Standard's correcting prompt, so its targets must pass that pass's
+    /// guard.
+    public static let options = CleanupOptions(level: .standard, pass: .correcting)
 
     private let outputGuard: OutputGuard
 

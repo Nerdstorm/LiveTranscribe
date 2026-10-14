@@ -6,8 +6,9 @@ import Shared
 /// together ("the", "of", "is", "and") and the intensifiers a rewording may drop ("really",
 /// "basically").
 ///
-/// ``DroppedWords`` catches a run of deleted words, but lets one word go at a time and is off at
-/// High, where rewording needs room. This check applies at every level and catches a single word:
+/// ``DroppedWords`` catches a run of deleted words, but lets one word go at a time and is off in
+/// Standard's rewording pass, where rewording needs room. This check applies in every pass and
+/// catches a single word:
 /// "We need milk, eggs, and bread." cleaned to "We need eggs and bread." loses the milk.
 ///
 /// Rewording may replace, reorder, respell and merge words, so a deleted content word still

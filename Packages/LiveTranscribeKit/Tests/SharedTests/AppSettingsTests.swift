@@ -35,7 +35,7 @@ struct AppSettingsTests {
         settings.llmModel = "mlx-community/Qwen3-0.6B-4bit"
         settings.cleanupEnabled = false
         settings.cleanupAdapterEnabled = false
-        settings.cleanupLevel = .high
+        settings.cleanupLevel = .deep
         settings.vadSilenceMs = 800
         settings.cleanupTimeoutSeconds = 2.5
         store.save(settings)
@@ -78,7 +78,7 @@ struct AppSettingsTests {
         advanced.captureRestartDelaySeconds = 3
         advanced.captureMaxRestartsPerMinute = 12
         var elsewhere = AppSettings.defaults
-        elsewhere.cleanupLevel = .high
+        elsewhere.cleanupLevel = .deep
         elsewhere.sttModel = "example/stt"
         elsewhere.dictation.enabled = false
         elsewhere.dictation.hotkey = "modifier:rightOption"
@@ -206,7 +206,57 @@ struct AppSettingsTests {
         let (store, suite) = makeStore()
         defer { UserDefaults().removePersistentDomain(forName: suite) }
         UserDefaults(suiteName: suite)?.set("extreme", forKey: AppSettingsKey.cleanupLevel.rawValue)
-        #expect(store.load().cleanupLevel == .medium)
+        #expect(store.load().cleanupLevel == .standard)
+    }
+
+    @Test func standardIsTheDefaultLevel() {
+        #expect(AppSettings.defaults.cleanupLevel == .standard)
+    }
+
+    /// Light, Medium and High became Standard. The stored value changes too, since the pickers
+    /// read it directly.
+    @Test func migratingMovesTheEarlierCleanupLevelsToStandard() {
+        for name in ["light", "medium", "high"] {
+            let (store, suite) = makeStore()
+            defer { UserDefaults().removePersistentDomain(forName: suite) }
+            let stored = UserDefaults(suiteName: suite)
+            stored?.set(name, forKey: AppSettingsKey.cleanupLevel.rawValue)
+            #expect(store.load().cleanupLevel == .standard, "\(name) reads as Standard before the migration too")
+
+            store.migrate()
+
+            #expect(stored?.string(forKey: AppSettingsKey.cleanupLevel.rawValue) == "standard", "\(name)")
+            #expect(store.load().cleanupLevel == .standard)
+        }
+    }
+
+    @Test func migratingKeepsNoneDeepAndAnUnsetLevel() {
+        for name in ["none", "deep", nil] {
+            let (store, suite) = makeStore()
+            defer { UserDefaults().removePersistentDomain(forName: suite) }
+            let stored = UserDefaults(suiteName: suite)
+            stored?.set(name, forKey: AppSettingsKey.cleanupLevel.rawValue)
+
+            store.migrate()
+
+            #expect(stored?.string(forKey: AppSettingsKey.cleanupLevel.rawValue) == name)
+        }
+    }
+
+    /// An install that had the speech model repair already still gets the level's.
+    @Test func migratingAfterTheFirstRepairMovesTheLevel() {
+        let (store, suite) = makeStore()
+        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        let stored = UserDefaults(suiteName: suite)
+        stored?.set(1, forKey: "settingsMigrations")
+        stored?.set("high", forKey: AppSettingsKey.cleanupLevel.rawValue)
+        let parakeet = "mlx-community/parakeet-tdt-0.6b-v3"
+        stored?.set(parakeet, forKey: AppSettingsKey.sttModel.rawValue)
+
+        store.migrate()
+
+        #expect(stored?.string(forKey: AppSettingsKey.cleanupLevel.rawValue) == "standard")
+        #expect(store.load().sttModel == parakeet, "the first repair doesn't run again")
     }
 
     @Test func inputDeviceChoiceRoundTrips() {

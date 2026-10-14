@@ -3,7 +3,7 @@
 //!
 //! A correction replaces the words it corrects with its phrase, and the cue goes. Deep reads two
 //! kinds:
-//! - Medium's: up to [`GuardPolicy::max_retracted_words`](crate::GuardPolicy) words just before a
+//! - Standard's: up to [`GuardPolicy::max_retracted_words`](crate::GuardPolicy) words just before a
 //!   run of cues, taken out with the cues ("we need three, sorry, four"), in the cue's sentence;
 //!   or at the end of the one before, when the cues open the next: one phrase that doesn't start
 //!   it ("I left my charger in the garage. Actually, the lobby."), or more after a "scratch that"
@@ -32,7 +32,7 @@
 //! back ([`SelfRepair::leaves_taken_back`]); it corrects that word too ("The billing service goes
 //! live. Sorry, I mean the login service." → "The login service goes live."). Nor does a fact or
 //! a name leave the one of its sort just before the words it corrects ("three servers, sorry,
-//! four" corrects "three", never only "servers"). Medium's take back no more than the corrected
+//! four" corrects "three", never only "servers"). Standard's take back no more than the corrected
 //! words said again ("the physio team, sorry, not physio, nursing" is never "the nursing"), and no
 //! less than a sentence that a phrase opening the way it did starts again ("Ship it to Prague,
 //! scratch that, hold it until September" is never "Ship it to hold it until September").
@@ -79,7 +79,7 @@ const DAYS: [&str; 7] = [
     "sunday",
 ];
 
-/// Medium's corrections in the words said, by said index.
+/// Standard's corrections in the words said, by said index.
 pub(super) struct Spans {
     /// For each start, the ends of the corrected words and cues that may be taken out from there.
     pub(super) ends: Vec<Vec<usize>>,
@@ -94,7 +94,7 @@ pub(super) struct Spans {
     pub(super) keys: Vec<usize>,
 }
 
-/// Medium's corrections in `words`.
+/// Standard's corrections in `words`.
 pub(super) fn spans(words: &[SaidWord], repair: &SelfRepair, placeholders: &WordSet) -> Spans {
     let mut spans = Spans {
         ends: vec![Vec::new(); words.len() + 1],
@@ -304,7 +304,7 @@ fn once(words: &[SaidWord], repair: &SelfRepair, placeholders: &WordSet) -> Vec<
                         for count in 1..=repair.max_retracted_words.min(cue_start - start) {
                             let corrected = start..start + count;
                             let replaces = || count == 1 && !weak && repair.replaces(&words[start], phrase);
-                            // Within a sentence, a phrase that stays where it is was Medium's.
+                            // Within a sentence, a phrase that stays where it is was Standard's.
                             if !(crosses || corrected.end < cue_start)
                                 || words[corrected.clone()].iter().any(|word| word.opens_phrase > 0)
                                 || restated.as_ref().is_some_and(|restated| {
@@ -637,7 +637,7 @@ impl SelfRepair {
         )
     }
 
-    /// Of the words a phrase of Medium's corrections may correct (`corrected`, all of them, since
+    /// Of the words a phrase of Standard's corrections may correct (`corrected`, all of them, since
     /// which a repair took back isn't known), the ones its key word stands in for, which no repair
     /// may write again: the one where the phrase puts it, found by a word the phrase says again
     /// after it ("blue" in "the blue room, sorry, the green room") or else before it ("Sam" in

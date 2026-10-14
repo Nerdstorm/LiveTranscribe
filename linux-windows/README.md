@@ -287,24 +287,26 @@ in Settings › Advanced, as it is at first, the app downloads the model the fir
 models folder, checks each file's SHA-256, and loads it on the CPU on a thread of its own
 (`cleaner.rs`). Settings › Advanced shows how that goes, and then where the model runs and with
 which adapters. Until it's ready, or with it off, nothing is reworded: dictation still removes
-filler words, lays out spoken lists and letters and writes numbers in digits from Medium up.
+filler words, lays out spoken lists and letters and writes numbers in digits at Standard and Deep.
 Turning it off lets the model go, and turning it on loads it again, without a restart. A cleanup
 that takes longer than the **Timeout** there (3 s; for Deep, at least 8 s) is dropped, and the
-text goes in without it, as on the Mac.
+text goes in without it, as on the Mac. The levels are None, Standard and Deep; a `settings.json`
+that still names `light`, `medium` or `high` reads as `standard`.
 
 The model is
 [Nerdstorm/Qwen3-1.7B-MLX-4bit-OpenVINO](https://huggingface.co/Nerdstorm/Qwen3-1.7B-MLX-4bit-OpenVINO)
 (0.94 GB), pinned in `CLEANUP_MODEL` (`crates/language-model/src/pinned_model.rs`). It is the Mac
 app's own weights, mlx-community/Qwen3-1.7B-4bit, which `tools/export-qwen3-cleanup.py` puts in
-OpenVINO's graph for Qwen3-1.7B with each adapter's matrices as inputs of the model, so Medium and
-High resolve self-corrections and Deep runs with its adapter, as on the Mac. To convert it again,
+OpenVINO's graph for Qwen3-1.7B with each adapter's matrices as inputs of the model, so Standard
+resolves self-corrections and Deep runs with its adapter, as on the Mac. To convert it again,
 run the script in a Python environment with the packages it names and the OpenVINO the app ships
 (2026.2.1), publish the folder it writes, and pin the new commit.
 
 Cleanup runs on the CPU, and a Medium cleanup takes about four times as long as on a Mac (Deep
 hasn't been timed on a desktop CPU); neither the NPU nor the GPU is used for it. Its answers match
-the Mac's: 509 of the Mac app's 515 Medium test cases came out word for word the same, and, with
-the same runtime on a Mac's CPU, all 114 of Deep's hand-written cases character for character.
+the Mac's: 509 of the Mac app's 515 self-correction test cases, cleaned by Standard's correcting
+pass, came out word for word the same, and, with the same runtime on a Mac's CPU, all 114 of
+Deep's hand-written cases character for character.
 `Train requests` writes the requests the Mac app makes for a set of cases, `examples/bench.rs` in
 `lt-language-model` answers them, and `Train replay` scores the answers as `Train measure` scores
 the Mac's.

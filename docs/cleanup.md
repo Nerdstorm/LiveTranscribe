@@ -4,11 +4,9 @@
 
 | Level | What cleanup changes |
 |---|---|
-| **None** | Nothing. The transcript is inserted as heard, with spoken commands applied (and, on the Mac, your snippets and vocabulary). |
-| **Light** | Punctuation, casing and misheard words. Fillers and self-corrections are kept as spoken; the model is told not to add or remove words (it may drop a repeated word such as "the the"). |
-| **Medium** (default) | Light, plus: fillers such as "um" are removed, spoken self-corrections are resolved ("Monday, no wait, Tuesday" → "Tuesday"), spoken lists and letters are laid out wherever line breaks are allowed, and spoken numbers are written in digits ("twenty one chairs" → "21 chairs"). |
-| **High** | Medium, plus light rewording for grammar and clarity. On a 1.7B model it behaves close to Medium. A dictation with a word that can cue a correction ("no", "actually", …, whether or not it is one) is cleaned twice: Medium's pass resolves the correction, then High's rewords the result, and if that rewording is rejected, Medium's result is used. |
-| **Deep** | Medium, plus repairs that need the whole dictation: a correction that reaches back into an earlier sentence ("…whether the release is tomorrow. No, sorry, the after tomorrow." → "…whether the release is the day after tomorrow."), a garbled correction phrase read as meant, grammar ("he actually check" → "he actually checked") and misheard words fixed from what the rest says, and emails, letters and lists laid out wherever line breaks are allowed. It doesn't reword as High does: every change must be one of those repairs. Slower, and never the default. |
+| **None** | Nothing. The transcript is inserted as heard, with spoken commands applied (and, on the Mac, your snippets and vocabulary). Fillers are kept, lists and letters aren't laid out, and numbers stay words. |
+| **Standard** (default) | Punctuation, casing and misheard words. Fillers such as "um" are removed, spoken self-corrections are resolved ("Monday, no wait, Tuesday" → "Tuesday"), spoken lists and letters are laid out wherever line breaks are allowed, and spoken numbers are written in digits ("twenty one chairs" → "21 chairs"). Plus light rewording for grammar and clarity, which on a 1.7B model changes little. A dictation with a word that can cue a correction ("no", "actually", …, whether or not it is one) is cleaned in two passes: the correcting pass resolves the correction, then the rewording pass rewords the result, and if that rewording is rejected or there is no time left for it, the correcting pass's result is used. Such a dictation takes longer. |
+| **Deep** | Standard, plus repairs that need the whole dictation: a correction that reaches back into an earlier sentence ("…whether the release is tomorrow. No, sorry, the after tomorrow." → "…whether the release is the day after tomorrow."), a garbled correction phrase read as meant, grammar ("he actually check" → "he actually checked") and misheard words fixed from what the rest says, and emails, letters and lists laid out wherever line breaks are allowed. It doesn't reword as Standard does: every change must be one of those repairs. Slower, and never the default. |
 
 The levels work the same on the Mac, Linux and Windows: Linux and Windows run a Rust port of the
 Mac app's prompts, checks and executor, held to the Swift code by test fixtures, with the same two
@@ -17,13 +15,16 @@ adapters ([Architecture](architecture.md)). Choose the level from the menu bar (
 live transcript. Spoken commands, layout and numbers in digits apply to dictation only, as do the
 Mac's snippets and vocabulary (Linux and Windows have none yet).
 
+If you had chosen **Light**, **Medium** or **High**, you're now on **Standard**. On the Mac,
+dictation history keeps the name of the level each earlier dictation was cleaned at.
+
 ## What cleanup does
 
 - **Self-corrections.** The cues are "sorry", "I mean", "I meant", "no", "wait", "rather",
   "actually", "make that", "scratch that" and "correction" (and, at Deep, "or rather"). A cue may be
   followed by "not" and the words it takes back, said again ("room four, no, not four, five" → "room
   five"); the "not" goes only then, so "Thursday, not Friday" keeps it. A small adapter, trained on
-  synthetic data, resolves them at Medium and High; Deep has an adapter of its own. On the Mac,
+  synthetic data, resolves them at Standard; Deep has an adapter of its own. On the Mac,
   **Resolve spoken self-corrections** in **Settings › Advanced** (on by default) switches both
   adapters off, and then corrections are kept as spoken.
 - **Deep** cares about what a cue follows: "No" that answers a question, "sorry" that apologises and
@@ -37,7 +38,7 @@ Mac's snippets and vocabulary (Linux and Windows have none yet).
   sign-off, and things you need or steps to take as a list, even when you didn't announce one ("We
   need milk, eggs and bread." becomes three bullets). It doesn't yet split a longer letter's body
   into paragraphs ([Known limitations](limitations.md)). What you lay out yourself, by saying "new
-  line", "bullet point" or "number one", the layout rules lay out as at Medium.
+  line", "bullet point" or "number one", the layout rules lay out as at Standard.
 - **Lists.** A list needs at least two items, marked by spoken ordinals in order from "first"
   ("first", "second", … to "tenth", or "firstly", …; "finally" or "lastly" may end it), by the
   numbers one, two, … to ten in order, each starting a clause and followed by "is" or "was", a
@@ -60,10 +61,10 @@ Mac's snippets and vocabulary (Linux and Windows have none yet).
   "-", each item starts with a capital, the line before the list ends with a colon, text after the
   list starts a new paragraph, and items keep their full stops only if every item is a sentence of
   four words or more. No other words change.
-- **Numbers.** From Medium up, in every field, rules write spoken numbers in digits once the model
-  and the list layout are done. The model sees and writes numbers as words, so it can still resolve
-  a correction between them ("fifty thousand, I mean sixty thousand" → "60,000"); speech-to-text
-  writes them as words too. These always become digits:
+- **Numbers.** At Standard and Deep, in every field, rules write spoken numbers in digits once the
+  model and the list layout are done. The model sees and writes numbers as words, so it can still
+  resolve a correction between them ("fifty thousand, I mean sixty thousand" → "60,000");
+  speech-to-text writes them as words too. These always become digits:
 
   | Said | Written |
   |---|---|
@@ -114,13 +115,13 @@ Mac's snippets and vocabulary (Linux and Windows have none yet).
   only the system's own edit controls (Notepad's, older programs') are known to take several
   lines; browser, Electron and Office fields are typed on one line, with line breaks as spaces.
 - **A check on every answer.** The model's answer is used only if it passes. Otherwise your own
-  words are typed instead, with fillers still removed from Medium up, lists and letters still
-  laid out, and numbers still written in digits. Below Deep, an answer fails if it:
+  words are typed instead, with fillers still removed, lists and letters still laid out, and
+  numbers still written in digits. At Standard, an answer fails if it:
   - is empty or chatty;
   - drops a correction cue without a genuine self-correction;
-  - deletes a run of spoken words (below High), or leaves out a word that carries meaning at any
-    level ("milk" from "milk, eggs and bread"): rewording may replace, reorder or respell words,
-    but not drop them;
+  - deletes a run of spoken words (in the correcting pass, which may not reword), or leaves out a
+    word that carries meaning in either pass ("milk" from "milk, eggs and bread"): rewording may
+    replace, reorder or respell words, but not drop them;
   - drops or moves a name ("hi John … cheers Sam" → "Hi Sam, … Cheers."), or drops a negation;
   - alters a placeholder (for a snippet, emoji, address, line break or list marker);
   - or changes the word count or the text too much.
@@ -139,9 +140,10 @@ Mac's snippets and vocabulary (Linux and Windows have none yet).
   fewer than three items (two are a list only when you set them off: with a colon or a pause that
   speech-to-text writes as a full stop, "a few things we need. Getting the feeds working and
   releasing the fix", or with a comma after words that count them, "two things, …"), and a
-  placeholder alone on a line. When Deep's answer is turned down, Medium's pass runs in the time
-  left, and its answer is shown if Deep's check accepts it too; otherwise you get what you said.
-- **With the language model off**, nothing is reworded. Medium, High and Deep still remove fillers,
+  placeholder alone on a line. When Deep's answer is turned down, Standard's cleanup (its one or
+  two passes) runs in the time left, and its answer is shown if Deep's check accepts it too;
+  otherwise you get what you said.
+- **With the language model off**, nothing is reworded. Standard and Deep still remove fillers,
   lay out lists and letters and write numbers in digits in dictation, and snippets, vocabulary and
   spoken commands still apply. The switch is **Clean up transcripts with the LLM** in **Settings ›
   Advanced**; on the Mac it applies at the next launch, on Linux and Windows at once.
@@ -185,6 +187,6 @@ Until it has loaded, nothing is reworded. A Medium cleanup takes about four time
 Mac (Deep hasn't been timed on a desktop CPU), so the timeout matters more: if long dictations go in
 uncleaned, raise **Timeout** in **Settings › Advanced**. The model is the Mac's own weights
 converted for OpenVINO, with the adapters as inputs of the model. Its answers match the Mac's: 509
-of the Mac app's 515 Medium test cases word for word, and, run on a Mac's CPU, all 114 of Deep's
-hand-written cases character for character
+of the Mac app's 515 self-correction test cases word for word, cleaned by Standard's correcting
+pass, and, run on a Mac's CPU, all 114 of Deep's hand-written cases character for character
 ([linux-windows/README.md](../linux-windows/README.md#cleanup)).

@@ -19,7 +19,10 @@ use lt_shared::CleanupLevel;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 
-use crate::{Adapter, CleanupOptions, CleanupRequest, DeepCleanup, DeepPasses, Example, PromptBuilder, PromptTemplate};
+use crate::{
+    Adapter, CleanupOptions, CleanupPass, CleanupRequest, DeepCleanup, DeepPasses, Example, PromptBuilder,
+    PromptTemplate,
+};
 
 /// Differences shown in full when a fixture fails; the rest are counted.
 const SHOWN: usize = 10;
@@ -59,6 +62,13 @@ fn level(name: &str) -> CleanupLevel {
         .into_iter()
         .find(|level| level.as_str() == name)
         .unwrap_or_else(|| panic!("no cleanup level {name:?}"))
+}
+
+fn pass(name: &str) -> CleanupPass {
+    CleanupPass::ALL
+        .into_iter()
+        .find(|pass| pass.as_str() == name)
+        .unwrap_or_else(|| panic!("no cleanup pass {name:?}"))
 }
 
 /// A number as the Mac app recorded it.
@@ -107,6 +117,7 @@ fn adapter(name: &str) -> Adapter {
 #[serde(deny_unknown_fields)]
 struct OptionsJson {
     level: String,
+    pass: String,
     vocabulary: Vec<String>,
     placeholders: Vec<String>,
     multiline: bool,
@@ -118,6 +129,7 @@ impl OptionsJson {
     fn options(&self) -> CleanupOptions {
         CleanupOptions {
             level: level(&self.level),
+            pass: pass(&self.pass),
             vocabulary: self.vocabulary.clone(),
             placeholders: self.placeholders.clone(),
             multiline: self.multiline,
@@ -134,7 +146,7 @@ struct DeepJson {
     adapter: String,
     thinking: bool,
     thinking_tokens: usize,
-    falls_back_to_medium: bool,
+    falls_back_to_standard: bool,
     minimum_timeout_seconds: String,
 }
 
@@ -148,7 +160,7 @@ impl DeepJson {
             adapter: adapter(&self.adapter),
             thinking: self.thinking,
             thinking_tokens: self.thinking_tokens,
-            falls_back_to_medium: self.falls_back_to_medium,
+            falls_back_to_standard: self.falls_back_to_standard,
             minimum_timeout_seconds: number(&self.minimum_timeout_seconds),
         }
     }

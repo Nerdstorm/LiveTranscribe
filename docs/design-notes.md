@@ -11,7 +11,7 @@ in [Architecture](architecture.md), with diagrams.
   ([Nerdstorm/LiveTranscribe-Sinhala](https://github.com/Nerdstorm/LiveTranscribe-Sinhala)). Cleanup
   stays on Qwen3-1.7B: a 4B model fixed only a little more, at 2 to 2.5 times the time
   ([Architecture](architecture.md)), and no 4B or larger model is planned, now or for a later
-  Command Mode. That is also why **High** behaves close to Medium.
+  Command Mode. That is also why **Standard**'s rewording changes little.
 - **Speech models are loaded by kind** (`Transcription/SpeechModelKind.swift`): the app reads
   `model_type` from a model's config.json and loads it from its folder, downloaded or local, with
   mlx-audio-swift's loader for that kind. The list mirrors mlx-audio-swift's own `STT.loadModel`,
@@ -37,32 +37,37 @@ in [Architecture](architecture.md), with diagrams.
 
 ## Cleanup
 
-- **The adapters are switched per request**: the self-correction adapter at Medium and High,
-  Deep's at Deep, and none at Light, so Light never resolves corrections. Both adapt the same
-  layers, so one set of LoRA layers is loaded and the adapter a request needs has its weights
-  swapped in, in the same step as the generation.
+- **The adapters are switched per request**: the self-correction adapter in Standard's passes,
+  and Deep's at Deep. Both adapt the same layers, so one set of LoRA layers is loaded and the
+  adapter a request needs has its weights swapped in, in the same step as the generation.
 - **The adapters are loaded as separate LoRA layers**, at the exact base-model commit they were
   trained on, not fused into the weights. Fusing re-quantizes the adapted weights to 4 bits, and
   the fused adapter resolved only 13% of self-corrections.
-- **At High, a dictation with a correction cue is cleaned twice**: Medium's prompt, which the
-  adapter was trained on, resolves the correction, then High's rewords the result within the same
-  deadline. A rejected rewording keeps the first pass.
+- **Three levels: None, Standard and Deep.** Standard is what High was, which on a 1.7B model
+  behaved close to Medium. Light and Medium went, and a saved Light, Medium or High becomes
+  Standard, so None is the only level that keeps fillers.
+- **At Standard, a dictation with a correction cue is cleaned twice**: the correcting pass, on the
+  prompt the adapter was trained on (Medium's), resolves the correction, then the rewording pass
+  rewords the result within the same deadline. A rejected rewording keeps the first pass. So a
+  dictation with a cue takes longer than it did at Medium. Each pass has its own word-ratio bounds
+  (0.5 to 1.2 for correcting, 0.4 to 1.3 for rewording), and only the rewording pass may delete a
+  run of spoken words.
 - **Fillers and layout are rules, not model output.** A 1.7B model does neither reliably, and a
   rule can be tested exhaustively. Fillers are removed before the model runs; lists are laid out
   after it, only where line breaks are allowed; list items keep the speaker's words, since layout
   moves and punctuates and never rewords. A letter's greeting and sign-off are found before the
   model runs and only its body is cleaned: shown a whole letter, the model moved the name in the
   sign-off into the greeting.
-- **The check keeps names in place and content words in, at every level below Deep.** In a
+- **The check keeps names in place and content words in, in both of Standard's passes.** In a
   single-line field there is no letter frame, and the model still moved the sign-off's name into
-  the greeting; at High, rewording was checked for length and similarity only, and dropped "milk"
-  from a shopping list. Now a name (a capitalised word that does not start a sentence) must stay
-  where it was said, or be respelled there, and a word that is not a function word ("the", "of",
-  "is", "really") may not be deleted with nothing in its place. Function words are a fixed list
-  rather than a part-of-speech tagger: a list is deterministic and testable, and a tagger's errors
-  on unpunctuated speech would decide what counts as content. On 860 texts without a correction
-  cue, cleaned at High, the two checks rejected only 2 answers the old check accepted, and both had
-  changed the meaning.
+  the greeting; at High (now Standard), rewording was checked for length and similarity only, and
+  dropped "milk" from a shopping list. Now a name (a capitalised word that does not start a
+  sentence) must stay where it was said, or be respelled there, and a word that is not a function
+  word ("the", "of", "is", "really") may not be deleted with nothing in its place. Function words
+  are a fixed list rather than a part-of-speech tagger: a list is deterministic and testable, and a
+  tagger's errors on unpunctuated speech would decide what counts as content. On 860 texts without
+  a correction cue, cleaned at High (now Standard), the two checks rejected only 2 answers the old
+  check accepted, and both had changed the meaning.
 - **Snippets and spoken commands are hidden from the model.** Each snippet trigger, emoji,
   address, line break and list marker becomes a placeholder (`⟦S1⟧`) that the model must copy
   unchanged. The check rejects any output that alters one, and what it stands for goes back in only
@@ -82,8 +87,8 @@ in [Architecture](architecture.md), with diagrams.
 
 ## Deep
 
-- **Deep is a level of its own, not a stronger High.** Repairs across sentences need a model that
-  may change more, and a check that knows which changes are repairs. Widening the check's
+- **Deep is a level of its own, not a stronger Standard.** Repairs across sentences need a model
+  that may change more, and a check that knows which changes are repairs. Widening the check's
   word-count and similarity limits would let rewording through too, so Deep's answer is checked by
   lining up the words said with the words written (`SelfRepair`), where every difference must be
   a repair Deep may make and names, numbers, dates, negations and placeholders are protected.
@@ -110,16 +115,17 @@ in [Architecture](architecture.md), with diagrams.
   one, or at the start of a list item.
   A capital still guards a name everywhere else, since the capital is all the check has to tell a
   name from a misheard word.
-- **A rejected Deep answer gets Medium's pass**, not the uncleaned text, so choosing Deep never
-  shows less than Medium would. Running Medium's pass first, on every dictation with a
-  correction cue, took two passes and got fewer right (72 of the 114, against 88 in one pass).
-- **Deep's limits.** A correction may take back up to six words, as at Medium, and its phrase may
-  bring up to two new ones; one from a later sentence must share a word or a kind of fact with what
-  it corrects, unless it replaces the phrase that sentence ends with by one that starts like it
-  (not a whole sentence, a new clause, or a bare number for "two chairs"); Deep waits at least
-  8 s, since a rejected answer runs Medium's pass too; and an
-  answer that drops a later sentence's correction whole is rejected, after Deep's adapter did that
-  on a real dictation.
+- **A rejected Deep answer gets Standard's cleanup** (its one or two passes), not the uncleaned
+  text, and its answer is shown if Deep's check accepts it too, so choosing Deep shows what
+  Standard would wherever that check allows. Running the correcting pass first, on every
+  dictation with a correction cue, took two passes and got fewer right (72 of the 114, against 88
+  in one pass).
+- **Deep's limits.** A correction may take back up to six words, as at Standard, and its phrase
+  may bring up to two new ones; one from a later sentence must share a word or a kind of fact with
+  what it corrects, unless it replaces the phrase that sentence ends with by one that starts like
+  it (not a whole sentence, a new clause, or a bare number for "two chairs"); Deep waits at least
+  8 s, since a rejected answer runs Standard's cleanup too; and an answer that drops a later
+  sentence's correction whole is rejected, after Deep's adapter did that on a real dictation.
 
 ### How Deep was chosen
 
@@ -128,7 +134,8 @@ a new prompt, a separate pass, or training), and for Qwen3's thinking mode to sh
 helped. Each was measured with `Train measure` on an M4 Pro on 2026-09-30, on the 114 hand-written
 cases in [`Training/eval/deep.jsonl`](../Packages/LiveTranscribeKit/Training/eval/deep.jsonl),
 which nothing was trained on. Right means the shown text is the target, ignoring casing and
-punctuation.
+punctuation. These runs were made when there were five levels: Medium's pass is what Standard's
+correcting pass is now, with the same prompt, adapter and check, and Deep fell back to it alone.
 
 | Deep ran with | Right | Fell back | Unchanged | Meaning changed | Other | p50 (ms) | p95 (ms) |
 |---|---:|---:|---:|---:|---:|---:|---:|
@@ -154,18 +161,19 @@ Each row is one run, so latencies from different rows are only roughly comparabl
 - **An adapter of its own.** Trained on Deep's prompt with synthetic examples only
   ([Training/README.md](../Packages/LiveTranscribeKit/Training/README.md#deeps-adapter)), it
   fixed what the prompt alone could not: the model copied every correction without it.
-- **Medium's pass after a rejected answer**, so Deep shows at least what Medium would: on
-  Medium's own 515 test cases, Deep got 508 right, three more than Medium, where Deep's answer
+- **A fallback after a rejected answer**, so Deep shows at least what the level below it would.
+  With Medium's pass as the fallback (Standard's cleanup is the fallback now), on the 515
+  self-correction test cases, Deep got 508 right, three more than Medium, where Deep's answer
   alone got 501.
 
 Deep was also run, with its first adapter, on 246 dictations from the owner's history on the Mac.
 They were used only to measure: never trained on, never in a prompt, never committed. Their target is the text the app
 inserted at the time, which is not always right, so this measures how much Deep changes more than
-how right it is. Deep's text matched it on 198, Medium's on 214, and neither changed a protected
-fact. Of Deep's other 48 answers, many differ only in what this run leaves out (spoken emoji, and
-the line breaks the app laid out in fields that take several lines), several are better, a few
-reword more than they need to, and one dropped a later sentence's correction together with what it
-corrected, which the check now turns down.
+how right it is. Deep's text matched it on 198, Medium's (now Standard's correcting pass) on 214,
+and neither changed a protected fact. Of Deep's other 48 answers, many differ only in what this
+run leaves out (spoken emoji, and the line breaks the app laid out in fields that take several
+lines), several are better, a few reword more than they need to, and one dropped a later
+sentence's correction together with what it corrected, which the check now turns down.
 
 ## Dictation on the Mac
 

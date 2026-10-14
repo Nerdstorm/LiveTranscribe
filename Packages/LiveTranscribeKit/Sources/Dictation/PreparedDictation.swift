@@ -20,9 +20,9 @@ import Vocabulary
 struct PreparedDictation {
     /// The transcript with phrases replaced and vocabulary applied: what cleanup starts from.
     let text: String
-    /// Lists and letters are laid out: from Medium up, in fields that take several lines.
+    /// Lists and letters are laid out: at Standard and Deep, in fields that take several lines.
     let laysOut: Bool
-    /// Spoken numbers are written in digits: from Medium up, in every field.
+    /// Spoken numbers are written in digits: at Standard and Deep, in every field.
     let writesNumbers: Bool
     private let protected: ProtectedText
     private let layout: Layout

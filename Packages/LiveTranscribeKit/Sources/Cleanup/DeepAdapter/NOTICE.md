@@ -13,7 +13,7 @@ adapter for Qwen3-1.7B by the Qwen team, Alibaba Cloud, converted by mlx-communi
 - Config SHA-256: `4da7a22747aee524dd279579f7deabd20bf6da0ba6381acf0a87bce23309679e`
 
 `adapters.safetensors` contains the weights. `adapter_config.json` pins the base revision
-and the LoRA shape: rank 8, scale 20, last 16 layers. Medium and High use the separate
+and the LoRA shape: rank 8, scale 20, last 16 layers. Standard's passes use the separate
 adapter in `../Adapter`; its weights are unchanged.
 
 Training combined synthetic dictations, their measured macOS text-to-speech recognizer

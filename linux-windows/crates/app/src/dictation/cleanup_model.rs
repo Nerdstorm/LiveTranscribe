@@ -17,8 +17,8 @@ pub(crate) struct BundledAdapter {
     pub(crate) weights: &'static [u8],
 }
 
-/// The Mac app's adapters, compiled into the app: the self-correction adapter, which Medium and
-/// High use, and Deep's. About 10 MB each.
+/// The Mac app's adapters, compiled into the app: the self-correction adapter, which Standard's
+/// passes use, and Deep's. About 10 MB each.
 pub(crate) const BUNDLED_ADAPTERS: [BundledAdapter; 2] = [
     BundledAdapter {
         adapter: Adapter::Medium,
@@ -48,7 +48,7 @@ pub(crate) struct OpenVinoCleanup {
 
 impl OpenVinoCleanup {
     /// `model`, with the bundled adapters it takes: none when it was exported without adapter
-    /// inputs. Without the self-correction adapter, Light, Medium and High ask for nothing to be
+    /// inputs. Without the self-correction adapter, Standard's passes ask for nothing to be
     /// removed, as the Mac app does when its adapter can't be used, and Deep runs on the base
     /// model.
     pub(crate) fn new(mut model: LanguageModel) -> Self {
@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn a_request_keeps_its_prompt_and_budget() {
-        let request = request_at(CleanupLevel::Medium, true);
+        let request = request_at(CleanupLevel::Standard, true);
         let runtime = runtime_request(&request, &[Adapter::Medium, Adapter::Deep]);
         assert_eq!(runtime.messages.len(), request.messages.len());
         assert_eq!(
@@ -152,8 +152,7 @@ mod tests {
     fn each_level_runs_with_the_adapter_the_model_has() {
         let adapter = |level, loaded: &[Adapter]| runtime_request(&request_at(level, true), loaded).adapter;
         let both = [Adapter::Medium, Adapter::Deep];
-        assert_eq!(adapter(CleanupLevel::Light, &both), None);
-        assert_eq!(adapter(CleanupLevel::High, &both).as_deref(), Some("medium"));
+        assert_eq!(adapter(CleanupLevel::Standard, &both).as_deref(), Some("medium"));
         assert_eq!(adapter(CleanupLevel::Deep, &both).as_deref(), Some("deep"));
         assert_eq!(
             adapter(CleanupLevel::Deep, &[Adapter::Medium]).as_deref(),
@@ -161,7 +160,7 @@ mod tests {
             "Deep without its own adapter runs with the self-correction adapter"
         );
         assert_eq!(
-            adapter(CleanupLevel::Medium, &[]),
+            adapter(CleanupLevel::Standard, &[]),
             None,
             "a model without adapters runs on its own"
         );

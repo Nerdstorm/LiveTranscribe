@@ -19,8 +19,6 @@ public enum FallbackReason: Sendable, Equatable, CustomStringConvertible {
     case lowSimilarity(Double)
     /// A correction cue was dropped, but the removed words were not a self-correction.
     case invalidSelfCorrection
-    /// A self-correction was resolved at a level that keeps every spoken word.
-    case selfCorrectionNotAllowed
     /// A placeholder (for a snippet, emoji, address, line break or list marker) was dropped,
     /// repeated or altered.
     case placeholderChanged
@@ -59,7 +57,6 @@ public enum FallbackReason: Sendable, Equatable, CustomStringConvertible {
         case .wordRatio(let ratio): String(format: "word-count ratio %.2f outside allowed range", ratio)
         case .lowSimilarity(let similarity): String(format: "similarity %.2f below threshold", similarity)
         case .invalidSelfCorrection: "removed words that were not a self-correction"
-        case .selfCorrectionNotAllowed: "resolved a self-correction at a level that keeps every word"
         case .placeholderChanged: "changed a placeholder"
         case .droppedWords(let count): "dropped \(count) spoken words"
         case .lostNegation: "dropped a negation"
@@ -94,7 +91,7 @@ public enum GuardVerdict: Sendable, Equatable {
 /// Decides whether the LLM's output can replace the raw transcript.
 ///
 /// The model is asked only to correct, so output that is empty, chatty, much longer or shorter
-/// than the level allows, or substantially different from the input is treated as a meaning
+/// than the pass allows (``CleanupPass``), or substantially different from the input is treated as a meaning
 /// change and rejected. So is output that damaged a placeholder, since what it stands for could
 /// then not be put back.
 ///
@@ -102,20 +99,19 @@ public enum GuardVerdict: Sendable, Equatable {
 /// instead of the length and similarity limits: dropping a cue is acceptable only as part of
 /// removing a spoken self-correction. This catches the model's most harmful mistake, keeping
 /// the words the speaker took back and dropping their correction, which is often short enough
-/// to pass the length and similarity limits. At a level that keeps every word (Light), dropping
-/// a cue is always rejected.
+/// to pass the length and similarity limits.
 ///
-/// Output that keeps every cue may not remove a negation and, unless the level allows rewording
-/// (High), may not delete a run of spoken words outright (``DroppedWords``). At every level, it
+/// Output that keeps every cue may not remove a negation and, unless the pass allows rewording
+/// (Standard's rewording pass), may not delete a run of spoken words outright (``DroppedWords``). In every pass, it
 /// must keep each name where the speaker said it (``SpokenNames``) and may not delete a word that
 /// carries meaning with nothing in its place (``ContentWords``): rewording replaces words, it does
 /// not leave them out. The start of a word broken off and said again in full may go
 /// (``WordFragments``).
 public struct OutputGuard: Sendable {
     public struct Policy: Sendable, Equatable {
-        /// Allowed ratio of the output's word count to the input's, per level. A level missing
-        /// from the table uses ``CleanupLevel/wordRatioBounds``.
-        public var wordRatioBounds: [CleanupLevel: ClosedRange<Double>]
+        /// Allowed ratio of the output's word count to the input's, per pass. A pass missing
+        /// from the table uses ``CleanupPass/wordRatioBounds``.
+        public var wordRatioBounds: [CleanupPass: ClosedRange<Double>]
         /// Minimum ``EditDistance/normalizedSimilarity(_:_:)`` between raw and cleaned text.
         public var minSimilarity: Double
         /// Lowercased openings that signal the model is talking about the text, not returning it.
@@ -147,7 +143,7 @@ public struct OutputGuard: Sendable {
         public var requiresNamesInPlace: Bool
 
         public init(
-            wordRatioBounds: [CleanupLevel: ClosedRange<Double>],
+            wordRatioBounds: [CleanupPass: ClosedRange<Double>],
             minSimilarity: Double,
             preambles: [String],
             correctionCues: [String],
@@ -176,13 +172,13 @@ public struct OutputGuard: Sendable {
             self.requiresNamesInPlace = requiresNamesInPlace
         }
 
-        /// The bounds for `level`.
-        public func wordRatioBounds(for level: CleanupLevel) -> ClosedRange<Double> {
-            wordRatioBounds[level] ?? level.wordRatioBounds
+        /// The bounds for `pass`.
+        public func wordRatioBounds(for pass: CleanupPass) -> ClosedRange<Double> {
+            wordRatioBounds[pass] ?? pass.wordRatioBounds
         }
 
         public static let `default` = Policy(
-            wordRatioBounds: Dictionary(uniqueKeysWithValues: CleanupLevel.allCases.map { ($0, $0.wordRatioBounds) }),
+            wordRatioBounds: Dictionary(uniqueKeysWithValues: CleanupPass.allCases.map { ($0, $0.wordRatioBounds) }),
             minSimilarity: 0.6,
             preambles: [
                 "here is", "here's", "here are", "sure,", "sure!", "sure.", "certainly",
@@ -264,7 +260,7 @@ public struct OutputGuard: Sendable {
 
         // Deep has its own check instead of the limits below: it may repair across sentences and
         // lay the text out, and may change nothing else.
-        if options.level.repairsAcrossSentences {
+        if options.pass == .repairing {
             if !options.multiline, cleaned.contains(where: \.isNewline) {
                 return .rejected(.layoutNotAllowed)
             }
@@ -290,7 +286,6 @@ public struct OutputGuard: Sendable {
 
         let cleanedWords = EditDistance.words(in: EditDistance.normalize(cleaned))
         if selfCorrection.dropsCue(raw: rawWords, cleaned: cleanedWords) {
-            guard options.level.resolvesSelfCorrections else { return .rejected(.selfCorrectionNotAllowed) }
             return selfCorrection.isCorrection(raw: rawWords, cleaned: cleanedWords)
                 ? .accepted(cleaned)
                 : .rejected(.invalidSelfCorrection)
@@ -298,7 +293,7 @@ public struct OutputGuard: Sendable {
         let alignment = WordAlignment(raw: rawWords, cleaned: cleanedWords)
         let placeholderWords = Set(options.placeholders.map(EditDistance.normalize))
         let fragments = wordFragments.indices(in: raw, placeholders: placeholderWords)
-        if !options.level.allowsRewording, let count = droppedWords.droppedRun(in: alignment, fragments: fragments) {
+        if !options.pass.allowsRewording, let count = droppedWords.droppedRun(in: alignment, fragments: fragments) {
             return .rejected(.droppedWords(count: count))
         }
         if droppedWords.losesNegation(raw: rawWords, cleaned: cleanedWords) {
@@ -315,7 +310,7 @@ public struct OutputGuard: Sendable {
         let rawWordCount = EditDistance.words(in: raw).count
         if rawWordCount > 0 {
             let ratio = Double(EditDistance.words(in: cleaned).count) / Double(rawWordCount)
-            if !policy.wordRatioBounds(for: options.level).contains(ratio) {
+            if !policy.wordRatioBounds(for: options.pass).contains(ratio) {
                 return .rejected(.wordRatio(ratio))
             }
         }

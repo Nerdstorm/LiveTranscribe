@@ -26,9 +26,12 @@ enum HistoryListFormat {
     /// applied (`DictationProcessor`), so it is not simply what speech-to-text heard.
     static let fellBackHelp = "Cleanup didn't apply; snippets, vocabulary and spoken commands still did"
 
-    /// The cleanup level's name for a stored raw value; the raw value itself if it is unknown.
+    /// The cleanup level's name for a stored raw value. A dictation from before cleanup had three
+    /// levels keeps the name of the level it was cleaned at, such as Medium; an unknown value is
+    /// shown as it is.
     static func cleanupLevel(_ rawValue: String) -> String {
-        CleanupLevel(rawValue: rawValue)?.displayName ?? rawValue
+        if let level = CleanupLevel(rawValue: rawValue) { return level.displayName }
+        return ["light", "medium", "high"].contains(rawValue) ? rawValue.capitalized : rawValue
     }
 
     /// How the text reached the app, for a stored delivery value (see the dictation controller).

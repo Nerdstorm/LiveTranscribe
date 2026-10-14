@@ -5,10 +5,10 @@ import Shared
 /// the vocabulary and the placeholder rule, each from its own function.
 ///
 /// Without the fine-tuned adapter the model cannot resolve spoken self-corrections reliably (see
-/// ``Prompt/cleanup``), so Light, Medium and High get the strict keep-every-word rules (High
-/// may reword, but not remove); with it, Medium and High ask for the correction only. Medium with
-/// the adapter and nothing else to add is exactly ``Prompt/adapted``, the prompt the adapter was
-/// trained on.
+/// ``Prompt/cleanup``), so Standard's passes get the strict keep-every-word rules (its rewording
+/// pass may reword, but not remove); with it, they ask for the correction only. Standard's
+/// correcting pass with the adapter and nothing else to add is exactly ``Prompt/adapted``, the
+/// prompt the adapter was trained on.
 ///
 /// Deep has its own instruction, with or without the adapter (``deepRules(multiline:letterBody:)``).
 public struct PromptBuilder: Sendable, Equatable {
@@ -22,13 +22,13 @@ public struct PromptBuilder: Sendable, Equatable {
         self.override = override
     }
 
-    /// The template for `options`. The ``CleanupLevel/none`` level never reaches the model; it
-    /// gets Light's rules.
+    /// The template for `options`, by its pass (``CleanupOptions/pass``). The ``CleanupLevel/none``
+    /// level never reaches the model.
     public func template(for options: CleanupOptions) -> PromptTemplate {
         if let override { return override }
-        let levelRules = options.level.repairsAcrossSentences
+        let levelRules = options.pass == .repairing
             ? Self.deepRules(multiline: options.multiline, letterBody: options.letterBody)
-            : Self.baseRules + Self.levelRules(for: options.level, adapted: adapted)
+            : Self.baseRules + Self.passRules(for: options.pass, adapted: adapted)
         let rules = levelRules
             + [Self.unchangedRule]
             + [Self.vocabularyRule(options.vocabulary), Self.placeholderRule(options.placeholders)].compactMap { $0 }
@@ -43,10 +43,10 @@ public struct PromptBuilder: Sendable, Equatable {
     static let unchangedRule = "If the text is already correct, return it unchanged."
     static let outputRule = "Output only the corrected text."
 
-    /// What the model may change. A self-correction is resolved only with the adapter.
-    static func levelRules(for level: CleanupLevel, adapted: Bool) -> [String] {
-        let resolves = adapted && level.resolvesSelfCorrections
-        switch (level.allowsRewording, resolves) {
+    /// What the model may change in one of Standard's passes. A self-correction is resolved only
+    /// with the adapter.
+    static func passRules(for pass: CleanupPass, adapted: Bool) -> [String] {
+        switch (pass.allowsRewording, adapted) {
         case (false, false):
             return ["Do not add, remove, summarise or rephrase content."]
         case (false, true):

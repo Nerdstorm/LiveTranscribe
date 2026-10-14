@@ -7,15 +7,16 @@ use lt_styles::FillerRemover;
 use crate::placeholder_aliases::PlaceholderAliases;
 use crate::thinking_output::ThinkingOutput;
 use crate::{
-    Adapter, CancelFlag, CleanupModel, CleanupOptions, CleanupRequest, Clock, Deadline, DeepCleanup, DeepPasses,
-    FallbackReason, GenerationOutcome, GuardVerdict, OutputGuard, PromptBuilder, SystemClock, cleanup_scripts, prompt,
+    Adapter, CancelFlag, CleanupModel, CleanupOptions, CleanupPass, CleanupRequest, Clock, Deadline, DeepCleanup,
+    DeepPasses, FallbackReason, GenerationOutcome, GuardVerdict, OutputGuard, PromptBuilder, SystemClock,
+    cleanup_scripts, prompt,
 };
 
 /// What one cleanup made of a text.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CleanedText {
     /// The model's output, when the guard accepted it. Otherwise the text the model was given:
-    /// the raw text, less fillers from Medium up.
+    /// the raw text, less fillers at Standard and Deep.
     pub text: String,
     /// Why the model's output was not used; `None` when it was, or when the model had nothing to
     /// do.
@@ -45,21 +46,21 @@ impl CleanedText {
 /// Model-agnostic: the model is passed in, so the policy (levels, timeout, cancellation,
 /// fallback) is testable without loading one.
 ///
-/// The text the model sees is the raw transcript with fillers removed from Medium up. When the
-/// guard rejects the output, that text is the result: fillers stay removed, so a fallback differs
-/// from a success only in what the model would have corrected.
+/// The text the model sees is the raw transcript with fillers removed. When the guard rejects the
+/// output, that text is the result: fillers stay removed, so a fallback differs from a success
+/// only in what the model would have corrected.
 ///
-/// High runs in two passes when the text has a correction cue ("sorry", "no", "I mean"): the
-/// Medium prompt resolves the self-correction, as the adapter was trained to, then the High prompt
-/// rewords the result. Both share the one deadline. If the rewording is rejected or there is no
-/// time left for it, the resolved text is used; that is a success at Medium's standard, not a
-/// fallback.
+/// Standard asks once, with its rewording pass, or twice when the text has a correction cue
+/// ("sorry", "no", "I mean"): the correcting pass resolves the self-correction, as the adapter was
+/// trained to, then the rewording pass rewords the result ([`CleanupPass`]). Both share the one
+/// deadline. If the rewording is rejected or there is no time left for it, the resolved text is
+/// used; that is a success, not a fallback.
 ///
 /// Deep runs as [`DeepCleanup`] says: its own prompt, with or without the adapter, thinking or
-/// not, after Medium's pass or on its own, under a longer deadline. When its repair is turned
-/// down, Medium's result is used, from the pass before it or one run in the time left: a success
-/// at Medium's standard, not a fallback. A result from the pass run in the time left must pass
-/// Deep's check as well.
+/// not, after the correcting pass or on its own, under a longer deadline. When its repair is
+/// turned down, the correcting pass's result is used if it ran first; otherwise Standard's cleanup
+/// runs in the time left, and its result is used if it passes Deep's check as well. Either is a
+/// success, not a fallback.
 #[derive(Clone)]
 pub struct CleanupExecutor {
     context_limit: usize,
@@ -72,7 +73,7 @@ pub struct CleanupExecutor {
 
 impl CleanupExecutor {
     /// - `context_limit`: how many earlier segments the model sees before the text.
-    /// - `timeout_seconds`: how long one cleanup may take, both of High's passes together. Deep
+    /// - `timeout_seconds`: how long one cleanup may take, both of Standard's passes together. Deep
     ///   takes the longer of this and its own minimum ([`DeepCleanup::deadline`]).
     ///
     /// Deep runs as the app ships it ([`DeepCleanup::SHIPPED`]).
@@ -145,10 +146,8 @@ impl CleanupExecutor {
 
         let verdict = if options.level.repairs_across_sentences() {
             self.repairing(&input, context, options, started, model, cancel)
-        } else if options.level.allows_rewording() && self.output_guard.correction_cue_count(&input) > 0 {
-            self.resolving_then_rewording(&input, context, options, started, model, cancel)
         } else {
-            self.pass(&input, context, options, self.timeout_seconds, model, cancel)
+            self.standard(&input, context, options, self.timeout_seconds, model, cancel)
         };
 
         let latency_ms = whole_milliseconds(self.elapsed_since(started));
@@ -169,11 +168,11 @@ impl CleanupExecutor {
         }
     }
 
-    /// What the model is asked for `text` under `options`. The adapter is on where the level
-    /// resolves self-corrections, as it was trained to, and at Deep as [`DeepCleanup::adapter`]
-    /// says; only Deep thinks.
+    /// What the model is asked for `text` under `options`. The self-correction adapter is on for
+    /// Standard's passes, as it was trained to, and Deep's pass has the adapter
+    /// [`DeepCleanup::adapter`] says; only Deep thinks.
     pub fn request(&self, text: &str, context: &[String], options: &CleanupOptions) -> CleanupRequest {
-        let repairs = options.level.repairs_across_sentences();
+        let repairs = options.pass == CleanupPass::Repairing;
         let adapter = if repairs {
             self.deep.adapter
         } else if options.level.resolves_self_corrections() {
@@ -191,12 +190,12 @@ impl CleanupExecutor {
         )
     }
 
-    /// Deep: its own pass, under Deep's deadline. With [`DeepPasses::AfterMedium`] and a
-    /// correction cue in the text, Medium's pass resolves what it can first; if Deep's pass is then
-    /// rejected or out of time, Medium's result is kept, a success at Medium's standard. Otherwise,
-    /// when Deep's answer is turned down, Medium's pass runs in the time left
-    /// ([`DeepCleanup::falls_back_to_medium`]), and its answer is shown only if Deep's check
-    /// accepts it too: Medium's guard lets through some meaning changes that Deep's turns down,
+    /// Deep: its own pass, under Deep's deadline. With [`DeepPasses::AfterCorrecting`] and a
+    /// correction cue in the text, Standard's correcting pass resolves what it can first; if Deep's
+    /// pass is then rejected or out of time, that result is kept. Otherwise, when Deep's answer is
+    /// turned down, Standard's cleanup runs in the time left
+    /// ([`DeepCleanup::falls_back_to_standard`]), and its answer is shown only if Deep's check
+    /// accepts it too: Standard's guard lets through some meaning changes that Deep's turns down,
     /// such as a correction that takes back more than it corrects. Otherwise Deep's reason is
     /// reported and what was said is shown.
     fn repairing<M: CleanupModel>(
@@ -209,15 +208,20 @@ impl CleanupExecutor {
         cancel: &CancelFlag,
     ) -> GuardVerdict {
         let seconds = self.deep.deadline(self.timeout_seconds);
-        let resolving = CleanupOptions {
-            level: CleanupLevel::Medium,
+        let standard = CleanupOptions {
+            level: CleanupLevel::Standard,
+            pass: CleanupPass::Rewording,
             ..options.clone()
         };
+        let correcting = CleanupOptions {
+            pass: CleanupPass::Correcting,
+            ..standard.clone()
+        };
         let resolves_first =
-            self.deep.passes == DeepPasses::AfterMedium && self.output_guard.correction_cue_count(input) > 0;
+            self.deep.passes == DeepPasses::AfterCorrecting && self.output_guard.correction_cue_count(input) > 0;
         let mut resolved = None;
         if resolves_first {
-            let first = self.pass(input, context, &resolving, seconds, model, cancel);
+            let first = self.pass(input, context, &correcting, seconds, model, cancel);
             if let GuardVerdict::Accepted(text) = first {
                 resolved = Some(text);
             }
@@ -238,10 +242,10 @@ impl CleanupExecutor {
             return repaired;
         };
         if let Some(text) = resolved {
-            tracing::info!("Deep repair rejected, keeping Medium's result: {reason}");
+            tracing::info!("Deep repair rejected, keeping the corrected text: {reason}");
             return GuardVerdict::Accepted(text);
         }
-        if !self.deep.falls_back_to_medium || resolves_first || !reason.rejects_an_answer() {
+        if !self.deep.falls_back_to_standard || resolves_first || !reason.rejects_an_answer() {
             return repaired;
         }
         let left = self.remaining(seconds, started);
@@ -249,7 +253,7 @@ impl CleanupExecutor {
         if !has_time || cancel.is_cancelled() {
             return repaired;
         }
-        let fallback = self.pass(input, context, &resolving, left, model, cancel);
+        let fallback = self.standard(input, context, &standard, left, model, cancel);
         let GuardVerdict::Accepted(answer) = &fallback else {
             return repaired;
         };
@@ -257,34 +261,39 @@ impl CleanupExecutor {
             .output_guard
             .review(input, &GenerationOutcome::Completed(answer.clone()), options);
         if let GuardVerdict::Rejected(check) = checked {
-            tracing::info!("Deep repair rejected ({reason}), and Medium's cleanup fails Deep's check: {check}");
+            tracing::info!("Deep repair rejected ({reason}), and Standard's cleanup fails Deep's check: {check}");
             return repaired;
         }
-        tracing::info!("Deep repair rejected, showing Medium's cleanup: {reason}");
+        tracing::info!("Deep repair rejected, showing Standard's cleanup: {reason}");
         fallback
     }
 
-    /// High with a self-correction: Medium resolves it, then High rewords what is left in the time
+    /// Standard, within `seconds`: one rewording pass, or, with a correction cue in the text, the
+    /// correcting pass resolves it, then the rewording pass rewords what is left in the time
     /// remaining. A rejected rewording keeps the resolved text.
-    fn resolving_then_rewording<M: CleanupModel>(
+    fn standard<M: CleanupModel>(
         &self,
         input: &str,
         context: &[String],
         options: &CleanupOptions,
-        started: Instant,
+        seconds: f64,
         model: &mut M,
         cancel: &CancelFlag,
     ) -> GuardVerdict {
-        let resolving = CleanupOptions {
-            level: CleanupLevel::Medium,
+        if options.pass != CleanupPass::Rewording || self.output_guard.correction_cue_count(input) == 0 {
+            return self.pass(input, context, options, seconds, model, cancel);
+        }
+        let started = self.clock.now();
+        let correcting = CleanupOptions {
+            pass: CleanupPass::Correcting,
             ..options.clone()
         };
-        let first = self.pass(input, context, &resolving, self.timeout_seconds, model, cancel);
+        let first = self.pass(input, context, &correcting, seconds, model, cancel);
         let GuardVerdict::Accepted(resolved) = &first else {
             return first;
         };
 
-        let remaining = self.remaining(self.timeout_seconds, started);
+        let remaining = self.remaining(seconds, started);
         let has_time = remaining > 0.0;
         if !has_time || cancel.is_cancelled() {
             tracing::info!("No time left to reword; keeping the resolved self-correction");
@@ -349,7 +358,7 @@ impl CleanupExecutor {
     }
 }
 
-/// What `level` does without the model: fillers removed from Medium up, otherwise the text
+/// What `level` does without the model: fillers removed at Standard and Deep, otherwise the text
 /// unchanged. It is what the model is given, what a fallback returns, and what dictation inserts
 /// when the cleanup model is turned off, so all three agree.
 pub fn deterministic_cleanup(text: &str, level: CleanupLevel) -> String {

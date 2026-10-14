@@ -20,8 +20,8 @@ The details are in other pages:
 The Mac app is written in Swift. The Linux and Windows app is written in Rust. They share their
 models (converted for each runtime), their cleanup adapters, their speech model catalog and their
 expected results, so the same text path types the same text, and the cleanup model answers alike in
-nearly every case: 509 of the Mac's 515 Medium replies, and, run on a Mac's CPU, all of Deep's 114
-hand-written cases.
+nearly every case: 509 of the Mac's 515 replies to the self-correction test cases (Standard's
+correcting pass), and, run on a Mac's CPU, all of Deep's 114 hand-written cases.
 
 | | Mac | Linux and Windows |
 |---|---|---|
@@ -67,7 +67,7 @@ flowchart TD
     F -->|no| G["Letter frame<br/>a letter's greeting and sign-off<br/>go on lines of their own"]
     G --> H["Cleanup of the body<br/>the only step that uses the language model"]
     H --> I["Line breaks and list markers put back<br/>lists and letters laid out"]
-    I --> NUM["Numbers written in digits<br/>from Medium up"]
+    I --> NUM["Numbers written in digits"]
     NUM --> J["Snippets, emoji and addresses put back"]
     J --> K["Inserted at the cursor"]
     N --> K
@@ -78,23 +78,23 @@ flowchart TD
    records until the next press. A lone tap is cancelled.
 2. **Speech to text.** The speech model writes what it heard, with its mistakes.
 3. **Phrases protected.** Snippet triggers, emoji, addresses, and in fields that take several
-   lines, line breaks and, from Medium up, spoken list markers ("number one", "bullet point") are
-   replaced by placeholders such as `⟦S1⟧`. The language model can't change what a placeholder
-   stands for, and its answer is turned down if a placeholder goes missing. Dictated punctuation,
-   and "new line" in a one-line field, are written into the text at once, and the model may still
-   adjust them.
+   lines, line breaks and, at Standard and Deep, spoken list markers ("number one", "bullet
+   point") are replaced by placeholders such as `⟦S1⟧`. The language model can't change what a
+   placeholder stands for, and its answer is turned down if a placeholder goes missing. Dictated
+   punctuation, and "new line" in a one-line field, are written into the text at once, and the
+   model may still adjust them.
 4. **Vocabulary.** Each spoken variant you listed is rewritten to your spelling ("nerd storm" →
    "Nerdstorm"). Terms that sound like something in the dictation are also listed in the cleanup
    prompt, to be spelt as written.
-5. **Letter frame.** From Medium up, in fields that take several lines, a letter's greeting and
-   sign-off go on lines of their own, by rules, and only the body goes to the language model.
+5. **Letter frame.** At Standard and Deep, in fields that take several lines, a letter's greeting
+   and sign-off go on lines of their own, by rules, and only the body goes to the language model.
 6. **Cleanup.** See the next section.
 7. **Layout, numbers, then the rest put back.** Line breaks and list markers come back first, so
-   the layout rules can lay out lists and letters. From Medium up, in every field, spoken numbers
-   are then written in digits ("twenty one chairs" → "21 chairs"). This comes after the model, so
-   it resolves a correction between numbers in words ("fifty thousand, I mean sixty thousand"),
-   and after the list rules, so a list marker said as a word still makes a list. Then snippets,
-   emoji and addresses come back, where no rule can change them.
+   the layout rules can lay out lists and letters. At Standard and Deep, in every field, spoken
+   numbers are then written in digits ("twenty one chairs" → "21 chairs"). This comes after the
+   model, so it resolves a correction between numbers in words ("fifty thousand, I mean sixty
+   thousand"), and after the list rules, so a list marker said as a word still makes a list. Then
+   snippets, emoji and addresses come back, where no rule can change them.
 8. **Insertion.** On the Mac, Accessibility is tried first (the text is read back to check it
    arrived), and pasting, with your clipboard restored afterwards, is the fallback; an app set to
    paste gets paste only. Linux types it through the Wayland input method, or pastes it: for now on
@@ -132,12 +132,13 @@ flowchart LR
     C -->|turned down| FB["The text after step 1"]
 ```
 
-1. **Rules** (`Styles`) do what needs no judgement: fillers such as "um" go from Medium up, and
-   lists, letters and numbers are written by rules around the model, as the previous section
+1. **Rules** (`Styles`) do what needs no judgement: fillers such as "um" go at Standard and Deep,
+   and lists, letters and numbers are written by rules around the model, as the previous section
    shows.
 2. **The prompt** (`PromptBuilder`) tells the model the level's rules in plain English, with no
-   worked examples. Light to High start from the same two base rules, and each level adds its
-   own; Deep has its own, longer set. This is what Medium sends, with one vocabulary term:
+   worked examples. Standard's two passes start from the same two base rules, and each adds its
+   own; Deep has its own, longer set. This is what Standard's correcting pass sends, with one
+   vocabulary term:
 
    ```text
    Correct transcription errors, punctuation, casing and grammar in the TEXT.
@@ -150,19 +151,20 @@ flowchart LR
    ```
 
 3. **The model and its adapter.** Qwen3-1.7B runs on the computer, with a LoRA adapter chosen per
-   request: none at Light, the self-correction adapter at Medium and High, and Deep's adapter at
-   Deep. An adapter is a small set of extra weights, trained on examples of exactly these rules.
-   It doesn't replace the prompt: Medium's prompt above is the one its adapter was trained with.
-   Without the adapters, Light and Medium are told to remove nothing and High to reword without
-   removing, since the model alone can't resolve a correction reliably; Deep keeps its own prompt
-   and runs on the base model (52 of 114 cases, in the table below).
+   request: the self-correction adapter in Standard's passes, and Deep's adapter at Deep. An
+   adapter is a small set of extra weights, trained on examples of exactly these rules. It doesn't
+   replace the prompt: the correcting pass's prompt above is the one its adapter was trained with.
+   Without the adapters, the correcting pass is told to remove nothing and the rewording pass to
+   reword without removing, since the model alone can't resolve a correction reliably; Deep keeps
+   its own prompt and runs on the base model (52 of 114 cases, in the table below).
 4. **The check** (`OutputGuard`) compares the answer with what was said. The answer may not drop a
    negation or a word that carries meaning, move a name, damage a placeholder, or come out much
-   longer, shorter or more different than the level allows. It may drop a correction cue ("sorry",
+   longer, shorter or more different than the pass allows. It may drop a correction cue ("sorry",
    "I mean") only together with the words the cue takes back. Deep's check (`SelfRepair`) lines up
    the words said with the words written, and every difference must be a repair Deep may make. An
-   answer that fails is never shown: the text after step 1 is inserted instead (at High Medium's
-   result, at Deep Medium's pass, as below), and dictation history records why.
+   answer that fails is never shown: the text after step 1 is inserted instead (at Standard, the
+   correcting pass's result when only the rewording failed; at Deep, Standard's cleanup if Deep's
+   check accepts it, as below), and dictation history records why.
 
 The model is skipped, and the level's rules alone apply, when cleanup with the language model is
 off in Settings, when any Sinhala character is in the text (a script the model can't copy), and
@@ -173,23 +175,23 @@ Each level runs one or more passes of the model:
 ```mermaid
 flowchart TD
     S["Text after the rules"] --> L{"Level"}
-    L -->|Light, Medium| M1["Pass with the level's prompt"]
-    L -->|"High, no correction cue"| H1["Pass with High's prompt"]
-    L -->|"High, with a cue such as sorry"| H2["Medium's pass<br/>resolves the correction"]
+    L -->|"Standard, no correction cue"| W1["Rewording pass"]
+    L -->|"Standard, with a cue such as sorry"| C1["Correcting pass<br/>resolves the correction"]
     L -->|Deep| D1["Deep's pass<br/>its own prompt and adapter"]
-    M1 --> C{"Check"}
-    H1 --> C
-    H2 --> HC{"Check"}
-    HC -->|accepted| H3["High's pass<br/>rewords the result"]
-    HC -->|turned down| RAW
-    H3 --> HC2{"Check"}
-    HC2 -->|accepted| OUT["Cleaned text"]
-    HC2 -->|"turned down, or no time left"| MED["Medium's result"]
+    W1 --> C{"Check"}
+    C1 --> CC{"Check"}
+    CC -->|accepted| W2["Rewording pass<br/>rewords the result"]
+    CC -->|"turned down, or timed out"| RAW
+    W2 --> CC2{"Check"}
+    CC2 -->|accepted| OUT["Cleaned text"]
+    CC2 -->|"turned down, or no time left"| COR["The correcting pass's result"]
     D1 --> DC{"Deep's check<br/>SelfRepair"}
     DC -->|accepted| OUT
-    DC -->|turned down| M2["Medium's pass<br/>in the time left"]
+    DC -->|turned down| S2["Standard's cleanup<br/>one or two passes,<br/>in the time left"]
     DC -->|no answer in time| RAW
-    M2 --> C
+    S2 --> SC{"Standard's checks,<br/>then Deep's"}
+    SC -->|accepted| OUT
+    SC -->|"turned down, or timed out"| RAW
     C -->|accepted| OUT
     C -->|"turned down, or timed out"| RAW["Text after the rules<br/>recorded as a fallback"]
 ```
@@ -368,9 +370,9 @@ flowchart LR
     MEAS -->|"better, and nothing worse"| SHIP["Adapter committed<br/>in Sources/Cleanup"]
 ```
 
-- `Train measure` cleans a data set through the app's own cleanup at one level. It counts the
-  answers that were right, fell back, stayed unchanged, changed the meaning or were otherwise
-  different, and reports latency.
+- `Train measure` cleans a data set through the app's own cleanup at one level, or one of
+  Standard's passes alone. It counts the answers that were right, fell back, stayed unchanged,
+  changed the meaning or were otherwise different, and reports latency.
 - `make bench` and `make eval` measure word error rate and latency on spoken clips, for the live
   transcript and for dictation.
 - The training data is generated from templates, plus examples written by hand
@@ -385,7 +387,7 @@ flowchart LR
 |---|---|---|
 | add a spoken command | `Sources/SpokenCommands` | `make golden`, and port it to `crates/spoken-commands` |
 | change how lists or letters are laid out, or numbers written | `Sources/Styles` | `make golden`, and port it to `crates/styles` |
-| change what a level may do | the level's flags and word-ratio bounds (`Shared/CleanupLevel`), the prompt (`PromptBuilder`), the passes and deadline (`CleanupExecutor`, `DeepCleanup`), and the check (`OutputGuard`, `SelfRepair`) | `make golden`, port it to `crates/cleanup` (and `crates/shared`), and measure with `Train measure` |
+| change what a level may do | the level's flags (`Shared/CleanupLevel`), each pass's word-ratio bounds (`Cleanup/CleanupPass`), the prompt (`PromptBuilder`), the passes and deadline (`CleanupExecutor`, `DeepCleanup`), and the check (`OutputGuard`, `SelfRepair`) | `make golden`, port it to `crates/cleanup` (and `crates/shared`), and measure with `Train measure` |
 | teach the model something new | the generators in `Sources/CleanupTraining` | retrain, measure before and after, and commit the adapter if nothing gets worse |
 | add a speech model | `Sources/Transcription/Resources/speech-models.json` | pin its Mac entry with `scripts/pin-speech-model.sh`, and its Linux and Windows entry with `scripts/pin-linux-windows-speech-model.sh` |
 | change how text is typed into apps | `Sources/Insertion` | `crates/insertion`, with `crates/wayland` and `crates/windows` |

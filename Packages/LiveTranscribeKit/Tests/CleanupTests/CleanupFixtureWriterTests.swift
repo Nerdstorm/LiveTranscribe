@@ -80,6 +80,8 @@ enum CleanupFixtures {
 
     struct Options: Encodable {
         let level: String
+        /// Which of the level's requests (``CleanupPass``).
+        let pass: String
         let vocabulary: [String]
         let placeholders: [String]
         let multiline: Bool
@@ -88,6 +90,7 @@ enum CleanupFixtures {
 
         init(_ options: CleanupOptions) {
             level = options.level.rawValue
+            pass = options.pass.rawValue
             vocabulary = options.vocabulary
             placeholders = options.placeholders
             multiline = options.multiline
@@ -140,7 +143,7 @@ enum CleanupFixtures {
         let adapter: String
         let thinking: Bool
         let thinkingTokens: Int
-        let fallsBackToMedium: Bool
+        let fallsBackToStandard: Bool
         let minimumTimeoutSeconds: String
 
         init(_ deep: DeepCleanup) {
@@ -148,7 +151,7 @@ enum CleanupFixtures {
             adapter = deep.adapter.rawValue
             thinking = deep.thinking
             thinkingTokens = deep.thinkingTokens
-            fallsBackToMedium = deep.fallsBackToMedium
+            fallsBackToStandard = deep.fallsBackToStandard
             minimumTimeoutSeconds = CleanupFixtures.number(deep.minimumTimeoutSeconds)
         }
     }
@@ -185,7 +188,6 @@ enum CleanupFixtures {
             case .wordRatio(let ratio): reason = "wordRatio"; number = CleanupFixtures.number(ratio)
             case .lowSimilarity(let similarity): reason = "lowSimilarity"; number = CleanupFixtures.number(similarity)
             case .invalidSelfCorrection: reason = "invalidSelfCorrection"
-            case .selfCorrectionNotAllowed: reason = "selfCorrectionNotAllowed"
             case .placeholderChanged: reason = "placeholderChanged"
             case .droppedWords(let dropped): reason = "droppedWords"; count = dropped
             case .lostNegation: reason = "lostNegation"

@@ -182,13 +182,16 @@ fn occurrences(cue: &[String], words: &[String]) -> Vec<usize> {
 mod tests {
     use lt_shared::CleanupLevel;
 
-    use crate::{CleanupOptions, FallbackReason, GenerationOutcome, GuardVerdict, OutputGuard};
+    use crate::{CleanupOptions, CleanupPass, FallbackReason, GenerationOutcome, GuardVerdict, OutputGuard};
 
     fn review(raw: &str, cleaned: &str) -> GuardVerdict {
         OutputGuard::default().review(
             raw,
             &GenerationOutcome::Completed(cleaned.to_owned()),
-            &CleanupOptions::new(CleanupLevel::Medium),
+            &CleanupOptions {
+                pass: CleanupPass::Correcting,
+                ..CleanupOptions::new(CleanupLevel::Standard)
+            },
         )
     }
 
