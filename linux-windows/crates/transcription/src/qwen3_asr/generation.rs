@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use super::locked_tokens::Locked;
+
 /// Tokens that end a reply, and are not part of it: `<|im_end|>` and `<|endoftext|>`.
 pub const END_OF_REPLY: [u32; 2] = [151_645, 151_643];
 
@@ -34,13 +36,17 @@ pub struct Decoded {
 /// - an end-of-reply token ends the reply and is not part of it;
 /// - once the reply has 24 tokens, it ends as soon as its last 24 hold 3 or fewer different tokens;
 /// - it ends at `max_tokens` tokens.
+///
+/// `locked`, if given, keeps the reply to a language's letters, as the Mac app's own decoding
+/// does when it's told one (Qwen3ASR+ScriptLock.swift): each token is the likeliest it allows.
 pub fn decode_greedily<E>(
     first_logits: &[f32],
     max_tokens: usize,
+    mut locked: Option<Locked<'_>>,
     mut next_logits: impl FnMut(u32) -> Result<Vec<f32>, E>,
 ) -> Result<Decoded, E> {
     let mut tokens = Vec::new();
-    let mut next = likeliest(first_logits);
+    let mut next = choose(first_logits, locked.as_mut());
     for index in 0..max_tokens {
         if END_OF_REPLY.contains(&next) {
             return Ok(Decoded {
@@ -49,6 +55,9 @@ pub fn decode_greedily<E>(
             });
         }
         tokens.push(next);
+        if let Some(locked) = locked.as_mut() {
+            locked.write(next);
+        }
         if is_looping(&tokens) {
             return Ok(Decoded {
                 tokens,
@@ -58,11 +67,29 @@ pub fn decode_greedily<E>(
         if index == max_tokens - 1 {
             break;
         }
-        next = likeliest(&next_logits(next)?);
+        next = choose(&next_logits(next)?, locked.as_mut());
     }
     Ok(Decoded {
         tokens,
         stop: Stop::Limit,
+    })
+}
+
+/// The likeliest token, or, locked, the likeliest the lock allows; the end of the reply if it
+/// allows none, which a lock never does.
+fn choose(logits: &[f32], locked: Option<&mut Locked<'_>>) -> u32 {
+    let Some(locked) = locked else {
+        return likeliest(logits);
+    };
+    let allowed = locked.allowed();
+    let mut best: Option<usize> = None;
+    for (index, (&logit, &allowed)) in logits.iter().zip(allowed).enumerate() {
+        if allowed && best.is_none_or(|best| logit > logits[best]) {
+            best = Some(index);
+        }
+    }
+    best.map_or(END_OF_REPLY[0], |best| {
+        u32::try_from(best).expect("a vocabulary fits in u32")
     })
 }
 
@@ -100,12 +127,33 @@ mod tests {
     /// Decodes a scripted reply: each call returns the logits for the next scripted token.
     fn decode(script: &[u32], max_tokens: usize) -> (Decoded, usize) {
         let mut steps = 0;
-        let decoded = decode_greedily::<()>(&picking(script[0]), max_tokens, |_| {
+        let decoded = decode_greedily::<()>(&picking(script[0]), max_tokens, None, |_| {
             steps += 1;
             Ok(picking(script[steps]))
         })
         .unwrap();
         (decoded, steps)
+    }
+
+    /// Locked to Latin letters, the reply takes "Hello" over the likelier 我.
+    #[test]
+    fn a_locked_reply_takes_the_likeliest_token_the_lock_allows() {
+        use crate::qwen3_asr::locked_tokens::LockedTokens;
+        use crate::qwen3_asr::tokenizer::Tokenizer;
+        use crate::script_lock::{ScriptLock, WritingScript};
+
+        let tokenizer = Tokenizer::from_json(r#"{"Hello": 0, "æĪĳ": 1}"#, r#"{"added_tokens_decoder": {}}"#).unwrap();
+        let mut tokens = LockedTokens::new(&tokenizer, 151_936);
+        let english = ScriptLock::new(WritingScript::Latin);
+        let mut first = vec![0.0; 151_936];
+        first[1] = 2.0;
+        first[0] = 1.0;
+        let decoded = decode_greedily::<()>(&first, 10, Some(Locked::new(&english, &mut tokens)), |_| {
+            Ok(picking(END_OF_REPLY[0]))
+        })
+        .unwrap();
+        assert_eq!(decoded.tokens, [0]);
+        assert_eq!(decoded.stop, Stop::EndOfReply);
     }
 
     #[test]

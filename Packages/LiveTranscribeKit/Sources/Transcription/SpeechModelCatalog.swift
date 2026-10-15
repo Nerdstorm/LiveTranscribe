@@ -11,7 +11,8 @@ import Shared
 /// download in it, and a model without the Mac's is left out here. A model that can be told which
 /// language to write lists the languages it takes (`language_choices`), for the Language
 /// setting; one that can't find the language itself names the one Automatic tells it
-/// (`automatic_language`).
+/// (`automatic_language`). Qwen3-ASR's languages name their letters too (`script`), which its
+/// transcription is locked to (``ScriptLock``).
 public struct SpeechModelCatalog: Sendable {
     /// One model: what Settings shows about it, and where the Mac downloads it from.
     public struct Model: Decodable, Identifiable, Equatable, Sendable {
@@ -60,6 +61,9 @@ public struct SpeechModelCatalog: Sendable {
         public let code: String
         /// Its name in English, as Settings shows it.
         public let name: String
+        /// The letters it's written in, for a model whose letters are locked to the language it's
+        /// told (Qwen3-ASR, ``ScriptLock``); `nil` for one whose aren't.
+        public let script: WritingScript?
 
         public var id: String { code }
     }

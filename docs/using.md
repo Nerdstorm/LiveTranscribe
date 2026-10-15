@@ -158,13 +158,19 @@ macOS's microphone indicator then stays on while the app runs.
 Choose the language the speech model writes from the menu bar's **Language** menu, or from the
 **Language** menu on the model's row in **Settings › Models**. Both list only the languages the
 chosen model can be told, after **Automatic**, the default. Automatic lets the model work out the
-language from each recording; a short or noisy one can come out in another language. Choosing
-English keeps every dictation and the live transcript in English, and something said in another
-language then comes out as made-up English. The choice is one for every model: one that doesn't
-have the language uses Automatic, and the choice comes back with a model that has it. Qwen3-ASR
-(30 languages, and Sinhala in the default model) and Whisper (100) can be told a language.
-Cohere Transcribe can't work out the language, so its Automatic is English. Parakeet can't be told
-one, and its **Language** menu is greyed out.
+language from each recording; a short or noisy one can come out in another language. The choice is
+one for every model: one that doesn't have the language uses Automatic, and the choice comes back
+with a model that has it. Qwen3-ASR (30 languages, and Sinhala in the default model) and Whisper
+(100) can be told a language. Cohere Transcribe can't work out the language, so its Automatic is
+English. Parakeet can't be told one, and its **Language** menu is greyed out.
+
+Qwen3-ASR takes the language it's told as no more than a hint, so Live Transcribe also keeps it
+to that language's letters. With English chosen it never writes Sinhala or Chinese, and something
+said in another language comes out in English, translated or misheard. A language written in the
+same letters, such as German with English chosen, can still come through as it was said. Every
+language not written in Latin letters keeps them as well, for English words, as the Sinhala model
+writes them. Whisper and Cohere Transcribe are told the language without being kept to its
+letters.
 
 ### Updates
 

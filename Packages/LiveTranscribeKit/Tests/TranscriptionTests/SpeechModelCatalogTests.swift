@@ -126,6 +126,33 @@ struct SpeechModelCatalogTests {
         #expect(MLXTranscriber.parameters(english, for: nil, language: "de").language == "en", "a model outside the catalog")
     }
 
+    /// Qwen3-ASR takes a language as a hint, so its letters are locked to the one it's told, and
+    /// each of its languages names them. No other model's are locked.
+    @Test func everyQwenLanguageNamesItsLettersAndNoOtherModelsDo() {
+        for model in catalog.models {
+            for choice in model.languageChoices {
+                #expect((choice.script != nil) == (model.mac.kind == "qwen3_asr"), "\(model.id): \(choice.code)")
+            }
+        }
+        let qwen = catalog.models.first { $0.id == "qwen3-asr-0.6b-sinhala" }
+        #expect(qwen?.language(forSetting: "si")?.script == .sinhala)
+        #expect(qwen?.language(forSetting: "en")?.script == .latin)
+        #expect(qwen?.language(forSetting: "ja")?.script == .japanese)
+    }
+
+    @Test func qwenIsLockedToTheLettersOfTheLanguageItsToldAndAutomaticLocksNothing() throws {
+        let qwen = try #require(catalog.models.first { $0.id == "qwen3-asr-0.6b-sinhala" })
+        let whisper = try #require(catalog.models.first { $0.mac.kind == "whisper" })
+        let cohere = try #require(catalog.models.first { $0.id == "cohere-transcribe" })
+        #expect(MLXTranscriber.lock(for: qwen, language: "si")?.script == .sinhala)
+        #expect(MLXTranscriber.lock(for: qwen, language: "en")?.script == .latin)
+        #expect(MLXTranscriber.lock(for: qwen, language: nil) == nil)
+        #expect(MLXTranscriber.lock(for: qwen, language: "ca") == nil, "Catalan isn't one of its languages")
+        #expect(MLXTranscriber.lock(for: whisper, language: "en") == nil)
+        #expect(MLXTranscriber.lock(for: cohere, language: nil) == nil, "Automatic's English is told, not locked")
+        #expect(MLXTranscriber.lock(for: nil, language: "en") == nil, "a model outside the catalog")
+    }
+
     /// Parakeet's config.json names no kind, so the app reads it from the repository's name.
     @Test func aKindItsConfigDoesntNameIsInTheRepositorysName() throws {
         for model in catalog.models where model.mac.kind == "parakeet" {

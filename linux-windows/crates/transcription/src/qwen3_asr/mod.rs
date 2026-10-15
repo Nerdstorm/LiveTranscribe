@@ -7,10 +7,13 @@
 //! features are encoded in chunks and windows ([`EncoderLayout`]); the audio rows replace the
 //! prompt's first placeholders, and a language the clip is told starts the reply
 //! ([`prompt::told_language`]); the reply is decoded greedily ([`generation`]) and read as a
-//! language and a transcript ([`Languages::read`]), or, told one, as the transcript.
+//! language and a transcript ([`Languages::read`]), or, told one, as the transcript. Told a
+//! language that names its letters, the reply is kept to them ([`crate::script_lock`]), as the
+//! Mac app's own decoding keeps it.
 
 mod encoder_layout;
 pub mod generation;
+mod locked_tokens;
 mod log_mel;
 mod openvino_model;
 mod openvino_runtime;
@@ -22,6 +25,9 @@ use std::collections::HashMap;
 use std::fmt;
 
 use lt_shared::audio_format::{SAMPLE_RATE, samples_for_milliseconds};
+
+use crate::script_lock::{ScriptLock, WritingScript};
+pub use locked_tokens::{Locked, LockedTokens};
 
 pub use encoder_layout::{CHUNK_FRAMES, CHUNKS_PER_WINDOW, EncoderLayout, placeholders};
 pub use generation::{Decoded, Stop};
@@ -225,6 +231,9 @@ pub struct Transcriber<M> {
     told: HashMap<String, Vec<u32>>,
     /// A language couldn't be spelled for the prompt, which has been said.
     said_untold: bool,
+    /// The tokens each language's letters allow, read from the tokenizer when a clip is first
+    /// told a language that names them.
+    locked_tokens: Option<LockedTokens>,
     log_mel: LogMelExtractor,
 }
 
@@ -240,6 +249,7 @@ impl<M: SpeechModel> Transcriber<M> {
             languages,
             told: HashMap::new(),
             said_untold: false,
+            locked_tokens: None,
             log_mel: LogMelExtractor::new(),
         })
     }
@@ -251,11 +261,13 @@ impl<M: SpeechModel> Transcriber<M> {
 
     /// The transcript of `samples`, 16 kHz mono, in `language` (its name, such as "English") if
     /// it's given; otherwise the model finds the language. A tokenizer read without its merges
-    /// can't spell the language for the prompt, so the model finds it then too.
+    /// can't spell the language for the prompt, so the model finds it then too. Told a language,
+    /// the transcript is written in `script`'s letters if it's given ([`ScriptLock`]).
     pub fn transcribe(
         &mut self,
         samples: &[f32],
         language: Option<&str>,
+        script: Option<WritingScript>,
     ) -> Result<Transcription, TranscribeError<M::Error>> {
         if samples.len() < MINIMUM_SAMPLES {
             return Ok(Transcription::empty());
@@ -289,8 +301,19 @@ impl<M: SpeechModel> Transcriber<M> {
             .model
             .prefill(&ids, self.prompt.audio_start(), &audio)
             .map_err(TranscribeError::Model)?;
+        let lock = script.filter(|_| told.is_some()).map(ScriptLock::new);
+        let locked = match &lock {
+            Some(lock) => {
+                let tokenizer = &self.tokenizer;
+                let tokens = self
+                    .locked_tokens
+                    .get_or_insert_with(|| LockedTokens::new(tokenizer, first.len()));
+                Some(Locked::new(lock, tokens))
+            }
+            None => None,
+        };
         let model = &mut self.model;
-        let decoded = generation::decode_greedily(&first, max_tokens, |token| model.step(token))
+        let decoded = generation::decode_greedily(&first, max_tokens, locked, |token| model.step(token))
             .map_err(TranscribeError::Model)?;
         if max_tokens > 0 && decoded.tokens.len() >= max_tokens {
             tracing::warn!(
@@ -510,7 +533,7 @@ mod tests {
     #[test]
     fn transcribes_a_clip() {
         let mut transcriber = transcriber_replying(&[11528, 6364, 151_704, 29170, 432, 13, 151_645]);
-        let transcription = transcriber.transcribe(&[0.01; 94_560], None).unwrap();
+        let transcription = transcriber.transcribe(&[0.01; 94_560], None, None).unwrap();
         assert_eq!(transcription.text, "Ship it.");
         assert_eq!(transcription.language.as_deref(), Some("English"));
         assert_eq!(transcription.tokens, 6);
@@ -537,7 +560,7 @@ mod tests {
     fn a_language_told_starts_the_reply() {
         let reply = [29170, 432, 13, 151_645];
         let mut told = transcriber_that_encodes(&reply);
-        let transcription = told.transcribe(&[0.01; 16_000], Some("english")).unwrap();
+        let transcription = told.transcribe(&[0.01; 16_000], Some("english"), None).unwrap();
         assert_eq!(transcription.text, "Ship it.");
         assert_eq!(
             transcription.language.as_deref(),
@@ -546,7 +569,7 @@ mod tests {
         );
 
         let mut untold = transcriber_that_encodes(&reply);
-        untold.transcribe(&[0.01; 16_000], None).unwrap();
+        untold.transcribe(&[0.01; 16_000], None, None).unwrap();
         let (told_ids, ..) = told.model.prefilled.clone().unwrap();
         let (untold_ids, ..) = untold.model.prefilled.clone().unwrap();
         let answer = prompt::told_language(&told.tokenizer, "English").unwrap();
@@ -554,11 +577,30 @@ mod tests {
         assert_eq!(told.tokenizer.decode(&answer), "language English<asr_text>");
     }
 
+    /// Told a language with its letters, the reply keeps to them: told English, Qwen3-ASR can't
+    /// write Sinhala, and writes the likeliest token the lock allows instead.
+    #[test]
+    fn a_language_told_with_its_letters_keeps_the_reply_to_them() {
+        // "ක" (E0 B6 9A), a byte a token.
+        let reply = [1_224, 1_182, 1_154, 151_645];
+        let mut unlocked = transcriber_that_encodes(&reply);
+        let transcription = unlocked.transcribe(&[0.01; 16_000], Some("English"), None).unwrap();
+        assert_eq!(transcription.text, "ක");
+        let mut locked = transcriber_that_encodes(&reply);
+        let transcription = locked
+            .transcribe(&[0.01; 16_000], Some("English"), Some(WritingScript::Latin))
+            .unwrap();
+        assert_eq!(
+            transcription.text, "...",
+            "the scripted tokens aren't allowed, and the likeliest that is, of equals the first, is ."
+        );
+    }
+
     /// A tokenizer read without its merges can't spell the language, so the model finds it.
     #[test]
     fn a_language_that_cant_be_spelled_is_left_to_the_model() {
         let mut transcriber = transcriber_replying(&[11528, 6364, 151_704, 29170, 432, 13, 151_645]);
-        let transcription = transcriber.transcribe(&[0.01; 16_000], Some("English")).unwrap();
+        let transcription = transcriber.transcribe(&[0.01; 16_000], Some("English"), None).unwrap();
         assert_eq!(transcription.text, "Ship it.");
         let (ids, ..) = transcriber.model.prefilled.clone().unwrap();
         assert_eq!(ids.last(), Some(&198), "the prompt ends with the assistant's line feed");
@@ -567,13 +609,13 @@ mod tests {
     #[test]
     fn pads_a_short_clip_to_a_second_and_gives_nothing_for_a_click() {
         let mut transcriber = transcriber_replying(&[151_645]);
-        let transcription = transcriber.transcribe(&[0.01; 3_200], None).unwrap();
+        let transcription = transcriber.transcribe(&[0.01; 3_200], None, None).unwrap();
         assert_eq!(transcription.text, "");
         assert_eq!(transcriber.model.convolved_chunks, [(2, 100)]);
 
         let mut transcriber = transcriber_replying(&[151_645]);
         assert_eq!(
-            transcriber.transcribe(&[0.01; 1_599], None).unwrap(),
+            transcriber.transcribe(&[0.01; 1_599], None, None).unwrap(),
             Transcription::empty()
         );
         assert!(transcriber.model.convolved_chunks.is_empty());
@@ -583,11 +625,11 @@ mod tests {
     fn limits_the_reply_by_the_clip_length() {
         // A second of audio allows 94 tokens.
         let mut transcriber = transcriber_replying(&vec![432; 200]);
-        let transcription = transcriber.transcribe(&[0.01; 16_000], None).unwrap();
+        let transcription = transcriber.transcribe(&[0.01; 16_000], None, None).unwrap();
         assert_eq!(transcription.stop, Some(Stop::Loop));
         let looping: Vec<u32> = (0..200).map(|n| [432, 13, 29170, 6364][n % 4]).collect();
         let mut transcriber = transcriber_replying(&looping);
-        let transcription = transcriber.transcribe(&[0.01; 16_000], None).unwrap();
+        let transcription = transcriber.transcribe(&[0.01; 16_000], None, None).unwrap();
         assert_eq!(transcription.tokens, 94);
         assert_eq!(transcription.stop, Some(Stop::Limit));
     }
@@ -596,7 +638,7 @@ mod tests {
     fn refuses_a_clip_over_twenty_minutes() {
         let mut transcriber = transcriber_replying(&[151_645]);
         let error = transcriber
-            .transcribe(&vec![0.0; MAX_CLIP_SAMPLES + 1], None)
+            .transcribe(&vec![0.0; MAX_CLIP_SAMPLES + 1], None, None)
             .unwrap_err();
         assert!(matches!(error, TranscribeError::TooLong { .. }));
     }

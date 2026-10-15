@@ -8,7 +8,8 @@
 //! Face commit and each file's SHA-256, or to an archive's SHA-256 and each file's in it. A model
 //! that can be told which language to write lists the languages it takes (`language_choices`),
 //! for the Language setting; one that can't find the language itself names the one Automatic
-//! tells it (`automatic_language`).
+//! tells it (`automatic_language`). Qwen3-ASR's languages name their letters too (`script`), which
+//! its transcription is locked to ([`crate::script_lock`]).
 //!
 //! [`SpeechModel::verify`] checks a model's folder against those before the model is opened:
 //! sherpa-onnx aborts the process on a file ONNX Runtime can't read ([`crate::sherpa`]), so only
@@ -25,6 +26,7 @@ use std::time::{Instant, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::script_lock::WritingScript;
 use crate::sherpa::Family;
 
 /// The version of `speech-models.json` this build reads, as SpeechModelCatalog.swift's `format`.
@@ -95,6 +97,10 @@ pub struct LanguageChoice {
     pub code: String,
     /// Its name in English, as Settings shows it.
     pub name: String,
+    /// The letters it's written in, for a model whose letters are locked to the language it's
+    /// told (our Qwen3-ASR runtime, [`crate::script_lock`]); `None` for one whose aren't.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub script: Option<WritingScript>,
 }
 
 impl LanguageChoice {
@@ -146,6 +152,12 @@ impl Engine {
             Self::OpenVino { .. } => true,
             Self::SherpaOnnx { family, .. } => family.finds_language(),
         }
+    }
+
+    /// Whether the model's letters are locked to the language it's told: our Qwen3-ASR runtime's,
+    /// since Qwen3-ASR takes a language as no more than a hint ([`crate::script_lock`]).
+    pub fn locks_script(&self) -> bool {
+        matches!(self, Self::OpenVino { .. })
     }
 }
 
@@ -507,6 +519,11 @@ impl SpeechModelCatalog {
                 model.language_choices.clear();
                 model.automatic_language = None;
             }
+            if !model.engine.locks_script() {
+                for choice in &mut model.language_choices {
+                    choice.script = None;
+                }
+            }
             models.push(model);
         }
         Ok(Self { models })
@@ -584,6 +601,12 @@ fn check(model: &SpeechModel) -> Result<(), String> {
         }
         if !codes.insert(choice.code.as_str()) {
             return Err(format!("the language {} is listed twice", choice.code));
+        }
+        if model.engine.locks_script() && choice.script.is_none() {
+            return Err(format!(
+                "the language {} names no script, which its letters are locked to",
+                choice.code
+            ));
         }
     }
     // A model that can't find the language must be told one, so it needs both.
@@ -867,6 +890,66 @@ mod tests {
                 .any(|choice| choice.code == "si" && choice.name == "Sinhala")
         );
         assert_eq!(qwen.automatic_choice(), None, "it finds the language itself");
+    }
+
+    /// Qwen3-ASR takes a language as a hint, so our runtime locks its letters to the one it's
+    /// told, and each of its languages names them. sherpa-onnx's models aren't locked.
+    #[test]
+    fn qwen3_asrs_languages_name_their_letters_and_no_other_models_keep_them() {
+        let catalog = SpeechModelCatalog::parse(BUNDLED, Platform::Linux).unwrap();
+        let qwen = catalog.model("qwen3-asr-0.6b-sinhala").unwrap();
+        let script = |code: &str| {
+            qwen.language_choices
+                .iter()
+                .find(|choice| choice.code == code)
+                .and_then(|choice| choice.script)
+        };
+        assert_eq!(script("si"), Some(WritingScript::Sinhala));
+        assert_eq!(script("en"), Some(WritingScript::Latin));
+        assert_eq!(script("ja"), Some(WritingScript::Japanese));
+        for model in catalog.models() {
+            for choice in &model.language_choices {
+                assert_eq!(
+                    choice.script.is_some(),
+                    model.engine.locks_script(),
+                    "{}: {}",
+                    model.id,
+                    choice.code
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_locked_models_language_needs_its_script_and_another_models_isnt_kept() {
+        let openvino = json!({
+            "engine": "openvino",
+            "repository": "a/b",
+            "revision": "8298d9b2d532965800b2c0c64b81965ededb03a3",
+            "files": [{"name": "model.bin", "bytes": 1, "sha256": sha256(b"x")}],
+        });
+        let error = parse_with_languages(json!([{"code": "en", "name": "English"}]), openvino.clone()).unwrap_err();
+        assert!(error.to_string().contains("names no script"), "{error}");
+        let locked =
+            parse_with_languages(json!([{"code": "en", "name": "English", "script": "Latn"}]), openvino).unwrap();
+        assert_eq!(
+            locked.models()[0].language_choices[0].script,
+            Some(WritingScript::Latin)
+        );
+        let unlocked = parse_with_languages(
+            json!([{"code": "en", "name": "English", "script": "Latn"}]),
+            cohere_section(),
+        )
+        .unwrap();
+        assert_eq!(unlocked.models()[0].language_choices[0].script, None);
+        assert!(
+            parse_with_languages(
+                json!([{"code": "en", "name": "English", "script": "Latin"}]),
+                cohere_section()
+            )
+            .is_err(),
+            "scripts go by their ISO 15924 codes"
+        );
     }
 
     #[test]

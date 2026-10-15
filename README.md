@@ -302,7 +302,8 @@ last three are builds that [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) 
 quantised to 8 bits for ONNX. Qwen3-ASR, Whisper and Cohere Transcribe can be told which language to
 write, from the menu bar or tray, or from the model's row: **Automatic**, the default, lets the model
 work it out, or, for Cohere Transcribe, which can't, writes English. Parakeet always works it out.
-They are listed in
+Qwen3-ASR takes the language as a hint, so it's also kept to that language's letters: with English
+chosen, it never writes Sinhala or Chinese. They are listed in
 [`speech-models.json`](Packages/LiveTranscribeKit/Sources/Transcription/Resources/speech-models.json),
 each pinned to a tested commit or, for sherpa-onnx archives, a SHA-256, and both apps read that
 list. **Another model** there takes, on the Mac, any Hugging Face repository that mlx-audio-swift

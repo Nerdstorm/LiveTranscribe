@@ -16,7 +16,9 @@ import Shared
 /// language to write (Qwen3-ASR, Whisper, Cohere Transcribe) is told the Language setting's at
 /// each transcription, so a change applies to the next without loading the model again.
 /// Automatic tells it nothing, and it finds the language, except Cohere Transcribe, which can't
-/// and is told English.
+/// and is told English. Qwen3-ASR takes the language it's told as no more than a hint, so it's
+/// also kept to that language's letters (``ScriptLock``), and decoded here rather than by
+/// mlx-audio-swift.
 public actor MLXTranscriber: Transcriber {
     /// Shorter clips are returned as empty text rather than sent to the model: they hold no word,
     /// and some models' subsampling (Parakeet's conformer, say) needs a minimum number of frames.
@@ -25,8 +27,12 @@ public actor MLXTranscriber: Transcriber {
     /// The Speech-to-text setting to load: the one the transcriber was made with, or the last one
     /// it was switched to.
     private var modelID: String
-    /// The loaded model, and the setting it was loaded for.
-    private var loaded: (modelID: String, model: any STTGenerationModel)?
+    /// The loaded model, the setting it was loaded for and its folder.
+    private var loaded: (modelID: String, model: any STTGenerationModel, folder: URL)?
+    /// The masks that lock the loaded Qwen3-ASR's letters to the language it's told, made from
+    /// its vocabulary when a language is first told, and the setting they were made for; `nil`
+    /// masks if its vocabulary couldn't be read.
+    private var lockedLogits: (modelID: String, logits: LockedLogits?)?
     /// A model is taking the place of the one before, which is already gone.
     private var isReplacingModel = false
     /// Transcriptions asked for meanwhile, which wait for the new model.
@@ -69,6 +75,7 @@ public actor MLXTranscriber: Transcriber {
         defer { finishReplacingModel() }
         if loaded != nil {
             loaded = nil
+            lockedLogits = nil
             Memory.clearCache()
         }
         let model = try await kind.load(folder)
@@ -80,7 +87,7 @@ public actor MLXTranscriber: Transcriber {
             audio: MLXArray.zeros([AudioFormat.sampleRate]),
             generationParameters: OutputLimit.capping(model.defaultGenerationParameters, sampleCount: AudioFormat.sampleRate)
         )
-        loaded = (modelID, model)
+        loaded = (modelID, model, folder)
         progress(ModelLoadProgress(modelID: modelID, stage: .ready, fractionCompleted: 1))
         Log.transcription.info(
             "STT model ready: \(location.description, privacy: .public), \(kind.modelType, privacy: .public) (warm-up \(started.duration(to: .now).wholeMilliseconds) ms)"
@@ -107,19 +114,50 @@ public actor MLXTranscriber: Transcriber {
         let interval = signposter.beginInterval("STT", id: signposter.makeSignpostID())
         defer { signposter.endInterval("STT", interval) }
 
-        let told = Self.parameters(
-            model.defaultGenerationParameters,
-            for: catalog.model(forSetting: loaded.modelID),
-            language: language()
-        )
+        let catalogModel = catalog.model(forSetting: loaded.modelID)
+        let setting = language()
+        let told = Self.parameters(model.defaultGenerationParameters, for: catalogModel, language: setting)
         let parameters = OutputLimit.capping(told, sampleCount: samples.count)
-        let output = model.generate(audio: MLXArray(samples), generationParameters: parameters)
-        if parameters.maxTokens > 0, output.generationTokens >= parameters.maxTokens {
+        let text: String
+        let generationTokens: Int
+        if let qwen = model as? Qwen3ASRModel, let lock = Self.lock(for: catalogModel, language: setting),
+           let logits = lockedLogits(for: loaded) {
+            (text, generationTokens) = qwen.generate(audio: MLXArray(samples), parameters: parameters, locking: lock, with: logits)
+        } else {
+            let output = model.generate(audio: MLXArray(samples), generationParameters: parameters)
+            (text, generationTokens) = (output.text, output.generationTokens)
+        }
+        if parameters.maxTokens > 0, generationTokens >= parameters.maxTokens {
             Log.transcription.warning(
                 "STT stopped at its limit of \(parameters.maxTokens, privacy: .public) tokens for \(samples.count / (AudioFormat.sampleRate / 1000), privacy: .public) ms of audio; the model was probably repeating itself"
             )
         }
-        return output.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The lock on a catalog model's letters for the Language setting: the language's letters,
+    /// for a language of the model's that names them (Qwen3-ASR's, ``ScriptLock``). `nil` for
+    /// Automatic, which tells Qwen3-ASR nothing, and for a model whose letters aren't locked.
+    static func lock(for model: SpeechModelCatalog.Model?, language setting: String?) -> ScriptLock? {
+        model?.language(forSetting: setting)?.script.map(ScriptLock.init)
+    }
+
+    /// The masks for the loaded model, made from its `vocab.json` the first time a language is
+    /// told. If the vocabulary can't be read, the model is told the language unlocked, as
+    /// Automatic's would be guessed.
+    private func lockedLogits(for loaded: (modelID: String, model: any STTGenerationModel, folder: URL)) -> LockedLogits? {
+        if let made = lockedLogits, made.modelID == loaded.modelID { return made.logits }
+        var logits: LockedLogits?
+        do {
+            let json = try Data(contentsOf: loaded.folder.appending(path: "vocab.json"))
+            logits = LockedLogits(vocabulary: try LockedVocabulary(vocabularyJSON: json, endOfReply: Qwen3ASRModel.endOfReply))
+        } catch {
+            Log.transcription.error(
+                "STT can't lock its letters to the language it's told, so it's told the language alone: \(String(describing: error), privacy: .public)"
+            )
+        }
+        lockedLogits = (loaded.modelID, logits)
+        return logits
     }
 
     /// `parameters`, with the language to write for a catalog model that can be told one: the

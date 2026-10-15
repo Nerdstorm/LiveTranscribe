@@ -108,20 +108,26 @@ impl SpeechToText {
     /// The transcript of `samples`, 16 kHz mono. `language` is the Language setting
     /// (`sttLanguage`, a code, `None` for Automatic): a model that can be told which language to
     /// write writes it if it's one of its languages, and otherwise Automatic's: Qwen3-ASR finds
-    /// the language, and Cohere Transcribe writes English. Parakeet always finds it.
+    /// the language, and Cohere Transcribe writes English. Parakeet always finds it. Qwen3-ASR
+    /// takes the language as a hint, so it's also kept to the language's letters
+    /// ([`crate::script_lock`]).
     pub fn transcribe(&mut self, samples: &[f32], language: Option<&str>) -> Result<Transcript, TranscribeError> {
         match self {
-            Self::Qwen3Asr { transcriber, languages } => transcriber
-                .transcribe(
-                    samples,
-                    chosen_language(languages, None, language).map(|choice| choice.name.as_str()),
-                )
-                .map(|transcription| Transcript {
-                    text: transcription.text,
-                    language: transcription.language,
-                    tokens: transcription.tokens,
-                })
-                .map_err(TranscribeError::Qwen3Asr),
+            Self::Qwen3Asr { transcriber, languages } => {
+                let choice = chosen_language(languages, None, language);
+                transcriber
+                    .transcribe(
+                        samples,
+                        choice.map(|choice| choice.name.as_str()),
+                        choice.and_then(|choice| choice.script),
+                    )
+                    .map(|transcription| Transcript {
+                        text: transcription.text,
+                        language: transcription.language,
+                        tokens: transcription.tokens,
+                    })
+                    .map_err(TranscribeError::Qwen3Asr)
+            }
             Self::SherpaOnnx(transcriber) => transcriber
                 .transcribe(samples, language)
                 .map(|transcript| Transcript {
