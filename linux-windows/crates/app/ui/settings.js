@@ -435,8 +435,10 @@ function renderCatalog({ force = false } = {}) {
 }
 
 /**
- * The language a model told one writes: the Language setting's, if the model has it, and
- * otherwise its first. The setting is one for every such model.
+ * The language a model that can be told one writes: Automatic, then its languages, with the
+ * Language setting's chosen if the model has it, and otherwise Automatic. The setting is one for
+ * every such model. Automatic lets the model find the language, or, for one that can't, says in
+ * brackets what it writes: "Automatic (English)".
  */
 function languageMenu(model) {
   const choices = model.languageChoices;
@@ -444,10 +446,14 @@ function languageMenu(model) {
   const select = document.createElement("select");
   select.dataset.model = model.id;
   select.setAttribute("aria-label", `${model.name}’s language`);
-  select.replaceChildren(...choices.map((choice) => option(choice.code, choice.name)));
-  select.value = choices.some((choice) => choice.code === setting) ? setting : choices[0].code;
+  const automatic = model.automaticLanguage ? `Automatic (${model.automaticLanguage})` : "Automatic";
+  const languages = document.createElement("optgroup");
+  languages.label = "Languages";
+  languages.replaceChildren(...choices.map((choice) => option(choice.code, choice.name)));
+  select.replaceChildren(option("", automatic), languages);
+  select.value = choices.some((choice) => choice.code === setting) ? setting : "";
   select.addEventListener("change", async () => {
-    await change({ sttLanguage: select.value });
+    await change({ sttLanguage: select.value || null });
     // The menu has closed, so the rows can be drawn again, keeping the focus on it.
     if (catalogStale) {
       renderCatalog({ force: true });

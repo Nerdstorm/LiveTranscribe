@@ -6,8 +6,10 @@
 //! reads its own platform's and leaves out a model without one, so each app has its own list, and
 //! a model is named, described and credited alike everywhere. Every file is pinned: to a Hugging
 //! Face commit and each file's SHA-256, or to an archive's SHA-256 and each file's in it. A model
-//! that is told which language to write, where others find it, lists the languages it can be told
-//! (`language_choices`), for the Language setting.
+//! that can be told which language to write lists the languages it takes (`language_choices`),
+//! for the Language setting; one that can't find the language itself names the one Automatic
+//! tells it (`automatic_language`). Qwen3-ASR's languages name their letters too (`script`), which
+//! its transcription is locked to ([`crate::script_lock`]).
 //!
 //! [`SpeechModel::verify`] checks a model's folder against those before the model is opened:
 //! sherpa-onnx aborts the process on a file ONNX Runtime can't read ([`crate::sherpa`]), so only
@@ -24,6 +26,7 @@ use std::time::{Instant, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::script_lock::WritingScript;
 use crate::sherpa::Family;
 
 /// The version of `speech-models.json` this build reads, as SpeechModelCatalog.swift's `format`.
@@ -74,9 +77,12 @@ pub struct SpeechModel {
     pub licence: String,
     /// Who made it, and converted it for this platform, credited as its licence asks.
     pub credit: String,
-    /// The languages it can be told to write, its default first; empty for a model that finds
-    /// the language itself, or that this platform's engine can't tell one.
+    /// The languages it can be told to write, in the order Settings lists them; empty for a model
+    /// this platform's engine can't tell one (Parakeet), which finds the language itself.
     pub language_choices: Vec<LanguageChoice>,
+    /// The code of the language Automatic tells it, for a model that can't find the language
+    /// itself (Cohere Transcribe); `None` for one that finds it.
+    pub automatic_language: Option<String>,
     pub engine: Engine,
     /// Its files, as they are in its folder.
     pub files: Vec<ModelFile>,
@@ -86,10 +92,15 @@ pub struct SpeechModel {
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LanguageChoice {
-    /// Its ISO 639-1 code, as the model is told it: `en`, `de`.
+    /// Its ISO 639 code: `en`, `de`, `fil`. One setting holds it for every model, so a language
+    /// has the same code in each.
     pub code: String,
     /// Its name in English, as Settings shows it.
     pub name: String,
+    /// The letters it's written in, for a model whose letters are locked to the language it's
+    /// told (our Qwen3-ASR runtime, [`crate::script_lock`]); `None` for one whose aren't.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub script: Option<WritingScript>,
 }
 
 impl LanguageChoice {
@@ -100,13 +111,17 @@ impl LanguageChoice {
     }
 }
 
-/// The language of `choices` to tell a model, for the Language setting (`sttLanguage`, a code):
-/// the setting's, if it's one of them, and otherwise the first, the default. `None` when there
-/// are no choices.
-pub fn chosen_language<'a>(choices: &'a [LanguageChoice], setting: Option<&str>) -> Option<&'a LanguageChoice> {
-    setting
-        .and_then(|code| choices.iter().find(|choice| choice.code == code))
-        .or_else(|| choices.first())
+/// The language of `choices` to tell a model, for the Language setting (`sttLanguage`, a code,
+/// `None` for Automatic): the setting's, if it's one of them, and otherwise Automatic's,
+/// `automatic`, for a model that can't find the language itself. `None` tells the model nothing:
+/// it finds the language.
+pub fn chosen_language<'a>(
+    choices: &'a [LanguageChoice],
+    automatic: Option<&str>,
+    setting: Option<&str>,
+) -> Option<&'a LanguageChoice> {
+    let find = |code: &str| choices.iter().find(|choice| choice.code == code);
+    setting.and_then(find).or_else(|| automatic.and_then(find))
 }
 
 /// What runs a model on this platform, and where its files come from.
@@ -121,10 +136,28 @@ pub enum Engine {
 }
 
 impl Engine {
-    /// Whether it tells the model which language to write. Our Qwen3-ASR runtime lets the model
-    /// find it.
+    /// Whether it can tell the model which language to write: our Qwen3-ASR runtime, in its
+    /// prompt, and sherpa-onnx's Cohere Transcribe. NeMo transducers can't be told one.
     pub fn takes_language(&self) -> bool {
-        matches!(self, Self::SherpaOnnx { family, .. } if family.takes_language())
+        match self {
+            Self::OpenVino { .. } => true,
+            Self::SherpaOnnx { family, .. } => family.takes_language(),
+        }
+    }
+
+    /// Whether the model finds the language itself, when it isn't told one. Cohere Transcribe
+    /// can't.
+    pub fn finds_language(&self) -> bool {
+        match self {
+            Self::OpenVino { .. } => true,
+            Self::SherpaOnnx { family, .. } => family.finds_language(),
+        }
+    }
+
+    /// Whether the model's letters are locked to the language it's told: our Qwen3-ASR runtime's,
+    /// since Qwen3-ASR takes a language as no more than a hint ([`crate::script_lock`]).
+    pub fn locks_script(&self) -> bool {
+        matches!(self, Self::OpenVino { .. })
     }
 }
 
@@ -163,9 +196,14 @@ pub enum Role {
 
 impl SpeechModel {
     /// The language to tell it to write, for the Language setting ([`chosen_language`]); `None`
-    /// for a model that isn't told one.
+    /// tells it none, and it finds the language.
     pub fn language(&self, setting: Option<&str>) -> Option<&LanguageChoice> {
-        chosen_language(&self.language_choices, setting)
+        chosen_language(&self.language_choices, self.automatic_language.as_deref(), setting)
+    }
+
+    /// The language Automatic tells it, if it can't find the language itself.
+    pub fn automatic_choice(&self) -> Option<&LanguageChoice> {
+        self.language(None)
     }
 
     /// How much a download fetches.
@@ -471,6 +509,7 @@ impl SpeechModelCatalog {
                 languages: entry.languages,
                 licence: entry.licence,
                 language_choices: entry.language_choices,
+                automatic_language: entry.automatic_language,
                 engine,
                 files,
             };
@@ -478,6 +517,12 @@ impl SpeechModelCatalog {
             // Another platform's engine may tell the model; this one lets it find the language.
             if !model.engine.takes_language() {
                 model.language_choices.clear();
+                model.automatic_language = None;
+            }
+            if !model.engine.locks_script() {
+                for choice in &mut model.language_choices {
+                    choice.script = None;
+                }
             }
             models.push(model);
         }
@@ -557,9 +602,28 @@ fn check(model: &SpeechModel) -> Result<(), String> {
         if !codes.insert(choice.code.as_str()) {
             return Err(format!("the language {} is listed twice", choice.code));
         }
+        if model.engine.locks_script() && choice.script.is_none() {
+            return Err(format!(
+                "the language {} names no script, which its letters are locked to",
+                choice.code
+            ));
+        }
     }
-    if model.engine.takes_language() && model.language_choices.is_empty() {
-        return Err("it's told which language to write, and has no language_choices".to_owned());
+    // A model that can't find the language must be told one, so it needs both.
+    let must_be_told = model.engine.takes_language() && !model.engine.finds_language();
+    if must_be_told && model.language_choices.is_empty() {
+        return Err("it can't find the language itself, and has no language_choices".to_owned());
+    }
+    match &model.automatic_language {
+        Some(code) if !codes.contains(code.as_str()) => {
+            return Err(format!(
+                "its automatic_language, {code}, isn't one of its language_choices"
+            ));
+        }
+        None if must_be_told => {
+            return Err("it can't find the language itself, and has no automatic_language".to_owned());
+        }
+        _ => {}
     }
     match &model.engine {
         Engine::OpenVino { repository, revision } => {
@@ -622,6 +686,8 @@ struct Entry {
     credit: String,
     #[serde(default)]
     language_choices: Vec<LanguageChoice>,
+    #[serde(default)]
+    automatic_language: Option<String>,
     linux: Option<Section>,
     windows: Option<Section>,
 }
@@ -687,19 +753,20 @@ mod tests {
             "models": [{
                 "id": "test-model", "name": "Test", "summary": "For tests.", "languages": "English",
                 "licence": "MIT", "credit": "Us", "language_choices": [{"code": "en", "name": "English"}],
-                "linux": section, "windows": section,
+                "automatic_language": "en", "linux": section, "windows": section,
             }],
         });
         SpeechModelCatalog::parse(&text.to_string(), Platform::Linux).unwrap()
     }
 
-    /// A catalog of one model with `language_choices` and the section `linux`.
+    /// A catalog of one model with `language_choices`, English as Automatic's, and the section
+    /// `linux`.
     fn parse_with_languages(language_choices: Value, linux: Value) -> Result<SpeechModelCatalog, CatalogError> {
         let text = json!({
             "format": 1,
             "models": [{
                 "id": "told", "name": "Told", "summary": "", "languages": "", "licence": "MIT", "credit": "",
-                "language_choices": language_choices, "linux": linux,
+                "language_choices": language_choices, "automatic_language": "en", "linux": linux,
             }],
         });
         SpeechModelCatalog::parse(&text.to_string(), Platform::Linux)
@@ -790,7 +857,11 @@ mod tests {
             .iter()
             .map(|choice| choice.code.as_str())
             .collect();
-        assert_eq!(codes[0], "en", "English is the default");
+        assert_eq!(
+            cohere.automatic_choice().map(|choice| choice.name.as_str()),
+            Some("English"),
+            "it can't find the language, so Automatic tells it English"
+        );
         codes.sort_unstable();
         // IsValidCohereTranscribeLanguage, in sherpa-onnx's offline-recognizer-cohere-transcribe-impl.h:
         // with any other, it decodes nothing.
@@ -800,24 +871,108 @@ mod tests {
                 "ar", "de", "el", "en", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "vi", "zh"
             ]
         );
-        for id in ["qwen3-asr-0.6b-sinhala", "parakeet-tdt-0.6b-v2", "parakeet-tdt-0.6b-v3"] {
+        for id in ["parakeet-tdt-0.6b-v2", "parakeet-tdt-0.6b-v3"] {
             let model = catalog.model(id).unwrap();
-            assert!(model.language_choices.is_empty(), "{id} finds the language itself");
+            assert!(model.language_choices.is_empty(), "{id} can't be told a language");
+        }
+    }
+
+    /// Our runtime puts the language in Qwen3-ASR's prompt, by the name its config.json lists.
+    #[test]
+    fn qwen3_asr_is_told_the_languages_its_config_lists() {
+        let catalog = SpeechModelCatalog::parse(BUNDLED, Platform::Linux).unwrap();
+        let qwen = catalog.model("qwen3-asr-0.6b-sinhala").unwrap();
+        assert_eq!(qwen.language_choices.len(), 31);
+        assert_eq!(qwen.language_choices[0].name, "English");
+        assert!(
+            qwen.language_choices
+                .iter()
+                .any(|choice| choice.code == "si" && choice.name == "Sinhala")
+        );
+        assert_eq!(qwen.automatic_choice(), None, "it finds the language itself");
+    }
+
+    /// Qwen3-ASR takes a language as a hint, so our runtime locks its letters to the one it's
+    /// told, and each of its languages names them. sherpa-onnx's models aren't locked.
+    #[test]
+    fn qwen3_asrs_languages_name_their_letters_and_no_other_models_keep_them() {
+        let catalog = SpeechModelCatalog::parse(BUNDLED, Platform::Linux).unwrap();
+        let qwen = catalog.model("qwen3-asr-0.6b-sinhala").unwrap();
+        let script = |code: &str| {
+            qwen.language_choices
+                .iter()
+                .find(|choice| choice.code == code)
+                .and_then(|choice| choice.script)
+        };
+        assert_eq!(script("si"), Some(WritingScript::Sinhala));
+        assert_eq!(script("en"), Some(WritingScript::Latin));
+        assert_eq!(script("ja"), Some(WritingScript::Japanese));
+        for model in catalog.models() {
+            for choice in &model.language_choices {
+                assert_eq!(
+                    choice.script.is_some(),
+                    model.engine.locks_script(),
+                    "{}: {}",
+                    model.id,
+                    choice.code
+                );
+            }
         }
     }
 
     #[test]
-    fn the_language_told_is_the_settings_if_the_model_has_it_and_else_its_first() {
-        let catalog = SpeechModelCatalog::parse(BUNDLED, Platform::Linux).unwrap();
-        let cohere = catalog.model("cohere-transcribe").unwrap();
-        let told = |setting| cohere.language(setting).map(|choice| choice.code.as_str());
-        assert_eq!(told(Some("de")), Some("de"));
-        assert_eq!(told(None), Some("en"));
-        assert_eq!(told(Some("si")), Some("en"), "Sinhala isn't one of its languages");
+    fn a_locked_models_language_needs_its_script_and_another_models_isnt_kept() {
+        let openvino = json!({
+            "engine": "openvino",
+            "repository": "a/b",
+            "revision": "8298d9b2d532965800b2c0c64b81965ededb03a3",
+            "files": [{"name": "model.bin", "bytes": 1, "sha256": sha256(b"x")}],
+        });
+        let error = parse_with_languages(json!([{"code": "en", "name": "English"}]), openvino.clone()).unwrap_err();
+        assert!(error.to_string().contains("names no script"), "{error}");
+        let locked =
+            parse_with_languages(json!([{"code": "en", "name": "English", "script": "Latn"}]), openvino).unwrap();
         assert_eq!(
-            catalog.model("parakeet-tdt-0.6b-v3").unwrap().language(Some("de")),
-            None
+            locked.models()[0].language_choices[0].script,
+            Some(WritingScript::Latin)
         );
+        let unlocked = parse_with_languages(
+            json!([{"code": "en", "name": "English", "script": "Latn"}]),
+            cohere_section(),
+        )
+        .unwrap();
+        assert_eq!(unlocked.models()[0].language_choices[0].script, None);
+        assert!(
+            parse_with_languages(
+                json!([{"code": "en", "name": "English", "script": "Latin"}]),
+                cohere_section()
+            )
+            .is_err(),
+            "scripts go by their ISO 15924 codes"
+        );
+    }
+
+    #[test]
+    fn the_language_told_is_the_settings_if_the_model_has_it_and_else_automatics() {
+        let catalog = SpeechModelCatalog::parse(BUNDLED, Platform::Linux).unwrap();
+        let told = |id, setting| {
+            catalog
+                .model(id)
+                .unwrap()
+                .language(setting)
+                .map(|choice| choice.code.as_str())
+        };
+        assert_eq!(told("cohere-transcribe", Some("de")), Some("de"));
+        assert_eq!(told("cohere-transcribe", None), Some("en"));
+        assert_eq!(
+            told("cohere-transcribe", Some("si")),
+            Some("en"),
+            "Sinhala isn't one of its languages"
+        );
+        assert_eq!(told("qwen3-asr-0.6b-sinhala", Some("si")), Some("si"));
+        assert_eq!(told("qwen3-asr-0.6b-sinhala", None), None, "it finds the language");
+        assert_eq!(told("qwen3-asr-0.6b-sinhala", Some("vi")), Some("vi"));
+        assert_eq!(told("parakeet-tdt-0.6b-v3", Some("de")), None);
     }
 
     #[test]
@@ -827,7 +982,8 @@ mod tests {
         assert_eq!(named("de"), Some("de"));
         assert_eq!(named(" German "), Some("de"));
         assert_eq!(named("JA"), Some("ja"));
-        assert_eq!(named("Sinhala"), None);
+        assert_eq!(named("Sinhala"), Some("si"), "Qwen3-ASR's Sinhala fine-tune knows it");
+        assert_eq!(named("Catalan"), None, "only Whisper on the Mac knows it");
     }
 
     #[test]
@@ -841,6 +997,10 @@ mod tests {
                 "listed twice",
             ),
             (json!([]), "has no language_choices"),
+            (
+                json!([{"code": "de", "name": "German"}]),
+                "automatic_language, en, isn't one of its language_choices",
+            ),
         ] {
             let error = parse_with_languages(choices, cohere_section()).unwrap_err();
             assert!(error.to_string().contains(problem), "{error}");
@@ -848,16 +1008,54 @@ mod tests {
     }
 
     #[test]
+    fn a_model_that_cant_find_the_language_needs_automatics() {
+        let text = json!({
+            "format": 1,
+            "models": [{
+                "id": "told", "name": "Told", "summary": "", "languages": "", "licence": "MIT", "credit": "",
+                "language_choices": [{"code": "en", "name": "English"}], "linux": cohere_section(),
+            }],
+        });
+        let error = SpeechModelCatalog::parse(&text.to_string(), Platform::Linux).unwrap_err();
+        assert!(error.to_string().contains("has no automatic_language"), "{error}");
+    }
+
+    #[test]
     fn a_model_this_platform_cant_tell_keeps_no_language_choices() {
+        let nemo = json!({
+            "engine": "sherpa-onnx",
+            "family": "nemo-transducer",
+            "archive": {"url": "https://example.com/p.tar.bz2", "bytes": 1, "sha256": sha256(b"p")},
+            "files": [
+                {"name": "encoder.onnx", "bytes": 1, "sha256": sha256(b"e"), "role": "encoder"},
+                {"name": "decoder.onnx", "bytes": 1, "sha256": sha256(b"d"), "role": "decoder"},
+                {"name": "joiner.onnx", "bytes": 1, "sha256": sha256(b"j"), "role": "joiner"},
+                {"name": "tokens.txt", "bytes": 1, "sha256": sha256(b"t"), "role": "tokens"},
+            ],
+        });
+        let catalog = parse_with_languages(json!([{"code": "en", "name": "English"}]), nemo).unwrap();
+        assert!(catalog.models()[0].language_choices.is_empty());
+        assert_eq!(catalog.models()[0].automatic_language, None);
+        assert_eq!(catalog.language_named("English"), None);
+    }
+
+    #[test]
+    fn a_model_that_finds_the_language_may_list_none() {
         let openvino = json!({
             "engine": "openvino",
             "repository": "a/b",
             "revision": "8298d9b2d532965800b2c0c64b81965ededb03a3",
             "files": [{"name": "model.bin", "bytes": 1, "sha256": sha256(b"x")}],
         });
-        let catalog = parse_with_languages(json!([{"code": "en", "name": "English"}]), openvino).unwrap();
+        let text = json!({
+            "format": 1,
+            "models": [{
+                "id": "finds", "name": "F", "summary": "", "languages": "", "licence": "MIT", "credit": "",
+                "linux": openvino,
+            }],
+        });
+        let catalog = SpeechModelCatalog::parse(&text.to_string(), Platform::Linux).unwrap();
         assert!(catalog.models()[0].language_choices.is_empty());
-        assert_eq!(catalog.language_named("English"), None);
     }
 
     #[test]

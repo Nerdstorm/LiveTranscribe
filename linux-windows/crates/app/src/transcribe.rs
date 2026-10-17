@@ -116,8 +116,8 @@ fn chosen(option: Option<&str>, library: &SpeechModelLibrary) -> anyhow::Result<
 }
 
 /// The code of the language `--language` names, for the model chosen: `None` without the option,
-/// and for a model that finds the language itself, which is said on standard error. A language
-/// the model can't be told is refused.
+/// Automatic, and for a model that can't be told a language, which is said on standard error. A
+/// language the model can't be told is refused.
 fn told_language<'a>(chosen: &'a ChosenModel, option: Option<&str>) -> anyhow::Result<Option<&'a str>> {
     let Some(text) = option else { return Ok(None) };
     let choices = match chosen {
@@ -126,7 +126,7 @@ fn told_language<'a>(chosen: &'a ChosenModel, option: Option<&str>) -> anyhow::R
     };
     if choices.is_empty() {
         eprintln!(
-            "⚠ {} finds the language itself: --language is for Cohere Transcribe",
+            "⚠ {} can't be told a language, and finds it itself: --language is for Qwen3-ASR and Cohere Transcribe",
             chosen.name()
         );
         return Ok(None);
@@ -221,15 +221,19 @@ mod tests {
         let cohere = ChosenModel::Catalog(catalog.model("cohere-transcribe").unwrap());
         assert_eq!(told_language(&cohere, Some("German")).unwrap(), Some("de"));
         assert_eq!(told_language(&cohere, Some("ja")).unwrap(), Some("ja"));
-        assert_eq!(told_language(&cohere, None).unwrap(), None, "the model's first");
+        assert_eq!(told_language(&cohere, None).unwrap(), None, "Automatic");
         let error = told_language(&cohere, Some("Sinhala")).unwrap_err().to_string();
         assert!(error.contains("de (German)"), "{error}");
+
+        let qwen = ChosenModel::Catalog(catalog.model("qwen3-asr-0.6b-sinhala").unwrap());
+        assert_eq!(told_language(&qwen, Some("English")).unwrap(), Some("en"));
+        assert_eq!(told_language(&qwen, Some("si")).unwrap(), Some("si"));
 
         let parakeet = ChosenModel::Catalog(catalog.model("parakeet-tdt-0.6b-v3").unwrap());
         assert_eq!(
             told_language(&parakeet, Some("de")).unwrap(),
             None,
-            "it finds the language"
+            "it can't be told one"
         );
     }
 

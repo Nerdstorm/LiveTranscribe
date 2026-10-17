@@ -218,6 +218,15 @@ impl Tokenizer {
         })
     }
 
+    /// The bytes a vocabulary token writes; `None` for an added token (`<|im_end|>`) or an id
+    /// the tokenizer doesn't know.
+    pub fn bytes_of(&self, id: u32) -> Option<&[u8]> {
+        match self.pieces.get(&id) {
+            Some(Piece::Bytes(bytes)) => Some(bytes),
+            _ => None,
+        }
+    }
+
     /// The text of `ids`. Ids the tokenizer doesn't know are skipped.
     pub fn decode(&self, ids: &[u32]) -> String {
         let mut bytes = Vec::new();
@@ -358,6 +367,15 @@ mod tests {
             .collect();
         assert_eq!(ids, expected);
         assert_eq!(tokenizer.decode(&ids), "hello world");
+    }
+
+    #[test]
+    fn a_vocabulary_token_writes_its_bytes_and_an_added_token_none() {
+        let tokenizer = tokenizer();
+        assert_eq!(tokenizer.bytes_of(id(&tokenizer, "Ġwo")), Some(&b" wo"[..]));
+        assert_eq!(tokenizer.bytes_of(id(&tokenizer, "Ċ")), Some(&b"\n"[..]));
+        assert_eq!(tokenizer.bytes_of(id(&tokenizer, "<|im_end|>")), None);
+        assert_eq!(tokenizer.bytes_of(9_999), None);
     }
 
     #[test]

@@ -3,11 +3,13 @@ import Dictation
 import Permissions
 import Shared
 import SwiftUI
+import Transcription
 import TranscriptUI
 import Updates
 
 /// The menu bar menu: dictation status and controls, stopping the live transcript, the cleanup
-/// level, the microphone, the app's windows, About and, in a release, updates.
+/// level, the speech model's language, the microphone, the app's windows, About and, in a
+/// release, updates.
 ///
 /// Made for `MenuBarExtra { MenuBarContent(context:) } label: { MenuBarLabel(context:) }` with
 /// `.menuBarExtraStyle(.menu)`, so it uses only views a menu can show. What it says and allows
@@ -17,6 +19,8 @@ public struct MenuBarContent: View {
     private static let d = AppSettings.defaults
 
     @AppStorage(AppSettingsKey.cleanupLevel.rawValue) private var cleanupLevel = d.cleanupLevel
+    @AppStorage(AppSettingsKey.sttModel.rawValue) private var speechModel = d.sttModel
+    @AppStorage(AppSettingsKey.sttLanguage.rawValue) private var speechLanguage: String?
     @AppStorage(AppSettingsKey.showVirtualInputDevices.rawValue)
     private var showOtherDevices = d.dictation.showVirtualInputDevices
     @AppStorage(AppSettingsKey.dictationHotkey.rawValue) private var dictationHotkey = d.dictation.hotkey
@@ -76,6 +80,7 @@ public struct MenuBarContent: View {
                     .tag(level)
             }
         }
+        languagePicker
         if transcript.supportsInputSelection {
             MenuMicrophoneSubmenu(transcript: transcript, showOtherDevices: $showOtherDevices)
         }
@@ -98,6 +103,32 @@ public struct MenuBarContent: View {
         }
         Button("Quit Live Transcribe") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
+    }
+
+    /// The Language setting, with the languages the chosen speech model can be told. A model
+    /// that can't be told one has Automatic alone, and the menu is greyed out.
+    private var languagePicker: some View {
+        let model = context.speechModels.catalog.model(forSetting: speechModel)
+        let menu = SpeechLanguageMenu(model: model)
+        let selection = Binding(
+            get: { menu.tag(forSetting: speechLanguage) },
+            set: { (tag: String) in
+                let code = SpeechLanguageMenu.setting(forTag: tag)
+                context.settingsStore.setSpeechLanguage(code)
+                Log.ui.info("Speech language chosen from the menu bar: \(code ?? "automatic", privacy: .public)")
+            }
+        )
+        return Picker("Language", selection: selection) {
+            Text(menu.automaticTitle).tag(SpeechLanguageMenu.automatic)
+            if menu.canChoose {
+                Divider()
+            }
+            ForEach(menu.choices) { choice in
+                Text(choice.name).tag(choice.code)
+            }
+        }
+        .disabled(!menu.canChoose)
+        .help(menu.canChoose ? "The language \(model?.name ?? "the speech model") writes" : "This speech model finds the language itself")
     }
 
     /// *Check for Updates…*, which a running check disables, or the release a scheduled check

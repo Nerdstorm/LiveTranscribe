@@ -48,9 +48,10 @@ public enum AppSettingsKey: String, CaseIterable, Sendable {
     /// The chosen microphone's Core Audio UID; absent means the system default input.
     /// Not part of ``AppSettings``: it is read at every Start rather than once at launch.
     case inputDeviceUID
-    /// The Language setting: the code of the language a speech model that is told one (Cohere
-    /// Transcribe) writes; absent means the model's first, English. The other models find the
-    /// language themselves. Not part of ``AppSettings``: it is read at every transcription.
+    /// The Language setting: the code of the language a speech model that can be told one
+    /// (Qwen3-ASR, Whisper, Cohere Transcribe) writes; absent means Automatic: the model finds
+    /// the language, or, for one that can't (Cohere Transcribe), writes English. Not part of
+    /// ``AppSettings``: it is read at every transcription.
     case sttLanguage
 }
 
@@ -213,8 +214,7 @@ public struct AppSettingsStore: Sendable {
         }
     }
 
-    /// The Language setting's code, or `nil` for each model's first
-    /// (``AppSettingsKey/sttLanguage``).
+    /// The Language setting's code, or `nil` for Automatic (``AppSettingsKey/sttLanguage``).
     public var speechLanguage: String? {
         guard let code = defaults.string(forKey: AppSettingsKey.sttLanguage.rawValue), !code.isEmpty else {
             return nil
@@ -222,8 +222,8 @@ public struct AppSettingsStore: Sendable {
         return code
     }
 
-    /// Stores the language a speech model that is told one writes, by its code; `nil` goes back
-    /// to each model's first.
+    /// Stores the language a speech model that can be told one writes, by its code; `nil` goes
+    /// back to Automatic.
     public func setSpeechLanguage(_ code: String?) {
         if let code, !code.isEmpty {
             defaults.set(code, forKey: AppSettingsKey.sttLanguage.rawValue)

@@ -202,8 +202,8 @@ The models it downloads itself, at its first start.
    and `--device CPU` keeps speech-to-text on the CPU. `livetranscribe keys` names the keys you
    press, `livetranscribe models` lists the catalog, and
    `livetranscribe transcribe --model parakeet-tdt-0.6b-v2 clip.wav` transcribes a WAV file with
-   one of its models, downloading it first (`--language de` tells Cohere Transcribe which
-   language to write).
+   one of its models, downloading it first (`--language de` tells Qwen3-ASR or Cohere
+   Transcribe which language to write; `run --language automatic` sets a saved one aside).
 
 On Windows, from source, in Git Bash: `packaging/windows/fetch-openvino.sh`,
 `cargo build --release -p lt-app`, then put OpenVINO where the installed app has it, beside the

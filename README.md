@@ -299,9 +299,11 @@ restart, each credited there with its licence. The Mac offers seven: the default
 1.7B, Parakeet TDT v2 (English) and v3 (European languages), Whisper large-v3-turbo and Cohere
 Transcribe. Linux and Windows offer four: the default, Parakeet v2 and v3 and Cohere Transcribe; the
 last three are builds that [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (k2-fsa, Apache-2.0)
-quantised to 8 bits for ONNX. Cohere Transcribe can't tell which language it hears, so its row also
-chooses which of its 14 it writes (English at first); the others find the language themselves. They
-are listed in
+quantised to 8 bits for ONNX. Qwen3-ASR, Whisper and Cohere Transcribe can be told which language to
+write, from the menu bar or tray, or from the model's row: **Automatic**, the default, lets the model
+work it out, or, for Cohere Transcribe, which can't, writes English. Parakeet always works it out.
+Qwen3-ASR takes the language as a hint, so it's also kept to that language's letters: with English
+chosen, it never writes Sinhala or Chinese. They are listed in
 [`speech-models.json`](Packages/LiveTranscribeKit/Sources/Transcription/Resources/speech-models.json),
 each pinned to a tested commit or, for sherpa-onnx archives, a SHA-256, and both apps read that
 list. **Another model** there takes, on the Mac, any Hugging Face repository that mlx-audio-swift

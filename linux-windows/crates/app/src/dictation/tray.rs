@@ -1,17 +1,18 @@
 //! The tray icon and its menu, as the Mac app's menu bar extra (MenuBarContent) has them: the
 //! status line, Start or Stop Dictation, Cancel Dictation, Copy Last Dictation, the Cleanup level,
-//! Settings and Quit. Tauri owns the main thread, the menu and the Settings window; the engine's
+//! the speech model's Language, Settings and Quit. Tauri owns the main thread, the menu and the Settings window; the engine's
 //! status arrives from its thread, and the menu's choices go back to it as messages, or as changed
 //! settings. The icon is drawn for the taskbar's light or dark mode (the desktop's, on Linux) each
 //! time it changes.
 
 use std::cell::Cell;
-use std::sync::Arc;
 use std::sync::mpsc::Sender;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use anyhow::Context;
 use lt_dictation_ui::{Blocker, MenuBarIcon, MenuBarStatus, ModelState, Theme, draw_icon};
 use lt_shared::CleanupLevel;
+use lt_transcription::catalog::SpeechModel;
 use serde_json::{Map, Value};
 use tauri::image::Image;
 use tauri::ipc::Invoke;
@@ -45,7 +46,7 @@ pub(crate) fn run(
         .invoke_handler(commands())
         .setup(move |app| {
             settings::follow_changes(app.handle(), &settings, &library);
-            let tray = Tray::build(app.handle(), messages, settings)?;
+            let tray = Tray::build(app.handle(), messages, settings, library)?;
             let handle = app.handle().clone();
             start(
                 app.handle(),
@@ -177,12 +178,18 @@ struct Tray {
     cancel: MenuItem<Wry>,
     copy: MenuItem<Wry>,
     levels: Vec<(CleanupLevel, CheckMenuItem<Wry>)>,
+    languages: Arc<Mutex<LanguageMenu>>,
     /// The icon showing, and the mode it was drawn for.
     drawn: Cell<Option<(MenuBarIcon, Theme)>>,
 }
 
 impl Tray {
-    fn build(app: &AppHandle, messages: Sender<Message>, settings: Arc<SettingsService>) -> tauri::Result<Self> {
+    fn build(
+        app: &AppHandle,
+        messages: Sender<Message>,
+        settings: Arc<SettingsService>,
+        library: Arc<SpeechModelLibrary>,
+    ) -> tauri::Result<Self> {
         let cleanup = settings.current().0.cleanup_level;
         let status = MenuItem::with_id(app, "status", "Loading speech models…", false, None::<&str>)?;
         let toggle = MenuItem::with_id(app, "toggle", "Start Dictation", false, None::<&str>)?;
@@ -205,6 +212,8 @@ impl Tray {
         let level_items: Vec<&dyn IsMenuItem<Wry>> =
             levels.iter().map(|(_, item)| item as &dyn IsMenuItem<Wry>).collect();
         let cleanup_menu = Submenu::with_id_and_items(app, "cleanup", "Cleanup", true, &level_items)?;
+        let languages = Arc::new(Mutex::new(LanguageMenu::new(app, library)?));
+        let language_menu = lock(&languages).submenu.clone();
         let open_settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
         let quit = MenuItem::with_id(app, "quit", "Quit Live Transcribe", true, None::<&str>)?;
         let menu = Menu::with_items(
@@ -217,12 +226,14 @@ impl Tray {
                 &copy,
                 &PredefinedMenuItem::separator(app)?,
                 &cleanup_menu,
+                &language_menu,
                 &open_settings,
                 &PredefinedMenuItem::separator(app)?,
                 &quit,
             ],
         )?;
         let choices = levels.clone();
+        let chosen_languages = Arc::clone(&languages);
         let theme = Theme::detect_taskbar();
         let icon = TrayIconBuilder::with_id("live-transcribe")
             .icon(icon_image(MenuBarIcon::Loading, theme))
@@ -247,6 +258,8 @@ impl Tray {
                     id => {
                         if let Some((level, _)) = choices.iter().find(|(level, _)| id == cleanup_id(*level)) {
                             choose_cleanup(&settings, &choices, *level);
+                        } else if let Some(language) = LanguageMenu::setting_of(id) {
+                            choose_language(&settings, &chosen_languages, language);
                         }
                         None
                     }
@@ -263,6 +276,7 @@ impl Tray {
             cancel,
             copy,
             levels,
+            languages,
             drawn: Cell::new(Some((MenuBarIcon::Loading, theme))),
         })
     }
@@ -295,6 +309,7 @@ impl Tray {
                 .iter()
                 .map(|(level, item)| item.set_checked(*level == status.cleanup)),
         );
+        results.push(lock(&self.languages).show(status.model_id.as_deref(), status.language.as_deref()));
         for error in results.into_iter().filter_map(Result::err) {
             tracing::warn!("Couldn't update the tray: {error}");
         }
@@ -324,8 +339,148 @@ fn cleanup_id(level: CleanupLevel) -> String {
     format!("cleanup-{}", level.as_str())
 }
 
+/// The Language submenu, as the Mac's menu bar has it: Automatic, then the languages the speech
+/// model in use can be told. It's drawn again when the model changes, and greyed out with
+/// Automatic alone for a model that can't be told one (Parakeet) or isn't in the catalog.
+struct LanguageMenu {
+    app: AppHandle,
+    library: Arc<SpeechModelLibrary>,
+    submenu: Submenu<Wry>,
+    separator: PredefinedMenuItem<Wry>,
+    /// The catalog model it was drawn for (`None` for no model, or one outside the catalog);
+    /// `None` until it's drawn.
+    drawn_for: Option<Option<String>>,
+    /// Automatic (`None`), then each language by its code, with its item, as the menu lists them.
+    items: Vec<(Option<String>, CheckMenuItem<Wry>)>,
+}
+
+impl LanguageMenu {
+    const AUTOMATIC: &'static str = "language-automatic";
+
+    fn new(app: &AppHandle, library: Arc<SpeechModelLibrary>) -> tauri::Result<Self> {
+        Ok(Self {
+            app: app.clone(),
+            library,
+            submenu: Submenu::with_id(app, "language", "Language", false)?,
+            separator: PredefinedMenuItem::separator(app)?,
+            drawn_for: None,
+            items: Vec::new(),
+        })
+    }
+
+    /// The Language setting an item's id stands for: `Some(None)` for Automatic, and `None` for
+    /// an id that isn't a language's.
+    fn setting_of(id: &str) -> Option<Option<String>> {
+        if id == Self::AUTOMATIC {
+            return Some(None);
+        }
+        id.strip_prefix("language-").map(|code| Some(code.to_owned()))
+    }
+
+    fn id(code: &str) -> String {
+        format!("language-{code}")
+    }
+
+    /// Lists the languages of the model `model_id` names, drawing the menu again if it was
+    /// drawn for another, and ticks the setting's, or Automatic.
+    fn show(&mut self, model_id: Option<&str>, setting: Option<&str>) -> tauri::Result<()> {
+        if self.drawn_for.as_ref().map(Option::as_deref) != Some(model_id) {
+            self.draw(model_id)?;
+        }
+        self.tick(setting)
+    }
+
+    /// Ticks the setting's language if the menu has it, and otherwise Automatic.
+    fn tick(&self, setting: Option<&str>) -> tauri::Result<()> {
+        let listed = setting.filter(|code| self.items.iter().any(|(item, _)| item.as_deref() == Some(*code)));
+        for (code, item) in &self.items {
+            item.set_checked(code.as_deref() == listed)?;
+        }
+        Ok(())
+    }
+
+    fn draw(&mut self, model_id: Option<&str>) -> tauri::Result<()> {
+        let had_languages = self.items.len() > 1;
+        for (_, item) in self.items.drain(..) {
+            self.submenu.remove(&item)?;
+        }
+        if had_languages {
+            self.submenu.remove(&self.separator)?;
+        }
+        let model = model_id.and_then(|id| self.library.catalog().model(id));
+        let choices = model.map(|model| model.language_choices.as_slice()).unwrap_or_default();
+        let automatic = match model.and_then(SpeechModel::automatic_choice) {
+            Some(choice) => format!("Automatic ({})", choice.name),
+            None => "Automatic".to_owned(),
+        };
+        let mut items = vec![(
+            None,
+            CheckMenuItem::with_id(&self.app, Self::AUTOMATIC, automatic, true, false, None::<&str>)?,
+        )];
+        for choice in choices {
+            let item = CheckMenuItem::with_id(
+                &self.app,
+                Self::id(&choice.code),
+                &choice.name,
+                true,
+                false,
+                None::<&str>,
+            )?;
+            items.push((Some(choice.code.clone()), item));
+        }
+        for (index, (_, item)) in items.iter().enumerate() {
+            self.submenu.append(item)?;
+            if index == 0 && !choices.is_empty() {
+                self.submenu.append(&self.separator)?;
+            }
+        }
+        self.submenu.set_enabled(!choices.is_empty())?;
+        self.items = items;
+        self.drawn_for = Some(model_id.map(str::to_owned));
+        Ok(())
+    }
+}
+
+/// Saves the language chosen in the menu (`None` for Automatic), which tells dictation and the
+/// Settings window.
+fn choose_language(settings: &SettingsService, menu: &Mutex<LanguageMenu>, chosen: Option<String>) {
+    let mut change = Map::new();
+    change.insert("sttLanguage".to_owned(), chosen.map_or(Value::Null, Value::from));
+    let language = match settings.change(&change) {
+        Ok(settings) => settings.stt_language,
+        Err(error) => {
+            tracing::error!("Couldn't change the language: {error}");
+            settings.current().0.stt_language
+        }
+    };
+    // Each item ticks itself when chosen, and unticks when chosen again; the menu reads as one
+    // choice once the rest follow.
+    if let Err(error) = lock(menu).tick(language.as_deref()) {
+        tracing::warn!("Couldn't update the Language menu: {error}");
+    }
+}
+
+fn lock(menu: &Mutex<LanguageMenu>) -> std::sync::MutexGuard<'_, LanguageMenu> {
+    menu.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
 /// `icon` for the taskbar's light or dark mode.
 fn icon_image(icon: MenuBarIcon, theme: Theme) -> Image<'static> {
     let image = draw_icon(icon, theme, ICON_SIZE);
     Image::new_owned(image.rgba, image.width, image.height)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_language_items_id_is_the_setting_it_stands_for() {
+        assert_eq!(LanguageMenu::setting_of(LanguageMenu::AUTOMATIC), Some(None));
+        assert_eq!(
+            LanguageMenu::setting_of(&LanguageMenu::id("en")),
+            Some(Some("en".to_owned()))
+        );
+        assert_eq!(LanguageMenu::setting_of("cleanup-standard"), None);
+    }
 }

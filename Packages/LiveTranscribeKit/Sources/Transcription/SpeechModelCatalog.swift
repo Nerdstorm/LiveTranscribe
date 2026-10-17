@@ -8,9 +8,11 @@ import Shared
 /// of its Hugging Face repository: every copy of a release downloads the files it was tested
 /// with, and moving a pin is a change like any other. The Linux and Windows app reads the same
 /// file, so a model is named, described and credited alike everywhere; each platform has its own
-/// download in it, and a model without the Mac's is left out here. A model that is told which
-/// language to write, where others find it, lists the languages it can be told
-/// (`language_choices`), for the Language setting.
+/// download in it, and a model without the Mac's is left out here. A model that can be told which
+/// language to write lists the languages it takes (`language_choices`), for the Language
+/// setting; one that can't find the language itself names the one Automatic tells it
+/// (`automatic_language`). Qwen3-ASR's languages name their letters too (`script`), which its
+/// transcription is locked to (``ScriptLock``).
 public struct SpeechModelCatalog: Sendable {
     /// One model: what Settings shows about it, and where the Mac downloads it from.
     public struct Model: Decodable, Identifiable, Equatable, Sendable {
@@ -24,26 +26,44 @@ public struct SpeechModelCatalog: Sendable {
         public let licence: String
         /// Who made it, credited as its licence asks.
         public let credit: String
-        /// The languages it can be told to write, its default first; empty for a model that
-        /// finds the language itself.
+        /// The languages it can be told to write, in the order Settings lists them; empty for a
+        /// model that can't be told one (Parakeet), which finds the language itself.
         public let languageChoices: [LanguageChoice]
+        /// The code of the language Automatic tells it, for a model that can't find the language
+        /// itself (Cohere Transcribe); `nil` for one that finds it.
+        public let automaticLanguage: String?
         /// The Mac's download.
         public let mac: Download
 
-        /// The language to tell it to write, for the Language setting (a code): the setting's,
-        /// if it's one of the model's, and otherwise its first. `nil` for a model that isn't
-        /// told one.
+        /// The language Automatic tells it, if it can't find the language itself.
+        public var automaticChoice: LanguageChoice? {
+            languageChoices.first { $0.code == automaticLanguage }
+        }
+
+        /// The language to tell it to write, for the Language setting (a code, `nil` for
+        /// Automatic): the setting's, if it's one of the model's, and otherwise Automatic's,
+        /// which is `nil` for a model that finds the language itself.
         public func language(forSetting setting: String?) -> LanguageChoice? {
-            languageChoices.first { $0.code == setting } ?? languageChoices.first
+            languageChoices.first { $0.code == setting } ?? automaticChoice
+        }
+
+        /// How the model is told `choice`: Qwen3-ASR by the name its prompt takes ("language
+        /// English"), and the others by the code.
+        public func told(_ choice: LanguageChoice) -> String {
+            mac.kind == "qwen3_asr" ? choice.name : choice.code
         }
     }
 
     /// A language a model can be told to write.
     public struct LanguageChoice: Decodable, Hashable, Identifiable, Sendable {
-        /// Its ISO 639-1 code, as the model is told it: `en`, `de`.
+        /// Its ISO 639 code: `en`, `de`, `fil`. One setting holds it for every model, so a
+        /// language has the same code in each.
         public let code: String
         /// Its name in English, as Settings shows it.
         public let name: String
+        /// The letters it's written in, for a model whose letters are locked to the language it's
+        /// told (Qwen3-ASR, ``ScriptLock``); `nil` for one whose aren't.
+        public let script: WritingScript?
 
         public var id: String { code }
     }
@@ -130,18 +150,20 @@ public struct SpeechModelCatalog: Sendable {
         let licence: String
         let credit: String
         let languageChoices: [LanguageChoice]?
+        let automaticLanguage: String?
         let mac: Download?
 
         private enum CodingKeys: String, CodingKey {
             case id, name, summary, languages, licence, credit, mac
             case languageChoices = "language_choices"
+            case automaticLanguage = "automatic_language"
         }
 
         var model: Model? {
             mac.map {
                 Model(
                     id: id, name: name, summary: summary, languages: languages, licence: licence, credit: credit,
-                    languageChoices: languageChoices ?? [], mac: $0
+                    languageChoices: languageChoices ?? [], automaticLanguage: automaticLanguage, mac: $0
                 )
             }
         }

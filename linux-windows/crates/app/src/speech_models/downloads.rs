@@ -340,7 +340,9 @@ pub(crate) mod tests {
             language_choices: vec![LanguageChoice {
                 code: "en".to_owned(),
                 name: "English".to_owned(),
+                script: None,
             }],
+            automatic_language: Some("en".to_owned()),
             engine: Engine::SherpaOnnx {
                 family: Family::CohereTranscribe,
                 archive: Archive {

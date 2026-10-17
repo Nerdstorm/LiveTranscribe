@@ -14,11 +14,14 @@
 //! - [`catalog`] mirrors SpeechModelCatalog.swift: the models the app offers to download, read
 //!   from the catalog the Mac app has too, and the check of a model's files before it opens.
 //! - [`speech_to_text`] opens a model with whichever of the two runs it.
+//! - [`script_lock`] mirrors ScriptLock.swift: the letters Qwen3-ASR may write once it's told a
+//!   language.
 //!
 //! Transcripts are never logged: log lines carry counts only.
 
 pub mod catalog;
 pub mod output_limit;
 pub mod qwen3_asr;
+pub mod script_lock;
 pub mod sherpa;
 pub mod speech_to_text;

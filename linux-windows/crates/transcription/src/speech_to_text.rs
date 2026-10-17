@@ -4,7 +4,7 @@
 use std::fmt;
 use std::path::Path;
 
-use crate::catalog::{Engine, VerifiedModel};
+use crate::catalog::{Engine, LanguageChoice, VerifiedModel, chosen_language};
 use crate::qwen3_asr::{self, DeviceChoice, OpenVinoModel, Transcriber, open_transcriber};
 use crate::sherpa::{self, SherpaTranscriber};
 
@@ -20,7 +20,11 @@ pub struct Transcript {
 
 /// A loaded model.
 pub enum SpeechToText {
-    Qwen3Asr(Box<Transcriber<OpenVinoModel>>),
+    Qwen3Asr {
+        transcriber: Box<Transcriber<OpenVinoModel>>,
+        /// The languages it can be told, from the catalog; none for a model outside it.
+        languages: Vec<LanguageChoice>,
+    },
     SherpaOnnx(SherpaTranscriber),
 }
 
@@ -65,12 +69,15 @@ impl SpeechToText {
     /// keeps compiled models) are for the OpenVINO models; sherpa-onnx runs on the CPU.
     pub fn open(model: &VerifiedModel<'_>, device: &DeviceChoice, cache: Option<&Path>) -> Result<Self, OpenError> {
         match &model.model().engine {
-            Engine::OpenVino { .. } => Self::open_converted(model.folder(), device, cache),
+            Engine::OpenVino { .. } => {
+                Self::open_qwen3_asr(model.folder(), device, cache, &model.model().language_choices)
+            }
             Engine::SherpaOnnx { family, .. } => SherpaTranscriber::open(
                 model.folder(),
                 *family,
                 &model.model().files,
                 &model.model().language_choices,
+                model.model().automatic_language.as_deref(),
                 sherpa::default_threads(),
             )
             .map(Self::SherpaOnnx)
@@ -78,26 +85,49 @@ impl SpeechToText {
         }
     }
 
-    /// Opens the Qwen3-ASR model the setup kit converted into `folder`, a catalog one or another.
+    /// Opens a Qwen3-ASR model the setup kit converted into `folder`, outside the catalog. It
+    /// isn't told a language.
     pub fn open_converted(folder: &Path, device: &DeviceChoice, cache: Option<&Path>) -> Result<Self, OpenError> {
+        Self::open_qwen3_asr(folder, device, cache, &[])
+    }
+
+    fn open_qwen3_asr(
+        folder: &Path,
+        device: &DeviceChoice,
+        cache: Option<&Path>,
+        languages: &[LanguageChoice],
+    ) -> Result<Self, OpenError> {
         open_transcriber(folder, device, cache)
-            .map(|transcriber| Self::Qwen3Asr(Box::new(transcriber)))
+            .map(|transcriber| Self::Qwen3Asr {
+                transcriber: Box::new(transcriber),
+                languages: languages.to_vec(),
+            })
             .map_err(OpenError::Qwen3Asr)
     }
 
     /// The transcript of `samples`, 16 kHz mono. `language` is the Language setting
-    /// (`sttLanguage`, a code): a model told which language to write, Cohere Transcribe, writes
-    /// it if it's one of its languages, and otherwise its first; the others find the language.
+    /// (`sttLanguage`, a code, `None` for Automatic): a model that can be told which language to
+    /// write writes it if it's one of its languages, and otherwise Automatic's: Qwen3-ASR finds
+    /// the language, and Cohere Transcribe writes English. Parakeet always finds it. Qwen3-ASR
+    /// takes the language as a hint, so it's also kept to the language's letters
+    /// ([`crate::script_lock`]).
     pub fn transcribe(&mut self, samples: &[f32], language: Option<&str>) -> Result<Transcript, TranscribeError> {
         match self {
-            Self::Qwen3Asr(transcriber) => transcriber
-                .transcribe(samples)
-                .map(|transcription| Transcript {
-                    text: transcription.text,
-                    language: transcription.language,
-                    tokens: transcription.tokens,
-                })
-                .map_err(TranscribeError::Qwen3Asr),
+            Self::Qwen3Asr { transcriber, languages } => {
+                let choice = chosen_language(languages, None, language);
+                transcriber
+                    .transcribe(
+                        samples,
+                        choice.map(|choice| choice.name.as_str()),
+                        choice.and_then(|choice| choice.script),
+                    )
+                    .map(|transcription| Transcript {
+                        text: transcription.text,
+                        language: transcription.language,
+                        tokens: transcription.tokens,
+                    })
+                    .map_err(TranscribeError::Qwen3Asr)
+            }
             Self::SherpaOnnx(transcriber) => transcriber
                 .transcribe(samples, language)
                 .map(|transcript| Transcript {
@@ -112,7 +142,7 @@ impl SpeechToText {
     /// Where the model's passes run, as the terminal and Settings say it.
     pub fn placement(&self) -> String {
         match self {
-            Self::Qwen3Asr(transcriber) => transcriber.model().placement(),
+            Self::Qwen3Asr { transcriber, .. } => transcriber.model().placement(),
             Self::SherpaOnnx(transcriber) => format!("CPU, {} threads (sherpa-onnx)", transcriber.threads()),
         }
     }

@@ -98,6 +98,8 @@ pub(crate) struct DictationStatus {
     pub(crate) hotkey: Option<String>,
     pub(crate) has_last_dictation: bool,
     pub(crate) cleanup: CleanupLevel,
+    /// The Language setting, a code; `None` for Automatic.
+    pub(crate) language: Option<String>,
     /// Cleanup's language model: `None` while it's turned off in Settings › Advanced.
     pub(crate) cleanup_model: Option<CleanupModelStatus>,
     /// Why dictation can't start at all; the engine never runs then.
@@ -400,7 +402,7 @@ impl Running {
                 .and_then(|code| catalog.language_named(code))
             {
                 Some(choice) => eprintln!("Language: {}", choice.name),
-                None => eprintln!("Language: the speech model's default"),
+                None => eprintln!("Language: Automatic"),
             }
         }
         if cancel && self.controller.is_recording() {
@@ -562,6 +564,7 @@ impl Running {
             hotkey: self.settings.dictation_enabled.then(|| self.hotkey_name.clone()),
             has_last_dictation: self.controller.last_text().is_some(),
             cleanup: self.controller.cleanup_level(),
+            language: self.settings.stt_language.clone(),
             cleanup_model: self.cleanup.status(),
             blocker: None,
         };

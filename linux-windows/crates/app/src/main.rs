@@ -46,8 +46,9 @@ struct ModelOptions {
     /// can't run), or only on one OpenVINO device: CPU, GPU or NPU. The other models run on the CPU
     #[arg(long, default_value = "auto", value_name = "DEVICE")]
     device: DeviceChoice,
-    /// The language Cohere Transcribe writes, by its code or name, such as de or German; the
-    /// other models find the language themselves [default: English]
+    /// The language the speech model writes, by its code or name, such as en or English, for
+    /// Qwen3-ASR and Cohere Transcribe [default: Automatic: the model finds it, and Cohere
+    /// Transcribe writes English]
     #[arg(long, value_name = "LANGUAGE")]
     language: Option<String>,
 }
